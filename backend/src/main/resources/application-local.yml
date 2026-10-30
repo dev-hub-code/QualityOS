@@ -1,0 +1,17 @@
+# Local development defaults only. Real environments set these through the prod profile's environment.
+DB_URL: jdbc:postgresql://localhost:5432/qualityos
+DB_APP_USER: qualityos_app
+DB_APP_PASSWORD: qualityos_app_local
+DB_MIGRATION_USER: qualityos_migrator
+DB_MIGRATION_PASSWORD: qualityos_migrator_local
+
+management:
+  endpoint:
+    health:
+      show-details: always
+
+qualityos:
+  security:
+    jwt:
+      # Generates a throwaway key pair at startup, so local logins end when the backend restarts.
+      allow-ephemeral-keys: true

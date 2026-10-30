@@ -1,0 +1,77 @@
+package com.qualityos.identity.controller;
+
+import com.qualityos.common.response.ApiResponse;
+import com.qualityos.identity.dto.AuthDtos.ChangePasswordRequest;
+import com.qualityos.identity.dto.AuthDtos.LoginRequest;
+import com.qualityos.identity.dto.AuthDtos.MeResponse;
+import com.qualityos.identity.dto.AuthDtos.RefreshRequest;
+import com.qualityos.identity.dto.AuthDtos.RegisterRequest;
+import com.qualityos.identity.dto.AuthDtos.SwitchTenantRequest;
+import com.qualityos.identity.dto.AuthDtos.TokenResponse;
+import com.qualityos.identity.service.AuthService;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.util.Set;
+import java.util.TreeSet;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/v1/auth")
+@Tag(name = "Authentication")
+public class AuthController {
+
+    private final AuthService auth;
+
+    AuthController(AuthService auth) {
+        this.auth = auth;
+    }
+
+    @PostMapping("/register")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<TokenResponse> register(@Valid @RequestBody RegisterRequest request) {
+        return ApiResponse.ok(auth.register(request));
+    }
+
+    @PostMapping("/login")
+    public ApiResponse<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
+        return ApiResponse.ok(auth.login(request));
+    }
+
+    @PostMapping("/refresh")
+    public ApiResponse<TokenResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+        return ApiResponse.ok(auth.refresh(request.refreshToken()));
+    }
+
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(@Valid @RequestBody RefreshRequest request) {
+        auth.logout(request.refreshToken());
+    }
+
+    @PostMapping("/switch-tenant")
+    public ApiResponse<TokenResponse> switchTenant(@Valid @RequestBody SwitchTenantRequest request) {
+        return ApiResponse.ok(auth.switchTenant(request.tenantId(), request.refreshToken()));
+    }
+
+    @PostMapping("/change-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        auth.changePassword(request);
+    }
+
+    @GetMapping("/me")
+    public ApiResponse<MeResponse> me(Authentication authentication) {
+        Set<String> permissions = new TreeSet<>(authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .toList());
+        return ApiResponse.ok(auth.me(permissions));
+    }
+}

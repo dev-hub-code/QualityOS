@@ -130,6 +130,28 @@ class SubscriptionIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void theWebsiteReadsLivePricesWithoutSigningIn() throws Exception {
+        mvc.perform(get("/api/v1/public/plans"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].code").value("STARTER"))
+                .andExpect(jsonPath("$.data[0].monthlyPrice").isNumber())
+                .andExpect(jsonPath("$.data[3].monthlyPrice").isEmpty())
+                .andExpect(jsonPath("$.data[0].id").doesNotExist())
+                .andExpect(jsonPath("$.data[0].graceDays").doesNotExist());
+    }
+
+    @Test
+    void aPlanNoLongerOfferedLeavesTheWebsite() throws Exception {
+        asDatabaseSuperuser().update("UPDATE subscription_plans SET active = FALSE WHERE code = 'GROWTH'");
+        try {
+            mvc.perform(get("/api/v1/public/plans"))
+                    .andExpect(jsonPath("$.data[?(@.code == 'GROWTH')]").isEmpty());
+        } finally {
+            asDatabaseSuperuser().update("UPDATE subscription_plans SET active = TRUE WHERE code = 'GROWTH'");
+        }
+    }
+
+    @Test
     void aMemberCannotReachThePlatformConsole() throws Exception {
         as(owner, get(PLATFORM + "/plans")).andExpect(status().isForbidden());
         as(owner, get(PLATFORM + "/organisations")).andExpect(status().isForbidden());

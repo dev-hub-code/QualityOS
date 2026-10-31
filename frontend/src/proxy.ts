@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { REFRESH_COOKIE } from "@/lib/bff";
 
 const PUBLIC_PAGES = [
+  "/",
   "/login",
   "/register",
   "/status",

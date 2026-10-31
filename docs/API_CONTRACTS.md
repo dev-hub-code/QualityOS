@@ -192,6 +192,9 @@ Reading `/api/v1/subscription` needs only membership. Everything else here needs
 | POST | `/api/v1/subscription/cancel`, `/resume` | Cancelling runs to the end of the period |
 | GET | `/api/v1/subscription/invoices`, `/invoices/{id}/pdf`, `/payments` | Billing history |
 
+`GET /api/v1/public/plans` needs no sign-in. It serves the website's price list: plans on offer, without ids, tax or
+grace settings.
+
 ## Platform administration
 
 All need `PLATFORM_ADMIN`, which only a row in `platform_admins` gives. The tenant id in these paths is an operator's

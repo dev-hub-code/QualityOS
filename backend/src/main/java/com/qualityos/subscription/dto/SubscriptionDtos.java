@@ -39,6 +39,18 @@ public final class SubscriptionDtos {
             long version) {
     }
 
+    public record PublicPlan(
+            String code,
+            String name,
+            String description,
+            BigDecimal monthlyPrice,
+            BigDecimal annualPrice,
+            Integer maxUsers,
+            Integer maxFacilities,
+            List<String> features,
+            int trialDays) {
+    }
+
     public record SavePlanRequest(
             @NotBlank @Size(max = 100) String name,
             @NotBlank @Size(max = 300) String description,

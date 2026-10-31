@@ -78,8 +78,7 @@ class TenantIsolationIT extends AbstractIntegrationTest {
                         .content(json.writeValueAsString(Map.of("name", "X", "permissions", List.of("NCR_VIEW")))))
                 .andExpect(status().isNotFound());
         as(tenantB, delete("/api/v1/roles/" + roleId)).andExpect(status().isNotFound());
-        as(tenantB, postJson("/api/v1/users", Map.of(
-                        "email", uniqueEmail(), "fullName", "X", "initialPassword", PASSWORD, "roleIds", List.of(roleId))))
+        as(tenantB, postJson("/api/v1/invitations", Map.of("email", uniqueEmail(), "roleIds", List.of(roleId))))
                 .andExpect(status().isUnprocessableContent());
     }
 
@@ -121,9 +120,7 @@ class TenantIsolationIT extends AbstractIntegrationTest {
 
     @Test
     void switchingBetweenOwnOrganizationsScopesData() throws Exception {
-        as(tenantA, postJson("/api/v1/users", Map.of(
-                        "email", tenantB.email(), "fullName", "X", "roleIds", List.of(roleId(tenantA, "VIEWER")))))
-                .andExpect(status().isCreated());
+        addExistingAccount(tenantA, tenantB, "VIEWER");
 
         String body = as(tenantB, postJson("/api/v1/auth/switch-tenant", Map.of(
                         "tenantId", tenantA.tenantId(), "refreshToken", tenantB.refreshToken())))
@@ -138,9 +135,7 @@ class TenantIsolationIT extends AbstractIntegrationTest {
 
     @Test
     void tokenForAnOrganizationTheUserLeftStopsWorking() throws Exception {
-        as(tenantA, postJson("/api/v1/users", Map.of(
-                        "email", tenantB.email(), "fullName", "X", "roleIds", List.of(roleId(tenantA, "VIEWER")))))
-                .andExpect(status().isCreated());
+        addExistingAccount(tenantA, tenantB, "VIEWER");
         String body = as(tenantB, postJson("/api/v1/auth/switch-tenant", Map.of(
                         "tenantId", tenantA.tenantId(), "refreshToken", tenantB.refreshToken())))
                 .andReturn().getResponse().getContentAsString();
@@ -198,6 +193,44 @@ class TenantIsolationIT extends AbstractIntegrationTest {
                 .andExpect(status().isNotFound());
         as(tenantB, postJson("/api/v1/purchase-orders", helper.order(ownSupplier, ownFacility, foreignMaterial)))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void invitationsAreInvisibleAcrossTenants() throws Exception {
+        String email = uniqueEmail();
+        invite(tenantA, email, "VIEWER");
+        String id = JsonPath.read(as(tenantA, get("/api/v1/invitations")).andReturn().getResponse().getContentAsString(),
+                "$.data[0].id");
+
+        as(tenantB, get("/api/v1/invitations")).andExpect(jsonPath("$.data.length()").value(0));
+        as(tenantB, postJson("/api/v1/invitations/" + id + "/revoke", Map.of())).andExpect(status().isNotFound());
+        as(tenantB, postJson("/api/v1/invitations/" + id + "/resend", Map.of())).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void anInvitationTokenOnlyWorksUnderItsOwnTenant() throws Exception {
+        String token = invite(tenantA, uniqueEmail(), "VIEWER");
+        String forged = tenantB.tenantId() + token.substring(token.indexOf('.'));
+
+        mvc.perform(postJson("/api/v1/auth/invitations/preview", Map.of("token", forged)))
+                .andExpect(status().isUnprocessableContent());
+        mvc.perform(postJson("/api/v1/auth/invitations/accept", Map.of(
+                        "token", forged, "fullName", "X", "password", PASSWORD)))
+                .andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void notificationsAndPreferencesAreHeldBackByRowLevelSecurity() throws Exception {
+        UUID id = UUID.randomUUID();
+        asAppRole(tenantA.tenantId(), statement -> statement.update(
+                "INSERT INTO notifications (id, tenant_id, user_id, type, title, body, email_status) "
+                        + "VALUES (?, ?, ?, 'INSPECTION_SENT_BACK', 'T', 'B', 'PENDING')",
+                id, tenantA.tenantId(), tenantA.userId()));
+
+        as(tenantB, get("/api/v1/notifications")).andExpect(jsonPath("$.data.totalItems").value(0));
+        as(tenantB, postJson("/api/v1/notifications/" + id + "/read", Map.of())).andExpect(status().isNotFound());
+        asAppRole(tenantB.tenantId(), statement -> assertThat(statement.queryForObject(
+                "SELECT count(*) FROM notifications WHERE id = ?", Long.class, id)).isZero());
     }
 
     @Test

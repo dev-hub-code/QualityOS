@@ -45,6 +45,11 @@ export default function LoginPage() {
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? "Signing in…" : "Sign in"}
       </Button>
+      <p className="text-sm">
+        <Link href="/forgot-password" className="underline">
+          Forgot your password?
+        </Link>
+      </p>
       <p className="text-sm text-muted-foreground">
         New to QualityOS?{" "}
         <Link href="/register" className="text-primary underline underline-offset-4">

@@ -97,3 +97,17 @@ erDiagram
 Phase 3 note: supplier, material, product and receipt documents all live in `attachments`, linked by
 `entity_type` and `entity_id`, so there is no `supplier_documents` table. `tenant_settings` moved to Phase 9.
 Quantities, measurements and prices use `NUMERIC(18,6)`, and the API refuses values that would need rounding.
+
+## Phase 5: notifications and account email (V5)
+
+`notifications` (one row per recipient, with email delivery state and retry time), `notification_preferences`
+(only where a user has changed a default), `invitations` (with the roles to grant) are tenant-owned and under
+row-level security. `account_tokens` holds one-time password reset and email verification tokens; like
+`refresh_tokens` it belongs to a user, not a tenant. `users.email_verified_at` is new.
+
+- Every token is stored only as a SHA-256 hash.
+- An invitation token carries its tenant id so that it can be looked up under that tenant's row-level security. The id
+  grants nothing, because the hash must also be found in that tenant.
+- `tenants_with_pending_email()` is `SECURITY DEFINER` and is the only cross-tenant read in the application. It returns
+  tenant ids and nothing else. The `delivery_scan` policy that lets it see rows applies to the schema owner, never to
+  the application role. The delivery job then reads each tenant's rows under that tenant's own context.

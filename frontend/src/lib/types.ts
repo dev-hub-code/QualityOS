@@ -4,7 +4,7 @@ export interface OrganizationSummary {
 }
 
 export interface Me {
-  user: { id: string; email: string; fullName: string };
+  user: { id: string; email: string; fullName: string; emailVerified: boolean };
   tenantId: string;
   onboarded: boolean;
   permissions: string[];
@@ -385,4 +385,32 @@ export interface Inspection {
   };
   results: InspectionResult[];
   decisions: InspectionDecision[];
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  expiresAt: string;
+  expired: boolean;
+}
+
+export interface InvitationPreview {
+  organizationName: string;
+  email: string;
+  existingAccount: boolean;
+}
+
+export interface AppNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  link: string | null;
+  createdAt: string;
+  read: boolean;
+}
+
+export interface NotificationPreference {
+  type: string;
+  emailEnabled: boolean;
 }

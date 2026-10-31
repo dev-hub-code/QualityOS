@@ -53,6 +53,7 @@ public class AuthService {
     private final TenantAccessService access;
     private final OrganizationProvisioningService provisioning;
     private final OrganizationService organizations;
+    private final AccountEmailService accountEmails;
     private final AccessTokenIssuer accessTokens;
     private final PasswordEncoder passwordEncoder;
     private final AuditService audit;
@@ -66,6 +67,7 @@ public class AuthService {
             TenantAccessService access,
             OrganizationProvisioningService provisioning,
             OrganizationService organizations,
+            AccountEmailService accountEmails,
             AccessTokenIssuer accessTokens,
             PasswordEncoder passwordEncoder,
             AuditService audit,
@@ -76,6 +78,7 @@ public class AuthService {
         this.access = access;
         this.provisioning = provisioning;
         this.organizations = organizations;
+        this.accountEmails = accountEmails;
         this.accessTokens = accessTokens;
         this.passwordEncoder = passwordEncoder;
         this.audit = audit;
@@ -101,6 +104,7 @@ public class AuthService {
             users.saveAndFlush(user);
             provisioning.provision(tenantId, user.getId(), request.organizationName().trim());
             audit.record("USER_REGISTERED", "User", user.getId());
+            accountEmails.sendVerification(user);
             return issueSession(user.getId(), tenantId);
         }));
     }
@@ -114,14 +118,7 @@ public class AuthService {
             throw invalidCredentials();
         }
         User user = found.get();
-        boolean passwordMatches = passwordEncoder.matches(request.password(), user.getPasswordHash());
-        boolean locked = user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now());
-        if (locked || !passwordMatches || user.getStatus() != User.Status.ACTIVE) {
-            if (!locked && !passwordMatches) {
-                recordFailedLogin(user.getId());
-            }
-            throw invalidCredentials();
-        }
+        requirePassword(user, request.password());
 
         UUID tenantId = chooseTenant(user.getId(), request.tenantId());
         return TenantContext.callAs(tenantId, user.getId(), () -> tx.execute(status -> {
@@ -132,6 +129,18 @@ public class AuthService {
             audit.record("USER_LOGGED_IN", "User", user.getId());
             return issueSession(user.getId(), tenantId);
         }));
+    }
+
+    /** Must run with no open transaction. Applies the same lockout rules wherever a password is presented. */
+    void requirePassword(User user, String password) {
+        boolean passwordMatches = passwordEncoder.matches(password, user.getPasswordHash());
+        boolean locked = user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now());
+        if (locked || !passwordMatches || user.getStatus() != User.Status.ACTIVE) {
+            if (!locked && !passwordMatches) {
+                recordFailedLogin(user.getId());
+            }
+            throw invalidCredentials();
+        }
     }
 
     public TokenResponse refresh(String presentedToken) {
@@ -220,7 +229,7 @@ public class AuthService {
         User user = tx.execute(status -> users.findById(userId).orElseThrow());
         List<OrganizationSummary> memberOf = access.organizationsOf(userId);
         return new MeResponse(
-                new UserSummary(user.getId(), user.getEmail(), user.getFullName()),
+                new UserSummary(user.getId(), user.getEmail(), user.getFullName(), user.getEmailVerifiedAt() != null),
                 tenantId,
                 organizations.getCurrent().onboarded(),
                 permissions,
@@ -254,7 +263,7 @@ public class AuthService {
         }));
     }
 
-    private TokenResponse issueSession(UUID userId, UUID tenantId) {
+    TokenResponse issueSession(UUID userId, UUID tenantId) {
         String refreshToken = RefreshTokens.generate();
         refreshTokens.save(newToken(userId, tenantId, UuidV7.generate(), refreshToken));
         return new TokenResponse(

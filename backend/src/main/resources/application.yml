@@ -27,6 +27,15 @@ spring:
         jdbc:
           time_zone: UTC
           batch_size: 50
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
   lifecycle:
     timeout-per-shutdown-phase: 20s
   servlet:
@@ -40,9 +49,16 @@ server:
   forward-headers-strategy: native
 
 qualityos:
+  # The address users reach the web application on, used for links in emails.
+  app-url: ${APP_URL:http://localhost:3000}
+  mail:
+    from: ${MAIL_FROM:QualityOS <no-reply@qualityos.local>}
+  jobs:
+    enabled: ${JOBS_ENABLED:true}
   storage:
     local-root: ${STORAGE_LOCAL_ROOT}
   security:
+    auth-rate-limit-per-minute: ${AUTH_RATE_LIMIT_PER_MINUTE:30}
     jwt:
       issuer: qualityos
       audience: qualityos-api
@@ -52,6 +68,10 @@ qualityos:
       public-key: ${JWT_PUBLIC_KEY:}
 
 management:
+  health:
+    # Readiness must not depend on a mail server: mail is retried, and sign-in works without it.
+    mail:
+      enabled: false
   endpoints:
     web:
       exposure:

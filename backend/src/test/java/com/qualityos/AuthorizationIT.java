@@ -107,9 +107,7 @@ class AuthorizationIT extends AbstractIntegrationTest {
         Session first = register();
         Session second = register();
 
-        as(second, postJson("/api/v1/users", Map.of(
-                        "email", first.email(), "fullName", "Ignored", "roleIds", List.of(roleId(second, "VIEWER")))))
-                .andExpect(status().isCreated());
+        addExistingAccount(second, first, "VIEWER");
 
         as(first, get("/api/v1/organizations"))
                 .andExpect(status().isOk())

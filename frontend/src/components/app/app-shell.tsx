@@ -4,6 +4,8 @@ import { LogOut, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { NotificationBell } from "@/components/app/notification-bell";
+import { VerifyEmailBanner } from "@/components/app/verify-email-banner";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/hooks/use-me";
 import { hardNavigate, session } from "@/lib/api";
@@ -39,6 +41,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-svh flex-col md:flex-row">
       <header className="flex items-center justify-between border-b px-4 py-3 md:hidden print:hidden">
         <span className="font-heading font-semibold text-primary">QualityOS</span>
+        <span className="flex-1" />
+        <NotificationBell />
         <Button
           variant="ghost"
           size="icon"
@@ -53,7 +57,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside
         className={`${menuOpen ? "flex" : "hidden"} flex-col gap-4 border-b bg-muted/40 p-4 md:flex md:w-60 md:shrink-0 md:border-r md:border-b-0 print:hidden`}
       >
-        <span className="hidden font-heading text-lg font-semibold text-primary md:block">QualityOS</span>
+        <div className="hidden items-center justify-between md:flex">
+          <span className="font-heading text-lg font-semibold text-primary">QualityOS</span>
+          <NotificationBell />
+        </div>
 
         {me.organizations.length > 1 ? (
           <select
@@ -99,7 +106,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
+      <main className="min-w-0 flex-1 p-4 md:p-8">
+        {!me.user.emailVerified && <VerifyEmailBanner />}
+        {children}
+      </main>
     </div>
   );
 }

@@ -14,6 +14,8 @@ public final class Permissions {
     public static final String PURCHASE_VIEW = "PURCHASE_VIEW";
     public static final String RECEIPT_MANAGE = "RECEIPT_MANAGE";
     public static final String INSPECTION_VIEW = "INSPECTION_VIEW";
+    public static final String INSPECTION_APPROVE = "INSPECTION_APPROVE";
+    public static final String DISPOSITION_RECORD = "DISPOSITION_RECORD";
     public static final String INSPECTION_EXECUTE = "INSPECTION_EXECUTE";
 
     private Permissions() {

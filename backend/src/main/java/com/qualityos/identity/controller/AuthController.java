@@ -3,7 +3,14 @@ package com.qualityos.identity.controller;
 import com.qualityos.common.response.ApiResponse;
 import com.qualityos.identity.dto.AuthDtos.ChangePasswordRequest;
 import com.qualityos.identity.dto.AuthDtos.LoginRequest;
+import com.qualityos.identity.dto.AuthDtos.AcceptInvitationRequest;
+import com.qualityos.identity.dto.AuthDtos.InvitationPreview;
 import com.qualityos.identity.dto.AuthDtos.MeResponse;
+import com.qualityos.identity.dto.AuthDtos.PasswordResetConfirmation;
+import com.qualityos.identity.dto.AuthDtos.PasswordResetRequest;
+import com.qualityos.identity.dto.AuthDtos.TokenRequest;
+import com.qualityos.identity.service.AccountEmailService;
+import com.qualityos.identity.service.InvitationService;
 import com.qualityos.identity.dto.AuthDtos.RefreshRequest;
 import com.qualityos.identity.dto.AuthDtos.RegisterRequest;
 import com.qualityos.identity.dto.AuthDtos.SwitchTenantRequest;
@@ -29,9 +36,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService auth;
+    private final AccountEmailService accountEmails;
+    private final InvitationService invitations;
 
-    AuthController(AuthService auth) {
+    AuthController(AuthService auth, AccountEmailService accountEmails, InvitationService invitations) {
         this.auth = auth;
+        this.accountEmails = accountEmails;
+        this.invitations = invitations;
     }
 
     @PostMapping("/register")
@@ -65,6 +76,41 @@ public class AuthController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         auth.changePassword(request);
+    }
+
+    @PostMapping("/password-reset/request")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void requestPasswordReset(@Valid @RequestBody PasswordResetRequest request) {
+        accountEmails.requestPasswordReset(request.email());
+    }
+
+    @PostMapping("/password-reset/confirm")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void confirmPasswordReset(@Valid @RequestBody PasswordResetConfirmation request) {
+        accountEmails.resetPassword(request);
+    }
+
+    @PostMapping("/email-verification/request")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public void requestEmailVerification() {
+        accountEmails.resendVerification();
+    }
+
+    @PostMapping("/email-verification/confirm")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void confirmEmailVerification(@Valid @RequestBody TokenRequest request) {
+        accountEmails.verifyEmail(request.token());
+    }
+
+    /** Tokens travel in request bodies here, because paths end up in access logs. */
+    @PostMapping("/invitations/preview")
+    public ApiResponse<InvitationPreview> previewInvitation(@Valid @RequestBody TokenRequest request) {
+        return ApiResponse.ok(invitations.preview(request.token()));
+    }
+
+    @PostMapping("/invitations/accept")
+    public ApiResponse<TokenResponse> acceptInvitation(@Valid @RequestBody AcceptInvitationRequest request) {
+        return ApiResponse.ok(invitations.accept(request));
     }
 
     @GetMapping("/me")

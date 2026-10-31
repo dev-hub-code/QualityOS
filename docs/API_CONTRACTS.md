@@ -2,7 +2,7 @@
 
 Base path `/api/v1`. The running service is the source of truth for what exists: see `/v3/api-docs`.
 
-**Implemented:** system info, health, authentication, organizations, users, roles, permissions and audit logs (Phases 1 and 2), and facilities, suppliers, materials, products, purchase orders, material receipts and attachments (Phase 3), and inspection templates and inspections (Phase 4). Phase 5 onward is planned.
+**Implemented:** system info, health, authentication, organizations, users, roles, permissions and audit logs (Phases 1 and 2), and facilities, suppliers, materials, products, purchase orders, material receipts and attachments (Phase 3), inspection templates and inspections (Phase 4), and notifications, invitations and account email (Phase 5). Phase 6 onward is planned.
 
 ## Response envelope
 
@@ -85,7 +85,7 @@ proxy refuses token-carrying endpoints, and refuses writes from another origin.
 | 2 (built) | `/organizations`, `/users` (plus `/{membershipId}/roles`, `/activate`, `/deactivate`), `/roles`, `/permissions`, `/audit-logs` |
 | 3 (built) | `/facilities`, `/suppliers`, `/products`, `/materials`, `/purchase-orders`, `/material-receipts` |
 | 4 (built) | `/inspection-templates` (plus `/{id}/versions`, `/{id}/publish`), `/inspections` (plus `/{id}/execute`, `/submit`, `/approve`, `/send-back`, `/disposition`, `/cancel`), `/material-receipts/awaiting-inspection` |
-| 5 | `/notifications`, `/notification-preferences`, `/invitations`, `/auth/password-reset`, `/auth/verify-email` |
+| 5 (built) | `/auth/password-reset/{request,confirm}`, `/auth/email-verification/{request,confirm}`, `/auth/invitations/{preview,accept}`, `/invitations` (plus `/{id}/resend`, `/{id}/revoke`), `/notifications` (plus `/unread-count`, `/{id}/read`, `/read-all`, `/preferences`). `POST /users` is removed: people join by invitation |
 | 6 | `/ncrs` (plus `/{id}/containment`, `/close`), `/capas` (plus `/{id}/actions`, `/verify`, `/close`) |
 | 7 | `/traceability/batches/{batchNumber}`, `/traceability/products/{productId}` |
 | 8 | `/instruments`, `/calibrations`, `/audits` |

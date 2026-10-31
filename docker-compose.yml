@@ -26,6 +26,12 @@ services:
       timeout: 3s
       retries: 10
 
+  # Catches every email sent locally; nothing leaves this machine. Read them at http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "127.0.0.1:${MAILPIT_PORT:-8025}:8025"
+
   backend:
     build: ./backend
     environment:
@@ -33,6 +39,14 @@ services:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
       DB_URL: jdbc:postgresql://postgres:5432/qualityos
       STORAGE_LOCAL_ROOT: /data/attachments
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-QualityOS <no-reply@qualityos.local>}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      # Above the production default, because the browser tests all sign in from one address.
+      AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-120}
     volumes:
       - attachments-data:/data/attachments
     ports:

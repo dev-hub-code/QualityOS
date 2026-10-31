@@ -2,11 +2,9 @@ package com.qualityos.identity.service;
 
 import com.qualityos.common.audit.AuditService;
 import com.qualityos.common.exception.BusinessRuleException;
-import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.tenant.TenantContext;
-import com.qualityos.identity.dto.UserRoleDtos.AddMemberRequest;
 import com.qualityos.identity.dto.UserRoleDtos.MemberResponse;
 import com.qualityos.identity.dto.UserRoleDtos.RoleSummary;
 import com.qualityos.identity.entity.Membership;
@@ -28,7 +26,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,7 +37,6 @@ public class UserManagementService {
     private final RoleRepository roles;
     private final UserRoleRepository userRoles;
     private final RoleMapper roleMapper;
-    private final PasswordEncoder passwordEncoder;
     private final AuditService audit;
 
     UserManagementService(
@@ -49,14 +45,12 @@ public class UserManagementService {
             RoleRepository roles,
             UserRoleRepository userRoles,
             RoleMapper roleMapper,
-            PasswordEncoder passwordEncoder,
             AuditService audit) {
         this.memberships = memberships;
         this.users = users;
         this.roles = roles;
         this.userRoles = userRoles;
         this.roleMapper = roleMapper;
-        this.passwordEncoder = passwordEncoder;
         this.audit = audit;
     }
 
@@ -76,20 +70,6 @@ public class UserManagementService {
                         Collectors.mapping(a -> rolesById.get(a.getRoleId()), Collectors.toList())));
         return PageResponse.from(page, m -> toResponse(
                 m, usersById.get(m.getUserId()), rolesByMembership.getOrDefault(m.getId(), List.of())));
-    }
-
-    @Transactional
-    public MemberResponse add(AddMemberRequest request) {
-        List<Role> granted = loadGrantable(request.roleIds());
-        String email = AuthService.normalizeEmail(request.email());
-        User user = users.findByEmail(email).orElseGet(() -> createUser(request, email));
-        if (memberships.findByUserId(user.getId()).isPresent()) {
-            throw new ConflictException("This user is already a member of the organisation.");
-        }
-        Membership membership = memberships.saveAndFlush(new Membership(user.getId()));
-        granted.forEach(role -> userRoles.save(new UserRole(membership.getId(), role.getId())));
-        audit.record("MEMBER_ADDED", "Membership", membership.getId(), null, Map.of("roles", codes(granted)));
-        return toResponse(membership, user, granted.stream().map(roleMapper::toSummary).toList());
     }
 
     @Transactional
@@ -129,19 +109,11 @@ public class UserManagementService {
         audit.record(active ? "MEMBER_ACTIVATED" : "MEMBER_DEACTIVATED", "Membership", membershipId);
     }
 
-    private User createUser(AddMemberRequest request, String email) {
-        if (request.initialPassword() == null) {
-            throw new BusinessRuleException("An initial password is required for a new user.");
-        }
-        return users.saveAndFlush(
-                new User(email, passwordEncoder.encode(request.initialPassword()), request.fullName().trim()));
-    }
-
     private Membership load(UUID id) {
         return memberships.findById(id).orElseThrow(() -> new ResourceNotFoundException("User", id));
     }
 
-    private List<Role> loadGrantable(Collection<UUID> roleIds) {
+    List<Role> loadGrantable(Collection<UUID> roleIds) {
         List<Role> found = roles.findVisibleByIds(roleIds, TenantContext.getCurrentTenantId());
         if (found.size() != roleIds.size()) {
             throw new BusinessRuleException("One or more roles do not exist.");

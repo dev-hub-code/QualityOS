@@ -176,6 +176,11 @@ public class ProductService implements AttachmentPolicy {
         productMaterials.delete(mapping);
     }
 
+    @Transactional(readOnly = true)
+    public void requireExists(UUID id) {
+        load(id);
+    }
+
     @Override
     public String entityType() {
         return "PRODUCT";

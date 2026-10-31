@@ -13,6 +13,8 @@ public final class Permissions {
     public static final String PRODUCT_MANAGE = "PRODUCT_MANAGE";
     public static final String PURCHASE_VIEW = "PURCHASE_VIEW";
     public static final String RECEIPT_MANAGE = "RECEIPT_MANAGE";
+    public static final String INSPECTION_VIEW = "INSPECTION_VIEW";
+    public static final String INSPECTION_EXECUTE = "INSPECTION_EXECUTE";
 
     private Permissions() {
     }
@@ -31,6 +33,14 @@ public final class Permissions {
         public static final String PURCHASE_VIEW = "hasAuthority('PURCHASE_VIEW')";
         public static final String PURCHASE_MANAGE = "hasAuthority('PURCHASE_MANAGE')";
         public static final String RECEIPT_MANAGE = "hasAuthority('RECEIPT_MANAGE')";
+        public static final String TEMPLATE_VIEW = "hasAuthority('TEMPLATE_VIEW')";
+        public static final String TEMPLATE_MANAGE = "hasAuthority('TEMPLATE_MANAGE')";
+        public static final String TEMPLATE_PUBLISH = "hasAuthority('TEMPLATE_PUBLISH')";
+        public static final String INSPECTION_VIEW = "hasAuthority('INSPECTION_VIEW')";
+        public static final String INSPECTION_CREATE = "hasAuthority('INSPECTION_CREATE')";
+        public static final String INSPECTION_EXECUTE = "hasAuthority('INSPECTION_EXECUTE')";
+        public static final String INSPECTION_APPROVE = "hasAuthority('INSPECTION_APPROVE')";
+        public static final String DISPOSITION_RECORD = "hasAuthority('DISPOSITION_RECORD')";
 
         private Require() {
         }

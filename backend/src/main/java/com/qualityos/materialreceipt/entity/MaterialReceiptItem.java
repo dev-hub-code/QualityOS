@@ -20,7 +20,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class MaterialReceiptItem extends TenantOwnedEntity {
 
-    public enum InspectionStatus { NOT_REQUIRED, PENDING, CANCELLED }
+    public enum InspectionStatus { NOT_REQUIRED, PENDING, IN_PROGRESS, COMPLETED, CANCELLED }
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "receipt_id")
@@ -36,6 +36,8 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
 
     @Enumerated(EnumType.STRING)
     private InspectionStatus inspectionStatus;
+
+    private String disposition;
 
     public MaterialReceiptItem(
             MaterialReceipt receipt,
@@ -59,5 +61,14 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
 
     void cancelInspection() {
         inspectionStatus = InspectionStatus.CANCELLED;
+    }
+
+    public boolean inspectionStarted() {
+        return inspectionStatus == InspectionStatus.IN_PROGRESS || inspectionStatus == InspectionStatus.COMPLETED;
+    }
+
+    public void updateInspection(InspectionStatus status, String disposition) {
+        this.inspectionStatus = status;
+        this.disposition = disposition;
     }
 }

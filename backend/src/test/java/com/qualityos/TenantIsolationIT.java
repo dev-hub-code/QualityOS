@@ -200,6 +200,24 @@ class TenantIsolationIT extends AbstractIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void inspectionsAndTemplatesAreInvisibleAcrossTenants() throws Exception {
+        MasterDataHelper helper = new MasterDataHelper();
+        String template = JsonPath.read(as(tenantA, postJson("/api/v1/inspection-templates",
+                        Map.of("code", helper.unique(), "name", "T", "inspectionType", "IQC")))
+                .andReturn().getResponse().getContentAsString(), "$.data.template.id");
+
+        as(tenantB, get("/api/v1/inspection-templates/" + template)).andExpect(status().isNotFound());
+        as(tenantB, get("/api/v1/inspection-templates")).andExpect(jsonPath("$.data.totalItems").value(0));
+        as(tenantB, get("/api/v1/inspections")).andExpect(jsonPath("$.data.totalItems").value(0));
+        as(tenantB, postJson("/api/v1/inspection-templates/" + template + "/publish",
+                        Map.of("effectiveFrom", "2026-01-01")))
+                .andExpect(status().isNotFound());
+        as(tenantB, postJson("/api/v1/inspections",
+                        Map.of("receiptItemId", UUID.randomUUID().toString(), "templateId", template)))
+                .andExpect(status().isNotFound());
+    }
+
     /** A material from one tenant cannot be attached to another's supplier row, even with raw SQL. */
     @Test
     void compositeForeignKeysHoldForPurchasing() throws Exception {

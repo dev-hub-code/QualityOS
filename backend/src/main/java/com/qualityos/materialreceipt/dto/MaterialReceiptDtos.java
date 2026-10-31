@@ -73,6 +73,24 @@ public final class MaterialReceiptDtos {
             String internalBatch,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
             boolean inspectionRequired,
-            String inspectionStatus) {
+            String inspectionStatus,
+            String disposition) {
+    }
+
+    /** A received batch, as the inspection module sees it. */
+    public record ReceivedBatch(
+            UUID itemId,
+            UUID receiptId,
+            String grnNumber,
+            LocalDate receivedOn,
+            UUID supplierId,
+            String supplierName,
+            UUID facilityId,
+            UUID materialId,
+            String materialCode,
+            String materialName,
+            String supplierBatch,
+            String internalBatch,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity) {
     }
 }

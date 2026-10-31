@@ -17,4 +17,9 @@ public interface AttachmentPolicy {
 
     /** @return whether the parent exists in the current tenant */
     boolean parentExists(UUID entityId);
+
+    /** @return whether the parent's files are now part of a closed record, and can no longer change */
+    default boolean locked(UUID entityId) {
+        return false;
+    }
 }

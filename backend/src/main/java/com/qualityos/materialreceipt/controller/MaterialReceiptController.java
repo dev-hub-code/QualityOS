@@ -6,6 +6,7 @@ import com.qualityos.common.response.Pages;
 import com.qualityos.common.security.Permissions.Require;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.CreateReceiptRequest;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceiptDetail;
+import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceivedBatch;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceiptSummary;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.VoidReceiptRequest;
 import com.qualityos.materialreceipt.service.MaterialReceiptService;
@@ -46,6 +47,13 @@ public class MaterialReceiptController {
             @RequestParam(required = false) String q,
             @RequestParam(required = false) UUID purchaseOrderId) {
         return ApiResponse.ok(receipts.list(q, purchaseOrderId, Pages.of(page, size, sort, SORTABLE, "grnNumber")));
+    }
+
+    @GetMapping("/awaiting-inspection")
+    @PreAuthorize(Require.INSPECTION_VIEW)
+    public ApiResponse<PageResponse<ReceivedBatch>> awaitingInspection(
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size) {
+        return ApiResponse.ok(receipts.awaitingInspection(Pages.of(page, size, null, Set.of(), "createdAt")));
     }
 
     @GetMapping("/{id}")

@@ -85,3 +85,37 @@ export const receiptSchema = z.object({
     .min(1),
 });
 export type ReceiptValues = z.infer<typeof receiptSchema>;
+
+const optionalDecimal = decimal.or(z.literal(""));
+const signedDecimal = z
+  .string()
+  .trim()
+  .refine((value) => value === "" || DECIMAL_PATTERN.test(value.replace(/^-/, "")), "Enter a valid number");
+const wholeNumber = z.string().trim().regex(/^\d{1,3}$/, "Enter a whole number");
+
+export const templateDraftSchema = z.object({
+  changeNote: z.string().trim().max(1000),
+  samplingType: z.enum(["FIXED", "PERCENTAGE", "FULL"]),
+  sampleSize: wholeNumber,
+  samplePercent: optionalDecimal,
+  acceptanceNumber: wholeNumber,
+  parameters: z.array(
+    z.object({
+      code: z.string().trim().min(1, "Enter a code").max(50),
+      name: z.string().trim().min(1, "Enter a name").max(200),
+      dataType: z.enum(["NUMERIC", "TEXT", "BOOLEAN", "DATE"]),
+      uomId: z.string(),
+      minValue: signedDecimal,
+      maxValue: signedDecimal,
+      nominalValue: signedDecimal,
+      tolerance: optionalDecimal,
+      expectedText: z.string().trim().max(500),
+      criticality: z.enum(["CRITICAL", "MAJOR", "MINOR"]),
+      mandatory: z.boolean(),
+      perSample: z.boolean(),
+      evidenceRequired: z.boolean(),
+      inspectionMethod: z.string().trim().max(200),
+    }),
+  ),
+});
+export type TemplateDraftValues = z.infer<typeof templateDraftSchema>;

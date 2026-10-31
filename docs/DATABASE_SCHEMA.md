@@ -35,19 +35,22 @@ for GRN, NCR, CAPA), `suppliers`, `supplier_contacts`, `product_categories`, `pr
 **`supplier_categories`**, **`product_revisions`**, **`product_materials`** (mapping).
 
 ### Phase 4: inspection
-`inspection_templates`, `inspection_template_versions` (status, effective dates, immutable once published),
-`inspection_parameters`, `inspection_sampling_plans`, `inspections`, `inspection_results`,
-`inspection_approvals`, `inspection_attachments`, **`inspection_samples`** (one row per sample measured).
+`inspection_templates`, `inspection_template_versions` (status, effective dates, sampling plan, immutable once
+published), `inspection_parameters`, `inspections`, `inspection_results` (one row per sample measured),
+`inspection_approvals` (append-only decision history). Evidence uses `attachments`, with the parameter code as
+its category. A sampling plan belongs to its version, so it cannot change once published.
 
 Rules enforced in the database as well as in code:
 
-- A trigger rejects `UPDATE` and `DELETE` on versions and parameters of a published template.
+- Triggers reject changes to published versions and their parameters (a version may only be superseded), to an
+  inspection's specification, to results once submitted, and to any row of `inspection_approvals`.
+- `disposition = 'ACCEPT'` requires `final_result = 'PASS'`, as a check constraint.
 - `inspections.spec_snapshot JSONB` stores the full specification at execution time. It is one of the
   few legitimate JSONB uses: an immutable historical document.
 - `inspection_results` keeps evaluation (`PASS`, `FAIL`, `PENDING_REVIEW`). Disposition (`ACCEPT`, `REJECT`,
   `HOLD`, `REWORK`, `CONDITIONAL_ACCEPTANCE`) is a separate column on `inspections`, and the two never mix.
 - `actual_value` is stored as typed columns (`value_numeric NUMERIC(18,6)`, `value_text`, `value_boolean`,
-  `value_timestamp`) so results can be analysed.
+  `value_date`) so results can be analysed.
 
 ### Phase 5: notifications and account email
 `notifications`, **`notification_preferences`**, plus tables for invitations and for password reset and

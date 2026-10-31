@@ -22,11 +22,13 @@ function Row({ dispatch }: { dispatch: Dispatch }) {
   const [returning, setReturning] = useState(false);
   const [shipping, setShipping] = useState(false);
   if (dispatch.reversalReason) return <StatusBadge status="REVERSED" />;
-  if (!canManage) return null;
+  if (!canManage) return <StatusBadge status={dispatch.shippedOn ? "SHIPPED" : "AWAITING_SHIPMENT"} />;
   const hasReturns = dispatch.lines.some((line) => Number(line.returnedQuantity) > 0);
   const shipped = dispatch.shippedOn !== null;
   const returnable = shipped
-    ? dispatch.lines.filter((line) => Number(line.returnedQuantity) < Number(line.quantity))
+    ? dispatch.lines.filter(
+        (line) => Number(line.returnedQuantity) + Number(line.expectedQuantity) < Number(line.quantity),
+      )
     : [];
   const shipmentFields: FieldDef[] = [
     { name: "shippedOn", label: "Shipped on", type: "date", required: true },
@@ -46,11 +48,13 @@ function Row({ dispatch }: { dispatch: Dispatch }) {
     { name: "quantity", label: "Returned quantity", type: "decimal", required: true },
     { name: "serials", label: "Serial numbers, if tracked (one per line)", type: "textarea" },
     { name: "returnReference", label: "Return reference", required: true },
-    { name: "reversalDate", label: "Date received", type: "date", required: true },
+    { name: "reversalDate", label: "Date received or expected", type: "date", required: true },
+    { name: "expected", label: "Not here yet: the goods are on their way", type: "checkbox" },
     { name: "reason", label: "Reason for return", type: "textarea", required: true },
   ];
   return (
     <>
+      <StatusBadge status={shipped ? "SHIPPED" : "AWAITING_SHIPMENT"} />
       {returnable.length > 0 && (
         <Button variant="ghost" size="sm" onClick={() => setReturning(true)}>
           Record return

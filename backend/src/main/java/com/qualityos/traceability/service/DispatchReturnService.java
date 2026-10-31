@@ -142,7 +142,8 @@ public class DispatchReturnService {
                 new BusinessRuleException("Confirm this shipment before recording a return against it."));
         String reference = request.returnReference().trim();
         LocalDate today = LocalDate.now(ZoneId.of(organizations.getCurrent().timezone()));
-        if (request.reversalDate().isAfter(today) || request.reversalDate().isBefore(shipment.getShippedOn())) {
+        if (request.reversalDate().isBefore(shipment.getShippedOn())
+                || (!request.isExpected() && request.reversalDate().isAfter(today))) {
             throw new BusinessRuleException("The return date must fall between the shipment and today.");
         }
         Map<UUID, DispatchItem> lines = dispatchItems.findByDispatchIdIn(List.of(dispatchId)).stream()
@@ -162,7 +163,9 @@ public class DispatchReturnService {
         }
         Map<UUID, BigDecimal> requested = request.items().stream().collect(Collectors.toMap(
                 ReturnLineRequest::dispatchItemId, ReturnLineRequest::quantity, BigDecimal::add));
-        List<DispatchReversalItem> earlier = reversalItems.findByDispatchItemIdIn(lines.keySet());
+        List<DispatchReversalItem> earlier = reversalItems.findByDispatchItemIdIn(lines.keySet()).stream()
+                .filter(item -> !item.isCancelled())
+                .toList();
         requested.forEach((lineId, quantity) -> {
             BigDecimal already = earlier.stream()
                     .filter(item -> item.getDispatchItemId().equals(lineId))
@@ -173,7 +176,8 @@ public class DispatchReturnService {
             }
         });
         DispatchReversal reversal = reversals.saveAndFlush(new DispatchReversal(
-                numbers.next("RET"), dispatchId, reference, request.reversalDate(), request.reason().trim()));
+                numbers.next("RET"), dispatchId, reference, request.reversalDate(), request.reason().trim(),
+                request.isExpected()));
         Set<String> alreadyReturned = earlier.stream()
                 .flatMap(item -> item.getSerialNumbers().stream())
                 .collect(Collectors.toCollection(HashSet::new));
@@ -182,13 +186,59 @@ public class DispatchReturnService {
             requireSerials(line, serials, alreadyReturned);
             alreadyReturned.addAll(serials);
             reversalItems.save(new DispatchReversalItem(reversal.getId(), line.dispatchItemId(),
-                    lines.get(line.dispatchItemId()).getProductionBatchId(), line.quantity(), serials));
+                    lines.get(line.dispatchItemId()).getProductionBatchId(), line.quantity(), serials, request.isExpected()));
         });
         reversalItems.flush();
         audit.record("DISPATCH_RETURN_RECORDED", ENTITY, reversal.getId(), null,
                 Map.of("number", reversal.getReversalNumber(), "dispatch", dispatch.getDispatchNumber(),
                         "reference", reference));
         return views(List.of(reversal)).getFirst();
+    }
+
+    /** Physical receipt of an announced return. From here the goods wait in quarantine for an inspection. */
+    @Transactional
+    public ReversalView receive(UUID id, LocalDate receivedOn) {
+        DispatchReversal reversal = requireExpected(id);
+        DispatchRecord dispatch = dispatches.findForUpdate(reversal.getDispatchId()).orElseThrow();
+        LocalDate shippedOn = shipments.findByDispatchId(dispatch.getId()).orElseThrow().getShippedOn();
+        LocalDate today = LocalDate.now(ZoneId.of(organizations.getCurrent().timezone()));
+        if (receivedOn.isAfter(today) || receivedOn.isBefore(shippedOn)) {
+            throw new BusinessRuleException("The return date must fall between the shipment and today.");
+        }
+        reversal.received(receivedOn);
+        reversalItems.findByReversalIdIn(List.of(id)).forEach(DispatchReversalItem::received);
+        reversals.flush();
+        audit.record("DISPATCH_RETURN_RECEIVED", ENTITY, id);
+        return views(List.of(reversal)).getFirst();
+    }
+
+    /** The goods never came, so their quantity stops counting against the dispatch. */
+    @Transactional
+    public ReversalView cancel(UUID id) {
+        DispatchReversal reversal = requireExpected(id);
+        dispatches.findForUpdate(reversal.getDispatchId()).orElseThrow();
+        reversalItems.findByReversalIdIn(List.of(id)).forEach(DispatchReversalItem::cancel);
+        reversal.cancel(Instant.now());
+        reversals.flush();
+        audit.record("DISPATCH_RETURN_CANCELLED", ENTITY, id);
+        return views(List.of(reversal)).getFirst();
+    }
+
+    private DispatchReversal requireExpected(UUID id) {
+        DispatchReversal reversal = load(id);
+        if (reversal.getStatus() != DispatchReversal.Status.EXPECTED) {
+            throw new BusinessRuleException("This return is not waiting to arrive.");
+        }
+        return reversal;
+    }
+
+    /** The dispatch lines this serial number came back from. */
+    @Transactional(readOnly = true)
+    public Set<UUID> returnedLines(String serial) {
+        return reversalItems.findBySerial(serial).stream()
+                .filter(item -> item.getStatus() != DispatchReversalItem.Status.EXPECTED)
+                .map(DispatchReversalItem::getDispatchItemId)
+                .collect(Collectors.toSet());
     }
 
     private void requireSerials(ReturnLineRequest line, List<String> serials, Set<String> alreadyReturned) {
@@ -211,8 +261,12 @@ public class DispatchReturnService {
     public ReversalSummary summary(UUID dispatchId) {
         requireDispatch(dispatchId);
         List<DispatchItem> lines = dispatchItems.findByDispatchIdIn(List.of(dispatchId));
-        List<DispatchReversalItem> returned = reversalItems.findByDispatchItemIdIn(
+        List<DispatchReversalItem> all = reversalItems.findByDispatchItemIdIn(
                 lines.stream().map(DispatchItem::getId).toList());
+        List<DispatchReversalItem> returned = all.stream()
+                .filter(item -> !item.isCancelled() && item.getStatus() != DispatchReversalItem.Status.EXPECTED)
+                .toList();
+        BigDecimal expected = total(all, DispatchReversalItem.Status.EXPECTED);
         BigDecimal dispatched = lines.stream().map(DispatchItem::getQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal reversed = total(returned, null);
         BigDecimal accepted = total(returned, DispatchReversalItem.Status.ACCEPTED);
@@ -221,7 +275,7 @@ public class DispatchReturnService {
                 ? "NOT_REVERSED"
                 : reversed.compareTo(dispatched) == 0 ? "FULLY_REVERSED" : "PARTIALLY_REVERSED";
         return new ReversalSummary(dispatchId, status, dispatched, reversed, dispatched.subtract(reversed),
-                reversed.subtract(accepted).subtract(rejected), accepted, rejected);
+                expected, reversed.subtract(accepted).subtract(rejected), accepted, rejected);
     }
 
     private static BigDecimal total(List<DispatchReversalItem> items, DispatchReversalItem.Status status) {

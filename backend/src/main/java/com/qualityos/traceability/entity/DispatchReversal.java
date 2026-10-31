@@ -19,7 +19,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class DispatchReversal extends TenantOwnedEntity {
 
-    public enum Status { RETURN_RECEIVED, PENDING_INSPECTION, CLOSED }
+    public enum Status { EXPECTED, RETURN_RECEIVED, PENDING_INSPECTION, CLOSED, CANCELLED }
 
     private String reversalNumber;
     private UUID dispatchId;
@@ -33,12 +33,29 @@ public class DispatchReversal extends TenantOwnedEntity {
     private Instant closedAt;
 
     public DispatchReversal(
-            String reversalNumber, UUID dispatchId, String returnReference, LocalDate reversalDate, String reason) {
+            String reversalNumber,
+            UUID dispatchId,
+            String returnReference,
+            LocalDate reversalDate,
+            String reason,
+            boolean expected) {
         this.reversalNumber = reversalNumber;
         this.dispatchId = dispatchId;
         this.returnReference = returnReference;
         this.reversalDate = reversalDate;
         this.reason = reason;
+        this.status = expected ? Status.EXPECTED : Status.RETURN_RECEIVED;
+    }
+
+    /** The goods are here, so the date becomes the day they arrived. */
+    public void received(LocalDate on) {
+        status = Status.RETURN_RECEIVED;
+        reversalDate = on;
+    }
+
+    public void cancel(Instant now) {
+        status = Status.CANCELLED;
+        closedAt = now;
     }
 
     public void inspectionStarted() {

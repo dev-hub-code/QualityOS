@@ -35,7 +35,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A material receipt does not notify inspectors; they see it in the inspection queue | When a user needs it |
 | Notifications are polled once a minute, with no live push. Only email and in-app channels exist | When a user needs it |
 | Hindi and Marathi email text was machine-drafted and needs review by a native speaker before customers see it | Before customer launch |
-| Templates for CAPA due and closure, calibration, audit, subscription and payment exist, but nothing sends them yet. Calibration and audit arrive in Phase 8, subscription in Phase 10 | With those features |
+| Templates for calibration, audit, subscription and payment exist, but nothing sends them yet. Calibration and audit arrive in Phase 8, subscription in Phase 10 | With those features |
 | Some notifications have no dedicated template (NCR ready for closure, CAPA actions, verification, send-back, corrections). Their email has a translated frame around English text | When a user needs it |
 | Email delivery is recorded in `email_delivery_logs`, but there is no screen for it. The app itself is still English only | Phase 9, with the admin panel |
 | Organisation branding in email is the organisation name only. There is no logo upload | When a user needs it |
@@ -59,9 +59,8 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A corrected lot keeps its original purchase order line, and a finished NCR keeps its original supplier and material | By design: history is preserved |
 | A correction of an inspected lot does not trigger reinspection. It needs two approvers, who decide whether to act | Review after real use |
 | Naming serial numbers on a dispatch is optional, so a batch can ship without saying which units went. A trace then shows the customer by batch, not by unit | Review after real use |
-| A dispatch only counts as shipped once someone confirms it. Until then it can be cancelled, and it already shows on traces | Review after real use |
-| There is no lookup from one serial number to its customers. Traces work by batch; serial history is kept in dispatch and return lines | When a user needs it |
-| A trace finds who received a batch, but there is no recall workflow or recall report screen | When a user needs it |
+| A dispatch only counts as shipped once someone confirms it. Traces flag it until then, and managers get a daily reminder after three days | Review after real use |
+| The recall report lists who to contact. There is no recall workflow to track that contact, and no export beyond printing | When a user needs it |
 | `tenant_settings` and supplier scorecards are not built | Phase 9 |
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | Lists show only active records, with no way to restore an archived one | When a user needs it |

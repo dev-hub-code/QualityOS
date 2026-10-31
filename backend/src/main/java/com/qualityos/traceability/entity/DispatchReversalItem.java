@@ -23,7 +23,7 @@ import org.hibernate.type.SqlTypes;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class DispatchReversalItem extends TenantOwnedEntity {
 
-    public enum Status { RETURN_RECEIVED, PENDING_INSPECTION, ACCEPTED, REJECTED }
+    public enum Status { EXPECTED, RETURN_RECEIVED, PENDING_INSPECTION, ACCEPTED, REJECTED, CANCELLED }
 
     private UUID reversalId;
     private UUID dispatchItemId;
@@ -39,12 +39,18 @@ public class DispatchReversalItem extends TenantOwnedEntity {
     private String disposition;
 
     public DispatchReversalItem(
-            UUID reversalId, UUID dispatchItemId, UUID productionBatchId, BigDecimal quantity, List<String> serialNumbers) {
+            UUID reversalId,
+            UUID dispatchItemId,
+            UUID productionBatchId,
+            BigDecimal quantity,
+            List<String> serialNumbers,
+            boolean expected) {
         this.reversalId = reversalId;
         this.dispatchItemId = dispatchItemId;
         this.productionBatchId = productionBatchId;
         this.quantity = quantity;
         this.serialNumbers = new ArrayList<>(serialNumbers);
+        this.status = expected ? Status.EXPECTED : Status.RETURN_RECEIVED;
     }
 
     public boolean isDecided() {
@@ -52,10 +58,22 @@ public class DispatchReversalItem extends TenantOwnedEntity {
     }
 
     public void inspectionStarted() {
-        if (isDecided() || status == Status.PENDING_INSPECTION) {
+        if (status != Status.RETURN_RECEIVED) {
             throw new BusinessRuleException("These returned goods are not waiting for an inspection.");
         }
         status = Status.PENDING_INSPECTION;
+    }
+
+    public boolean isCancelled() {
+        return status == Status.CANCELLED;
+    }
+
+    public void received() {
+        status = Status.RETURN_RECEIVED;
+    }
+
+    public void cancel() {
+        status = Status.CANCELLED;
     }
 
     public void inspectionCancelled() {

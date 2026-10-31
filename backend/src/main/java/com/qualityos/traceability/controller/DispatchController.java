@@ -9,6 +9,7 @@ import com.qualityos.traceability.dto.TraceabilityDtos.CreateDispatchRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.CreateReversalRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.CustomerResponse;
 import com.qualityos.traceability.dto.TraceabilityDtos.DispatchResponse;
+import com.qualityos.traceability.dto.TraceabilityDtos.ReceiveReturnRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.ReversalSummary;
 import com.qualityos.traceability.dto.TraceabilityDtos.ReversalView;
 import com.qualityos.traceability.dto.TraceabilityDtos.ReverseRequest;
@@ -122,6 +123,19 @@ public class DispatchController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size) {
         return ApiResponse.ok(returns.list(Pages.of(page, size, null, Set.of("createdAt"), "createdAt")));
+    }
+
+    @PostMapping("/dispatch-reversals/{id}/receive")
+    @PreAuthorize(Require.TRACEABILITY_MANAGE)
+    public ApiResponse<ReversalView> receiveReturn(
+            @PathVariable UUID id, @Valid @RequestBody ReceiveReturnRequest request) {
+        return ApiResponse.ok(returns.receive(id, request.receivedOn()));
+    }
+
+    @PostMapping("/dispatch-reversals/{id}/cancel")
+    @PreAuthorize(Require.TRACEABILITY_MANAGE)
+    public ApiResponse<ReversalView> cancelReturn(@PathVariable UUID id) {
+        return ApiResponse.ok(returns.cancel(id));
     }
 
     @GetMapping("/dispatch-reversals/{id}")

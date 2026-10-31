@@ -32,10 +32,13 @@ class CapaOverdueJob {
     @Scheduled(initialDelayString = "PT5M", fixedDelayString = "PT1H")
     void remind() {
         List<UUID> tenants = tx.execute(status ->
-                jdbc.queryForList("SELECT tenants_with_overdue_capas()", UUID.class));
+                jdbc.queryForList("SELECT tenants_with_capas_due()", UUID.class));
         for (UUID tenantId : tenants) {
             try {
-                TenantContext.runAs(tenantId, null, capas::remindOverdue);
+                TenantContext.runAs(tenantId, null, () -> {
+                    capas.remindOverdue();
+                    capas.remindDueSoon();
+                });
             } catch (RuntimeException ex) {
                 log.error("Overdue reminders failed for tenant {}", tenantId, ex);
             }

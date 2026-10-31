@@ -19,6 +19,7 @@ import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { DispatchReturn, Inspection, TemplateSummary } from "@/lib/types";
 
 const TEMPLATES = "size=100";
+const RECEIVE_FIELDS: FieldDef[] = [{ name: "receivedOn", label: "Date received", type: "date", required: true }];
 
 function InspectDialog({ itemId, onClose }: { itemId: string; onClose: () => void }) {
   const router = useRouter();
@@ -60,7 +61,10 @@ export default function DispatchReversalPage() {
   const { id } = useParams<{ id: string }>();
   const path = `/dispatch-reversals/${id}`;
   const canInspect = usePermission("INSPECTION_CREATE");
+  const canManage = usePermission("TRACEABILITY_MANAGE");
+  const refresh = useRefresh();
   const [inspecting, setInspecting] = useState<string | null>(null);
+  const [receiving, setReceiving] = useState(false);
   const { data: reversal, error } = useQuery({ queryKey: [path], queryFn: () => api.get<DispatchReturn>(path) });
   if (!reversal) return <QueryState error={error} />;
   return (
@@ -74,12 +78,28 @@ export default function DispatchReversalPage() {
           </span>
         }
       />
+      {canManage && reversal.status === "EXPECTED" && (
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => setReceiving(true)}>Mark received</Button>
+          <Button variant="outline" onClick={() => api.post(`${path}/cancel`).then(refresh)}>
+            Cancel return
+          </Button>
+        </div>
+      )}
+      {receiving && (
+        <RecordDialog
+          title="Goods received"
+          fields={RECEIVE_FIELDS}
+          onClose={() => setReceiving(false)}
+          onSubmit={(values) => api.post(`${path}/receive`, values).then(refresh)}
+        />
+      )}
       <Section title="Details">
         <Details
           items={[
             ["Dispatch", reversal.dispatchNumber],
             ["Customer", reversal.customerName],
-            ["Return date", reversal.reversalDate],
+            [reversal.status === "EXPECTED" ? "Expected on" : "Date received", reversal.reversalDate],
             ["Reason", reversal.reason],
             ["Recorded by", reversal.recordedByName],
           ]}

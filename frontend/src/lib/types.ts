@@ -556,6 +556,7 @@ export interface Dispatch {
     productName: string;
     quantity: string;
     returnedQuantity: string;
+    expectedQuantity: string;
   }[];
   reversalReason: string | null;
 }
@@ -596,6 +597,8 @@ export interface TraceReport {
   forward: TraceNode[];
   dispatches: Dispatch[];
   returns: DispatchReturn[];
+  unconfirmedCustomers: string[];
+  recall: RecallLine[];
   affectedCustomers: string[];
   serialNumbers: string[];
   timeline: TimelineEvent[];
@@ -641,5 +644,29 @@ export interface DispatchReturn {
     serialNumbers: string[];
     status: string;
     disposition: string | null;
+  }[];
+}
+
+export interface RecallLine {
+  dispatchId: string;
+  dispatchNumber: string;
+  customerName: string;
+  dispatchedOn: string;
+  shippedOn: string | null;
+  quantity: string;
+  returnedQuantity: string;
+  outstandingQuantity: string;
+}
+
+export interface SerialTrace {
+  serialNumber: string;
+  batchNumber: string;
+  deliveries: {
+    dispatchId: string;
+    dispatchNumber: string;
+    customerName: string;
+    dispatchedOn: string;
+    shippedOn: string | null;
+    returned: boolean;
   }[];
 }

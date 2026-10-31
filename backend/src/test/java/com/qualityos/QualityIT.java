@@ -293,6 +293,31 @@ class QualityIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void aCapaIsRemindedOnceBeforeItsDueDateInTheOwnersLanguage() throws Exception {
+        String capa = capa(null, manager);
+        asAppRole(owner.tenantId(), sql -> sql.update(
+                "UPDATE corrective_actions SET target_date = current_date + 2 WHERE id = ?", UUID.fromString(capa)));
+        asAppRole(null, sql -> assertThat(sql.queryForList("SELECT tenants_with_capas_due()", UUID.class))
+                .contains(owner.tenantId()));
+
+        assertThat(TenantContext.callAs(owner.tenantId(), null, capaService::remindDueSoon)).isEqualTo(1);
+        assertThat(TenantContext.callAs(owner.tenantId(), null, capaService::remindDueSoon)).isZero();
+        as(manager, get("/api/v1/notifications"))
+                .andExpect(jsonPath("$.data.items[0].type").value("CAPA_DUE_SOON"));
+        assertThat(inTransactionAs(owner.tenantId(), null, () -> jdbc.queryForObject(
+                "SELECT email_template FROM notifications WHERE type = 'CAPA_DUE_SOON' AND tenant_id = ?",
+                String.class, owner.tenantId()))).isEqualTo("CAPA_DUE_REMINDER");
+    }
+
+    @Test
+    void aClosedCapaTellsItsOwnerWithTheClosureEmail() throws Exception {
+        closedCapa(null);
+        assertThat(inTransactionAs(owner.tenantId(), null, () -> jdbc.queryForList(
+                "SELECT email_template FROM notifications WHERE type = 'CAPA_CLOSED'", String.class)))
+                .isNotEmpty().containsOnly("CAPA_CLOSURE");
+    }
+
+    @Test
     void theOverdueFunctionRevealsOnlyTenantIds() throws Exception {
         String capa = capa(null, manager);
         asAppRole(owner.tenantId(), sql -> sql.update(

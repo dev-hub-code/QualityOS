@@ -133,3 +133,5 @@ row-level security. `account_tokens` holds one-time password reset and email ver
 - **`dispatch_shipments`** (V13) is the append-only proof that goods physically left. Triggers refuse a cancellation of a
   shipped dispatch, a return on an unshipped one, and a shipment on a cancelled one. Dispatches from before V13 were
   backfilled as shipped unless already cancelled.
+- **V14** adds `EXPECTED` and `CANCELLED` to return statuses, `corrective_actions.due_reminded_at`, and the tenant-id-only
+  job functions `tenants_with_capas_due()` and `tenants_with_unconfirmed_dispatches()`.

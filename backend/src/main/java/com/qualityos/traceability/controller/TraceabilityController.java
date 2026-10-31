@@ -6,6 +6,7 @@ import com.qualityos.common.response.Pages;
 import com.qualityos.common.security.Permissions.Require;
 import com.qualityos.traceability.dto.TraceabilityDtos.ProductionBatchView;
 import com.qualityos.traceability.dto.TraceabilityDtos.SearchHit;
+import com.qualityos.traceability.dto.TraceabilityDtos.SerialTrace;
 import com.qualityos.traceability.dto.TraceabilityDtos.TraceReport;
 import com.qualityos.traceability.service.ProductionService;
 import com.qualityos.traceability.service.TraceabilityService;
@@ -48,6 +49,12 @@ public class TraceabilityController {
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toSet());
         return ApiResponse.ok(traceability.report(batchNumber, permissions));
+    }
+
+    @GetMapping("/serials/{serial}")
+    @PreAuthorize(Require.TRACEABILITY_VIEW)
+    public ApiResponse<SerialTrace> serial(@PathVariable String serial) {
+        return ApiResponse.ok(traceability.serial(serial));
     }
 
     @GetMapping("/products/{productId}")

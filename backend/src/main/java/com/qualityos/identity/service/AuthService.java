@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -65,9 +66,11 @@ public class AuthService {
     private final AuditService audit;
     private final JwtProperties jwtProperties;
     private final TransactionTemplate tx;
+    private final JdbcTemplate jdbc;
     private final String unusablePasswordHash;
 
     AuthService(
+            JdbcTemplate jdbc,
             UserRepository users,
             RefreshTokenRepository refreshTokens,
             TenantAccessService access,
@@ -81,6 +84,7 @@ public class AuthService {
             AuditService audit,
             JwtProperties jwtProperties,
             PlatformTransactionManager transactionManager) {
+        this.jdbc = jdbc;
         this.users = users;
         this.refreshTokens = refreshTokens;
         this.access = access;
@@ -103,6 +107,9 @@ public class AuthService {
 
     /** Empty when the account must confirm its email address first, in which case no session exists yet. */
     public Optional<TokenResponse> register(RegisterRequest request) {
+        if (!Boolean.TRUE.equals(jdbc.queryForObject("SELECT registration_open FROM platform_settings", Boolean.class))) {
+            throw new BusinessRuleException("New sign-ups are closed at the moment. Please try again later.");
+        }
         String email = normalizeEmail(request.email());
         String passwordHash = passwordEncoder.encode(request.password());
         User user = new User(email, passwordHash, request.fullName().trim());

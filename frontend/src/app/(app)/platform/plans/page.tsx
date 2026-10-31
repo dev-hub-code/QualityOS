@@ -9,6 +9,7 @@ import { PlanComparison } from "@/components/platform/plan-comparison";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import type { FieldDef } from "@/lib/record-form";
 import type { Feature, Plan } from "@/lib/types";
@@ -55,6 +56,7 @@ const NUMBERS = [
 const money = (value: number | null) => (value === null ? "Custom" : formatMoney(value));
 
 export default function PlatformPlansPage() {
+  const billing = usePermission("PLATFORM_BILLING_MANAGE");
   const refresh = useRefresh();
   const [editing, setEditing] = useState<Plan | null>(null);
   const [adding, setAdding] = useState(false);
@@ -78,7 +80,7 @@ export default function PlatformPlansPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Plans" subtitle="Changes apply to new invoices. Issued invoices keep their figures.">
-        <Button onClick={() => setAdding(true)}>New plan</Button>
+        {billing && <Button onClick={() => setAdding(true)}>New plan</Button>}
       </PageHeader>
       <div className="overflow-x-auto">
         <Table>
@@ -106,7 +108,7 @@ export default function PlatformPlansPage() {
                 <TableCell className="text-right">{plan.maxUsers ?? "No limit"}</TableCell>
                 <TableCell className="text-right">{plan.maxFacilities ?? "No limit"}</TableCell>
                 <TableCell className="space-x-2 whitespace-nowrap">
-                  {!plan.archivedAt && (
+                  {billing && !plan.archivedAt && (
                     <>
                       <Button size="sm" variant="outline" onClick={() => setEditing(plan)}>
                         Edit {plan.name}
@@ -123,9 +125,11 @@ export default function PlatformPlansPage() {
                       </Button>
                     </>
                   )}
-                  <Button size="sm" variant="outline" onClick={() => setCopying(plan)}>
-                    Copy {plan.name}
-                  </Button>
+                  {billing && (
+                    <Button size="sm" variant="outline" onClick={() => setCopying(plan)}>
+                      Copy {plan.name}
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

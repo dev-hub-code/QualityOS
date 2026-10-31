@@ -148,3 +148,8 @@ is then read and changed under its own tenant context.
 The Control Center needs search and totals across every organisation, which row-level security rightly refuses. Those
 reads are `SECURITY DEFINER` functions that check `platform_admins` themselves. Details of one organisation are still
 read under its own tenant context.
+
+## Private to operators
+
+Support tickets and notes give the application role no rights at all, so a mistake in a tenant query cannot reach them.
+Maintenance mode reuses the same permission narrowing as a read-only subscription, rather than a second switch.

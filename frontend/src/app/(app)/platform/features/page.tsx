@@ -9,6 +9,7 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import type { FieldDef } from "@/lib/record-form";
 import type { Feature, FeatureOrganisationList, Plan } from "@/lib/types";
@@ -92,6 +93,7 @@ function Organisations({ feature, onClose }: { feature: Feature; onClose: () => 
 }
 
 export default function PlatformFeaturesPage() {
+  const billing = usePermission("PLATFORM_BILLING_MANAGE");
   const refresh = useRefresh();
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Feature | null>(null);
@@ -117,7 +119,7 @@ export default function PlatformFeaturesPage() {
         title="Features"
         subtitle="A plan decides what an organisation has bought. A person's role still decides what they may do."
       >
-        <Button onClick={() => setAdding(true)}>New feature</Button>
+        {billing && <Button onClick={() => setAdding(true)}>New feature</Button>}
       </PageHeader>
       <div className="overflow-x-auto">
         <Table>
@@ -146,12 +148,16 @@ export default function PlatformFeaturesPage() {
                 <TableCell>{feature.enforced ? "Enforced" : "Listed only, not enforced"}</TableCell>
                 <TableCell>{feature.organisations}</TableCell>
                 <TableCell className="space-x-2 whitespace-nowrap">
-                  <Button size="sm" variant="outline" onClick={() => setEditing(feature)}>
-                    Edit
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setToggling(feature)}>
-                    {feature.active ? "Deactivate" : "Activate"}
-                  </Button>
+                  {billing && (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => setEditing(feature)}>
+                        Edit
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setToggling(feature)}>
+                        {feature.active ? "Deactivate" : "Activate"}
+                      </Button>
+                    </>
+                  )}
                   <Button size="sm" variant="outline" onClick={() => setViewing(feature)}>
                     Organisations
                   </Button>
@@ -187,6 +193,7 @@ export default function PlatformFeaturesPage() {
                         <Button
                           size="sm"
                           variant={included ? "default" : "outline"}
+                          disabled={!billing}
                           aria-label={`${feature.name} on ${plan.name}: ${included ? "included" : "not included"}`}
                           onClick={() => setAssigning({ feature, plan, included: !included })}
                         >

@@ -9,6 +9,7 @@ import { Details, PageHeader, QueryState, Section, useRefresh } from "@/componen
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import type { Invoice, OrganisationDetail } from "@/lib/types";
 
@@ -16,6 +17,8 @@ const megabytes = (bytes: number) => `${(bytes / 1_048_576).toFixed(1)} MB`;
 const used = (count: number, limit: number | null) => (limit === null ? String(count) : `${count} of ${limit}`);
 
 export default function PlatformOrganisationPage() {
+  const billing = usePermission("PLATFORM_BILLING_MANAGE");
+  const support = usePermission("PLATFORM_CUSTOMER_MANAGE");
   const { organisationId } = useParams<{ organisationId: string }>();
   const path = `/platform/organisations/${organisationId}`;
   const refresh = useRefresh();
@@ -32,30 +35,34 @@ export default function PlatformOrganisationPage() {
   return (
     <div className="space-y-6">
       <PageHeader title={data.name} subtitle="Figures only. The content of this organisation's quality records is not shown here.">
-        <Button variant="outline" onClick={() => setExtending(true)}>
-          Extend
-        </Button>
-        {trialRunning && (
+        {(billing || support) && (
+          <Button variant="outline" onClick={() => setExtending(true)}>
+            Extend
+          </Button>
+        )}
+        {(billing || support) && trialRunning && (
           <Button variant="outline" onClick={() => setAction(["End trial", `${path}/trial/end`])}>
             End trial
           </Button>
         )}
-        {subscription.cancelledAt ? (
-          <Button variant="outline" onClick={() => setAction(["Resume subscription", `${path}/resume`])}>
-            Resume
-          </Button>
-        ) : (
-          <Button variant="outline" onClick={() => setAction(["Cancel subscription", `${path}/cancel`])}>
-            Cancel subscription
-          </Button>
-        )}
-        {data.suspendedAt ? (
-          <Button onClick={() => setAction(["Reactivate organisation", `${path}/reactivate`])}>Reactivate</Button>
-        ) : (
-          <Button variant="destructive" onClick={() => setAction(["Suspend organisation", `${path}/suspend`])}>
-            Suspend
-          </Button>
-        )}
+        {billing &&
+          (subscription.cancelledAt ? (
+            <Button variant="outline" onClick={() => setAction(["Resume subscription", `${path}/resume`])}>
+              Resume
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => setAction(["Cancel subscription", `${path}/cancel`])}>
+              Cancel subscription
+            </Button>
+          ))}
+        {support &&
+          (data.suspendedAt ? (
+            <Button onClick={() => setAction(["Reactivate organisation", `${path}/reactivate`])}>Reactivate</Button>
+          ) : (
+            <Button variant="destructive" onClick={() => setAction(["Suspend organisation", `${path}/suspend`])}>
+              Suspend
+            </Button>
+          ))}
       </PageHeader>
       {data.suspendedAt && (
         <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm">
@@ -136,7 +143,7 @@ export default function PlatformOrganisationPage() {
                   <TableCell>{formatDate(invoice.dueOn)}</TableCell>
                   <TableCell className="text-right">{formatMoney(invoice.total)}</TableCell>
                   <TableCell className="space-x-2 whitespace-nowrap text-right">
-                    {invoice.status === "ISSUED" && (
+                    {billing && invoice.status === "ISSUED" && (
                       <Button size="sm" variant="outline" onClick={() => setPaying(invoice)}>
                         Record payment
                       </Button>

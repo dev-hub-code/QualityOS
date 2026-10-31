@@ -47,11 +47,16 @@ public class PlanAccess {
             boolean readOnly = SubscriptionState.of(endsAt, rows.getInt("grace_days"), Instant.now())
                     == SubscriptionState.READ_ONLY;
             Set<String> enabled = Set.of(rows.getString("features").split(","));
+            boolean frozen = readOnly || maintenance();
             return permissions.stream()
                     .filter(permission -> allowedByPlan(permission, enabled))
-                    .filter(permission -> !readOnly || isSafeWhenReadOnly(permission))
+                    .filter(permission -> !frozen || isSafeWhenReadOnly(permission))
                     .collect(Collectors.toSet());
         }, tenantId);
+    }
+
+    private boolean maintenance() {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT maintenance_mode FROM platform_settings", Boolean.class));
     }
 
     /** Records already made stay readable after a downgrade. Reports are the paid feature itself, so they go. */

@@ -64,10 +64,14 @@ public class PlanCatalogue {
     }
 
     public PlanResponse create(CreatePlanRequest request) {
-        return tx.execute(status -> add(withDefaultFeatures(new SubscriptionPlan(request.code(), request.name().trim())), "PLAN_CREATED"));
+        return tx.execute(status -> add(withDefaults(new SubscriptionPlan(request.code(), request.name().trim())), "PLAN_CREATED"));
     }
 
-    private SubscriptionPlan withDefaultFeatures(SubscriptionPlan plan) {
+    private SubscriptionPlan withDefaults(SubscriptionPlan plan) {
+        jdbc.query("SELECT default_trial_days, default_grace_days FROM platform_settings", rows -> {
+            plan.setTrialDays(rows.getInt("default_trial_days"));
+            plan.setGraceDays(rows.getInt("default_grace_days"));
+        });
         plan.setFeatures(new ArrayList<>(features.findAllByOrderByName().stream()
                 .filter(feature -> feature.isActive() && feature.isDefaultEnabled())
                 .map(FeatureDefinition::getCode)

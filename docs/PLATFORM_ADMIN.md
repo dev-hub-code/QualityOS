@@ -208,3 +208,32 @@ All amounts are in Indian rupees, without GST, and plans can only be priced in r
 
 A suspended organisation's contract still counts towards MRR until it ends or is cancelled.
 
+
+## Settings
+
+Only a Super Admin can change settings, with the password and a reason. Every operator can read them, and customers
+cannot. Secrets stay in the environment.
+
+| Setting | Effect |
+|---|---|
+| Default trial and grace days | Used for plans created afterwards. Existing plans keep their own |
+| New sign-ups | When closed, registration is refused. Existing accounts and invitations still work |
+| Support email | Shown to customers during maintenance |
+| Maintenance mode | Customers keep read access, but lose change permissions, as they do when read-only. Operators keep platform access. Takes effect on the next request |
+
+## Announcements
+
+Super and Support Admins publish banners with a severity, an audience (everyone, on trial, or paying) and dates, in
+Indian Standard Time. Critical ones cannot be dismissed. Dismissal is remembered in that browser only.
+
+## Support console
+
+Shows contact, subscription, billing, usage counts and failed emails for one organisation. It shows no quality record
+content, and gives no way to sign in as a customer.
+
+Tickets move between `OPEN`, `IN_PROGRESS`, `WAITING_FOR_CUSTOMER`, `RESOLVED` and `CLOSED`. A closed ticket cannot
+change. Notes can be added but not edited. The application role has no rights on either table, so only database
+functions that check for an operator can reach them. Audit rows for tickets stay in the operator's own trail and hold
+ids and states only, because an organisation can read its own trail.
+
+Super and Support Admins can change tickets. Other operators can read them.

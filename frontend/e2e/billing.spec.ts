@@ -254,3 +254,50 @@ test("a critical action asks for the password again, continues, and shows in the
   }
   await expect(page.getByRole("row", { name: /notification-delivery/ })).toBeVisible();
 });
+
+test("an operator posts an announcement and keeps a private support ticket", async ({ page, browser }) => {
+  test.setTimeout(60_000);
+  const other = await browser.newContext();
+  const customer = await other.newPage();
+  await signUp(customer);
+  const me: { organizations: { name: string }[] } = await apiCaller(customer)("GET", "/auth/me");
+  const organisation = me.organizations[0].name;
+
+  const email = `admin-${unique()}@example.com`;
+  await signUp(page, email);
+  makePlatformAdmin(email);
+
+  const title = `Maintenance ${unique()}`;
+  await page.goto("/platform/announcements");
+  await page.getByRole("button", { name: "New announcement" }).click();
+  await page.getByLabel("Title").fill(title);
+  await page.getByLabel("Message").fill("Back by six.");
+  await page.getByLabel("Reason").fill("Planned work");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("row", { name: title })).toBeVisible();
+
+  await customer.goto("/dashboard");
+  await expect(customer.getByText(title)).toBeVisible();
+  await customer.getByRole("button", { name: "Dismiss" }).first().click();
+
+  await page.goto("/platform/support");
+  await page.getByLabel("Find an organisation").fill(organisation);
+  await page.getByRole("button", { name: organisation }).click();
+  await page.getByRole("button", { name: "New ticket" }).click();
+  await page.getByLabel("Subject").fill("Renewal question");
+  await page.getByLabel("First internal note").fill("Asked about annual billing.");
+  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("row", { name: "Renewal question" }).getByRole("button", { name: "View" }).click();
+  await expect(page.getByText("Asked about annual billing.")).toBeVisible();
+
+  await page.goto("/platform/settings");
+  await expect(page.getByRole("button", { name: "Edit settings" })).toBeVisible();
+
+  await page.goto("/platform/announcements");
+  await page.getByRole("row", { name: title }).getByRole("button", { name: "Edit" }).click();
+  await page.getByLabel("Active").uncheck();
+  await page.getByLabel("Reason").fill("Finished testing");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("row", { name: title })).toContainText("Inactive");
+  await other.close();
+});

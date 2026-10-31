@@ -3,7 +3,23 @@
 Multi-tenant manufacturing quality management and product traceability platform.
 A modular monolith: Spring Boot API, Next.js web app, PostgreSQL.
 
-**Status:** Phases 1 and 2 (foundation, identity and tenancy) complete. See [the implementation plan](docs/IMPLEMENTATION_PLAN.md).
+**Status:** Phases 1 to 10 are built and tested locally. This is a development-stage product: it has not been deployed
+to production, and GitHub Actions has not run yet (see [CI](docs/CI.md)). Production work (Phase 11) is deferred, so the
+Docker Compose stack here is for local use only. See [the implementation plan](docs/IMPLEMENTATION_PLAN.md) for phases
+and known gaps.
+
+## What it does
+
+| Area | Included |
+|---|---|
+| Identity and tenancy | Organisations, roles, permissions, facility limits, invitations, email verification, password reset |
+| Master data and purchasing | Facilities, suppliers, materials, products, units, purchase orders, material receipts, attachments |
+| Inspection | Versioned templates, sampling, incoming, in-process and final inspection, approval, disposition |
+| NCR and CAPA | Containment, root cause, corrective actions, verification, closure |
+| Traceability | Production batches, serial numbers, dispatch, returns, material corrections, forward and backward traces, recalls |
+| Calibration and audits | Instruments, calibration records, audit checklists, findings that raise NCRs |
+| Analytics | Dashboard, supplier scorecards, Pareto, PDF and Excel reports |
+| Subscription | Plans, limits, trials, invoices, platform console. Payments are recorded by hand, and invoices are not yet GST tax invoices |
 
 ## Prerequisites
 
@@ -47,6 +63,8 @@ npx playwright install chromium  # first time only
 npm run test:e2e                 # needs the running stack
 ```
 
+These commands are the current evidence. CI has not run them on GitHub yet.
+
 ## Documentation
 
 - [Architecture and technology decisions](docs/ARCHITECTURE.md)
@@ -54,3 +72,6 @@ npm run test:e2e                 # needs the running stack
 - [Database schema](docs/DATABASE_SCHEMA.md)
 - [Tenant isolation strategy](docs/TENANT_ISOLATION.md)
 - [API contracts](docs/API_CONTRACTS.md)
+- [Analytics definitions](docs/ANALYTICS.md)
+- [Continuous integration](docs/CI.md)
+- [Security review](docs/SECURITY_REVIEW.md)

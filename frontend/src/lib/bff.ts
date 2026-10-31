@@ -60,7 +60,8 @@ export function forwardedHeaders(request: NextRequest): Headers {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
-  const clientAddress = request.headers.get("x-forwarded-for");
+  // A client can send this header itself. Only the last entry was added by the proxy in front of this app.
+  const clientAddress = request.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim();
   if (clientAddress) headers.set("x-forwarded-for", clientAddress);
   return headers;
 }

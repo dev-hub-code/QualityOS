@@ -293,7 +293,7 @@ class QualityIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void aCapaIsRemindedOnceBeforeItsDueDateInTheOwnersLanguage() throws Exception {
+    void aCapaIsRemindedOnceBeforeItsDueDate() throws Exception {
         String capa = capa(null, manager);
         asAppRole(owner.tenantId(), sql -> sql.update(
                 "UPDATE corrective_actions SET target_date = current_date + 2 WHERE id = ?", UUID.fromString(capa)));

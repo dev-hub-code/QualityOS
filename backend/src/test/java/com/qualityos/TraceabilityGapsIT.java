@@ -181,8 +181,11 @@ class TraceabilityGapsIT extends TraceabilityFixture {
                 .andExpect(status().isCreated());
         Session stranger = register();
 
-        assertThat(inTransactionAs(owner.tenantId(), null, () -> jdbc.queryForList(
-                "SELECT tenants_with_unconfirmed_dispatches()", java.util.UUID.class))).contains(owner.tenantId());
+        asAppRole(null, sql -> {
+            assertThat(sql.queryForList("SELECT tenants_with_unconfirmed_dispatches()", java.util.UUID.class))
+                    .contains(owner.tenantId());
+            assertThat(sql.queryForObject("SELECT count(*) FROM dispatch_records", Long.class)).isZero();
+        });
         assertThat(inTransactionAs(owner.tenantId(), null, () -> dispatches.remindUnconfirmed())).isEqualTo(1);
         assertThat(inTransactionAs(owner.tenantId(), null, () -> dispatches.remindUnconfirmed())).isZero();
         assertThat(inTransactionAs(stranger.tenantId(), null, () -> dispatches.remindUnconfirmed())).isZero();

@@ -48,9 +48,8 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A template can only be chosen by hand; none is picked automatically for a material | When a user needs it |
 | Production batches take IPQC and FQC inspections only. OQC and the other template types have no production flow | When a user needs it |
 | A template cannot yet be limited to a product in the UI, and quantities consumed are not converted between units | When a user needs it |
-| A wrong dispatch or consumption cannot be corrected, because genealogy and dispatch are append-only. A correcting entry needs its own design | Before customer launch |
+| A whole dispatch can be reversed, but not part of one. Material used can only be reversed while its batch is in progress, so a mistake found after completion cannot be corrected | Before customer launch |
 | Naming serial numbers on a dispatch is optional, so a batch can ship without saying which units went. A trace then shows the customer by batch, not by unit | Review after real use |
-| The dispatch screen ships one batch per dispatch, though the API takes several. Dispatch dates are not checked against today | When a user needs it |
 | A trace finds who received a batch, but there is no recall workflow | When a user needs it |
 | `tenant_settings` and supplier scorecards are not built | Phase 9 |
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |

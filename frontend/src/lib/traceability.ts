@@ -18,3 +18,15 @@ export function toConsumeRequest(source: string, quantity: string) {
   const [kind, id] = source.split(":");
   return kind === "lot" ? { receiptItemId: id, quantity } : { parentBatchId: id, quantity };
 }
+
+/** The dispatch form numbers its lines: productionBatchId1, quantity1, serials1, and so on. */
+export function toDispatchItems(values: Record<string, unknown>, lines: number) {
+  return Array.from({ length: lines }, (_, index) => {
+    const line = index + 1;
+    return {
+      productionBatchId: values[`productionBatchId${line}`],
+      quantity: values[`quantity${line}`],
+      serialNumbers: parseSerials(String(values[`serials${line}`] ?? "")),
+    };
+  });
+}

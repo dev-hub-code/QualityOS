@@ -66,11 +66,17 @@ public final class TraceabilityDtos {
             Instant completedAt) {
     }
 
+    public record ReverseRequest(@NotBlank @Size(max = 500) String reason) {
+    }
+
+    /** @param reversalReason set when this entry was corrected, and then it no longer counts */
     public record Consumption(
+            UUID id,
             String sourceBatch,
             String description,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
-            Instant at) {
+            Instant at,
+            String reversalReason) {
     }
 
     public record BatchDetail(ProductionBatchView batch, List<Consumption> consumptions, List<String> serialNumbers) {
@@ -103,7 +109,9 @@ public final class TraceabilityDtos {
             LocalDate dispatchedOn,
             String reference,
             List<DispatchLine> lines,
-            Instant createdAt) {
+            Instant createdAt,
+            String reversalReason,
+            Instant reversedAt) {
     }
 
     /** @param matchedOn which field the term was found in */

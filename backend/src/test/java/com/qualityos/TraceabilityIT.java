@@ -377,6 +377,108 @@ class TraceabilityIT extends MasterDataFixture {
     }
 
     @Test
+    void aMistakenConsumptionIsReversedAndLeavesTheTrace() throws Exception {
+        Lot wrong = releasedLot("10");
+        Lot right = releasedLot("10");
+        String batch = startBatch(product());
+        String detail = body(consumeLot(batch, wrong.id(), "4").andExpect(status().isOk()));
+        String entry = JsonPath.read(detail, "$.data.consumptions[0].id");
+        String reverse = "/api/v1/production-batches/" + batch + "/consumptions/" + entry + "/reverse";
+
+        as(owner, postJson(reverse, Map.of("reason", " "))).andExpect(status().isBadRequest());
+        as(owner, postJson(reverse, Map.of("reason", "Wrong lot scanned")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.consumptions[0].reversalReason").value("Wrong lot scanned"));
+        as(owner, postJson(reverse, Map.of("reason", "Again"))).andExpect(status().isUnprocessableContent());
+
+        // All 10 are usable again, and a batch with only reversed inputs still counts as having none.
+        complete(batch, "1").andExpect(status().isUnprocessableContent());
+        consumeLot(batch, wrong.id(), "10").andExpect(status().isOk());
+        String later = JsonPath.read(body(as(owner, get("/api/v1/production-batches/" + batch))),
+                "$.data.consumptions[1].id");
+        as(owner, postJson("/api/v1/production-batches/" + batch + "/consumptions/" + later + "/reverse",
+                        Map.of("reason", "Wrong lot again")))
+                .andExpect(status().isOk());
+        consumeLot(batch, right.id(), "4").andExpect(status().isOk());
+
+        as(owner, get("/api/v1/traceability/batches/" + wrong.batch()))
+                .andExpect(jsonPath("$.data.forward.length()").value(0));
+        as(owner, get("/api/v1/traceability/batches/" + numberOf(batch)))
+                .andExpect(jsonPath("$.data.backward.length()").value(1))
+                .andExpect(jsonPath("$.data.backward[0].batchNumber").value(right.batch()));
+    }
+
+    @Test
+    void aConsumptionCanOnlyBeReversedWhileTheBatchIsInProgress() throws Exception {
+        Lot lot = releasedLot("10");
+        String batch = startBatch(product());
+        String entry = JsonPath.read(body(consumeLot(batch, lot.id(), "4")), "$.data.consumptions[0].id");
+        complete(batch, "4").andExpect(status().isOk());
+        as(owner, postJson("/api/v1/production-batches/" + batch + "/consumptions/" + entry + "/reverse",
+                        Map.of("reason", "Too late")))
+                .andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void aReversedDispatchReturnsStockAndSerialsAndLeavesAffectedCustomers() throws Exception {
+        Lot lot = releasedLot("10");
+        String batch = startBatch(product());
+        consumeLot(batch, lot.id(), "2").andExpect(status().isOk());
+        complete(batch, "2").andExpect(status().isOk());
+        String serial = "SER-" + code();
+        as(owner, postJson("/api/v1/production-batches/" + batch + "/serials", Map.of("serialNumbers", List.of(serial))))
+                .andExpect(status().isOk());
+        inspectBatch(batch, "FQC", "20.0", "ACCEPT");
+        String customer = customer();
+        String shipped = body(dispatch(customer, batch, "1", List.of(serial)).andExpect(status().isCreated()));
+        String reverse = "/api/v1/dispatches/" + idOf(shipped) + "/reverse";
+
+        Session viewer = addMember(owner, "VIEWER");
+        as(viewer, postJson(reverse, Map.of("reason", "Wrong truck"))).andExpect(status().isForbidden());
+        as(owner, postJson(reverse, Map.of("reason", "Wrong truck")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.reversalReason").value("Wrong truck"));
+        as(owner, postJson(reverse, Map.of("reason", "Again"))).andExpect(status().isUnprocessableContent());
+
+        as(owner, get("/api/v1/traceability/batches/" + numberOf(batch)))
+                .andExpect(jsonPath("$.data.affectedCustomers.length()").value(0))
+                .andExpect(jsonPath("$.data.dispatches[0].reversalReason").value("Wrong truck"))
+                .andExpect(jsonPath("$.data.timeline[?(@.kind == 'DISPATCH_REVERSED')]").isNotEmpty());
+        as(owner, get("/api/v1/production-batches/" + batch))
+                .andExpect(jsonPath("$.data.batch.availableQuantity").value("2.000000"));
+        dispatch(customer, batch, "1", List.of(serial)).andExpect(status().isCreated());
+    }
+
+    @Test
+    void aDispatchCannotBeDatedInTheFuture() throws Exception {
+        Lot lot = releasedLot("10");
+        String batch = releasedBatch(lot.id(), "5", "5");
+        // Two days ahead is in the future in every time zone an organisation can use.
+        as(owner, postJson("/api/v1/dispatches", Map.of(
+                        "customerId", customer(), "dispatchedOn", LocalDate.now().plusDays(2).toString(),
+                        "items", List.of(Map.of("productionBatchId", batch, "quantity", "1")))))
+                .andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void correctionsDoNotCrossTenantsOrChange() throws Exception {
+        Lot lot = releasedLot("10");
+        String batch = releasedBatch(lot.id(), "5", "5");
+        String shipped = body(dispatch(customer(), batch, "1", List.of()).andExpect(status().isCreated()));
+        String id = idOf(shipped);
+
+        Session stranger = register();
+        as(stranger, postJson("/api/v1/dispatches/" + id + "/reverse", Map.of("reason", "Mine")))
+                .andExpect(status().isNotFound());
+        as(owner, postJson("/api/v1/dispatches/" + id + "/reverse", Map.of("reason", "Mistake")))
+                .andExpect(status().isOk());
+        for (String sql : List.of("UPDATE trace_corrections SET reason = 'Rewritten'", "DELETE FROM trace_corrections")) {
+            assertThatThrownBy(() -> asAppRole(owner.tenantId(), statement -> statement.update(sql)))
+                    .as(sql).isInstanceOf(DataAccessException.class);
+        }
+    }
+
+    @Test
     void anotherTenantSeesNoneOfThisAndCannotReachIt() throws Exception {
         Lot lot = releasedLot("10");
         String batch = releasedBatch(lot.id(), "5", "5");

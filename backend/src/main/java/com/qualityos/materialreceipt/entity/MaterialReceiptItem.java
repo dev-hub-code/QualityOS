@@ -90,6 +90,11 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
         consumedQuantity = consumedQuantity.add(amount);
     }
 
+    /** Corrections only: returns stock taken by a consumption that was reversed. */
+    public void restore(BigDecimal amount) {
+        consumedQuantity = consumedQuantity.subtract(amount);
+    }
+
     public void updateInspection(InspectionStatus status, String disposition) {
         this.inspectionStatus = status;
         this.disposition = disposition;

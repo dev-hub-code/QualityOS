@@ -530,7 +530,14 @@ export interface ProductionBatch {
 
 export interface BatchDetail {
   batch: ProductionBatch;
-  consumptions: { sourceBatch: string; description: string; quantity: string; at: string }[];
+  consumptions: {
+    id: string;
+    sourceBatch: string;
+    description: string;
+    quantity: string;
+    at: string;
+    reversalReason: string | null;
+  }[];
   serialNumbers: string[];
 }
 
@@ -541,6 +548,7 @@ export interface Dispatch {
   dispatchedOn: string;
   reference: string | null;
   lines: { batchNumber: string; productCode: string; productName: string; quantity: string }[];
+  reversalReason: string | null;
 }
 
 export interface SearchHit {

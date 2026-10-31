@@ -13,6 +13,8 @@ public interface FinishedProductRepository extends JpaRepository<FinishedProduct
 
     List<FinishedProduct> findByProductionBatchIdInOrderBySerialNumber(Collection<UUID> batchIds);
 
+    List<FinishedProduct> findByDispatchItemIdIn(Collection<UUID> dispatchItemIds);
+
     long countByProductionBatchId(UUID batchId);
 
     List<FinishedProduct> findBySerialNumberIn(Collection<String> serialNumbers);

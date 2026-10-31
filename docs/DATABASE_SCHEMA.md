@@ -69,7 +69,8 @@ email verification tokens, stored hashed like refresh tokens.
 with recursive CTEs), `finished_products`, `dispatch_records`, **`dispatch_items`**, **`customers`** (V7). Received lots
 stay in `material_receipt_items`, which gains `consumed_quantity`, so no separate `batches` table exists.
 
-- `batch_relationships`, `dispatch_records` and `dispatch_items` cannot be changed, enforced by triggers.
+- `batch_relationships`, `dispatch_records` and `dispatch_items` cannot be changed, enforced by triggers. A mistake is
+  reversed by a new row in **`trace_corrections`** (V8), which holds the reason. Each record can be reversed once.
 - Check constraints stop a lot or batch giving out more than it holds, and stop anything leaving an unreleased batch.
 - `inspections` gains `production_batch_id`. Each inspection has exactly one subject, and a batch has one open inspection.
 

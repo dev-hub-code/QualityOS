@@ -22,9 +22,11 @@ import com.qualityos.traceability.dto.TraceabilityDtos.ProductionBatchView;
 import com.qualityos.traceability.entity.BatchRelationship;
 import com.qualityos.traceability.entity.FinishedProduct;
 import com.qualityos.traceability.entity.ProductionBatch;
+import com.qualityos.traceability.entity.TraceCorrection;
 import com.qualityos.traceability.repository.BatchRelationshipRepository;
 import com.qualityos.traceability.repository.FinishedProductRepository;
 import com.qualityos.traceability.repository.ProductionBatchRepository;
+import com.qualityos.traceability.repository.TraceCorrectionRepository;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
@@ -49,6 +51,7 @@ public class ProductionService {
     private final ProductionBatchRepository batches;
     private final BatchRelationshipRepository relationships;
     private final FinishedProductRepository finishedProducts;
+    private final TraceCorrectionRepository corrections;
     private final MaterialReceiptService receipts;
     private final ProductService products;
     private final FacilityService facilities;
@@ -59,6 +62,7 @@ public class ProductionService {
             ProductionBatchRepository batches,
             BatchRelationshipRepository relationships,
             FinishedProductRepository finishedProducts,
+            TraceCorrectionRepository corrections,
             MaterialReceiptService receipts,
             ProductService products,
             FacilityService facilities,
@@ -67,6 +71,7 @@ public class ProductionService {
         this.batches = batches;
         this.relationships = relationships;
         this.finishedProducts = finishedProducts;
+        this.corrections = corrections;
         this.receipts = receipts;
         this.products = products;
         this.facilities = facilities;
@@ -137,10 +142,33 @@ public class ProductionService {
         return detail(id);
     }
 
+    /**
+     * Undoes a mistaken entry while the batch is still in progress. The stock returns to its source, and the entry
+     * stays on record with the reason. Afterwards the batch's genealogy no longer includes that source.
+     */
+    @Transactional
+    public BatchDetail reverseConsumption(UUID id, UUID relationshipId, String reason) {
+        lock(id).requireInProgress();
+        BatchRelationship edge = relationships.findById(relationshipId)
+                .filter(found -> found.getChildBatchId().equals(id))
+                .orElseThrow(() -> new ResourceNotFoundException("Consumption", relationshipId));
+        if (corrections.existsByBatchRelationshipId(relationshipId)) {
+            throw new BusinessRuleException("This entry was already reversed.");
+        }
+        if (edge.getParentLotId() != null) {
+            receipts.restore(edge.getParentLotId(), edge.getQuantity());
+        } else {
+            lock(edge.getParentBatchId()).returnUsed(edge.getQuantity());
+        }
+        corrections.save(TraceCorrection.ofConsumption(relationshipId, reason.trim()));
+        audit.record("BATCH_CONSUMPTION_REVERSED", ENTITY, id, null, Map.of("reason", reason.trim()));
+        return detail(id);
+    }
+
     @Transactional
     public BatchDetail complete(UUID id, CompleteBatchRequest request) {
         ProductionBatch batch = lock(id);
-        if (!relationships.existsByChildBatchId(id)) {
+        if (relationships.findActiveByChildBatchIdIn(List.of(id)).isEmpty()) {
             throw new BusinessRuleException("Record what went into this batch first, or it cannot be traced.");
         }
         batch.complete(request.producedQuantity(), Instant.now());
@@ -191,15 +219,19 @@ public class ProductionService {
         Map<UUID, ProductionBatchView> parents = views(edges.stream()
                         .map(BatchRelationship::getParentBatchId).filter(java.util.Objects::nonNull).toList())
                 .stream().collect(Collectors.toMap(ProductionBatchView::id, Function.identity()));
+        Map<UUID, String> reasons = corrections
+                .findByBatchRelationshipIdIn(edges.stream().map(BatchRelationship::getId).toList()).stream()
+                .collect(Collectors.toMap(TraceCorrection::getBatchRelationshipId, TraceCorrection::getReason));
         return edges.stream().map(edge -> {
+            String reason = reasons.get(edge.getId());
             if (edge.getParentLotId() != null) {
                 LotView lot = lots.get(edge.getParentLotId());
-                return new Consumption(lot.internalBatch(), lot.materialCode() + " – " + lot.materialName(),
-                        edge.getQuantity(), edge.getCreatedAt());
+                return new Consumption(edge.getId(), lot.internalBatch(),
+                        lot.materialCode() + " – " + lot.materialName(), edge.getQuantity(), edge.getCreatedAt(), reason);
             }
             ProductionBatchView parent = parents.get(edge.getParentBatchId());
-            return new Consumption(parent.batchNumber(), parent.productCode() + " – " + parent.productName(),
-                    edge.getQuantity(), edge.getCreatedAt());
+            return new Consumption(edge.getId(), parent.batchNumber(),
+                    parent.productCode() + " – " + parent.productName(), edge.getQuantity(), edge.getCreatedAt(), reason);
         }).toList();
     }
 

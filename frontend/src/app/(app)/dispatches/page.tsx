@@ -4,16 +4,39 @@ import { useQuery } from "@tanstack/react-query";
 import { createColumnHelper } from "@tanstack/react-table";
 import { useState } from "react";
 import { DataTable } from "@/components/records/data-table";
-import { PageHeader, useRefresh } from "@/components/records/parts";
+import { PageHeader, StatusBadge, useRefresh } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api, type PageResponse } from "@/lib/api";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
-import { parseSerials } from "@/lib/traceability";
+import { toDispatchItems } from "@/lib/traceability";
 import type { Customer, Dispatch, ProductionBatch } from "@/lib/types";
 
 const RELEASED = "/production-batches?status=RELEASED&size=100";
+
+function Row({ dispatch }: { dispatch: Dispatch }) {
+  const canManage = usePermission("TRACEABILITY_MANAGE");
+  const refresh = useRefresh();
+  const [reversing, setReversing] = useState(false);
+  if (dispatch.reversalReason) return <StatusBadge status="REVERSED" />;
+  if (!canManage) return null;
+  return (
+    <>
+      <Button variant="ghost" size="sm" onClick={() => setReversing(true)}>
+        Reverse
+      </Button>
+      {reversing && (
+        <RecordDialog
+          title={`Reverse ${dispatch.dispatchNumber}`}
+          fields={[{ name: "reason", label: "Why this dispatch was wrong", type: "textarea", required: true }]}
+          onClose={() => setReversing(false)}
+          onSubmit={(values) => api.post(`/dispatches/${dispatch.id}/reverse`, values).then(refresh)}
+        />
+      )}
+    </>
+  );
+}
 
 const column = createColumnHelper<Dispatch>();
 const columns = [
@@ -29,6 +52,7 @@ const columns = [
         .map((line) => `${line.batchNumber} × ${formatQuantity(line.quantity)}`)
         .join(", "),
   }),
+  column.display({ id: "correction", header: "", cell: (info) => <Row dispatch={info.row.original} /> }),
 ];
 
 function DispatchDialog({ onClose }: { onClose: () => void }) {
@@ -41,6 +65,13 @@ function DispatchDialog({ onClose }: { onClose: () => void }) {
     queryKey: [RELEASED],
     queryFn: () => api.get<PageResponse<ProductionBatch>>(RELEASED),
   });
+  const [lines, setLines] = useState(1);
+  const options = (batches?.items ?? [])
+    .filter((batch) => Number(batch.availableQuantity) > 0)
+    .map((batch) => ({
+      value: batch.id,
+      label: `${batch.batchNumber} – ${batch.productCode} (${formatQuantity(batch.availableQuantity)} available)`,
+    }));
   const fields: FieldDef[] = [
     {
       name: "customerId",
@@ -51,31 +82,32 @@ function DispatchDialog({ onClose }: { onClose: () => void }) {
     },
     { name: "dispatchedOn", label: "Date", type: "date", required: true },
     { name: "reference", label: "Invoice or vehicle reference" },
-    {
-      name: "productionBatchId",
-      label: "Released batch",
-      type: "select",
-      required: true,
-      options: (batches?.items ?? [])
-        .filter((batch) => Number(batch.availableQuantity) > 0)
-        .map((batch) => ({
-          value: batch.id,
-          label: `${batch.batchNumber} – ${batch.productCode} (${formatQuantity(batch.availableQuantity)} available)`,
-        })),
-    },
-    { name: "quantity", label: "Quantity", type: "decimal", required: true },
-    { name: "serials", label: "Serial numbers, if tracked (one per line)", type: "textarea" },
+    ...Array.from({ length: lines }, (_, index): FieldDef[] => {
+      const line = index + 1;
+      return [
+        { name: `productionBatchId${line}`, label: `Released batch ${line}`, type: "select", required: true, options },
+        { name: `quantity${line}`, label: `Quantity ${line}`, type: "decimal", required: true },
+        { name: `serials${line}`, label: `Serial numbers ${line}, if tracked (one per line)`, type: "textarea" },
+      ];
+    }).flat(),
   ];
   return (
     <RecordDialog
       title="Record dispatch"
       fields={fields}
       onClose={onClose}
-      onSubmit={({ productionBatchId, quantity, serials, ...values }) =>
+      extra={
+        <Button type="button" variant="outline" onClick={() => setLines(lines + 1)}>
+          Add another batch
+        </Button>
+      }
+      onSubmit={(values) =>
         api
           .post("/dispatches", {
-            ...values,
-            items: [{ productionBatchId, quantity, serialNumbers: parseSerials(String(serials ?? "")) }],
+            customerId: values.customerId,
+            dispatchedOn: values.dispatchedOn,
+            reference: values.reference,
+            items: toDispatchItems(values, lines),
           })
           .then(refresh)
       }

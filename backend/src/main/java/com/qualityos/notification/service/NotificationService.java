@@ -1,5 +1,6 @@
 package com.qualityos.notification.service;
 
+import com.qualityos.common.mail.EmailContent;
 import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.tenant.TenantContext;
@@ -45,6 +46,13 @@ public class NotificationService {
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public void notify(Set<UUID> recipients, NotificationType type, String title, String body, String link) {
+        notify(recipients, type, title, body, link, null);
+    }
+
+    /** @param email a template for this event, which lets the email be written in each recipient's language */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void notify(
+            Set<UUID> recipients, NotificationType type, String title, String body, String link, EmailContent email) {
         Set<UUID> targets = new HashSet<>(recipients);
         targets.remove(null);
         TenantContext.findCurrentUserId().ifPresent(targets::remove);
@@ -55,7 +63,14 @@ public class NotificationService {
                 .map(NotificationPreference::getUserId)
                 .collect(Collectors.toSet());
         notifications.saveAll(targets.stream()
-                .map(userId -> new Notification(userId, type, title, body, link, !optedOut.contains(userId)))
+                .map(userId -> {
+                    Notification notification =
+                            new Notification(userId, type, title, body, link, !optedOut.contains(userId));
+                    if (email != null) {
+                        notification.useEmail(email);
+                    }
+                    return notification;
+                })
                 .toList());
     }
 

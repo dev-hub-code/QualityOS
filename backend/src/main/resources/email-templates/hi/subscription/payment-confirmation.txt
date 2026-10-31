@@ -1,0 +1,8 @@
+Subject: {{organizationName}} के लिए भुगतान प्राप्त हुआ
+
+भुगतान प्राप्त हुआ
+
+नमस्ते {{recipientName}},
+हमें {{organizationName}} के लिए {{amount}} का भुगतान प्राप्त हुआ है। धन्यवाद।
+
+बिलिंग देखें: {{actionUrl}}

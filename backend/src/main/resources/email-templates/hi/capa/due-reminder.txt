@@ -1,0 +1,8 @@
+Subject: CAPA {{capaNumber}} की नियत तिथि {{dueDate}} है
+
+एक CAPA की नियत तिथि निकट है
+
+नमस्ते {{recipientName}},
+{{capaNumber}} की नियत तिथि {{dueDate}} है: {{capaTitle}}।
+
+CAPA खोलें: {{actionUrl}}

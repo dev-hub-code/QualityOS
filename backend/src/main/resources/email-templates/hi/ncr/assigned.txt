@@ -1,0 +1,8 @@
+Subject: NCR {{ncrNumber}} आपको सौंपा गया है
+
+एक NCR आपको सौंपा गया है
+
+नमस्ते {{recipientName}},
+{{ncrNumber}} अब आपके जिम्मे है: {{ncrTitle}}।
+
+NCR खोलें: {{actionUrl}}

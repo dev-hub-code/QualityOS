@@ -1,0 +1,8 @@
+Subject: ऑडिट {{auditNumber}} निर्धारित है
+
+एक ऑडिट निर्धारित है
+
+नमस्ते {{recipientName}},
+ऑडिट {{auditNumber}} {{dueDate}} को निर्धारित है।
+
+ऑडिट खोलें: {{actionUrl}}

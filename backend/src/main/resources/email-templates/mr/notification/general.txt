@@ -1,0 +1,8 @@
+Subject: {{title}}
+
+{{title}}
+
+नमस्कार {{recipientName}},
+{{body}}
+
+उघडा: {{actionUrl}}

@@ -94,6 +94,7 @@ export function refreshTokens(refreshToken: string): Promise<Response> {
 const PROXYABLE_AUTH_PATHS = new Set([
   "me",
   "change-password",
+  "me/email-language",
   "password-reset/request",
   "password-reset/confirm",
   "resend-verification",

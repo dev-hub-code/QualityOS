@@ -1,0 +1,8 @@
+Subject: {{organizationName}} साठी देयक मिळाले
+
+देयक मिळाले
+
+नमस्कार {{recipientName}},
+आम्हाला {{organizationName}} साठी {{amount}} चे देयक मिळाले आहे. धन्यवाद.
+
+बिलिंग पाहा: {{actionUrl}}

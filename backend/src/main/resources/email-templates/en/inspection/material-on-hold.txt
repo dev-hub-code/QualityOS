@@ -1,0 +1,8 @@
+Subject: Batch {{batchNumber}} is on hold
+
+Material is on hold
+
+Hello {{recipientName}},
+Inspection {{inspectionNumber}} placed batch {{batchNumber}} on hold. It cannot be used until a final decision is recorded.
+
+Open inspection: {{actionUrl}}

@@ -1,0 +1,8 @@
+Subject: Audit {{auditNumber}} has findings
+
+An audit has findings
+
+Hello {{recipientName}},
+Audit {{auditNumber}} recorded findings that need your attention.
+
+Open audit: {{actionUrl}}

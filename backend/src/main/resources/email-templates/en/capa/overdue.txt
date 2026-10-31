@@ -1,0 +1,8 @@
+Subject: CAPA {{capaNumber}} is overdue
+
+A CAPA is overdue
+
+Hello {{recipientName}},
+{{capaNumber}} was due on {{dueDate}}: {{capaTitle}}.
+
+Open CAPA: {{actionUrl}}

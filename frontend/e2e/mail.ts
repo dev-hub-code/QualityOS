@@ -26,6 +26,24 @@ export async function linkFromEmail(address: string, path: string): Promise<stri
   return link!.replace(/^https?:\/\/[^/]+/, "");
 }
 
+/** The newest email to this address with exactly this subject, as Mailpit decoded it. */
+export async function emailWithSubject(address: string, subject: string) {
+  let message: { Subject: string; HTML: string; Text: string } | undefined;
+  await expect
+    .poll(
+      async () => {
+        const query = encodeURIComponent(`to:"${address}"`);
+        const found = await (await fetch(`${MAILPIT}/api/v1/search?query=${query}`)).json();
+        const summary = (found.messages ?? []).find((item: { Subject: string }) => item.Subject === subject);
+        if (summary) message = await (await fetch(`${MAILPIT}/api/v1/message/${summary.ID}`)).json();
+        return Boolean(message);
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+  return message!;
+}
+
 export async function inviteUser(page: Page, email: string, role: string) {
   await page.goto("/users");
   await page.getByRole("button", { name: "Invite user" }).click();

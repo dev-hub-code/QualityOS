@@ -1,0 +1,8 @@
+Subject: CAPA {{capaNumber}} ची अंतिम तारीख {{dueDate}} आहे
+
+एका CAPA ची अंतिम तारीख जवळ आली आहे
+
+नमस्कार {{recipientName}},
+{{capaNumber}} ची अंतिम तारीख {{dueDate}} आहे: {{capaTitle}}.
+
+CAPA उघडा: {{actionUrl}}

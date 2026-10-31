@@ -1,0 +1,8 @@
+Subject: {{instrumentName}} चे अंशांकन थकले आहे
+
+अंशांकन थकले आहे
+
+नमस्कार {{recipientName}},
+{{instrumentName}} चे अंशांकन {{dueDate}} रोजी देय होते.
+
+उपकरण उघडा: {{actionUrl}}

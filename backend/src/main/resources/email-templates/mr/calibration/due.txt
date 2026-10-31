@@ -1,0 +1,8 @@
+Subject: {{instrumentName}} चे अंशांकन देय आहे
+
+अंशांकन देय आहे
+
+नमस्कार {{recipientName}},
+{{instrumentName}} चे अंशांकन {{dueDate}} रोजी देय आहे.
+
+उपकरण उघडा: {{actionUrl}}

@@ -1,0 +1,8 @@
+Subject: तपासणी {{inspectionNumber}} वर तुमची कृती आवश्यक आहे
+
+एका तपासणीवर तुमची कृती आवश्यक आहे
+
+नमस्कार {{recipientName}},
+{{organizationName}} मधील बॅच {{batchNumber}} ची तपासणी {{inspectionNumber}} तुमची वाट पाहत आहे.
+
+तपासणी उघडा: {{actionUrl}}

@@ -1,0 +1,9 @@
+Subject: Confirm your QualityOS email address
+
+Confirm your email address
+
+Hello {{recipientName}},
+Please confirm this email address for your QualityOS account. The link works for {{expiryMinutes}} minutes.
+If you did not create this account, you can ignore this email.
+
+Confirm email: {{actionUrl}}

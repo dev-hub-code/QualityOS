@@ -1,0 +1,8 @@
+Subject: NCR {{ncrNumber}} तुम्हाला सोपवला आहे
+
+एक NCR तुम्हाला सोपवला आहे
+
+नमस्कार {{recipientName}},
+{{ncrNumber}} आता तुमच्याकडे आहे: {{ncrTitle}}.
+
+NCR उघडा: {{actionUrl}}

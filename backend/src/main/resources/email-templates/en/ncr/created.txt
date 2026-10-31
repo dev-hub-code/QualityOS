@@ -1,0 +1,9 @@
+Subject: NCR {{ncrNumber}} was raised
+
+A non-conformance was raised
+
+Hello {{recipientName}},
+{{ncrNumber}} was raised at {{organizationName}}: {{ncrTitle}}.
+Please assign an owner.
+
+Open NCR: {{actionUrl}}

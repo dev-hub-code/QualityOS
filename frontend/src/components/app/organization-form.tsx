@@ -4,9 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { EMAIL_LANGUAGES } from "@/components/app/email-language";
 import { applyServerErrors } from "@/components/forms/apply-server-errors";
 import { Field, FormError } from "@/components/forms/field";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
 import { organizationSchema, type OrganizationValues } from "@/lib/schemas";
 import type { Organization } from "@/lib/types";
@@ -39,12 +41,14 @@ export function OrganizationForm({ organization, submitLabel, readOnly, onSaved 
     },
   });
 
+  const [language, setLanguage] = useState(new Intl.Locale(organization.locale).language);
+
   const save = useMutation({
     mutationFn: (values: OrganizationValues) =>
       api.put<Organization>(`/organizations/${organization.id}`, {
         ...values,
         countryCode: organization.countryCode,
-        locale: organization.locale,
+        locale: `${language}-IN`,
         version: organization.version,
       }),
     onSuccess: async () => {
@@ -73,6 +77,21 @@ export function OrganizationForm({ organization, submitLabel, readOnly, onSaved 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Time zone" id="timezone" error={errors.timezone} {...register("timezone")} />
           <Field label="Currency" id="currency" error={errors.currency} {...register("currency")} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="organization-language">Default email language</Label>
+          <select
+            id="organization-language"
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            value={language}
+            onChange={(event) => setLanguage(event.target.value)}
+          >
+            {EMAIL_LANGUAGES.map(({ value, label }) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
       </fieldset>
       {!readOnly && (

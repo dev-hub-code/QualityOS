@@ -1,0 +1,8 @@
+Subject: Inspection {{inspectionNumber}} needs your action
+
+An inspection needs your action
+
+Hello {{recipientName}},
+Inspection {{inspectionNumber}} for batch {{batchNumber}} at {{organizationName}} is waiting for you.
+
+Open inspection: {{actionUrl}}

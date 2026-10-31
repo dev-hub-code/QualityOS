@@ -1,0 +1,8 @@
+Subject: Calibration is due for {{instrumentName}}
+
+Calibration is due
+
+Hello {{recipientName}},
+{{instrumentName}} is due for calibration on {{dueDate}}.
+
+Open instrument: {{actionUrl}}

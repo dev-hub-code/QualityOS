@@ -71,6 +71,15 @@ class EmailVerificationIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void confirmingSendsAWelcomeOnce() throws Exception {
+        String email = pendingAccount();
+        verify(mail.awaitToken(email, "Confirm")).andExpect(status().isNoContent());
+        Thread.sleep(200);
+        assertThat(mail.to(email)).extracting(message -> message.subject())
+                .containsExactly("Confirm your QualityOS email address", "Welcome to QualityOS");
+    }
+
+    @Test
     void aWrongPasswordLearnsNothingAboutAPendingAccount() throws Exception {
         String email = pendingAccount();
         mvc.perform(postJson("/api/v1/auth/login", Map.of("email", email, "password", "wrong-password-here")))
@@ -149,9 +158,11 @@ class EmailVerificationIT extends AbstractIntegrationTest {
         String verified = pendingAccount();
         verify(mail.awaitToken(verified, "Confirm")).andExpect(status().isNoContent());
         ageTokens(verified, "2 minutes");
+        Thread.sleep(200);
+        int before = mail.to(verified).size();
         resend(verified).andExpect(status().isAccepted());
         Thread.sleep(200);
-        assertThat(mail.to(verified)).hasSize(1);
+        assertThat(mail.to(verified)).hasSize(before);
     }
 
     @Test

@@ -1,14 +1,21 @@
 package com.qualityos.notification.service;
 
-import com.qualityos.common.mail.MailGateway;
+import com.qualityos.common.mail.EmailRequest;
+import com.qualityos.common.mail.EmailService;
+import com.qualityos.common.mail.EmailTemplate;
 import com.qualityos.common.mail.MailGateway.MailDeliveryException;
-import com.qualityos.common.mail.MailMessage;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.TenantAccessService;
+import com.qualityos.identity.service.TenantAccessService.MemberContact;
 import com.qualityos.notification.entity.Notification;
+import com.qualityos.organization.dto.OrganizationResponse;
+import com.qualityos.organization.service.OrganizationService;
 import com.qualityos.notification.repository.NotificationRepository;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -34,7 +41,8 @@ public class NotificationDeliveryService {
 
     private final NotificationRepository notifications;
     private final TenantAccessService access;
-    private final MailGateway mail;
+    private final EmailService emails;
+    private final OrganizationService organizations;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
     private final String appUrl;
@@ -42,13 +50,15 @@ public class NotificationDeliveryService {
     NotificationDeliveryService(
             NotificationRepository notifications,
             TenantAccessService access,
-            MailGateway mail,
+            EmailService emails,
+            OrganizationService organizations,
             JdbcTemplate jdbc,
             PlatformTransactionManager transactionManager,
             @Value("${qualityos.app-url}") String appUrl) {
         this.notifications = notifications;
         this.access = access;
-        this.mail = mail;
+        this.emails = emails;
+        this.organizations = organizations;
         this.jdbc = jdbc;
         this.tx = new TransactionTemplate(transactionManager);
         this.appUrl = appUrl;
@@ -75,13 +85,13 @@ public class NotificationDeliveryService {
 
     private void deliver(Notification notification) {
         // Checked at send time: someone may have left the organisation since this was created.
-        Optional<String> address = access.activeMemberEmail(notification.getUserId());
-        if (address.isEmpty()) {
+        Optional<MemberContact> contact = access.activeMemberContact(notification.getUserId());
+        if (contact.isEmpty()) {
             notification.emailSkipped();
             return;
         }
         try {
-            mail.send(new MailMessage(address.get(), notification.getTitle(), text(notification)));
+            emails.send(request(notification, contact.get()));
             notification.emailSent();
         } catch (MailDeliveryException ex) {
             log.warn("Notification email {} failed, attempt {}", notification.getId(),
@@ -90,9 +100,22 @@ public class NotificationDeliveryService {
         }
     }
 
-    private String text(Notification notification) {
-        return notification.getLink() == null
-                ? notification.getBody()
-                : notification.getBody() + "\n\n" + appUrl + notification.getLink();
+    private EmailRequest request(Notification notification, MemberContact contact) {
+        OrganizationResponse organization = organizations.getCurrent();
+        Map<String, Object> variables = new HashMap<>();
+        EmailTemplate template = EmailTemplate.GENERAL;
+        if (notification.getEmailTemplate() != null) {
+            template = EmailTemplate.valueOf(notification.getEmailTemplate());
+            variables.putAll(notification.getEmailVariables());
+            variables.computeIfPresent("dueDate", (name, date) -> LocalDate.parse((String) date));
+        } else {
+            variables.put("title", notification.getTitle());
+            variables.put("body", notification.getBody());
+        }
+        variables.put("recipientName", contact.fullName());
+        variables.put("organizationName", organization.name());
+        variables.put("actionUrl", notification.getLink() == null ? appUrl : appUrl + notification.getLink());
+        return new EmailRequest(notification.getTenantId(), contact.email(), template,
+                emails.language(contact.language(), organization.locale()), variables);
     }
 }

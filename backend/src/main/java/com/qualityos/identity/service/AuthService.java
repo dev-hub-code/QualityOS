@@ -1,10 +1,12 @@
 package com.qualityos.identity.service;
 
 import com.qualityos.common.audit.AuditService;
+import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ErrorCode;
 import com.qualityos.common.exception.QualityOsException;
 import com.qualityos.common.exception.ResourceNotFoundException;
+import com.qualityos.common.mail.EmailService;
 import com.qualityos.common.security.JwtProperties;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.common.util.UuidV7;
@@ -56,6 +58,7 @@ public class AuthService {
     private final OrganizationService organizations;
     private final AccountEmailService accountEmails;
     private final RegistrationProperties registration;
+    private final EmailService emails;
     private final AccessTokenIssuer accessTokens;
     private final PasswordEncoder passwordEncoder;
     private final AuditService audit;
@@ -71,6 +74,7 @@ public class AuthService {
             OrganizationService organizations,
             AccountEmailService accountEmails,
             RegistrationProperties registration,
+            EmailService emails,
             AccessTokenIssuer accessTokens,
             PasswordEncoder passwordEncoder,
             AuditService audit,
@@ -83,6 +87,7 @@ public class AuthService {
         this.organizations = organizations;
         this.accountEmails = accountEmails;
         this.registration = registration;
+        this.emails = emails;
         this.accessTokens = accessTokens;
         this.passwordEncoder = passwordEncoder;
         this.audit = audit;
@@ -254,9 +259,23 @@ public class AuthService {
         }
         String newHash = passwordEncoder.encode(request.newPassword());
         tx.executeWithoutResult(status -> {
-            users.findById(userId).orElseThrow().setPasswordHash(newHash);
+            User current = users.findById(userId).orElseThrow();
+            current.setPasswordHash(newHash);
             refreshTokens.revokeAllForUser(userId, Instant.now());
             audit.record("PASSWORD_CHANGED", "User", userId);
+            accountEmails.sendPasswordChanged(current);
+        });
+    }
+
+    /** @param language empty to follow the organisation's default */
+    public void changeEmailLanguage(String language) {
+        if (language != null && !emails.supports(language)) {
+            throw new BusinessRuleException("That language is not available.");
+        }
+        UUID userId = TenantContext.getCurrentUserId();
+        tx.executeWithoutResult(status -> {
+            users.findById(userId).orElseThrow().setPreferredLanguage(language);
+            audit.record("EMAIL_LANGUAGE_CHANGED", "User", userId);
         });
     }
 
@@ -266,7 +285,8 @@ public class AuthService {
         User user = tx.execute(status -> users.findById(userId).orElseThrow());
         List<OrganizationSummary> memberOf = access.organizationsOf(userId);
         return new MeResponse(
-                new UserSummary(user.getId(), user.getEmail(), user.getFullName(), user.getEmailVerifiedAt() != null),
+                new UserSummary(user.getId(), user.getEmail(), user.getFullName(), user.getEmailVerifiedAt() != null,
+                        user.getPreferredLanguage()),
                 tenantId,
                 organizations.getCurrent().onboarded(),
                 permissions,
@@ -295,6 +315,7 @@ public class AuthService {
                 user.setFailedLoginCount(0);
                 user.setLockedUntil(Instant.now().plus(LOCK_DURATION));
                 audit.record("USER_LOCKED", "User", userId);
+                accountEmails.sendAccountLocked(user, LOCK_DURATION);
             }
             audit.record("LOGIN_FAILED", "User", userId);
         }));

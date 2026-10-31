@@ -1,0 +1,8 @@
+Subject: NCR {{ncrNumber}} was assigned to you
+
+An NCR was assigned to you
+
+Hello {{recipientName}},
+{{ncrNumber}} is now yours: {{ncrTitle}}.
+
+Open NCR: {{actionUrl}}

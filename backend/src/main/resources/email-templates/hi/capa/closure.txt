@@ -1,0 +1,8 @@
+Subject: CAPA {{capaNumber}} बंद कर दिया गया
+
+एक CAPA बंद कर दिया गया
+
+नमस्ते {{recipientName}},
+{{capaNumber}} बंद कर दिया गया: {{capaTitle}}।
+
+CAPA खोलें: {{actionUrl}}

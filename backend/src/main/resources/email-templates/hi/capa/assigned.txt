@@ -1,0 +1,9 @@
+Subject: CAPA {{capaNumber}} आपको सौंपा गया है
+
+एक CAPA आपको सौंपा गया है
+
+नमस्ते {{recipientName}},
+{{capaNumber}} अब आपके जिम्मे है: {{capaTitle}}।
+इसकी नियत तिथि {{dueDate}} है।
+
+CAPA खोलें: {{actionUrl}}

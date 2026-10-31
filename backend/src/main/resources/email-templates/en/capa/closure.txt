@@ -1,0 +1,8 @@
+Subject: CAPA {{capaNumber}} was closed
+
+A CAPA was closed
+
+Hello {{recipientName}},
+{{capaNumber}} was closed: {{capaTitle}}.
+
+Open CAPA: {{actionUrl}}

@@ -48,6 +48,7 @@ public abstract class AbstractIntegrationTest {
         registry.add("DB_MIGRATION_USER", () -> "qualityos_migrator");
         registry.add("DB_MIGRATION_PASSWORD", () -> "migrator");
         registry.add("JOBS_ENABLED", () -> "false");
+        registry.add("MAIL_RETRY_DELAY", () -> "1ms");
         registry.add("REGISTRATION_EMAIL_VERIFICATION_REQUIRED", () -> "false");
         registry.add("AUTH_RATE_LIMIT_PER_MINUTE", () -> "1000000");
     }

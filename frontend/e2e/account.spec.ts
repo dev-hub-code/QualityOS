@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { signUp } from "./helpers";
-import { acceptInvitation, inviteUser, linkFromEmail } from "./mail";
+import { acceptInvitation, emailWithSubject, inviteUser, linkFromEmail } from "./mail";
 
 const PASSWORD = "correct-horse-battery";
 const NEW_PASSWORD = "another-long-password";
@@ -73,4 +73,26 @@ test("an invited person joins with their own password and sees no pending invita
   await page.reload();
   await expect(page.getByRole("cell", { name: email })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Pending invitations" })).toHaveCount(0);
+});
+
+test("a user who chooses Hindi receives a Hindi HTML email with a plain text part", async ({ page, browser }) => {
+  const email = `hindi-${unique()}@example.com`;
+  await signUp(page, email);
+  await page.goto("/settings");
+  const saved = page.waitForResponse((response) => response.url().includes("/email-language"));
+  await page.getByLabel("Send my emails in").selectOption("hi");
+  expect((await saved).status()).toBe(204);
+  await page.reload();
+  await expect(page.getByLabel("Send my emails in")).toHaveValue("hi");
+
+  const visitor = await (await browser.newContext()).newPage();
+  await visitor.goto("/forgot-password");
+  await visitor.getByLabel("Email").fill(email);
+  await visitor.getByRole("button", { name: /send/i }).click();
+
+  const message = await emailWithSubject(email, "अपना QualityOS पासवर्ड रीसेट करें");
+  expect(message.HTML).toContain('<html lang="hi">');
+  expect(message.HTML).toContain("पासवर्ड रीसेट करें");
+  expect(message.Text).toMatch(/reset-password\?token=/);
+  expect(message.Text).not.toContain("<p");
 });

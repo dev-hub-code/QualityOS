@@ -362,7 +362,7 @@ public class NcrService implements AttachmentPolicy {
     }
 
     void requireMember(UUID userId) {
-        if (access.activeMemberEmail(userId).isEmpty()) {
+        if (access.activeMemberContact(userId).isEmpty()) {
             throw new BusinessRuleException("This person is not an active member of the organisation.");
         }
     }

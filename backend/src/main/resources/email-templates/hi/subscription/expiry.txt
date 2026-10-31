@@ -1,0 +1,8 @@
+Subject: आपकी QualityOS सदस्यता {{dueDate}} को समाप्त होगी
+
+आपकी सदस्यता समाप्त होने वाली है
+
+नमस्ते {{recipientName}},
+{{organizationName}} की सदस्यता {{dueDate}} को समाप्त होगी।
+
+सदस्यता प्रबंधित करें: {{actionUrl}}

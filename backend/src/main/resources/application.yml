@@ -60,6 +60,9 @@ qualityos:
   app-url: ${APP_URL:http://localhost:3000}
   mail:
     from: ${MAIL_FROM:QualityOS <no-reply@qualityos.local>}
+    # A language here needs a folder in resources/email-templates, and any file it lacks falls back to English.
+    languages: en,hi,mr
+    retry-delay: ${MAIL_RETRY_DELAY:5s}
   jobs:
     enabled: ${JOBS_ENABLED:true}
   storage:

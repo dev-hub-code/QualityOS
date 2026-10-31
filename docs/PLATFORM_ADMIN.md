@@ -15,12 +15,46 @@ A page joins the navigation only once it works.
 
 ## Bootstrap
 
-Administrators cannot be created by the application, on purpose. Register the account normally, then run this as a
-database superuser:
+The first operator cannot be created by the application, on purpose. Register the account normally, then run this as a
+database superuser. Later operators are added under Operators by a Super Admin.
 
 ```sql
-INSERT INTO platform_admins (user_id) SELECT id FROM users WHERE email = 'someone@example.com';
+INSERT INTO platform_admins (user_id, role) SELECT id, 'SUPER_ADMIN' FROM users WHERE email = 'someone@example.com';
 ```
+
+The same statement is the recovery process if no Super Admin can sign in. The application refuses to remove or demote
+the last active Super Admin, so this only arises when that account is lost. For a deactivated row, run
+`UPDATE platform_admins SET deactivated_at = NULL, role = 'SUPER_ADMIN' WHERE user_id = ...` instead.
+
+## Operator roles
+
+| Role | Can change | Can read |
+|---|---|---|
+| Super Admin | Everything, including operators | Everything |
+| Billing Admin | Plans, features, invoices, payments, subscriptions | Everything except operators and the audit log |
+| Support Admin | Suspend, reactivate, extend, end a trial, retry an email | Everything except operators and the audit log |
+| Read-only Auditor | Nothing | Everything |
+
+Roles come from `platform_admins` on every request. Removing someone takes effect on their next request.
+
+## Re-authentication
+
+Adding or changing an operator, saving or archiving a plan, raising an invoice, recording a payment, cancelling, and
+suspending or reactivating an organisation need the password again, then allow 10 minutes. The time is held in the
+database, and wrong passwords count towards the normal sign-in lockout.
+
+## Audit log
+
+Shows operator actions on the platform and on subscriptions, invoices, payments and organisation status. A customer's
+own activity stays out of it. Rows cannot be changed or deleted by the application. Values whose names suggest secrets, tax numbers
+or bank details are replaced with `[hidden]` when shown or exported, and each export is itself logged.
+
+## Notifications, email and jobs
+
+- Notifications lists billing notices only. Quality notifications stay private to each organisation.
+- The email log shows one row per email. Only a notification that has used all its attempts can be retried.
+- An invoice past its due date is chased once. Each expiry stage is sent once.
+- Jobs shows every expected job, its latest result, failures in the last 24 hours, and its recent runs.
 
 ## Security
 

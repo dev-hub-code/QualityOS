@@ -10,7 +10,12 @@ import java.util.UUID;
  * @param variables dates are given as {@link java.time.LocalDate} and written in the recipient's language
  */
 public record EmailRequest(
-        UUID tenantId, String to, EmailTemplate template, String language, Map<String, Object> variables) {
+        UUID tenantId, String to, EmailTemplate template, String language, Map<String, Object> variables,
+        UUID notificationId) {
+
+    public EmailRequest(UUID tenantId, String to, EmailTemplate template, String language, Map<String, Object> variables) {
+        this(tenantId, to, template, language, variables, null);
+    }
 
     @Override
     public String toString() {

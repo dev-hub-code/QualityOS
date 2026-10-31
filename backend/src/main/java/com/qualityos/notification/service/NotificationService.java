@@ -7,6 +7,7 @@ import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.notification.dto.NotificationDtos.NotificationResponse;
 import com.qualityos.notification.dto.NotificationDtos.PreferenceResponse;
 import com.qualityos.notification.dto.NotificationDtos.UnreadCount;
+import com.qualityos.common.exception.ConflictException;
 import com.qualityos.notification.entity.Notification;
 import com.qualityos.notification.entity.NotificationPreference;
 import com.qualityos.notification.repository.NotificationPreferenceRepository;
@@ -72,6 +73,17 @@ public class NotificationService {
                     return notification;
                 })
                 .toList());
+    }
+
+    /** Only an email that gave up can go again. One already sent, or skipped, stays as it is. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void retryEmail(UUID id) {
+        Notification notification = notifications.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Notification", id.toString()));
+        if (notification.getEmailStatus() != Notification.EmailStatus.FAILED) {
+            throw new ConflictException("This email has not failed, so it cannot be retried.");
+        }
+        notification.emailRetried();
     }
 
     /** Whether anyone in this tenant was told about this since then, for reminders that run often. */

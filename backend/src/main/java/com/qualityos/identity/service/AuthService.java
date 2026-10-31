@@ -189,6 +189,19 @@ public class AuthService {
         }
     }
 
+    /**
+     * Asks the signed-in person for their password again, under the same lockout as signing in. It answers with its
+     * own code because 401 means the session has ended, and this session has not.
+     */
+    public void confirmPassword(String password) {
+        User user = tx.execute(status -> users.findById(TenantContext.getCurrentUserId()).orElseThrow());
+        try {
+            checkPassword(user, password);
+        } catch (QualityOsException ex) {
+            throw new QualityOsException(ErrorCode.REAUTHENTICATION_FAILED, "That password is not right.");
+        }
+    }
+
     private void checkPassword(User user, String password) {
         boolean passwordMatches = passwordEncoder.matches(password, user.getPasswordHash());
         boolean locked = user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now());

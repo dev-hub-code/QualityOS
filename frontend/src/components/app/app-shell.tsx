@@ -101,7 +101,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {CONTROL_CENTER_NAV.map(({ heading, items }) => (
               <div key={heading} className="space-y-1">
                 <p className="px-2 text-xs font-medium tracking-wide text-slate-400 uppercase">{heading}</p>
-                {items.map(({ href, label, icon: Icon }) => (
+                {visibleNavItems(me?.permissions ?? [], items).map(({ href, label, icon: Icon }) => (
                   <Link
                     key={href}
                     href={href}

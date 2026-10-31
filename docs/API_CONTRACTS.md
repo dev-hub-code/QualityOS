@@ -237,3 +237,20 @@ To make someone a platform administrator, an operator runs this as a database su
 ```sql
 INSERT INTO platform_admins (user_id) SELECT id FROM users WHERE email = 'someone@example.com';
 ```
+
+## Platform operations
+
+All under `/api/v1/platform`, and all need `PLATFORM_ADMIN`. A critical action refused with `REAUTHENTICATION_REQUIRED`
+may be sent again after `POST /reauthenticate`.
+
+| Method and path | Also needs | Purpose |
+|---|---|---|
+| `POST /reauthenticate` | | Confirm the password for 10 minutes. A wrong one gives `REAUTHENTICATION_FAILED` |
+| `GET /operators` | `PLATFORM_AUDIT_VIEW` | List operators |
+| `POST /operators` | `PLATFORM_OPERATOR_MANAGE` | Add an operator by email, role and reason |
+| `PUT /operators/{userId}` | `PLATFORM_OPERATOR_MANAGE` | Change role or active state, with a reason |
+| `GET /audit-logs`, `GET /audit-logs/export` | `PLATFORM_AUDIT_VIEW` | Filter by `q`, `action`, `entityType`, `from`, `to` |
+| `GET /email-logs` | | Filter by `q`, `status`, `retryable` |
+| `POST /organisations/{tenantId}/notifications/{notificationId}/retry-email` | `PLATFORM_CUSTOMER_MANAGE` | Send a given-up email again |
+| `GET /notifications` | | Billing notices, by `type` |
+| `GET /jobs`, `GET /jobs/{job}/runs` | | Job health and recent runs |

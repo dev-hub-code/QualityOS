@@ -103,28 +103,33 @@ public class PlatformController {
         return ApiResponse.ok(platform.plans());
     }
 
+    @PreAuthorize(Require.PLATFORM_BILLING_MANAGE)
     @PutMapping("/plans/{id}")
     public ApiResponse<PlanResponse> savePlan(@PathVariable UUID id, @Valid @RequestBody SavePlanRequest request) {
         return ApiResponse.ok(platform.savePlan(id, request));
     }
 
+    @PreAuthorize(Require.PLATFORM_BILLING_MANAGE)
     @PostMapping("/plans")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<PlanResponse> createPlan(@Valid @RequestBody CreatePlanRequest request) {
         return ApiResponse.ok(catalogue.create(request));
     }
 
+    @PreAuthorize(Require.PLATFORM_BILLING_MANAGE)
     @PostMapping("/plans/{id}/duplicate")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<PlanResponse> duplicatePlan(@PathVariable UUID id, @Valid @RequestBody CreatePlanRequest request) {
         return ApiResponse.ok(catalogue.duplicate(id, request));
     }
 
+    @PreAuthorize(Require.PLATFORM_BILLING_MANAGE)
     @PostMapping("/plans/{id}/active")
     public ApiResponse<PlanResponse> setPlanActive(@PathVariable UUID id, @Valid @RequestBody PlanActiveRequest request) {
         return ApiResponse.ok(catalogue.setActive(id, request));
     }
 
+    @PreAuthorize(Require.PLATFORM_BILLING_MANAGE)
     @PostMapping("/plans/{id}/archive")
     public ApiResponse<PlanResponse> archivePlan(@PathVariable UUID id, @Valid @RequestBody PlanActionRequest request) {
         return ApiResponse.ok(catalogue.archive(id, request));
@@ -226,24 +231,28 @@ public class PlatformController {
         return ApiResponse.ok(features.list());
     }
 
+    @PreAuthorize(Require.PLATFORM_BILLING_MANAGE)
     @PostMapping("/features")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<FeatureResponse> createFeature(@Valid @RequestBody CreateFeatureRequest request) {
         return ApiResponse.ok(features.create(request));
     }
 
+    @PreAuthorize(Require.PLATFORM_BILLING_MANAGE)
     @PutMapping("/features/{code}")
     public ApiResponse<FeatureResponse> updateFeature(
             @PathVariable String code, @Valid @RequestBody UpdateFeatureRequest request) {
         return ApiResponse.ok(features.update(code, request));
     }
 
+    @PreAuthorize(Require.PLATFORM_BILLING_MANAGE)
     @PostMapping("/features/{code}/active")
     public ApiResponse<FeatureResponse> setFeatureActive(
             @PathVariable String code, @Valid @RequestBody FeatureActiveRequest request) {
         return ApiResponse.ok(features.setActive(code, request));
     }
 
+    @PreAuthorize(Require.PLATFORM_BILLING_MANAGE)
     @PostMapping("/features/{code}/plans")
     public ApiResponse<PlanResponse> assignFeature(
             @PathVariable String code, @Valid @RequestBody AssignFeatureRequest request) {
@@ -307,6 +316,7 @@ public class PlatformController {
         return ApiResponse.ok(insights.organisation(tenantId));
     }
 
+    @PreAuthorize(Require.PLATFORM_BILLING_MANAGE)
     @PostMapping("/organisations/{tenantId}/invoices")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<InvoiceResponse> raiseInvoice(
@@ -314,6 +324,7 @@ public class PlatformController {
         return ApiResponse.ok(platform.raiseInvoice(tenantId, request));
     }
 
+    @PreAuthorize(Require.PLATFORM_BILLING_MANAGE)
     @PostMapping("/organisations/{tenantId}/invoices/{invoiceId}/payments")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<PaymentResponse> recordPayment(
@@ -321,32 +332,38 @@ public class PlatformController {
         return ApiResponse.ok(platform.recordPayment(tenantId, invoiceId, request));
     }
 
+    @PreAuthorize(Require.PLATFORM_ACCOUNT_MANAGE)
     @PostMapping("/organisations/{tenantId}/extend")
     public ApiResponse<SubscriptionResponse> extend(@PathVariable UUID tenantId, @Valid @RequestBody ExtendRequest request) {
         return ApiResponse.ok(platform.extend(tenantId, request.days(), request.reason()));
     }
 
+    @PreAuthorize(Require.PLATFORM_ACCOUNT_MANAGE)
     @PostMapping("/organisations/{tenantId}/trial/end")
     public ApiResponse<SubscriptionResponse> endTrial(@PathVariable UUID tenantId, @Valid @RequestBody ReasonRequest request) {
         return ApiResponse.ok(platform.endTrial(tenantId, request.reason()));
     }
 
+    @PreAuthorize(Require.PLATFORM_BILLING_MANAGE)
     @PostMapping("/organisations/{tenantId}/cancel")
     public ApiResponse<SubscriptionResponse> cancel(@PathVariable UUID tenantId, @Valid @RequestBody ReasonRequest request) {
         return ApiResponse.ok(platform.cancel(tenantId, request.reason()));
     }
 
+    @PreAuthorize(Require.PLATFORM_BILLING_MANAGE)
     @PostMapping("/organisations/{tenantId}/resume")
     public ApiResponse<SubscriptionResponse> resume(@PathVariable UUID tenantId, @Valid @RequestBody ReasonRequest request) {
         return ApiResponse.ok(platform.resume(tenantId, request.reason()));
     }
 
+    @PreAuthorize(Require.PLATFORM_CUSTOMER_MANAGE)
     @PostMapping("/organisations/{tenantId}/suspend")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void suspend(@PathVariable UUID tenantId, @Valid @RequestBody ReasonRequest request) {
         platform.suspend(tenantId, request.reason());
     }
 
+    @PreAuthorize(Require.PLATFORM_CUSTOMER_MANAGE)
     @PostMapping("/organisations/{tenantId}/reactivate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void reactivate(@PathVariable UUID tenantId, @Valid @RequestBody ReasonRequest request) {

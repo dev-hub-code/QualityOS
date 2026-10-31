@@ -1,13 +1,13 @@
 import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
-import { apiCaller, signUp, unique } from "./helpers";
+import { apiCaller, PASSWORD, signUp, unique } from "./helpers";
 
 /** Being a platform administrator can only be granted in the database, on purpose. */
-function makePlatformAdmin(email: string) {
+function makePlatformAdmin(email: string, recentlyConfirmed = true) {
   execFileSync("docker", [
     "compose", "exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "qualityos", "-c",
-    `INSERT INTO platform_admins (user_id) SELECT id FROM users WHERE email = '${email}'`,
+    `INSERT INTO platform_admins (user_id, reauthenticated_until) SELECT id, ${recentlyConfirmed ? "now() + INTERVAL '1 hour'" : "NULL"} FROM users WHERE email = '${email}'`,
   ]);
 }
 
@@ -219,3 +219,38 @@ test("a platform admin defines a feature, puts it on a plan, and reads usage and
   expect((await readFile(await (await csv).path())).toString()).toContain("MRR (INR)");
 });
 
+test("a critical action asks for the password again, continues, and shows in the audit log", async ({ page, browser }) => {
+  test.setTimeout(60_000);
+  const email = `root-${unique()}@example.com`;
+  await signUp(page, email);
+  makePlatformAdmin(email, false);
+  const other = await browser.newContext();
+  const colleague = `colleague-${unique()}@example.com`;
+  await signUp(await other.newPage(), colleague);
+  await other.close();
+
+  await page.goto("/platform/operators");
+  await expect(page.getByRole("row", { name: email })).toBeVisible();
+  await page.getByRole("button", { name: "Add operator" }).click();
+  await page.getByLabel("Email of an existing, confirmed account").fill(colleague);
+  await page.getByLabel("Platform role").selectOption("BILLING_ADMIN");
+  await page.getByLabel("Reason").fill("Joined the billing team");
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await page.getByLabel("Password", { exact: true }).fill("not the password");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "That password is not right." })).toBeVisible();
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("row", { name: colleague })).toContainText("Billing Admin");
+
+  // Listed by email, and the colleague's row also names who added them.
+  await page.getByRole("row", { name: email }).last().getByRole("link", { name: "Activity" }).click();
+  await expect(page.getByRole("row", { name: /OPERATOR_ADDED/ })).toContainText("Joined the billing team");
+  for (const path of ["notifications", "email-logs", "jobs"]) {
+    const response = page.waitForResponse((reply) => reply.url().includes(`/api/v1/platform/${path}`));
+    await page.goto(`/platform/${path}`);
+    expect((await response).ok()).toBe(true);
+  }
+  await expect(page.getByRole("row", { name: /notification-delivery/ })).toBeVisible();
+});

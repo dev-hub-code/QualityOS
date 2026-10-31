@@ -42,6 +42,7 @@ public class PlanCatalogue {
     private final AuditService audit;
     private final JdbcTemplate jdbc;
     private final FeatureDefinitionRepository features;
+    private final PlatformStepUp stepUp;
     private final JsonMapper json;
     private final TransactionTemplate tx;
 
@@ -50,12 +51,14 @@ public class PlanCatalogue {
             AuditService audit,
             JdbcTemplate jdbc,
             FeatureDefinitionRepository features,
+            PlatformStepUp stepUp,
             JsonMapper json,
             PlatformTransactionManager transactionManager) {
         this.plans = plans;
         this.audit = audit;
         this.jdbc = jdbc;
         this.features = features;
+        this.stepUp = stepUp;
         this.json = json;
         this.tx = new TransactionTemplate(transactionManager);
     }
@@ -119,6 +122,7 @@ public class PlanCatalogue {
 
     /** A plan someone is on stays, because its limits still apply to them. Move them to another plan first. */
     public PlanResponse archive(UUID id, PlanActionRequest request) {
+        stepUp.require();
         return tx.execute(status -> {
             SubscriptionPlan plan = find(id);
             requireCurrent(plan, request.version());

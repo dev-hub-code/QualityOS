@@ -1318,3 +1318,89 @@ export interface PlatformAnalytics {
   collectionRate: number | null;
   months: PlatformMonth[];
 }
+
+export interface PlatformOperator {
+  userId: string;
+  email: string;
+  fullName: string;
+  role: string;
+  addedAt: string;
+  deactivatedAt: string | null;
+  addedBy: string | null;
+  lastActivity: string | null;
+}
+
+export interface PlatformAuditEntry {
+  id: string;
+  occurredAt: string;
+  actor: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  organisation: string | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  reason: string | null;
+  correlationId: string | null;
+  ipAddress: string | null;
+}
+
+export interface PlatformAuditList {
+  total: number;
+  items: PlatformAuditEntry[];
+}
+
+export interface PlatformEmail {
+  id: string;
+  tenantId: string | null;
+  organisation: string | null;
+  notificationId: string | null;
+  recipient: string;
+  template: string;
+  status: string;
+  attempts: number;
+  lastAttempt: string;
+  errorType: string | null;
+  retryable: boolean;
+}
+
+export interface PlatformEmailList {
+  total: number;
+  items: PlatformEmail[];
+}
+
+export interface PlatformNotice {
+  id: string;
+  sentAt: string;
+  type: string;
+  title: string;
+  organisation: string;
+  tenantId: string;
+  recipient: string | null;
+  emailStatus: string;
+}
+
+export interface PlatformNoticeList {
+  total: number;
+  items: PlatformNotice[];
+}
+
+export interface PlatformJob {
+  name: string;
+  intervalSeconds: number;
+  lastStartedAt: string | null;
+  lastStatus: string | null;
+  lastDurationMs: number | null;
+  failuresToday: number;
+  stale: boolean;
+}
+
+export interface PlatformJobRun {
+  startedAt: string;
+  durationMs: number;
+  tenantsProcessed: number;
+  recordsProcessed: number;
+  notificationsGenerated: number;
+  failureCount: number;
+  status: string;
+}

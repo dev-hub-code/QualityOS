@@ -22,6 +22,13 @@ export interface PageResponse<T> {
   totalPages: number;
 }
 
+let askForPassword: (() => Promise<boolean>) | null = null;
+
+/** Set by the Control Center, the only place an action can need the password again. */
+export function setReauthPrompt(prompt: (() => Promise<boolean>) | null) {
+  askForPassword = prompt;
+}
+
 async function send<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
@@ -35,6 +42,10 @@ async function send<T>(url: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     if (response.status === 401 && url.startsWith("/api/v1") && typeof window !== "undefined") {
       hardNavigate("/login");
+    }
+    // The refused action changed nothing, so it is safe to send again.
+    if (payload?.error?.code === "REAUTHENTICATION_REQUIRED" && askForPassword && (await askForPassword())) {
+      return send<T>(url, init);
     }
     throw new ApiError(
       response.status,

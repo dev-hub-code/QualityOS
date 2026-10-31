@@ -21,7 +21,8 @@ public final class InspectionDtos {
     private InspectionDtos() {
     }
 
-    public record CreateInspectionRequest(@NotNull UUID receiptItemId, @NotNull UUID templateId) {
+    /** Names one subject: a received lot or a production batch. */
+    public record CreateInspectionRequest(UUID receiptItemId, UUID productionBatchId, @NotNull UUID templateId) {
     }
 
     public record ExecuteRequest(@NotEmpty List<@Valid ResultRequest> results) {
@@ -66,6 +67,7 @@ public final class InspectionDtos {
             String inspectionNumber,
             String inspectionType,
             UUID receiptItemId,
+            UUID productionBatchId,
             String supplierName,
             String materialCode,
             String materialName,
@@ -95,5 +97,17 @@ public final class InspectionDtos {
     }
 
     public record DecisionResponse(String decision, String note, UUID decidedBy, Instant decidedAt) {
+    }
+
+    /** One inspection as a trace shows it. */
+    public record InspectionHistory(
+            UUID id,
+            String inspectionNumber,
+            String inspectionType,
+            String batchNumber,
+            String status,
+            String finalResult,
+            String disposition,
+            java.time.Instant createdAt) {
     }
 }

@@ -19,9 +19,9 @@ const columns = [
     header: "Number",
     cell: (info) => <RecordLink href={`/inspections/${info.row.original.id}`}>{info.getValue()}</RecordLink>,
   }),
-  column.accessor("materialName", { header: "Material" }),
-  column.accessor("batchNumber", { header: "Lot" }),
-  column.accessor("supplierName", { header: "Supplier" }),
+  column.accessor("materialName", { header: "Item" }),
+  column.accessor("batchNumber", { header: "Batch" }),
+  column.accessor("supplierName", { header: "Supplier", cell: (info) => info.getValue() ?? "—" }),
   column.accessor("status", { header: "Status", cell: (info) => <StatusBadge status={info.getValue()} /> }),
   column.accessor("disposition", {
     header: "Disposition",
@@ -108,7 +108,7 @@ export default function InspectionsPage() {
       <DataTable
         path="/inspections"
         columns={columns}
-        searchLabel="Search by number or lot"
+        searchLabel="Search by number or batch"
         emptyMessage="No inspections yet."
       />
     </div>

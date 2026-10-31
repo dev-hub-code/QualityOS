@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiError, type PageResponse } from "@/lib/api";
 import { formatQuantity, type FieldDef, type FieldOption } from "@/lib/record-form";
-import type { Assignee, DefectCategory, Category, Facility, Material, Specification, Supplier, Unit } from "@/lib/types";
+import type { Assignee, DefectCategory, Category, Facility, Material, Product, Specification, Supplier, Unit } from "@/lib/types";
 
-const NEGATIVE = new Set(["REJECTED", "REJECT", "BLOCKED", "CANCELLED", "VOIDED", "FAIL", "HOLD", "CRITICAL", "OVERDUE"]);
-const POSITIVE = new Set(["APPROVED", "RECEIVED", "CLOSED", "NOT_REQUIRED", "PASS", "ACCEPT", "PUBLISHED", "COMPLETED", "MINOR"]);
+const NEGATIVE = new Set(["REJECTED", "REJECT", "BLOCKED", "CANCELLED", "VOIDED", "FAIL", "HOLD", "CRITICAL", "OVERDUE", "ON_HOLD"]);
+const POSITIVE = new Set(["APPROVED", "RECEIVED", "CLOSED", "NOT_REQUIRED", "PASS", "ACCEPT", "PUBLISHED", "COMPLETED", "MINOR", "RELEASED"]);
 
 export function StatusBadge({ status }: { status: string }) {
   const variant = NEGATIVE.has(status) ? "destructive" : POSITIVE.has(status) ? "default" : "secondary";
@@ -143,6 +143,7 @@ export function useDefectCategories() {
 
 export const useFacilities = () => useLookup<Facility>("/facilities");
 export const useMaterials = () => useLookup<Material>("/materials");
+export const useProducts = () => useLookup<Product>("/products");
 
 export function SpecificationTable({
   specifications,

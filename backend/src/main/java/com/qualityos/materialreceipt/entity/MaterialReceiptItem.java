@@ -1,5 +1,6 @@
 package com.qualityos.materialreceipt.entity;
 
+import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.persistence.TenantOwnedEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -32,6 +33,7 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
     private String supplierBatch;
     private String internalBatch;
     private BigDecimal quantity;
+    private BigDecimal consumedQuantity = BigDecimal.ZERO;
     private boolean inspectionRequired;
 
     @Enumerated(EnumType.STRING)
@@ -65,6 +67,27 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
 
     public boolean inspectionStarted() {
         return inspectionStatus == InspectionStatus.IN_PROGRESS || inspectionStatus == InspectionStatus.COMPLETED;
+    }
+
+    /** Only material that has passed its gate may enter production. Anything else stays out, whoever asks. */
+    public boolean isReleased() {
+        return inspectionStatus == InspectionStatus.NOT_REQUIRED
+                || (inspectionStatus == InspectionStatus.COMPLETED
+                        && ("ACCEPT".equals(disposition) || "CONDITIONAL_ACCEPTANCE".equals(disposition)));
+    }
+
+    public BigDecimal remainingQuantity() {
+        return quantity.subtract(consumedQuantity);
+    }
+
+    public void consume(BigDecimal amount) {
+        if (!isReleased()) {
+            throw new BusinessRuleException("Batch " + internalBatch + " has not been released for use.");
+        }
+        if (amount.compareTo(remainingQuantity()) > 0) {
+            throw new BusinessRuleException("Batch " + internalBatch + " has only " + remainingQuantity() + " left.");
+        }
+        consumedQuantity = consumedQuantity.add(amount);
     }
 
     public void updateInspection(InspectionStatus status, String disposition) {

@@ -16,6 +16,7 @@ import com.qualityos.product.dto.ProductDtos.AddMaterialRequest;
 import com.qualityos.product.dto.ProductDtos.AddRevisionRequest;
 import com.qualityos.product.dto.ProductDtos.BillOfMaterialResponse;
 import com.qualityos.product.dto.ProductDtos.ProductDetail;
+import com.qualityos.product.dto.ProductDtos.ProductReference;
 import com.qualityos.product.dto.ProductDtos.ProductResponse;
 import com.qualityos.product.dto.ProductDtos.RevisionResponse;
 import com.qualityos.product.dto.ProductDtos.SaveProductRequest;
@@ -32,7 +33,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Collection;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -179,6 +182,21 @@ public class ProductService implements AttachmentPolicy {
     @Transactional(readOnly = true)
     public void requireExists(UUID id) {
         load(id);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<UUID, ProductReference> references(Collection<UUID> ids) {
+        return products.findAllById(ids).stream()
+                .collect(Collectors.toMap(Product::getId, product -> new ProductReference(
+                        product.getId(), product.getCode(), product.getName(), product.getUomId())));
+    }
+
+    /** Ids of products whose code or name contains the term. */
+    @Transactional(readOnly = true)
+    public List<UUID> idsMatching(String term) {
+        return products.findAll(Searches.<Product>contains(term, "code", "name")).stream()
+                .map(Product::getId)
+                .toList();
     }
 
     @Override

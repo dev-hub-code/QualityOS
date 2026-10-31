@@ -24,6 +24,7 @@ import com.qualityos.supplier.service.SupplierService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -148,6 +149,12 @@ public class PurchaseOrderService {
      *
      * @param quantities total received in this receipt for each order item
      */
+    @Transactional(readOnly = true)
+    public Map<UUID, String> numbers(Collection<UUID> ids) {
+        return orders.findAllById(ids).stream()
+                .collect(Collectors.toMap(PurchaseOrder::getId, PurchaseOrder::getPoNumber));
+    }
+
     @Transactional(propagation = Propagation.MANDATORY)
     public ReceiptTarget recordReceipt(UUID id, Map<UUID, BigDecimal> quantities) {
         PurchaseOrder order = orders.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Purchase order", id));

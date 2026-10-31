@@ -52,6 +52,7 @@ public class Inspection extends TenantOwnedEntity {
     private String specSnapshot;
 
     private UUID receiptItemId;
+    private UUID productionBatchId;
     private UUID supplierId;
     private UUID facilityId;
     private UUID materialId;
@@ -82,6 +83,7 @@ public class Inspection extends TenantOwnedEntity {
             UUID templateVersionId,
             String specSnapshot,
             UUID receiptItemId,
+            UUID productionBatchId,
             UUID supplierId,
             UUID facilityId,
             UUID materialId,
@@ -93,6 +95,7 @@ public class Inspection extends TenantOwnedEntity {
         this.templateVersionId = templateVersionId;
         this.specSnapshot = specSnapshot;
         this.receiptItemId = receiptItemId;
+        this.productionBatchId = productionBatchId;
         this.supplierId = supplierId;
         this.facilityId = facilityId;
         this.materialId = materialId;

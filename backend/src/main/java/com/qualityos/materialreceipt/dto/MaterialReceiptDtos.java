@@ -93,4 +93,23 @@ public final class MaterialReceiptDtos {
             String internalBatch,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity) {
     }
+
+    /** A lot as traceability and production see it. */
+    public record LotView(
+            UUID itemId,
+            String grnNumber,
+            LocalDate receivedOn,
+            UUID purchaseOrderId,
+            String supplierName,
+            UUID materialId,
+            String materialCode,
+            String materialName,
+            String supplierBatch,
+            String internalBatch,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal remainingQuantity,
+            String inspectionStatus,
+            String disposition,
+            boolean released) {
+    }
 }

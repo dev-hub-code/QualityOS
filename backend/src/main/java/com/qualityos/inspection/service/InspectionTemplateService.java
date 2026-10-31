@@ -199,6 +199,18 @@ public class InspectionTemplateService {
     }
 
     @Transactional(readOnly = true)
+    public InspectionTemplate requireUsableForProduct(UUID templateId, UUID productId) {
+        InspectionTemplate template = load(templateId);
+        if (template.getArchivedAt() != null) {
+            throw new BusinessRuleException("This template is archived.");
+        }
+        boolean otherProduct = template.getProductId() != null && !template.getProductId().equals(productId);
+        if (otherProduct || template.getMaterialId() != null) {
+            throw new BusinessRuleException("This template is for a different item.");
+        }
+        return template;
+    }
+
     public InspectionTemplate requireUsableFor(UUID templateId, UUID materialId) {
         InspectionTemplate template = load(templateId);
         if (template.getArchivedAt() != null) {

@@ -69,4 +69,7 @@ public final class ProductDtos {
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantityPerUnit,
             UUID uomId) {
     }
+
+    public record ProductReference(UUID id, String code, String name, UUID uomId) {
+    }
 }

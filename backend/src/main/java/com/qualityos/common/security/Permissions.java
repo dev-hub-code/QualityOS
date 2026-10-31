@@ -39,10 +39,11 @@ public final class Permissions {
     public static final String PLATFORM_CUSTOMER_MANAGE = "PLATFORM_CUSTOMER_MANAGE";
     public static final String PLATFORM_OPERATOR_MANAGE = "PLATFORM_OPERATOR_MANAGE";
     public static final String PLATFORM_AUDIT_VIEW = "PLATFORM_AUDIT_VIEW";
+    public static final String PLATFORM_SETTINGS_MANAGE = "PLATFORM_SETTINGS_MANAGE";
     /** What each platform role adds to PLATFORM_ADMIN, which on its own only reads. */
     public static final Map<String, Set<String>> PLATFORM_ROLES = Map.of(
             "SUPER_ADMIN", Set.of(PLATFORM_BILLING_MANAGE, PLATFORM_CUSTOMER_MANAGE, PLATFORM_OPERATOR_MANAGE,
-                    PLATFORM_AUDIT_VIEW),
+                    PLATFORM_AUDIT_VIEW, PLATFORM_SETTINGS_MANAGE),
             "BILLING_ADMIN", Set.of(PLATFORM_BILLING_MANAGE),
             "SUPPORT_ADMIN", Set.of(PLATFORM_CUSTOMER_MANAGE),
             "READ_ONLY_AUDITOR", Set.of(PLATFORM_AUDIT_VIEW));
@@ -99,6 +100,7 @@ public final class Permissions {
         public static final String PLATFORM_CUSTOMER_MANAGE = "hasAuthority('PLATFORM_CUSTOMER_MANAGE')";
         public static final String PLATFORM_OPERATOR_MANAGE = "hasAuthority('PLATFORM_OPERATOR_MANAGE')";
         public static final String PLATFORM_AUDIT_VIEW = "hasAuthority('PLATFORM_AUDIT_VIEW')";
+        public static final String PLATFORM_SETTINGS_MANAGE = "hasAuthority('PLATFORM_SETTINGS_MANAGE')";
         public static final String PLATFORM_ACCOUNT_MANAGE =
                 "hasAnyAuthority('PLATFORM_BILLING_MANAGE', 'PLATFORM_CUSTOMER_MANAGE')";
         public static final String CALIBRATION_VIEW = "hasAuthority('CALIBRATION_VIEW')";

@@ -254,3 +254,18 @@ may be sent again after `POST /reauthenticate`.
 | `POST /organisations/{tenantId}/notifications/{notificationId}/retry-email` | `PLATFORM_CUSTOMER_MANAGE` | Send a given-up email again |
 | `GET /notifications` | | Billing notices, by `type` |
 | `GET /jobs`, `GET /jobs/{job}/runs` | | Job health and recent runs |
+
+## Platform console
+
+| Method and path | Also needs | Purpose |
+|---|---|---|
+| `GET /api/v1/platform-notices` | Any member, not `PLATFORM_ADMIN` | Maintenance state, support email and today's announcements |
+| `GET /api/v1/platform/settings` | | Read settings |
+| `PUT /api/v1/platform/settings` | `PLATFORM_SETTINGS_MANAGE`, password | Save, with `version` and `reason` |
+| `GET /api/v1/platform/announcements` | | List |
+| `POST /api/v1/platform/announcements`, `PUT .../{id}` | `PLATFORM_CUSTOMER_MANAGE` | Create or save, with `version` and `reason` |
+| `GET /api/v1/platform/support/tickets` | | Filter by `tenantId`, `status` |
+| `POST /api/v1/platform/support/tickets` | `PLATFORM_CUSTOMER_MANAGE` | Open with `tenantId`, `subject`, `note` |
+| `PUT /api/v1/platform/support/tickets/{id}/status` | `PLATFORM_CUSTOMER_MANAGE` | Change status, with `version` |
+| `GET`, `POST /api/v1/platform/support/tickets/{id}/notes` | `POST` needs `PLATFORM_CUSTOMER_MANAGE` | Read or add notes |
+| `GET /api/v1/platform/support/organisations/{tenantId}/errors` | | Failed emails in the last 30 days |

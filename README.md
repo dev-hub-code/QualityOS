@@ -19,7 +19,7 @@ and known gaps.
 | Traceability | Production batches, serial numbers, dispatch, returns, material corrections, forward and backward traces, recalls |
 | Calibration and audits | Instruments, calibration records, audit checklists, findings that raise NCRs |
 | Analytics | Dashboard, supplier scorecards, Pareto, PDF and Excel reports |
-| Subscription | Plans, limits, trials, invoices, and the Control Center at `/platform`. Payments are recorded by hand, and invoices are not yet GST tax invoices |
+| Subscription | Plans, limits, trials, invoices, and the Control Center at `/platform`, with operator roles, audit log, support console, settings and announcements. Payments are recorded by hand, and invoices are not yet GST tax invoices |
 
 ## Prerequisites
 

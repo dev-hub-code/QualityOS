@@ -43,6 +43,8 @@ class EndpointAuthorizationIT extends AbstractIntegrationTest {
             "POST /api/v1/notifications/{id}/read",
             "POST /api/v1/notifications/read-all",
             "PUT /api/v1/notifications/preferences",
+            // Any member: only what the platform wants everyone to see.
+            "GET /api/v1/platform-notices",
             // The parent record decides, in AttachmentService.
             "DELETE /api/v1/attachments/{id}",
             "GET /api/v1/attachments",

@@ -15,7 +15,7 @@ account emails a real customer needs.
 | 8 Calibration and audit | Instruments, QR, calibration records, audits, findings | Overdue instruments notify and audit findings raise NCRs | **Done** |
 | 9 Analytics | Dashboard, scorecards, Pareto, PDF and Excel exports | Reports honour tenant and facility scope | **Done** |
 | 10 Subscription | Plans, trials, limits, invoices | Limits enforced, prices editable by admin | **Done** |
-| 12 Control Center | Platform dashboard, plans, organisations, then billing, entitlements, operators and support. See [PLATFORM_ADMIN.md](PLATFORM_ADMIN.md) | Every acceptance item in the owner's brief | **Phases 1 to 4 built** |
+| 12 Control Center | Platform dashboard, plans, organisations, then billing, entitlements, operators and support. See [PLATFORM_ADMIN.md](PLATFORM_ADMIN.md) | Every acceptance item in the owner's brief | **All 5 phases built** |
 | 11 Production | Terraform, ECS, RDS, S3, Secrets Manager, CI/CD, monitoring, backups | Deployed and restore-tested | Deferred |
 
 Later: Module 12 (AI) after Phase 9, because it depends on accumulated data. SMS and WhatsApp stay behind
@@ -81,14 +81,17 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A plan change has no proration. A different plan starts on payment and the unused time on the old one is lost | Review after real use |
 | The starting user and facility limits, trial length, grace period and annual prices are placeholders, editable under Plans | Owner to confirm before launch |
 | Which features each plan includes is an interpretation of the brief's table. Starter has no dashboards or reports | Owner to confirm before launch |
-| Operator roles are enforced by the backend, but Control Center pages still show change buttons to roles that cannot use them. The action is refused with a message | Control Center Phase 5 |
 | Account emails, such as reset links, cannot be retried, because a resent link would have expired. Failed ones show in the email log | By design |
-| A platform maintenance announcement has no notice yet | Control Center Phase 5 |
+| Announcements are in-app banners for signed-in members. No email is sent, and people who are signed out do not see them | When a user needs it |
+| Support tickets are opened by operators. Customers cannot raise or see one, and nothing tells them a ticket's status | When a user needs it |
+| Support has no access to a customer's quality records. The separate time-limited approval the brief allows is not built | If support ever needs it |
+| Settings have no default currency, because only INR exists, and no notification defaults, because each person sets their own | When either is needed |
+| Maintenance mode removes change permissions, so a member's action is refused. Signing in, reading, billing and account actions still work | Review after real use |
 | Operators sign in with a password only. There is no second factor | Before customer launch |
 | Duplicate references are checked before saving, so two identical references saved at the same moment for different organisations could both pass | With a payment gateway |
 | Near-limit warnings show only in the Control Center and on the billing page. Customers get no notification or email before a limit stops them | When a user needs it |
 | Only `NCR_CAPA`, `REPORTS` and `ADVANCED` are enforced. A feature added in the Control Center is listed but restricts nothing until code enforces it | When a feature is sold |
-| An organisation's contact number is not recorded anywhere, so the Control Center cannot show it | Control Center Phase 5 |
+| An organisation's contact number is not recorded anywhere, so the Control Center cannot show it | When a user needs it |
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | Lists show only active records, with no way to restore an archived one | When a user needs it |
 | Facility, supplier, material and product pickers load the first 100 records | Add search when a tenant exceeds this |

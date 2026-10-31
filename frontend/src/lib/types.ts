@@ -1404,3 +1404,61 @@ export interface PlatformJobRun {
   failureCount: number;
   status: string;
 }
+
+export interface PlatformSettings {
+  defaultTrialDays: number;
+  defaultGraceDays: number;
+  maintenanceMode: boolean;
+  registrationOpen: boolean;
+  supportEmail: string | null;
+  version: number;
+  updatedAt: string;
+}
+
+export interface PlatformAnnouncement {
+  id: string;
+  title: string;
+  message: string;
+  severity: string;
+  audience: string;
+  startsOn: string;
+  endsOn: string;
+  active: boolean;
+  version: number;
+}
+
+export interface CustomerNotices {
+  maintenance: boolean;
+  supportEmail: string | null;
+  announcements: { id: string; title: string; message: string; severity: string }[];
+}
+
+export interface SupportTicket {
+  id: string;
+  tenantId: string;
+  organisation: string;
+  subject: string;
+  status: string;
+  openedBy: string;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface SupportTicketList {
+  total: number;
+  items: SupportTicket[];
+}
+
+export interface TicketNote {
+  id: string;
+  author: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface SupportError {
+  occurredAt: string;
+  template: string;
+  errorType: string | null;
+}

@@ -11,6 +11,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import type { FieldDef } from "@/lib/record-form";
 import type { Invoice, OrganisationList, Plan } from "@/lib/types";
@@ -26,6 +27,7 @@ interface Paying {
 }
 
 export default function PlatformOrganisationsPage() {
+  const billing = usePermission("PLATFORM_BILLING_MANAGE");
   const refresh = useRefresh();
   const { pending, message } = useAction();
   const [paying, setPaying] = useState<Paying | null>(null);
@@ -184,7 +186,7 @@ export default function PlatformOrganisationsPage() {
                 <TableCell>{suspendedAt ? "suspended" : subscription.state.replace("_", " ").toLowerCase()}</TableCell>
                 <TableCell>{formatDate(subscription.endsAt)}</TableCell>
                 <TableCell>
-                  {openInvoices.map((invoice) => (
+                  {billing && openInvoices.map((invoice) => (
                     <Button
                       key={invoice.id}
                       size="sm"

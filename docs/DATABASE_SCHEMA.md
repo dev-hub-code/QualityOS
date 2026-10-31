@@ -172,3 +172,10 @@ across organisations run as the schema owner and raise an error unless the curre
 `platform_operator_change` and `platform_mark_reauthenticated` can, and each checks the caller at the database.
 `email_delivery_logs.notification_id` links attempts to a notification. `subscription_invoices.overdue_notified_at`
 keeps an invoice from being chased twice.
+
+## Control Center console (V25)
+
+`platform_settings` is a single row with no secrets. The application role can read it, and only
+`platform_settings_save` can write it. `platform_announcements`, `support_tickets` and `support_notes` give the
+application role no rights at all, and are reached through functions that check the operator. `support_tickets` and
+`support_notes` also force row-level security, with a policy for the schema owner only.

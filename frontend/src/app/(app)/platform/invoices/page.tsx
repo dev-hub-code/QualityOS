@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import type { Invoice, InvoiceList, PlatformInvoice } from "@/lib/types";
 
@@ -67,6 +68,7 @@ function InvoiceDetails({ row, onClose }: { row: PlatformInvoice; onClose: () =>
 }
 
 export default function PlatformInvoicesPage() {
+  const billing = usePermission("PLATFORM_BILLING_MANAGE");
   const [filter, setFilter] = useState(NO_FILTER);
   const [page, setPage] = useState(0);
   const [viewing, setViewing] = useState<PlatformInvoice | null>(null);
@@ -174,7 +176,7 @@ export default function PlatformInvoicesPage() {
                       <Button size="sm" variant="outline" onClick={() => setViewing(row)}>
                         View
                       </Button>
-                      {row.status === "ISSUED" && (
+                      {billing && row.status === "ISSUED" && (
                         <Button size="sm" variant="outline" onClick={() => setPaying(row)}>
                           Record payment
                         </Button>

@@ -43,6 +43,10 @@ import {
   Bell,
   Mail,
   Timer,
+  SlidersHorizontal,
+  Megaphone,
+  LifeBuoy,
+  HeartPulse,
 } from "lucide-react";
 
 export interface NavItem {
@@ -89,28 +93,34 @@ export const NAV_ITEMS: NavItem[] = [
 
 /** Kept apart from the workspace. A page joins this list only once it works. */
 export const CONTROL_CENTER_NAV: { heading: string; items: NavItem[] }[] = [
-  { heading: "Overview", items: [
-      { label: "Dashboard", href: "/platform/dashboard", icon: LayoutDashboard },
-      { label: "Analytics", href: "/platform/analytics", icon: ChartNoAxesCombined },
-    ] },
+  { heading: "Overview", items: [{ label: "Dashboard", href: "/platform/dashboard", icon: LayoutDashboard }] },
   { heading: "Customers", items: [
       { label: "Organisations", href: "/platform/organisations", icon: Building },
+      { label: "Subscriptions", href: "/platform/subscriptions", icon: Repeat },
+      { label: "Trials", href: "/platform/trials", icon: Hourglass },
       { label: "Usage", href: "/platform/usage", icon: Gauge },
     ] },
   { heading: "Billing", items: [
-      { label: "Subscriptions", href: "/platform/subscriptions", icon: Repeat },
-      { label: "Trials", href: "/platform/trials", icon: Hourglass },
       { label: "Plans", href: "/platform/plans", icon: Tags },
-      { label: "Features", href: "/platform/features", icon: ToggleRight },
       { label: "Invoices", href: "/platform/invoices", icon: ReceiptText },
       { label: "Payments", href: "/platform/payments", icon: Banknote },
+      { label: "Analytics", href: "/platform/analytics", icon: ChartNoAxesCombined },
     ] },
-  { heading: "Platform", items: [
-      { label: "Operators", href: "/platform/operators", icon: UserCog, anyPermission: ["PLATFORM_AUDIT_VIEW"] },
-      { label: "Audit log", href: "/platform/audit-logs", icon: ScrollText, anyPermission: ["PLATFORM_AUDIT_VIEW"] },
+  { heading: "Configuration", items: [
+      { label: "Features", href: "/platform/features", icon: ToggleRight },
+      { label: "Settings", href: "/platform/settings", icon: SlidersHorizontal },
+      { label: "Announcements", href: "/platform/announcements", icon: Megaphone },
+    ] },
+  { heading: "Operations", items: [
+      { label: "Support", href: "/platform/support", icon: LifeBuoy },
       { label: "Notifications", href: "/platform/notifications", icon: Bell },
       { label: "Email log", href: "/platform/email-logs", icon: Mail },
       { label: "Jobs", href: "/platform/jobs", icon: Timer },
+      { label: "System health", href: "/status", icon: HeartPulse },
+    ] },
+  { heading: "Security", items: [
+      { label: "Operators", href: "/platform/operators", icon: UserCog, anyPermission: ["PLATFORM_AUDIT_VIEW"] },
+      { label: "Audit log", href: "/platform/audit-logs", icon: ScrollText, anyPermission: ["PLATFORM_AUDIT_VIEW"] },
     ] },
 ];
 

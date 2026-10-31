@@ -71,6 +71,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Audits are planned one at a time, with no recurring schedule or reminder before the date. A missed audit shows as overdue in the list | When a user needs it |
 | A recorded audit finding cannot be edited. A wrong one is handled by cancelling its NCR, and it stays on the report | Review after real use |
 | `tenant_settings` is not built | When a user needs it |
+| Dashboard figures are kept for 60 seconds per organisation, period and facility scope. Anything written to the audit log clears them at once on the same instance. Other changes, and changes on another instance, show within 60 seconds | With production work: use a shared cache if the figures must agree across instances |
 | A report stops at 5,000 rows and says so, so a larger period must be split | When a user needs it |
 | Key figures and charts show to anyone with `REPORT_VIEW`, as totals, even without the view permission for each kind of record. Lists and reports need that permission too | Review after real use |
 | Material rejection adds quantities as recorded, without converting units | When a user needs it |

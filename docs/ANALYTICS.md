@@ -23,6 +23,7 @@ open NCRs now. Supplier scorecards show rejection and NCR counts, with no compos
 ## Scope
 
 - An inspection, batch, instrument and audit belong to their own facility.
-- An NCR belongs to the facility of the inspection or audit that raised it. A CAPA belongs to the facility of its NCR.
-- An NCR raised by hand has no facility, so it, and any CAPA on it, is left out for a member limited to certain
-  facilities and whenever a facility is chosen.
+- An NCR belongs to the facility recorded on it, which comes from what raised it or is chosen when it is raised by hand.
+  A CAPA takes the facility of its NCR, or the one chosen for it.
+- A record with no facility, such as an older manual NCR, is left out for a member limited to certain facilities and
+  whenever a facility is chosen.

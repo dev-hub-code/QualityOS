@@ -165,6 +165,26 @@ class ReportingIT extends TraceabilityFixture {
     }
 
     @Test
+    void aRecordRaisedByHandCountsAtTheFacilityChosenForIt() throws Exception {
+        String here = facility(owner);
+        Session limited = addMember(owner, "QUALITY_MANAGER");
+        limit(limited, here);
+        as(owner, postJson("/api/v1/ncrs", Map.of("title", "Scratches", "description", "Seen on the line",
+                        "severity", "MINOR", "facilityId", here)))
+                .andExpect(status().isCreated());
+        as(owner, postJson("/api/v1/capas", Map.of("title", "Guard the line", "problemStatement", "Scratches recur",
+                        "ownerId", owner.userId(), "facilityId", here,
+                        "targetDate", LocalDate.now().plusDays(7).toString(), "effectivenessRequired", false)))
+                .andExpect(status().isCreated());
+
+        as(limited, get(OVERVIEW))
+                .andExpect(jsonPath("$.data.kpis.openNcrs").value(1))
+                .andExpect(jsonPath("$.data.kpis.openCapas").value(1));
+        as(limited, get("/api/v1/reports/ncr")).andExpect(jsonPath("$.data.rows.length()").value(1));
+        as(limited, get("/api/v1/reports/capa")).andExpect(jsonPath("$.data.rows.length()").value(1));
+    }
+
+    @Test
     void anOverdueCapaIsCountedWithItsNcrsFacility() throws Exception {
         String here = decideLot("10", "25.0", "REJECT");
         String ncr = asDatabaseSuperuser().queryForObject(

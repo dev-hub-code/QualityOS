@@ -5,6 +5,7 @@ import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.common.util.UuidV7;
 import java.util.UUID;
 import org.slf4j.MDC;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -25,10 +26,12 @@ public class AuditService {
 
     private final JdbcTemplate jdbc;
     private final JsonMapper json;
+    private final ApplicationEventPublisher events;
 
-    public AuditService(JdbcTemplate jdbc, JsonMapper json) {
+    public AuditService(JdbcTemplate jdbc, JsonMapper json, ApplicationEventPublisher events) {
         this.jdbc = jdbc;
         this.json = json;
+        this.events = events;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -50,6 +53,7 @@ public class AuditService {
                 MDC.get(CorrelationIdFilter.MDC_KEY),
                 toJson(previousState),
                 toJson(newState));
+        TenantContext.findCurrentTenantId().map(TenantDataChanged::new).ifPresent(events::publishEvent);
     }
 
     private String toJson(Object state) {

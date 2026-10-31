@@ -32,21 +32,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AnalyticsService {
 
-    /** An NCR belongs to the facility of what raised it. A manual NCR has none. */
-    static final String NCRS = """
-            non_conformances n
-            LEFT JOIN inspections ni ON ni.tenant_id = n.tenant_id AND ni.id = n.inspection_id
-            LEFT JOIN audits na ON na.tenant_id = n.tenant_id AND na.id = n.audit_id
-            """;
-    static final String NCR_FACILITY = "COALESCE(ni.facility_id, na.facility_id)";
+    static final String NCRS = "non_conformances n";
+    static final String NCR_FACILITY = "n.facility_id";
     static final String NCR_OPEN = "n.status NOT IN ('CLOSED', 'REJECTED', 'CANCELLED')";
-    /** A CAPA belongs to the facility of its NCR. */
     static final String CAPAS = """
             corrective_actions c
             LEFT JOIN non_conformances n ON n.tenant_id = c.tenant_id AND n.id = c.ncr_id
-            LEFT JOIN inspections ni ON ni.tenant_id = n.tenant_id AND ni.id = n.inspection_id
-            LEFT JOIN audits na ON na.tenant_id = n.tenant_id AND na.id = n.audit_id
             """;
+    static final String CAPA_FACILITY = "c.facility_id";
     static final String CAPA_OPEN = "c.status NOT IN ('CLOSED', 'CANCELLED')";
     /** Decided in the period. */
     private static final String DECIDED = "i.final_result IS NOT NULL AND i.approved_at >= :start AND i.approved_at < :end";
@@ -56,15 +49,21 @@ public class AnalyticsService {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ReportScope scopes;
+    private final AnalyticsCache cache;
 
-    AnalyticsService(NamedParameterJdbcTemplate jdbc, ReportScope scopes) {
+    AnalyticsService(NamedParameterJdbcTemplate jdbc, ReportScope scopes, AnalyticsCache cache) {
         this.jdbc = jdbc;
         this.scopes = scopes;
+        this.cache = cache;
     }
 
     @Transactional(readOnly = true)
     public Overview overview(LocalDate from, LocalDate to, UUID facilityId) {
         Resolved scope = scopes.resolve(from, to, facilityId);
+        return cache.get(scope, () -> compute(scope));
+    }
+
+    private Overview compute(Resolved scope) {
         MapSqlParameterSource params = scope.params();
         return new Overview(scope.from(), scope.to(), kpis(scope, params), inspectionTrend(scope, params),
                 suppliers(scope, params), defects(scope, params), products(scope, params), facilities(scope, params),
@@ -110,7 +109,7 @@ public class AnalyticsService {
         Map<String, Object> capas = jdbc.queryForMap("""
                 SELECT count(*) AS open, count(*) FILTER (WHERE c.target_date < :today) AS overdue
                 FROM %s WHERE %s%s
-                """.formatted(CAPAS, CAPA_OPEN, scope.facility(NCR_FACILITY)), params);
+                """.formatted(CAPAS, CAPA_OPEN, scope.facility(CAPA_FACILITY)), params);
         long total = count(inspections, "total");
         long passed = count(inspections, "passed");
         return new Kpis(
@@ -239,7 +238,7 @@ public class AnalyticsService {
                        sum(opened) AS opened, sum(closed) AS closed
                 FROM events WHERE at >= :start AND at < :end
                 GROUP BY 1 ORDER BY 1
-                """.formatted(CAPAS, scope.facility(NCR_FACILITY)), params,
+                """.formatted(CAPAS, scope.facility(CAPA_FACILITY)), params,
                 row -> {
                     found.put(row.getString("month"),
                             new CapaMonth(row.getString("month"), row.getLong("opened"), row.getLong("closed")));

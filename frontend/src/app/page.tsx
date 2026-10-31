@@ -73,6 +73,7 @@ export default function Home() {
             <a className="hover:text-foreground" href="#workflow">How it works</a>
             <a className="hover:text-foreground" href="#product">Product</a>
             <a className="hover:text-foreground" href="#pricing">Pricing</a>
+            <Link className="hover:text-foreground" href="/docs">Docs</Link>
           </nav>
           <div className="flex items-center gap-2">
             <Link href="/login" className={buttonVariants({ variant: "ghost", size: "sm" })}>

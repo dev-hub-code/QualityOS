@@ -5,15 +5,15 @@ const labels = (permissions: string[]) => visibleNavItems(permissions).map((item
 
 describe("visibleNavItems", () => {
   it("hides administration from users without permissions", () => {
-    expect(labels([])).toEqual(["Dashboard", "Settings"]);
+    expect(labels([])).toEqual(["Dashboard", "Settings", "Documentation"]);
   });
 
   it("shows master data by module permission", () => {
-    expect(labels(["PURCHASE_VIEW"])).toEqual(["Dashboard", "Purchase orders", "Receipts", "Settings"]);
+    expect(labels(["PURCHASE_VIEW"])).toEqual(["Dashboard", "Purchase orders", "Receipts", "Settings", "Documentation"]);
   });
 
   it("shows items for any matching permission", () => {
-    expect(labels(["USER_MANAGE"])).toEqual(["Dashboard", "Users", "Roles", "Settings"]);
-    expect(labels(["ROLE_MANAGE"])).toEqual(["Dashboard", "Roles", "Settings"]);
+    expect(labels(["USER_MANAGE"])).toEqual(["Dashboard", "Users", "Roles", "Settings", "Documentation"]);
+    expect(labels(["ROLE_MANAGE"])).toEqual(["Dashboard", "Roles", "Settings", "Documentation"]);
   });
 });

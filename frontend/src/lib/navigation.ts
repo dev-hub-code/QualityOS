@@ -22,6 +22,7 @@ import {
   Package,
   PackageCheck,
   Send,
+  BookOpen,
   Settings,
   ShieldCheck,
   Tags,
@@ -70,6 +71,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Roles", href: "/roles", icon: ShieldCheck, anyPermission: ["ROLE_MANAGE", "USER_MANAGE"] },
   { label: "Billing", href: "/settings/billing", icon: CreditCard, anyPermission: ["SUBSCRIPTION_MANAGE"] },
   { label: "Settings", href: "/settings", icon: Settings },
+  { label: "Documentation", href: "/docs", icon: BookOpen },
   { label: "Plans", href: "/platform/plans", icon: Tags, anyPermission: ["PLATFORM_ADMIN"] },
   { label: "Organisations", href: "/platform/organisations", icon: Building, anyPermission: ["PLATFORM_ADMIN"] },
 ];

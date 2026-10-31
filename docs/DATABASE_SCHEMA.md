@@ -142,6 +142,7 @@ row-level security. `account_tokens` holds one-time password reset and email ver
 - **V16** adds `instruments`, the append-only `calibration_records` and `instrument_usages`, `audit_checklists`,
   `audit_checklist_items`, `audits`, `audit_items` (a copy of the questions, kept apart from later checklist changes),
   `audit_findings`, the `AUDIT_CLOSE` permission, and the audit source on `non_conformances`.
+- **V20** adds `facility_id` to `non_conformances`, `corrective_actions` and `material_corrections`, filled from the inspection, audit, NCR, batch or lot behind each row.
 
 ## Phase 9: analytics (V17)
 

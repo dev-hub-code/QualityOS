@@ -10,6 +10,7 @@ import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.inspection.dto.InspectionDtos.ApproveRequest;
 import com.qualityos.inspection.dto.InspectionDtos.CreateInspectionRequest;
 import com.qualityos.inspection.dto.InspectionDtos.DecisionResponse;
@@ -90,6 +91,7 @@ public class InspectionService implements AttachmentPolicy {
     private final ProductionService production;
     private final DispatchReturnService returns;
     private final JsonMapper json;
+    private final FacilityScope scope;
 
     /** Lazy because the attachment service collects every policy, and this class is one. */
     InspectionService(
@@ -108,7 +110,9 @@ public class InspectionService implements AttachmentPolicy {
             NcrService ncrs,
             ProductionService production,
             DispatchReturnService returns,
-            JsonMapper json) {
+            JsonMapper json,
+            FacilityScope scope) {
+        this.scope = scope;
         this.instruments = instruments;
         this.inspections = inspections;
         this.results = results;
@@ -134,7 +138,7 @@ public class InspectionService implements AttachmentPolicy {
                 Specification.<Inspection>where(Searches.contains(search, "inspectionNumber", "batchNumber"))
                         .and(Searches.equalTo("status", status))
                         .and(Searches.equalTo("supplierId", supplierId));
-        Page<Inspection> page = inspections.findAll(filter, pageable);
+        Page<Inspection> page = inspections.findAll(scope.limit(filter, "facilityId"), pageable);
         Map<UUID, SupplierReference> supplierNames = suppliers.references(page.stream()
                 .map(Inspection::getSupplierId).filter(Objects::nonNull).collect(Collectors.toSet()));
         Map<UUID, MaterialReference> referenced = materials.references(page.stream()
@@ -170,7 +174,9 @@ public class InspectionService implements AttachmentPolicy {
 
     @Transactional(readOnly = true)
     public InspectionDetail get(UUID id) {
-        return toDetail(inspections.findById(id).orElseThrow(() -> new ResourceNotFoundException(ENTITY, id)));
+        Inspection inspection = inspections.findById(id).orElseThrow(() -> new ResourceNotFoundException(ENTITY, id));
+        scope.requireAllowed(inspection.getFacilityId(), ENTITY, id.toString());
+        return toDetail(inspection);
     }
 
     /** Freezes the specification in force today. Later template changes never reach this inspection. */
@@ -257,6 +263,7 @@ public class InspectionService implements AttachmentPolicy {
     }
 
     private Inspection save(Inspection inspection) {
+        scope.requireAllowed(inspection.getFacilityId(), ENTITY, inspection.getInspectionNumber());
         inspections.saveAndFlush(inspection);
         audit.record("INSPECTION_CREATED", ENTITY, inspection.getId());
         return inspection;
@@ -473,7 +480,10 @@ public class InspectionService implements AttachmentPolicy {
     }
 
     private Inspection lock(UUID id) {
-        return inspections.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException(ENTITY, id));
+        Inspection inspection =
+                inspections.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException(ENTITY, id));
+        scope.requireAllowed(inspection.getFacilityId(), ENTITY, id.toString());
+        return inspection;
     }
 
     private void decide(UUID id, String decision, String note) {
@@ -506,7 +516,8 @@ public class InspectionService implements AttachmentPolicy {
                 inspection.getBatchNumber(),
                 failed.stream().anyMatch(code -> criticality.getOrDefault(code, false)),
                 description,
-                rejected ? inspection.getQuantity() : null));
+                rejected ? inspection.getQuantity() : null,
+                inspection.getFacilityId()));
     }
 
     private SpecSnapshot specificationOf(Inspection inspection) {

@@ -1,7 +1,10 @@
 package com.qualityos.traceability.repository;
 
 import com.qualityos.traceability.entity.DispatchRecord;
+import java.util.Collection;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import jakarta.persistence.LockModeType;
@@ -19,6 +22,15 @@ public interface DispatchRecordRepository extends JpaRepository<DispatchRecord, 
               and not exists (select 1 from TraceCorrection c where c.dispatchId = d.id)
             """)
     long countUnconfirmed(LocalDate before);
+
+    /** Dispatches with every line in these facilities. One that also carries another plant's goods is left out. */
+    @Query("""
+            select d from DispatchRecord d
+            where not exists (
+                select 1 from DispatchItem i, ProductionBatch b
+                where i.dispatchId = d.id and b.id = i.productionBatchId and b.facilityId not in :facilities)
+            """)
+    Page<DispatchRecord> findWithin(Collection<UUID> facilities, Pageable pageable);
 
     /** Serialises cancelling, shipping and returning, which rule each other out. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)

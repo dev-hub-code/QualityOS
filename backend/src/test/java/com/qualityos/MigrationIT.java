@@ -1,6 +1,7 @@
 package com.qualityos;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import java.util.UUID;
@@ -80,5 +81,82 @@ class MigrationIT extends AbstractIntegrationTest {
         assertThat(sql.queryForObject(
                 "SELECT count(*) FROM pg_class WHERE relname IN ('dispatch_records', 'trace_corrections', 'dispatch_shipments') "
                         + "AND relforcerowsecurity", Integer.class)).isEqualTo(3);
+    }
+
+    @Test
+    void qualityRecordsTakeTheirFacilityFromWhatRaisedThem() {
+        Database database = emptyDatabase("19");
+        database.flyway().migrate();
+        JdbcTemplate sql = database.owner();
+        UUID tenant = UUID.randomUUID();
+        UUID facility = UUID.randomUUID();
+        UUID audit = UUID.randomUUID();
+        UUID lead = UUID.randomUUID();
+        UUID checklist = UUID.randomUUID();
+        UUID finding = UUID.randomUUID();
+        UUID placed = UUID.randomUUID();
+        UUID manual = UUID.randomUUID();
+        UUID capa = UUID.randomUUID();
+        sql.execute("ALTER TABLE tenants NO FORCE ROW LEVEL SECURITY");
+        List<String> tables = List.of(
+                "facilities", "audits", "audit_checklists", "audit_findings", "non_conformances", "corrective_actions");
+        tables.forEach(table -> sql.execute("ALTER TABLE " + table + " DISABLE ROW LEVEL SECURITY"));
+        sql.update("INSERT INTO tenants (id, name) VALUES (?, 'Acme')", tenant);
+        sql.update("INSERT INTO facilities (id, tenant_id, code, name) VALUES (?, ?, 'P', 'Pune')", facility, tenant);
+        sql.update("INSERT INTO users (id, email, password_hash, full_name) VALUES (?, 'a@example.com', 'x', 'A')", lead);
+        sql.update("INSERT INTO audit_checklists (id, tenant_id, code, name) VALUES (?, ?, 'C', 'C')", checklist, tenant);
+        sql.update("""
+                INSERT INTO audits (id, tenant_id, audit_number, audit_type, title, scope, facility_id, planned_on,
+                    lead_auditor_id, checklist_id)
+                VALUES (?, ?, 'AUD-1', 'INTERNAL', 'T', 'S', ?, DATE '2026-01-15', ?, ?)
+                """, audit, tenant, facility, lead, checklist);
+        sql.update("""
+                INSERT INTO audit_findings (id, tenant_id, audit_id, grade, statement, evidence)
+                VALUES (?, ?, ?, 'MINOR_NONCONFORMITY', 'S', 'E')
+                """, finding, tenant, audit);
+        for (UUID ncr : List.of(placed, manual)) {
+            sql.update("""
+                    INSERT INTO non_conformances (id, tenant_id, ncr_number, source, audit_id, audit_finding_id, severity,
+                        title, description)
+                    VALUES (?, ?, ?, ?, ?, ?, 'MINOR', 'T', 'D')
+                    """, ncr, tenant, ncr.toString(), ncr.equals(placed) ? "AUDIT" : "MANUAL",
+                    ncr.equals(placed) ? audit : null, ncr.equals(placed) ? finding : null);
+        }
+        sql.update("""
+                UPDATE non_conformances SET status = 'CLOSED', closed_at = now(), closed_by = ?, outcome_note = 'N',
+                    root_cause = 'R', containment_action = 'C'
+                WHERE id = ?
+                """, lead, placed);
+        sql.update("""
+                INSERT INTO corrective_actions (id, tenant_id, capa_number, ncr_id, title, problem_statement, owner_id,
+                    target_date)
+                VALUES (?, ?, 'CAPA-1', ?, 'T', 'P', ?, DATE '2026-02-15')
+                """, capa, tenant, placed, lead);
+        sql.update("""
+                UPDATE corrective_actions SET status = 'CLOSED', closed_at = now(), closed_by = ?, outcome_note = 'N',
+                    root_cause = 'R'
+                WHERE id = ?
+                """, lead, capa);
+        String touched = "SELECT updated_at::text FROM non_conformances WHERE id = '" + placed + "'";
+        String updatedAt = sql.queryForObject(touched, String.class);
+        tables.forEach(table -> sql.execute("ALTER TABLE " + table + " ENABLE ROW LEVEL SECURITY"));
+        sql.execute("ALTER TABLE tenants FORCE ROW LEVEL SECURITY");
+
+        Flyway latest = Flyway.configure().configuration(database.flyway().getConfiguration())
+                .target(MigrationVersion.LATEST).load();
+        assertThat(latest.migrate().success).isTrue();
+
+        tables.forEach(table -> sql.execute("ALTER TABLE " + table + " DISABLE ROW LEVEL SECURITY"));
+        assertThat(sql.queryForObject("SELECT facility_id FROM non_conformances WHERE id = ?", UUID.class, placed))
+                .isEqualTo(facility);
+        assertThat(sql.queryForObject(touched, String.class)).isEqualTo(updatedAt);
+        assertThat(sql.queryForObject("SELECT facility_id FROM corrective_actions WHERE id = ?", UUID.class, capa))
+                .isEqualTo(facility);
+        assertThat(sql.queryForObject("SELECT facility_id FROM non_conformances WHERE id = ?", UUID.class, manual))
+                .isNull();
+        assertThatThrownBy(() -> sql.update("UPDATE non_conformances SET title = 'Changed' WHERE id = ?", placed))
+                .hasMessageContaining("cannot be changed");
+        assertThatThrownBy(() -> sql.update("UPDATE corrective_actions SET title = 'Changed' WHERE id = ?", capa))
+                .hasMessageContaining("cannot be changed");
     }
 }

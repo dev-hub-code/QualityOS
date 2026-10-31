@@ -10,8 +10,10 @@ import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.material.service.MaterialService;
+import com.qualityos.organization.service.FacilityService;
 import com.qualityos.quality.dto.QualityDtos.Assignee;
 import com.qualityos.quality.dto.QualityDtos.AuditFailure;
 import com.qualityos.quality.dto.QualityDtos.CapaHistory;
@@ -69,6 +71,8 @@ public class NcrService implements AttachmentPolicy {
     private final DocumentNumberService numbers;
     private final AuditService audit;
     private final QualityAlerts alerts;
+    private final FacilityScope scope;
+    private final FacilityService facilities;
 
     NcrService(
             NonConformanceRepository ncrs,
@@ -80,7 +84,11 @@ public class NcrService implements AttachmentPolicy {
             TenantAccessService access,
             DocumentNumberService numbers,
             AuditService audit,
-            QualityAlerts alerts) {
+            QualityAlerts alerts,
+            FacilityScope scope,
+            FacilityService facilities) {
+        this.facilities = facilities;
+        this.scope = scope;
         this.ncrs = ncrs;
         this.history = history;
         this.categories = categories;
@@ -135,7 +143,7 @@ public class NcrService implements AttachmentPolicy {
                 .and(Searches.equalTo("status", status))
                 .and(Searches.equalTo("severity", severity))
                 .and(Searches.equalTo("inspectionId", inspectionId));
-        Page<NonConformance> page = ncrs.findAll(filter, pageable);
+        Page<NonConformance> page = ncrs.findAll(scope.limit(filter, "facilityId"), pageable);
         Map<UUID, String> members = access.activeMembers();
         Map<UUID, String> supplierNames = supplierNames(page.map(NonConformance::getSupplierId).toSet());
         Map<UUID, String> materialNames = materialNames(page.map(NonConformance::getMaterialId).toSet());
@@ -160,11 +168,15 @@ public class NcrService implements AttachmentPolicy {
 
     @Transactional
     public NcrDetail create(CreateNcrRequest request) {
+        scope.requirePlaced(request.facilityId());
+        if (request.facilityId() != null) {
+            facilities.requireActive(request.facilityId());
+        }
         requireReferences(request);
         if (request.defectCategoryId() != null) {
             requireCategory(request.defectCategoryId());
         }
-        return toDetail(raise(new NonConformance(
+        return toDetail(raise(request.facilityId(), new NonConformance(
                 numbers.next(NUMBER_PREFIX),
                 NonConformance.Source.MANUAL,
                 null,
@@ -184,7 +196,7 @@ public class NcrService implements AttachmentPolicy {
         if (ncrs.findByInspectionId(failure.inspectionId()).isPresent()) {
             return;
         }
-        raise(new NonConformance(
+        raise(failure.facilityId(), new NonConformance(
                 numbers.next(NUMBER_PREFIX),
                 NonConformance.Source.INSPECTION,
                 failure.inspectionId(),
@@ -202,7 +214,7 @@ public class NcrService implements AttachmentPolicy {
     @Transactional(propagation = Propagation.MANDATORY)
     public UUID raiseFromAudit(AuditFailure failure) {
         return ncrs.findByAuditFindingId(failure.findingId())
-                .orElseGet(() -> raise(NonConformance.fromAudit(
+                .orElseGet(() -> raise(failure.facilityId(), NonConformance.fromAudit(
                         numbers.next(NUMBER_PREFIX),
                         failure.auditId(),
                         failure.findingId(),
@@ -231,6 +243,7 @@ public class NcrService implements AttachmentPolicy {
     public NcrDetail assign(UUID id, UUID assigneeId) {
         requireMember(assigneeId);
         NonConformance ncr = lock(id);
+        scope.requireAllowedFor(assigneeId, ncr.getFacilityId());
         NonConformance.Status previous = ncr.getStatus();
         ncr.assign(assigneeId);
         record(ncr, previous, "Assigned");
@@ -337,7 +350,7 @@ public class NcrService implements AttachmentPolicy {
 
     @Override
     public boolean parentExists(UUID entityId) {
-        return ncrs.existsById(entityId);
+        return ncrs.findById(entityId).filter(ncr -> scope.allows(ncr.getFacilityId())).isPresent();
     }
 
     @Override
@@ -354,7 +367,8 @@ public class NcrService implements AttachmentPolicy {
         return ncr;
     }
 
-    private NonConformance raise(NonConformance ncr) {
+    private NonConformance raise(UUID facilityId, NonConformance ncr) {
+        ncr.setFacilityId(facilityId);
         ncrs.saveAndFlush(ncr);
         history.save(new NcrStatusChange(ncr.getId(), null, ncr.getStatus().name(), null));
         audit.record("NCR_RAISED", ENTITY, ncr.getId(), null,
@@ -399,11 +413,15 @@ public class NcrService implements AttachmentPolicy {
     }
 
     private NonConformance load(UUID id) {
-        return ncrs.findById(id).orElseThrow(() -> new ResourceNotFoundException("NCR", id));
+        NonConformance ncr = ncrs.findById(id).orElseThrow(() -> new ResourceNotFoundException("NCR", id));
+        scope.requireAllowed(ncr.getFacilityId(), "NCR", id.toString());
+        return ncr;
     }
 
     private NonConformance lock(UUID id) {
-        return ncrs.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("NCR", id));
+        NonConformance ncr = ncrs.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("NCR", id));
+        scope.requireAllowed(ncr.getFacilityId(), "NCR", id.toString());
+        return ncr;
     }
 
     private Map<UUID, String> supplierNames(Set<UUID> ids) {

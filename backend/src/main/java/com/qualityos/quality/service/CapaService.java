@@ -9,7 +9,9 @@ import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.TenantAccessService;
+import com.qualityos.organization.service.FacilityService;
 import com.qualityos.organization.service.OrganizationService;
 import com.qualityos.quality.dto.QualityDtos.ActionResponse;
 import com.qualityos.quality.dto.QualityDtos.AddActionRequest;
@@ -66,6 +68,8 @@ public class CapaService implements AttachmentPolicy {
     private final AuditService audit;
     private final QualityAlerts alerts;
     private final JsonMapper json;
+    private final FacilityScope scope;
+    private final FacilityService facilities;
 
     CapaService(
             CorrectiveActionRepository capas,
@@ -78,7 +82,11 @@ public class CapaService implements AttachmentPolicy {
             DocumentNumberService numbers,
             AuditService audit,
             QualityAlerts alerts,
-            JsonMapper json) {
+            JsonMapper json,
+            FacilityScope scope,
+            FacilityService facilities) {
+        this.facilities = facilities;
+        this.scope = scope;
         this.capas = capas;
         this.actions = actions;
         this.verifications = verifications;
@@ -99,7 +107,7 @@ public class CapaService implements AttachmentPolicy {
                 .<CorrectiveAction>where(Searches.contains(search, "capaNumber", "title"))
                 .and(Searches.equalTo("status", status))
                 .and(Searches.equalTo("ncrId", ncrId));
-        Page<CorrectiveAction> page = capas.findAll(filter, pageable);
+        Page<CorrectiveAction> page = capas.findAll(scope.limit(filter, "facilityId"), pageable);
         Map<UUID, String> members = access.activeMembers();
         LocalDate today = today();
         return PageResponse.from(page, capa -> new CapaSummary(
@@ -121,18 +129,28 @@ public class CapaService implements AttachmentPolicy {
     public CapaDetail create(CreateCapaRequest request) {
         ncrs.requireMember(request.ownerId());
         boolean effectiveness = request.effectivenessRequired();
+        UUID facilityId = request.facilityId();
         if (request.ncrId() != null) {
             NonConformance ncr = ncrs.requireOpen(request.ncrId());
             effectiveness |= ncr.getSeverity() != NonConformance.Severity.MINOR;
+            facilityId = ncr.getFacilityId();
+        } else {
+            scope.requirePlaced(facilityId);
+            if (facilityId != null) {
+                facilities.requireActive(facilityId);
+            }
         }
-        CorrectiveAction capa = capas.saveAndFlush(new CorrectiveAction(
+        scope.requireAllowedFor(request.ownerId(), facilityId);
+        CorrectiveAction created = new CorrectiveAction(
                 numbers.next(NUMBER_PREFIX),
                 request.ncrId(),
                 request.title().trim(),
                 request.problemStatement().trim(),
                 request.ownerId(),
                 request.targetDate(),
-                effectiveness));
+                effectiveness);
+        created.setFacilityId(facilityId);
+        CorrectiveAction capa = capas.saveAndFlush(created);
         history.save(new CapaStatusChange(capa.getId(), null, capa.getStatus().name(), null));
         audit.record("CAPA_CREATED", ENTITY, capa.getId(), null, Map.of("number", capa.getCapaNumber()));
         alerts.capaAssigned(capa);
@@ -289,7 +307,7 @@ public class CapaService implements AttachmentPolicy {
 
     @Override
     public boolean parentExists(UUID entityId) {
-        return capas.existsById(entityId);
+        return capas.findById(entityId).filter(capa -> scope.allows(capa.getFacilityId())).isPresent();
     }
 
     @Override
@@ -312,11 +330,15 @@ public class CapaService implements AttachmentPolicy {
     }
 
     private CorrectiveAction load(UUID id) {
-        return capas.findById(id).orElseThrow(() -> new ResourceNotFoundException("CAPA", id));
+        CorrectiveAction capa = capas.findById(id).orElseThrow(() -> new ResourceNotFoundException("CAPA", id));
+        scope.requireAllowed(capa.getFacilityId(), "CAPA", id.toString());
+        return capa;
     }
 
     private CorrectiveAction lock(UUID id) {
-        return capas.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("CAPA", id));
+        CorrectiveAction capa = capas.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("CAPA", id));
+        scope.requireAllowed(capa.getFacilityId(), "CAPA", id.toString());
+        return capa;
     }
 
     /** Dates are the customer's: a CAPA due today is not overdue until the day ends at their plant. */

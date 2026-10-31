@@ -6,6 +6,7 @@ import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.response.PageResponse;
+import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.organization.service.OrganizationService;
 import com.qualityos.notification.service.NotificationService;
 import com.qualityos.identity.service.TenantAccessService;
@@ -74,6 +75,7 @@ public class DispatchService {
     private final ProductionService production;
     private final DocumentNumberService numbers;
     private final AuditService audit;
+    private final FacilityScope scope;
 
     DispatchService(
             DispatchRecordRepository dispatches,
@@ -90,7 +92,9 @@ public class DispatchService {
             OrganizationService organizations,
             ProductionService production,
             DocumentNumberService numbers,
-            AuditService audit) {
+            AuditService audit,
+            FacilityScope scope) {
+        this.scope = scope;
         this.dispatches = dispatches;
         this.items = items;
         this.customers = customers;
@@ -135,7 +139,9 @@ public class DispatchService {
 
     @Transactional(readOnly = true)
     public PageResponse<DispatchResponse> list(Pageable pageable) {
-        Page<DispatchRecord> page = dispatches.findAll(pageable);
+        Page<DispatchRecord> page = scope.restriction()
+                .map(allowed -> dispatches.findWithin(allowed, pageable))
+                .orElseGet(() -> dispatches.findAll(pageable));
         return PageResponse.from(page, responses(page.getContent())::get);
     }
 
@@ -208,6 +214,7 @@ public class DispatchService {
     private void ship(DispatchRecord dispatch, DispatchItemRequest line) {
         ProductionBatch batch = batches.findForUpdate(line.productionBatchId())
                 .orElseThrow(() -> new BusinessRuleException("This batch does not exist."));
+        scope.requireAllowed(batch.getFacilityId(), "Batch", batch.getId().toString());
         batch.dispatch(line.quantity());
         DispatchItem item = items.saveAndFlush(new DispatchItem(dispatch.getId(), batch.getId(), line.quantity()));
         List<String> serials = line.serialNumbers() == null ? List.of() : line.serialNumbers();
@@ -326,6 +333,9 @@ public class DispatchService {
     }
 
     private DispatchRecord lock(UUID id) {
-        return dispatches.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Dispatch", id));
+        DispatchRecord dispatch =
+                dispatches.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Dispatch", id));
+        scope.require(items.facilitiesOf(id), "Dispatch", id.toString());
+        return dispatch;
     }
 }

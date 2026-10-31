@@ -11,6 +11,7 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /** The database refuses any change once a correction is applied, rejected or cancelled. */
 @Getter
@@ -31,6 +32,9 @@ public class MaterialCorrection extends TenantOwnedEntity {
     private UUID receiptItemId;
     private UUID batchRelationshipId;
     private UUID productionBatchId;
+
+    @Setter
+    private UUID facilityId;
 
     @Enumerated(EnumType.STRING)
     private Status status = Status.DRAFT;

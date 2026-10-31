@@ -43,7 +43,8 @@ public final class QualityDtos {
             UUID supplierId,
             UUID materialId,
             @Size(max = 100) String batchNumber,
-            @PositiveOrZero @Digits(integer = 12, fraction = 6) BigDecimal rejectedQuantity) {
+            @PositiveOrZero @Digits(integer = 12, fraction = 6) BigDecimal rejectedQuantity,
+            UUID facilityId) {
     }
 
     /** What an audit hands over when a finding raises an NCR. */
@@ -54,7 +55,8 @@ public final class QualityDtos {
             UUID supplierId,
             boolean major,
             String statement,
-            String description) {
+            String description,
+            UUID facilityId) {
     }
 
     /** How the correction of an audit finding stands. */
@@ -70,7 +72,8 @@ public final class QualityDtos {
             String batchNumber,
             boolean critical,
             String description,
-            BigDecimal rejectedQuantity) {
+            BigDecimal rejectedQuantity,
+            UUID facilityId) {
     }
 
     public record AssignRequest(@NotNull UUID assigneeId) {
@@ -146,7 +149,8 @@ public final class QualityDtos {
             @NotBlank @Size(max = MAX_TEXT) String problemStatement,
             @NotNull UUID ownerId,
             @NotNull @Future LocalDate targetDate,
-            boolean effectivenessRequired) {
+            boolean effectivenessRequired,
+            UUID facilityId) {
     }
 
     public record SaveAnalysisRequest(

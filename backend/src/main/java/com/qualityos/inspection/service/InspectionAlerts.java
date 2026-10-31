@@ -3,6 +3,7 @@ package com.qualityos.inspection.service;
 import com.qualityos.common.mail.EmailContent;
 import com.qualityos.common.mail.EmailTemplate;
 import com.qualityos.common.security.Permissions;
+import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.inspection.entity.Inspection;
 import com.qualityos.notification.service.NotificationService;
@@ -19,8 +20,10 @@ class InspectionAlerts {
 
     private final NotificationService notifications;
     private final TenantAccessService access;
+    private final FacilityScope scope;
 
-    InspectionAlerts(NotificationService notifications, TenantAccessService access) {
+    InspectionAlerts(NotificationService notifications, TenantAccessService access, FacilityScope scope) {
+        this.scope = scope;
         this.notifications = notifications;
         this.access = access;
     }
@@ -79,6 +82,7 @@ class InspectionAlerts {
         EmailContent email = template == EmailTemplate.GENERAL ? null : new EmailContent(template, Map.of(
                 "inspectionNumber", inspection.getInspectionNumber(),
                 "batchNumber", String.valueOf(inspection.getBatchNumber())));
-        notifications.notify(recipients, type, title, body, "/inspections/" + inspection.getId(), email);
+        notifications.notify(scope.allowedIn(inspection.getFacilityId(), recipients), type, title, body,
+                "/inspections/" + inspection.getId(), email);
     }
 }

@@ -101,7 +101,7 @@ export const DOC_PAGES: DocPage[] = [
           "You cannot grant a permission you do not hold yourself.",
           "An organisation must keep at least one active owner.",
           "You can create custom roles from the permissions you hold.",
-          "A member can be limited to certain facilities. This covers production batches, traces, serial numbers, recalls, instruments, audits, analytics and reports. Lists of lots, receipts, inspections, NCRs, CAPAs and dispatches are not limited yet.",
+          "A member can be limited to certain facilities. They then see and change only those facilities' records, and hear only about them. An NCR or CAPA with no facility stays with unlimited members.",
         ],
       },
     ],

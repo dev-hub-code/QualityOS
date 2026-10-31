@@ -58,7 +58,10 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A correction of an inspected lot does not trigger reinspection. It needs two approvers, who decide whether to act | Review after real use |
 | Naming serial numbers on a dispatch is optional, so a batch can ship without saying which units went. A trace then shows the customer by batch, not by unit | Review after real use |
 | A dispatch only counts as shipped once someone confirms it. Traces flag it until then, and managers get a daily reminder after three days | Review after real use |
-| Facility limits cover production batches, traces, serial numbers, recalls, instruments and audits. Lots, receipts, inspections, NCRs, CAPAs and dispatch lists are not limited yet | Next, before a customer relies on it |
+| A limited member sees only records placed in their facilities. Anything that cannot be placed stays with unlimited members: older manual NCRs and CAPAs, and new ones raised without a facility | By design |
+| A dispatch carrying goods from two plants is hidden from a member limited to one of them, as is its return | Review after real use |
+| A lot from another plant cannot be consumed by a member limited elsewhere. An unlimited member must record a transfer like that | Review after real use |
+| A batch trace can still show inspections and NCRs of a lot from another plant, because lineage must stay whole | By design |
 | The recall PDF does not shape Devanagari: names stay readable, but conjuncts do not form correctly | Before Hindi or Marathi customer names matter |
 | A dispatch after a recall starts is not blocked. Its customer joins the recall when closure is requested or approved | Review after real use |
 | Recalls start from one batch in the UI, though the API takes several. Linking a CAPA is API only | When a user needs it |
@@ -71,7 +74,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A report stops at 5,000 rows and says so, so a larger period must be split | When a user needs it |
 | Key figures and charts show to anyone with `REPORT_VIEW`, as totals, even without the view permission for each kind of record. Lists and reports need that permission too | Review after real use |
 | Material rejection adds quantities as recorded, without converting units | When a user needs it |
-| Analytics apply facility limits, but the lots, receipts, inspections, NCRs, CAPAs and dispatch lists do not yet | Next, before a customer relies on it |
 | No payment gateway yet. A platform administrator records each payment by hand, and no refund flow exists | When a gateway is chosen |
 | An invoice is not a GST tax invoice: it shows a single GST line with no CGST and SGST split, place of supply or HSN or SAC code. An accountant must review it, and the seller's details must be set, before it goes to a customer | Before the first paid customer |
 | A plan change has no proration. A different plan starts on payment and the unused time on the old one is lost | Review after real use |

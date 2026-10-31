@@ -8,6 +8,7 @@ import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
+import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.material.dto.MaterialDtos.MaterialReference;
 import com.qualityos.material.service.MaterialService;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.CreateReceiptRequest;
@@ -58,6 +59,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
     private final MaterialService materials;
     private final DocumentNumberService numbers;
     private final AuditService audit;
+    private final FacilityScope scope;
 
     MaterialReceiptService(
             MaterialReceiptRepository receipts,
@@ -66,7 +68,9 @@ public class MaterialReceiptService implements AttachmentPolicy {
             SupplierService suppliers,
             MaterialService materials,
             DocumentNumberService numbers,
-            AuditService audit) {
+            AuditService audit,
+            FacilityScope scope) {
+        this.scope = scope;
         this.receipts = receipts;
         this.items = items;
         this.purchaseOrders = purchaseOrders;
@@ -81,7 +85,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
         Specification<MaterialReceipt> filter =
                 Specification.<MaterialReceipt>where(Searches.contains(search, "grnNumber", "deliveryNote"))
                         .and(Searches.equalTo("purchaseOrderId", purchaseOrderId));
-        Page<MaterialReceipt> page = receipts.findAll(filter, pageable);
+        Page<MaterialReceipt> page = receipts.findAll(scope.limit(filter, "facilityId"), pageable);
         Map<UUID, SupplierReference> supplierNames =
                 suppliers.references(page.map(MaterialReceipt::getSupplierId).toSet());
         return PageResponse.from(page, receipt -> new ReceiptSummary(
@@ -149,7 +153,10 @@ public class MaterialReceiptService implements AttachmentPolicy {
     /** The inspection queue. */
     @Transactional(readOnly = true)
     public PageResponse<ReceivedBatch> awaitingInspection(Pageable pageable) {
-        Page<MaterialReceiptItem> page = items.findByInspectionStatus(InspectionStatus.PENDING, pageable);
+        Page<MaterialReceiptItem> page = scope.restriction()
+                .map(allowed -> items.findByInspectionStatusAndReceiptFacilityIdIn(
+                        InspectionStatus.PENDING, allowed, pageable))
+                .orElseGet(() -> items.findByInspectionStatus(InspectionStatus.PENDING, pageable));
         Map<UUID, SupplierReference> supplierNames = suppliers.references(
                 page.map(item -> item.getReceipt().getSupplierId()).toSet());
         Map<UUID, MaterialReference> referenced =
@@ -172,6 +179,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
     public LotView consume(UUID itemId, BigDecimal quantity) {
         MaterialReceiptItem item = items.findForUpdate(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Batch", itemId));
+        scope.requireAllowed(item.getReceipt().getFacilityId(), "Batch", itemId.toString());
         if (item.getReceipt().getStatus() == MaterialReceipt.Status.VOIDED) {
             throw new BusinessRuleException("This receipt was voided.");
         }
@@ -227,6 +235,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
     public List<LotView> releasedLots(UUID materialId) {
         return lots(items.findLots(materialId).stream()
                 .filter(item -> item.isReleased() && item.remainingQuantity().signum() > 0)
+                .filter(item -> scope.allows(item.getReceipt().getFacilityId()))
                 .toList());
     }
 
@@ -315,11 +324,14 @@ public class MaterialReceiptService implements AttachmentPolicy {
 
     @Override
     public boolean parentExists(UUID entityId) {
-        return receipts.existsById(entityId);
+        return receipts.findById(entityId).filter(receipt -> scope.allows(receipt.getFacilityId())).isPresent();
     }
 
     private MaterialReceiptItem loadItem(UUID id) {
-        return items.findWithReceipt(id).orElseThrow(() -> new ResourceNotFoundException("Received batch", id));
+        MaterialReceiptItem item =
+                items.findWithReceipt(id).orElseThrow(() -> new ResourceNotFoundException("Received batch", id));
+        scope.requireAllowed(item.getReceipt().getFacilityId(), "Received batch", id.toString());
+        return item;
     }
 
     private static ReceivedBatch toBatch(
@@ -342,7 +354,10 @@ public class MaterialReceiptService implements AttachmentPolicy {
     }
 
     private MaterialReceipt load(UUID id) {
-        return receipts.findWithItems(id).orElseThrow(() -> new ResourceNotFoundException("Material receipt", id));
+        MaterialReceipt receipt =
+                receipts.findWithItems(id).orElseThrow(() -> new ResourceNotFoundException("Material receipt", id));
+        scope.requireAllowed(receipt.getFacilityId(), "Material receipt", id.toString());
+        return receipt;
     }
 
     private ReceiptDetail toDetail(MaterialReceipt receipt) {

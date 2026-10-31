@@ -9,6 +9,7 @@ import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.inspection.service.InspectionService;
 import com.qualityos.material.dto.MaterialDtos.MaterialReference;
@@ -76,6 +77,7 @@ public class MaterialCorrectionService {
     private final NotificationService notifications;
     private final DocumentNumberService numbers;
     private final AuditService audit;
+    private final FacilityScope scope;
 
     MaterialCorrectionService(
             MaterialCorrectionRepository corrections,
@@ -90,7 +92,9 @@ public class MaterialCorrectionService {
             TenantAccessService access,
             NotificationService notifications,
             DocumentNumberService numbers,
-            AuditService audit) {
+            AuditService audit,
+            FacilityScope scope) {
+        this.scope = scope;
         this.corrections = corrections;
         this.items = items;
         this.approvals = approvals;
@@ -111,7 +115,7 @@ public class MaterialCorrectionService {
         Specification<MaterialCorrection> filter = Specification
                 .<MaterialCorrection>where(Searches.contains(search, "correctionNumber"))
                 .and(Searches.equalTo("status", status));
-        Page<MaterialCorrection> page = corrections.findAll(filter, pageable);
+        Page<MaterialCorrection> page = corrections.findAll(scope.limit(filter, "facilityId"), pageable);
         Map<UUID, String> names = access.activeMembers();
         return PageResponse.from(page, correction -> new CorrectionSummary(
                 correction.getId(),
@@ -145,6 +149,7 @@ public class MaterialCorrectionService {
 
     private CorrectionDetail createForLot(CreateCorrectionRequest request) {
         LotView lot = lot(request.receiptItemId());
+        UUID facilityId = receipts.batch(lot.itemId()).facilityId();
         List<Change> changes = new ArrayList<>();
         if (request.materialId() != null && !request.materialId().equals(lot.materialId())) {
             MaterialReference material = materials.references(Set.of(request.materialId())).get(request.materialId());
@@ -168,12 +173,14 @@ public class MaterialCorrectionService {
             changes.add(new Change(Field.QUANTITY, lot.quantity().toPlainString(), request.quantity().toPlainString(),
                     lot.quantity().toPlainString(), request.quantity().toPlainString()));
         }
-        return save(new MaterialCorrection(numbers.next("MC"), TargetType.LOT, lot.itemId(), null, null,
+        return save(facilityId, new MaterialCorrection(numbers.next("MC"), TargetType.LOT, lot.itemId(), null, null,
                 request.reason().trim()), changes);
     }
 
     private CorrectionDetail createForConsumption(CreateCorrectionRequest request) {
         ConsumptionRef entry = consumption(request.consumptionId());
+        UUID facilityId = production.batch(entry.childBatchId()).facilityId();
+        scope.requireAllowed(facilityId, "Batch", entry.childBatchId().toString());
         List<Change> changes = new ArrayList<>();
         if (request.correctedLotId() != null && !request.correctedLotId().equals(entry.lotId())) {
             LotView replacement = lot(request.correctedLotId());
@@ -188,11 +195,12 @@ public class MaterialCorrectionService {
             changes.add(new Change(Field.QUANTITY, entry.quantity().toPlainString(), request.quantity().toPlainString(),
                     entry.quantity().toPlainString(), request.quantity().toPlainString()));
         }
-        return save(new MaterialCorrection(numbers.next("MC"), TargetType.CONSUMPTION, entry.lotId(), entry.id(),
+        return save(facilityId, new MaterialCorrection(numbers.next("MC"), TargetType.CONSUMPTION, entry.lotId(), entry.id(),
                 entry.childBatchId(), request.reason().trim()), changes);
     }
 
-    private CorrectionDetail save(MaterialCorrection correction, List<Change> changes) {
+    private CorrectionDetail save(UUID facilityId, MaterialCorrection correction, List<Change> changes) {
+        correction.setFacilityId(facilityId);
         if (changes.isEmpty()) {
             throw new BusinessRuleException("Nothing here differs from the record.");
         }
@@ -410,12 +418,18 @@ public class MaterialCorrectionService {
     }
 
     private MaterialCorrection load(UUID id) {
-        return corrections.findById(id).orElseThrow(() -> new ResourceNotFoundException("Material correction", id));
+        return visible(corrections.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Material correction", id)));
     }
 
     private MaterialCorrection lock(UUID id) {
-        return corrections.findForUpdate(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Material correction", id));
+        return visible(corrections.findForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Material correction", id)));
+    }
+
+    private MaterialCorrection visible(MaterialCorrection correction) {
+        scope.requireAllowed(correction.getFacilityId(), "Material correction", correction.getId().toString());
+        return correction;
     }
 
     private record Change(Field field, String original, String corrected, String originalLabel, String correctedLabel) {

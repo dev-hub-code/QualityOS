@@ -13,6 +13,7 @@ import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /** Status changes only through these methods, each of which states where it may start from. */
 @Getter
@@ -40,6 +41,9 @@ public class NonConformance extends TenantOwnedEntity {
 
     @Enumerated(EnumType.STRING)
     private Source source;
+
+    @Setter
+    private UUID facilityId;
 
     private UUID inspectionId;
     private UUID auditId;

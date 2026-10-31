@@ -49,6 +49,7 @@ jobs:
           path: |
             backend/target/recall-samples
             backend/target/audit-samples
+            backend/target/report-samples
           retention-days: 14
       - name: Upload application
         uses: actions/upload-artifact@v4

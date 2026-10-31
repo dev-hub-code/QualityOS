@@ -162,3 +162,20 @@ and a second person.
 
 A major or minor nonconformity raises an NCR with the finding. An audit closes once its NCRs are finished, and needs a second
 person. The QR code holds only a link, which asks whoever scans it to sign in.
+
+## Analytics and reports
+
+All need `REPORT_VIEW`. `from` and `to` are dates in the organisation's time zone. They default to the last 90 days and
+may span two years at most. `facilityId` narrows the result; a facility the caller may not see is a 404.
+
+| Method | Path | Result |
+|---|---|---|
+| GET | `/api/v1/analytics/overview` | Key figures, chart series, pending approvals, recent activity |
+| GET | `/api/v1/reports/{slug}` | Report as JSON: columns, up to 5,000 rows, `truncated` |
+| GET | `/api/v1/reports/{slug}.pdf` | The same report as a PDF, audited as `REPORT_EXPORTED` |
+| GET | `/api/v1/reports/{slug}.xlsx` | The same report as a workbook, audited as `REPORT_EXPORTED` |
+
+Slugs: `inspection`, `supplier-quality`, `material-rejection`, `ncr`, `capa`, `calibration`, `audit`,
+`batch-traceability`. Each also needs the view permission for what it lists, or the call is a 403.
+
+How each figure is defined is in [ANALYTICS.md](ANALYTICS.md).

@@ -969,3 +969,62 @@ export interface AuditReport {
   generatedLabel: string;
   audit: Audit;
 }
+
+export interface Kpis {
+  totalInspections: number;
+  passedInspections: number;
+  failedInspections: number;
+  inspectionPassRate: number | null;
+  openNcrs: number;
+  closedNcrs: number;
+  openCapas: number;
+  overdueCapas: number;
+  supplierRejectionRate: number | null;
+  materialRejectionRate: number | null;
+  defectRate: number | null;
+  firstPassYield: number | null;
+  turnaroundHours: number | null;
+}
+
+export interface QualityShare {
+  name: string;
+  inspections: number;
+  passed: number;
+  passRate: number | null;
+}
+
+export interface SupplierScore {
+  name: string;
+  lots: number;
+  rejectedLots: number;
+  rejectionRate: number | null;
+  ncrs: number;
+  openNcrs: number;
+}
+
+export interface Overview {
+  from: string;
+  to: string;
+  kpis: Kpis;
+  inspectionTrend: { month: string; passed: number; failed: number; rejectedLots: number }[];
+  suppliers: SupplierScore[];
+  defects: { category: string; ncrs: number; share: number; cumulativeShare: number }[];
+  products: QualityShare[];
+  facilities: QualityShare[];
+  ncrAgeing: { label: string; ncrs: number }[];
+  capaTrend: { month: string; opened: number; closed: number }[];
+  pending: { inspectionsAwaitingApproval: number; ncrsAwaitingClosure: number; auditsAwaitingClosure: number };
+  recent: { kind: string; reference: string; link: string; status: string; on: string }[];
+}
+
+export interface ReportTable {
+  title: string;
+  organizationName: string;
+  facilityLabel: string;
+  periodLabel: string;
+  generatedLabel: string;
+  note: string;
+  columns: { label: string; weight: number; numeric: boolean }[];
+  rows: (string | null)[][];
+  truncated: boolean;
+}

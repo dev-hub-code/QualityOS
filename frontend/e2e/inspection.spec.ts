@@ -100,7 +100,7 @@ test("a template is published, and a failed critical measurement never releases 
   await manager.getByRole("dialog").getByRole("button", { name: "Save" }).click();
   await expect(manager.getByText("completed", { exact: true }).first()).toBeVisible();
 
-  await manager.getByRole("link", { name: "Report" }).click();
+  await manager.getByRole("link", { name: "Report", exact: true }).click();
   await expect(manager.getByRole("heading", { name: /Inspection report/ })).toBeVisible();
   await expect(manager.getByText("19.9 to 20.1").first()).toBeVisible();
 

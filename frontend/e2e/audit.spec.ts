@@ -70,7 +70,7 @@ test("an audit runs from checklist to a finding's NCR, a report, and closure by 
   });
   await expect(page.getByText(/is still open/)).toBeVisible();
 
-  await page.getByRole("link", { name: "Report" }).click();
+  await page.getByRole("link", { name: "Report", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Quality audit report/ })).toBeVisible();
   await expect(page.getByText(/not a certificate of compliance/)).toBeVisible();
   const [download] = await Promise.all([

@@ -13,8 +13,8 @@ account emails a real customer needs.
 | 6 NCR and CAPA | Lifecycles, containment, root cause, verification, closure | Failed inspection flows through to closed CAPA | **Done** |
 | 7 Traceability | Batch graph, forward and backward trace, timeline, search | Raw material to dispatch traced | **Done** |
 | 8 Calibration and audit | Instruments, QR, calibration records, audits, findings | Overdue instruments notify and audit findings raise NCRs | **Done** |
-| 9 Analytics | Dashboard, scorecards, Pareto, PDF and Excel exports | Reports honour tenant and facility scope | Next |
-| 10 Subscription | Plans, trials, limits, invoices | Limits enforced, prices editable by admin | |
+| 9 Analytics | Dashboard, scorecards, Pareto, PDF and Excel exports | Reports honour tenant and facility scope | **Done** |
+| 10 Subscription | Plans, trials, limits, invoices | Limits enforced, prices editable by admin | Next |
 | 11 Production | Terraform, ECS, RDS, S3, Secrets Manager, CI/CD, monitoring, backups | Deployed and restore-tested | Deferred |
 
 Later: Module 12 (AI) after Phase 9, because it depends on accumulated data. SMS and WhatsApp stay behind
@@ -37,19 +37,18 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Hindi and Marathi email text was machine-drafted and needs review by a native speaker before customers see it | Before customer launch |
 | Templates for subscription and payment exist, but nothing sends them yet | Phase 10 |
 | Some notifications have no dedicated template (NCR ready for closure, CAPA actions, verification, send-back, corrections). Their email has a translated frame around English text | When a user needs it |
-| Email delivery is recorded in `email_delivery_logs`, but there is no screen for it. The app itself is still English only | Phase 9, with the admin panel |
+| Email delivery is recorded in `email_delivery_logs`, but there is no screen for it. The app itself is still English only | Phase 10, with the admin panel |
 | Organisation branding in email is the organisation name only. There is no logo upload | When a user needs it |
 | Platform roles (`SUPER_ADMIN`, `PLATFORM_ADMIN`, `SUPPORT_ADMIN`) are not implemented | Phase 10, with the admin panel |
 | With verification switched off for private use, registration reveals that an email has an account | Private use only |
 | Sampling is fixed, percentage or every unit; AQL tables (such as ISO 2859-1) are not built | When a customer needs them |
-| A one-person organisation cannot finish an inspection, close an NCR or verify its own CAPA, because each needs a second person | Make it a tenant setting in Phase 9 |
-| NCR and CAPA workflows are fixed: a critical or major NCR always needs a closed CAPA and a verified fix. There are no per-tenant settings | Phase 9, with `tenant_settings` |
+| A one-person organisation cannot finish an inspection, close an NCR or verify its own CAPA, because each needs a second person | Phase 10, with `tenant_settings` |
+| NCR and CAPA workflows are fixed: a critical or major NCR always needs a closed CAPA and a verified fix. There are no per-tenant settings | Phase 10, with `tenant_settings` |
 | An NCR raised on a held lot has no rejected quantity, and a later reject does not fill it in | Review after real use |
 | Completing a CAPA action needs `CAPA_MANAGE`, so an action owner without it must ask someone who has it | Review after real use |
 | Overdue reminders cover the CAPA as a whole, not each action | When a user needs it |
 | Only inspection failures raise NCRs automatically. Evidence is attached to the CAPA, not to each action | When a user needs it |
-| NCRs are not yet linked to supplier scorecards | Phase 9 |
-| The inspection report is a printable page, not a generated PDF | Phase 9, with PDF exports |
+| A single inspection's report is a printable page, not a generated PDF. The inspection report across a period is one | When a user needs it |
 | A template can only be chosen by hand; none is picked automatically for a material | When a user needs it |
 | Production batches take IPQC and FQC inspections only. OQC and the other template types have no production flow | When a user needs it |
 | A template cannot yet be limited to a product in the UI, and quantities consumed are not converted between units | When a user needs it |
@@ -65,17 +64,20 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | The recall PDF does not shape Devanagari: names stay readable, but conjuncts do not form correctly | Before Hindi or Marathi customer names matter |
 | A dispatch after a recall starts is not blocked. Its customer joins the recall when closure is requested or approved | Review after real use |
 | Recalls start from one batch in the UI, though the API takes several. Linking a CAPA is API only | When a user needs it |
-| Scheduled job history has no screen. A silent job shows as `STALE` in health and as a log warning | Phase 9, with the admin panel |
+| Scheduled job history has no screen. A silent job shows as `STALE` in health and as a log warning | Phase 10, with the admin panel |
 | Recording an instrument on an inspection is optional, and applies to the whole inspection, not each measurement | Review after real use |
 | A failed calibration flags the inspections in doubt and notifies people, but does not raise an NCR or reopen them | Review after real use |
 | Audits are planned one at a time, with no recurring schedule or reminder before the date. A missed audit shows as overdue in the list | When a user needs it |
 | A recorded audit finding cannot be edited. A wrong one is handled by cancelling its NCR, and it stays on the report | Review after real use |
-| The audit PDF and QR label are generated, but there is no calibration register report | Phase 9, with reports |
-| `tenant_settings` and supplier scorecards are not built | Phase 9 |
+| `tenant_settings` is not built | Phase 10 |
+| A report stops at 5,000 rows and says so, so a larger period must be split | When a user needs it |
+| Key figures and charts show to anyone with `REPORT_VIEW`, as totals, even without the view permission for each kind of record. Lists and reports need that permission too | Review after real use |
+| Material rejection adds quantities as recorded, without converting units | When a user needs it |
+| Analytics apply facility limits, but the lots, receipts, inspections, NCRs, CAPAs and dispatch lists do not yet | Next, before a customer relies on it |
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | Lists show only active records, with no way to restore an archived one | When a user needs it |
 | Facility, supplier, material and product pickers load the first 100 records | Add search when a tenant exceeds this |
-| Facility sub-records (departments, lines, shifts), supplier contacts, material-to-product mappings, and new categories and units are not audited individually | Review in Phase 9 |
+| Facility sub-records (departments, lines, shifts), supplier contacts, material-to-product mappings, and new categories and units are not audited individually | Review after real use |
 
 ## Definition of done for each phase
 

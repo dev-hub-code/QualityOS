@@ -26,6 +26,11 @@ public class HtmlPdf {
     private final byte[] bold = font("fonts/DejaVuSans-Bold.ttf");
     private final byte[] devanagari = font("fonts/NotoSansDevanagari-Regular.ttf");
 
+    /** A page header or footer is a CSS string, where a quote in a name would end it and drop the whole rule. */
+    public static String cssString(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
     public static Template template(String path) {
         try (Reader source = new InputStreamReader(new ClassPathResource(path).getInputStream(), StandardCharsets.UTF_8)) {
             return Mustache.compiler().defaultValue("").compile(source);

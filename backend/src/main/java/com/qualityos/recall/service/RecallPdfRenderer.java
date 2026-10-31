@@ -4,6 +4,7 @@ import com.qualityos.common.report.HtmlPdf;
 import com.qualityos.recall.dto.RecallDtos.RecallReport;
 import com.samskivert.mustache.Template;
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 
@@ -19,7 +20,7 @@ public class RecallPdfRenderer {
     }
 
     public byte[] render(RecallReport report) {
-        return pdf.render(template.execute(Map.of(
+        Map<String, Object> model = new HashMap<>(Map.of(
                 "report", report,
                 "hasInspections", !report.inspections().isEmpty(),
                 "hasNcrs", !report.ncrs().isEmpty(),
@@ -29,7 +30,9 @@ public class RecallPdfRenderer {
                 "serialCount", report.serialNumbers().size(),
                 "dispatched", plain(report.recall().review().dispatchedQuantity()),
                 "returned", plain(report.recall().review().returnedQuantity()),
-                "outstanding", plain(report.recall().review().outstandingQuantity()))));
+                "outstanding", plain(report.recall().review().outstandingQuantity())));
+        model.put("footerName", HtmlPdf.cssString(report.organizationName()));
+        return pdf.render(template.execute(model));
     }
 
     private static String plain(BigDecimal quantity) {

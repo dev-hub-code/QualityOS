@@ -15,6 +15,8 @@ public interface AccountTokenRepository extends JpaRepository<AccountToken, UUID
 
     boolean existsByUserIdAndPurposeAndCreatedAtAfter(UUID userId, Purpose purpose, Instant after);
 
+    long countByUserIdAndPurposeAndCreatedAtAfter(UUID userId, Purpose purpose, Instant after);
+
     /** Returns 1 for exactly one caller, so a token cannot be spent twice by concurrent requests. */
     @Modifying
     @Query("""

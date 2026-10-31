@@ -13,14 +13,18 @@ import com.qualityos.identity.service.AccountEmailService;
 import com.qualityos.identity.service.InvitationService;
 import com.qualityos.identity.dto.AuthDtos.RefreshRequest;
 import com.qualityos.identity.dto.AuthDtos.RegisterRequest;
+import com.qualityos.identity.dto.AuthDtos.RegistrationPending;
+import com.qualityos.identity.dto.AuthDtos.ResendVerificationRequest;
 import com.qualityos.identity.dto.AuthDtos.SwitchTenantRequest;
 import com.qualityos.identity.dto.AuthDtos.TokenResponse;
+import com.qualityos.identity.dto.AuthDtos.VerificationStatus;
 import com.qualityos.identity.service.AuthService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.Set;
 import java.util.TreeSet;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,9 +50,11 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<TokenResponse> register(@Valid @RequestBody RegisterRequest request) {
-        return ApiResponse.ok(auth.register(request));
+    public ResponseEntity<ApiResponse<?>> register(@Valid @RequestBody RegisterRequest request) {
+        return auth.register(request)
+                .<ResponseEntity<ApiResponse<?>>>map(tokens ->
+                        ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(tokens)))
+                .orElseGet(() -> ResponseEntity.accepted().body(ApiResponse.ok(new RegistrationPending(true))));
     }
 
     @PostMapping("/login")
@@ -90,16 +96,21 @@ public class AuthController {
         accountEmails.resetPassword(request);
     }
 
-    @PostMapping("/email-verification/request")
+    @PostMapping("/resend-verification")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    public void requestEmailVerification() {
-        accountEmails.resendVerification();
+    public void resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+        accountEmails.resendVerification(request.email());
     }
 
-    @PostMapping("/email-verification/confirm")
+    @PostMapping("/verify-email")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void confirmEmailVerification(@Valid @RequestBody TokenRequest request) {
+    public void verifyEmail(@Valid @RequestBody TokenRequest request) {
         accountEmails.verifyEmail(request.token());
+    }
+
+    @GetMapping("/verification-status")
+    public ApiResponse<VerificationStatus> verificationStatus() {
+        return ApiResponse.ok(accountEmails.verificationStatus());
     }
 
     /** Tokens travel in request bodies here, because paths end up in access logs. */

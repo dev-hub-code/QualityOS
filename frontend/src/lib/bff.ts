@@ -96,8 +96,9 @@ const PROXYABLE_AUTH_PATHS = new Set([
   "change-password",
   "password-reset/request",
   "password-reset/confirm",
-  "email-verification/request",
-  "email-verification/confirm",
+  "resend-verification",
+  "verify-email",
+  "verification-status",
   "invitations/preview",
 ]);
 

@@ -6,6 +6,7 @@ import com.qualityos.common.mail.MailMessage;
 import com.qualityos.common.mail.MailRequested;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.dto.AuthDtos.PasswordResetConfirmation;
+import com.qualityos.identity.dto.AuthDtos.VerificationStatus;
 import com.qualityos.identity.entity.AccountToken;
 import com.qualityos.identity.entity.AccountToken.Purpose;
 import com.qualityos.identity.entity.User;
@@ -30,10 +31,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class AccountEmailService {
 
     private static final Duration RESET_TTL = Duration.ofHours(1);
-    private static final Duration VERIFICATION_TTL = Duration.ofDays(3);
 
     /** Stops the reset form being used to fill somebody's inbox. */
     private static final Duration RESEND_COOLDOWN = Duration.ofMinutes(1);
+
+    private static final int MAX_VERIFICATION_EMAILS_PER_HOUR = 5;
 
     private final UserRepository users;
     private final AccountTokenRepository tokens;
@@ -42,6 +44,7 @@ public class AccountEmailService {
     private final AuditService audit;
     private final ApplicationEventPublisher events;
     private final TransactionTemplate tx;
+    private final RegistrationProperties registration;
     private final String appUrl;
 
     AccountEmailService(
@@ -52,6 +55,7 @@ public class AccountEmailService {
             AuditService audit,
             ApplicationEventPublisher events,
             PlatformTransactionManager transactionManager,
+            RegistrationProperties registration,
             @Value("${qualityos.app-url}") String appUrl) {
         this.users = users;
         this.tokens = tokens;
@@ -60,6 +64,7 @@ public class AccountEmailService {
         this.audit = audit;
         this.events = events;
         this.tx = new TransactionTemplate(transactionManager);
+        this.registration = registration;
         this.appUrl = appUrl;
     }
 
@@ -101,20 +106,29 @@ public class AccountEmailService {
             user.setFailedLoginCount(0);
             user.setLockedUntil(null);
             // The link reached this mailbox, which is the same proof that verification asks for.
-            markVerified(user, now);
+            user.markEmailVerified(now);
             refreshTokens.revokeAllForUser(user.getId(), now);
             audit.record("PASSWORD_RESET", "User", user.getId());
         }));
     }
 
-    public void resendVerification() {
-        UUID userId = TenantContext.getCurrentUserId();
-        tx.executeWithoutResult(status -> {
-            User user = users.findById(userId).orElseThrow();
-            if (user.getEmailVerifiedAt() == null && !recentlySent(userId, Purpose.EMAIL_VERIFICATION)) {
+    /** Behaves the same for every address, so it cannot be used to discover accounts. */
+    public void resendVerification(String email) {
+        Optional<User> found = tx.execute(status -> users.findByEmail(AuthService.normalizeEmail(email)));
+        if (found.isEmpty()
+                || found.get().getEmailVerifiedAt() != null
+                || found.get().getStatus() == User.Status.DISABLED) {
+            return;
+        }
+        User user = found.get();
+        TenantContext.runAs(null, user.getId(), () -> tx.executeWithoutResult(status -> {
+            Instant anHourAgo = Instant.now().minus(Duration.ofHours(1));
+            if (!recentlySent(user.getId(), Purpose.EMAIL_VERIFICATION)
+                    && tokens.countByUserIdAndPurposeAndCreatedAtAfter(user.getId(), Purpose.EMAIL_VERIFICATION, anHourAgo)
+                            < MAX_VERIFICATION_EMAILS_PER_HOUR) {
                 sendVerification(user);
             }
-        });
+        }));
     }
 
     public void verifyEmail(String rawToken) {
@@ -122,14 +136,21 @@ public class AccountEmailService {
         TenantContext.runAs(null, token.getUserId(), () -> tx.executeWithoutResult(status -> {
             Instant now = Instant.now();
             consume(token, now);
-            markVerified(users.findById(token.getUserId()).orElseThrow(), now);
+            users.findById(token.getUserId()).orElseThrow().markEmailVerified(now);
+            tokens.invalidateOutstanding(token.getUserId(), Purpose.EMAIL_VERIFICATION, now);
             audit.record("EMAIL_VERIFIED", "User", token.getUserId());
         }));
     }
 
+    public VerificationStatus verificationStatus() {
+        User user = tx.execute(status -> users.findById(TenantContext.getCurrentUserId())).orElseThrow();
+        return new VerificationStatus(user.getEmailVerifiedAt() != null, registration.emailVerificationRequired());
+    }
+
     @Transactional(propagation = Propagation.MANDATORY)
     void sendVerification(User user) {
-        String token = issue(user.getId(), Purpose.EMAIL_VERIFICATION, VERIFICATION_TTL);
+        String token = issue(user.getId(), Purpose.EMAIL_VERIFICATION, registration.verificationTtl());
+        audit.record("EMAIL_VERIFICATION_SENT", "User", user.getId());
         events.publishEvent(new MailRequested(new MailMessage(
                 user.getEmail(),
                 "Confirm your QualityOS email address",
@@ -137,8 +158,8 @@ public class AccountEmailService {
                 Please confirm this email address for your QualityOS account:
                 %s/verify-email?token=%s
 
-                The link works for three days.
-                """.formatted(appUrl, token))));
+                The link works for %d minutes.
+                """.formatted(appUrl, token, registration.verificationTokenExpiryMinutes()))));
     }
 
     private String issue(UUID userId, Purpose purpose, Duration ttl) {
@@ -161,12 +182,6 @@ public class AccountEmailService {
     private void consume(AccountToken token, Instant now) {
         if (tokens.consume(token.getId(), now) != 1) {
             throw invalidLink();
-        }
-    }
-
-    private static void markVerified(User user, Instant now) {
-        if (user.getEmailVerifiedAt() == null) {
-            user.setEmailVerifiedAt(now);
         }
     }
 

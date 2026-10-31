@@ -31,7 +31,8 @@ export async function issueSessionVia(
     body: JSON.stringify(buildBody(await request.json())),
   });
   const payload = await upstream.json();
-  if (!upstream.ok) {
+  // Accepted, without a session: the account has to confirm its email address first.
+  if (!upstream.ok || upstream.status === 202) {
     return NextResponse.json(payload, { status: upstream.status });
   }
   const response = NextResponse.json({ success: true });

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
+import { ResendVerification } from "@/components/auth/resend-verification";
 import { FormError } from "@/components/forms/field";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -17,7 +18,7 @@ function VerifyEmail() {
     setState("pending");
     setError("");
     try {
-      await api.post("/auth/email-verification/confirm", { token });
+      await api.post("/auth/verify-email", { token });
       setState("done");
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Something went wrong.");
@@ -39,9 +40,13 @@ function VerifyEmail() {
     <div className="space-y-4">
       <h1 className="text-lg font-medium">Confirm your email address</h1>
       <FormError message={error} />
-      <Button className="w-full" disabled={state === "pending"} onClick={confirm}>
-        Confirm email
-      </Button>
+      {error ? (
+        <ResendVerification />
+      ) : (
+        <Button className="w-full" disabled={state === "pending"} onClick={confirm}>
+          Confirm email
+        </Button>
+      )}
     </div>
   );
 }

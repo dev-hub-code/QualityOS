@@ -178,10 +178,8 @@ public class InvitationService {
                 throw new BusinessRuleException("A role on this invitation no longer exists. Please ask for a new one.");
             }
             User account = existing.isPresent() ? users.findById(user.getId()).orElseThrow() : users.saveAndFlush(user);
-            if (account.getEmailVerifiedAt() == null) {
-                // Reading the invitation proves this mailbox.
-                account.setEmailVerifiedAt(now);
-            }
+            // Reading the invitation proves this mailbox.
+            account.markEmailVerified(now);
             Membership membership = memberships.saveAndFlush(new Membership(account.getId()));
             granted.forEach(role -> userRoles.save(new UserRole(membership.getId(), role.getId())));
             invitation.accept(now);

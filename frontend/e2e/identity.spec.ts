@@ -1,24 +1,9 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { finishOnboarding, registerOwner } from "./helpers";
 import { acceptInvitation, inviteUser } from "./mail";
 
 const PASSWORD = "correct-horse-battery";
 const unique = () => `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-
-async function registerOrganization(page: Page, name: string, email: string) {
-  await page.goto("/register");
-  await page.getByLabel("Organisation name").fill(name);
-  await page.getByLabel("Your name").fill("Asha Rao");
-  await page.getByLabel("Work email").fill(email);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Create organisation" }).click();
-  await expect(page).toHaveURL(/onboarding/);
-}
-
-async function finishOnboarding(page: Page) {
-  await page.getByLabel("GSTIN").fill("27ABCDE1234F1Z5");
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page).toHaveURL(/dashboard/);
-}
 
 test("unauthenticated visitors are sent to sign in", async ({ page }) => {
   await page.goto("/users");
@@ -28,7 +13,7 @@ test("unauthenticated visitors are sent to sign in", async ({ page }) => {
 
 test("register, onboard, sign out and sign back in", async ({ page }) => {
   const email = `owner-${unique()}@example.com`;
-  await registerOrganization(page, `Acme ${unique()}`, email);
+  await registerOwner(page, email);
   await finishOnboarding(page);
   await expect(page.getByRole("heading", { name: "Welcome, Asha Rao" })).toBeVisible();
 
@@ -46,7 +31,7 @@ test("register, onboard, sign out and sign back in", async ({ page }) => {
 });
 
 test("tokens are not readable by page scripts", async ({ page, context }) => {
-  await registerOrganization(page, `Acme ${unique()}`, `owner-${unique()}@example.com`);
+  await registerOwner(page, `owner-${unique()}@example.com`);
 
   expect(await page.evaluate(() => document.cookie)).not.toContain("qos_");
   const cookies = (await context.cookies()).filter((cookie) => cookie.name.startsWith("qos_"));
@@ -55,7 +40,7 @@ test("tokens are not readable by page scripts", async ({ page, context }) => {
 });
 
 test("an owner adds a viewer, whose navigation is restricted", async ({ page, browser }) => {
-  await registerOrganization(page, `Acme ${unique()}`, `owner-${unique()}@example.com`);
+  await registerOwner(page, `owner-${unique()}@example.com`);
   await finishOnboarding(page);
 
   const viewerEmail = `viewer-${unique()}@example.com`;
@@ -69,7 +54,7 @@ test("an owner adds a viewer, whose navigation is restricted", async ({ page, br
 });
 
 test("a custom role can be created", async ({ page }) => {
-  await registerOrganization(page, `Acme ${unique()}`, `owner-${unique()}@example.com`);
+  await registerOwner(page, `owner-${unique()}@example.com`);
   await finishOnboarding(page);
 
   await page.getByRole("link", { name: "Roles" }).click();
@@ -83,7 +68,7 @@ test("a custom role can be created", async ({ page }) => {
 });
 
 test("cross-site writes through the web tier are refused", async ({ page, request }) => {
-  await registerOrganization(page, `Acme ${unique()}`, `owner-${unique()}@example.com`);
+  await registerOwner(page, `owner-${unique()}@example.com`);
   const cookie = (await page.context().cookies()).map((c) => `${c.name}=${c.value}`).join("; ");
 
   const response = await request.post("/api/v1/roles", {

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -14,17 +15,17 @@ public final class UserRoleDtos {
     private UserRoleDtos() {
     }
 
-    /** @param initialPassword used only when no account exists yet for this email */
-    public record AddMemberRequest(
+    public record InviteRequest(
             @NotBlank @Email @Size(max = 254) String email,
-            @NotBlank @Size(max = 200) String fullName,
-            @Size(min = 10, max = 128) String initialPassword,
             @NotEmpty Set<@NotNull UUID> roleIds) {
 
         @Override
         public String toString() {
-            return "AddMemberRequest[" + email + "]";
+            return "InviteRequest[" + email + "]";
         }
+    }
+
+    public record InvitationResponse(UUID id, String email, Instant expiresAt, boolean expired) {
     }
 
     public record UpdateMemberRolesRequest(@NotEmpty Set<@NotNull UUID> roleIds) {

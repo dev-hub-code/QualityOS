@@ -1,0 +1,9 @@
+package com.qualityos.notification.service;
+
+public enum NotificationType {
+    INSPECTION_AWAITING_APPROVAL,
+    INSPECTION_CRITICAL_FAILURE,
+    INSPECTION_SENT_BACK,
+    INSPECTION_AWAITING_DISPOSITION,
+    INSPECTION_DISPOSITION_RECORDED
+}

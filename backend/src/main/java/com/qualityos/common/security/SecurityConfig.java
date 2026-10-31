@@ -5,6 +5,8 @@ import com.qualityos.common.response.ApiError;
 import com.qualityos.common.response.ApiResponse;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.time.Clock;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
@@ -26,13 +28,17 @@ public class SecurityConfig {
 
     private static final String[] PUBLIC_PATHS = {
         "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout",
+        "/api/v1/auth/password-reset/**", "/api/v1/auth/email-verification/confirm", "/api/v1/auth/invitations/**",
         "/api/v1/system/info", "/actuator/health/**", "/actuator/info", "/v3/api-docs/**", "/swagger-ui/**",
         "/swagger-ui.html"
     };
 
     @Bean
     SecurityFilterChain securityFilterChain(
-            HttpSecurity http, TenantJwtAuthenticationConverter jwtConverter, JsonMapper json) throws Exception {
+            HttpSecurity http,
+            TenantJwtAuthenticationConverter jwtConverter,
+            JsonMapper json,
+            @Value("${qualityos.security.auth-rate-limit-per-minute}") int authRateLimit) throws Exception {
         AuthenticationEntryPoint unauthenticated = (request, response, ex) ->
                 writeError(response, json, ErrorCode.UNAUTHENTICATED, "Authentication is required.");
         AccessDeniedHandler denied = (request, response, ex) ->
@@ -51,6 +57,9 @@ public class SecurityConfig {
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint(unauthenticated)
                         .accessDeniedHandler(denied))
+                .addFilterBefore(
+                        new AuthRateLimitFilter(authRateLimit, json, Clock.systemUTC()),
+                        BearerTokenAuthenticationFilter.class)
                 .addFilterAfter(new TenantContextFilter(), BearerTokenAuthenticationFilter.class)
                 .build();
     }

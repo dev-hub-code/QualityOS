@@ -14,8 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useMe } from "@/hooks/use-me";
 import { ApiError, api, type PageResponse } from "@/lib/api";
-import { addMemberSchema, type AddMemberValues } from "@/lib/schemas";
-import type { Member, Role } from "@/lib/types";
+import { inviteSchema, type InviteValues } from "@/lib/schemas";
+import type { Invitation, Member, Role } from "@/lib/types";
 
 function RolePicker({
   roles,
@@ -59,25 +59,17 @@ function AddMemberDialog({ roles, onClose }: { roles: Role[]; onClose: () => voi
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
-  } = useForm<AddMemberValues>({
-    resolver: zodResolver(addMemberSchema),
-    defaultValues: { initialPassword: "" },
-  });
+  } = useForm<InviteValues>({ resolver: zodResolver(inviteSchema) });
 
-  async function onSubmit(values: AddMemberValues) {
+  async function onSubmit(values: InviteValues) {
     if (selected.size === 0) {
       setFormError("Choose at least one role.");
       return;
     }
     setFormError("");
     try {
-      await api.post("/users", {
-        email: values.email,
-        fullName: values.fullName,
-        initialPassword: values.initialPassword || undefined,
-        roleIds: [...selected],
-      });
-      await queryClient.invalidateQueries({ queryKey: ["users"] });
+      await api.post("/invitations", { email: values.email, roleIds: [...selected] });
+      await queryClient.invalidateQueries({ queryKey: ["invitations"] });
       onClose();
     } catch (error) {
       setFormError(applyServerErrors(error, setError));
@@ -88,26 +80,17 @@ function AddMemberDialog({ roles, onClose }: { roles: Role[]; onClose: () => voi
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add user</DialogTitle>
+          <DialogTitle>Invite user</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           <FormError message={formError} />
           <Field label="Email" id="email" type="email" error={errors.email} {...register("email")} />
-          <Field label="Full name" id="fullName" error={errors.fullName} {...register("fullName")} />
-          <Field
-            label="Initial password"
-            id="initialPassword"
-            type="password"
-            autoComplete="new-password"
-            error={errors.initialPassword}
-            {...register("initialPassword")}
-          />
           <p className="text-sm text-muted-foreground">
-            Share it securely and ask them to change it. Leave blank if they already have a QualityOS account.
+            They will get a link by email, valid for seven days, and choose their own password.
           </p>
           <RolePicker roles={roles} selected={selected} onChange={setSelected} />
           <Button type="submit" disabled={isSubmitting}>
-            Add user
+            Send invitation
           </Button>
         </form>
       </DialogContent>
@@ -150,6 +133,44 @@ function EditRolesDialog({
   );
 }
 
+function PendingInvitations() {
+  const queryClient = useQueryClient();
+  const invitations = useQuery({
+    queryKey: ["invitations"],
+    queryFn: () => api.get<Invitation[]>("/invitations"),
+  });
+  const act = useMutation({
+    mutationFn: ({ id, action }: { id: string; action: "resend" | "revoke" }) =>
+      api.post(`/invitations/${id}/${action}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["invitations"] }),
+  });
+  if (!invitations.data?.length) return null;
+  return (
+    <section className="space-y-2">
+      <h2 className="font-medium">Pending invitations</h2>
+      <FormError message={act.error?.message} />
+      <ul className="divide-y rounded-lg border text-sm">
+        {invitations.data.map((invitation) => (
+          <li key={invitation.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
+            <span>
+              {invitation.email}
+              {invitation.expired && <Badge variant="destructive" className="ml-2">Expired</Badge>}
+            </span>
+            <span>
+              <Button variant="ghost" size="sm" onClick={() => act.mutate({ id: invitation.id, action: "resend" })}>
+                Resend
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => act.mutate({ id: invitation.id, action: "revoke" })}>
+                Revoke
+              </Button>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export default function UsersPage() {
   const queryClient = useQueryClient();
   const { data: me } = useMe();
@@ -175,10 +196,11 @@ export default function UsersPage() {
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
         <Button onClick={() => setAdding(true)} disabled={!roles.data}>
-          Add user
+          Invite user
         </Button>
       </div>
       <FormError message={setActive.error?.message} />
+      <PendingInvitations />
       <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>

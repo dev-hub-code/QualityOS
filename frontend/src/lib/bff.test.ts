@@ -7,6 +7,13 @@ function request(method: string, headers: Record<string, string>) {
 }
 
 describe("isProxyablePath", () => {
+  it("passes email-link endpoints but never one that issues a session", () => {
+    expect(isProxyablePath(["auth", "password-reset", "confirm"])).toBe(true);
+    expect(isProxyablePath(["auth", "invitations", "preview"])).toBe(true);
+    expect(isProxyablePath(["auth", "invitations", "accept"])).toBe(false);
+    expect(isProxyablePath(["auth", "login"])).toBe(false);
+  });
+
   it("allows business endpoints", () => {
     expect(isProxyablePath(["users"])).toBe(true);
     expect(isProxyablePath(["users", "123", "roles"])).toBe(true);

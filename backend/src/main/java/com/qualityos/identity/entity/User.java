@@ -31,6 +31,7 @@ public class User extends AuditedEntity {
     private int failedLoginCount;
     private Instant lockedUntil;
     private Instant lastLoginAt;
+    private Instant emailVerifiedAt;
 
     public User(String email, String passwordHash, String fullName) {
         this.email = email;

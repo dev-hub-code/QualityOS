@@ -1,4 +1,5 @@
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import { acceptInvitation, inviteUser } from "./mail";
 
 const PASSWORD = "correct-horse-battery";
 const unique = () => `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
@@ -62,36 +63,15 @@ async function receiveMaterial(page: Page) {
   });
 }
 
-async function addManager(page: Page) {
-  const email = `manager-${unique()}@example.com`;
-  await page.goto("/users");
-  await page.getByRole("button", { name: "Add user" }).click();
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Full name").fill("Meera Iyer");
-  await page.getByLabel("Initial password").fill(PASSWORD);
-  await page.getByRole("checkbox", { name: "Quality Manager" }).click();
-  await page.getByRole("button", { name: "Add user" }).last().click();
-  await expect(page.getByText(email)).toBeVisible();
-  return email;
-}
-
-async function signInAs(browser: Browser, email: string) {
-  const page = await (await browser.newContext()).newPage();
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/dashboard/);
-  return page;
-}
-
 test("a template is published, and a failed critical measurement never releases material", async ({
   page,
   browser,
 }) => {
   await signUp(page);
   await receiveMaterial(page);
-  const managerEmail = await addManager(page);
+  const managerEmail = `manager-${unique()}@example.com`;
+  await inviteUser(page, managerEmail, "Quality Manager");
+  const manager = await acceptInvitation(browser, managerEmail, "Meera Iyer", PASSWORD);
 
   await page.goto("/inspection-templates");
   await dialogAdd(page, "Add template", async (dialog) => {
@@ -130,8 +110,10 @@ test("a template is published, and a failed critical measurement never releases 
   await expect(page.getByText("Someone other than the inspector")).toBeVisible();
   const url = page.url();
 
-  const manager = await signInAs(browser, managerEmail);
-  await manager.goto(url);
+  await manager.goto("/notifications");
+  await manager.getByRole("button", { name: /Critical failure/ }).click();
+  await expect(manager).toHaveURL(url);
+  await expect(manager.getByRole("link", { name: "Notifications", exact: true }).first()).toBeAttached();
   await manager.getByRole("button", { name: "Approve" }).click();
   await manager.getByRole("dialog").getByRole("button", { name: "Save" }).click();
   await manager.getByRole("button", { name: "Record disposition" }).click();

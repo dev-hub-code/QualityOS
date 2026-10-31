@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { acceptInvitation, inviteUser } from "./mail";
 
 const PASSWORD = "correct-horse-battery";
 const unique = () => `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
@@ -58,22 +59,8 @@ test("an owner adds a viewer, whose navigation is restricted", async ({ page, br
   await finishOnboarding(page);
 
   const viewerEmail = `viewer-${unique()}@example.com`;
-  await page.getByRole("link", { name: "Users" }).click();
-  await page.getByRole("button", { name: "Add user" }).click();
-  const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Email").fill(viewerEmail);
-  await dialog.getByLabel("Full name").fill("Vikram Shah");
-  await dialog.getByLabel("Initial password").fill(PASSWORD);
-  await dialog.getByRole("checkbox", { name: "Viewer" }).click();
-  await dialog.getByRole("button", { name: "Add user" }).click();
-  await expect(page.getByRole("cell", { name: viewerEmail })).toBeVisible();
-
-  const viewer = await (await browser.newContext()).newPage();
-  await viewer.goto("/login");
-  await viewer.getByLabel("Email").fill(viewerEmail);
-  await viewer.getByLabel("Password").fill(PASSWORD);
-  await viewer.getByRole("button", { name: "Sign in" }).click();
-  await expect(viewer).toHaveURL(/dashboard/);
+  await inviteUser(page, viewerEmail, "Viewer");
+  const viewer = await acceptInvitation(browser, viewerEmail, "Vikram Shah", PASSWORD);
   await expect(viewer.getByRole("link", { name: "Settings" })).toBeVisible();
   await expect(viewer.getByRole("link", { name: "Users" })).toHaveCount(0);
 

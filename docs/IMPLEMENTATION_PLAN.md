@@ -9,8 +9,8 @@ account emails a real customer needs.
 | 2 Identity and tenancy | Registration, login, JWT, refresh rotation, onboarding, memberships, RBAC, TenantContext, RLS, audit log | Two organisations proven isolated by tests | **Done** |
 | 3 Master data | Facilities, departments, suppliers, products, materials, UoM, purchase orders, receipts, attachments | PO to receipt workflow in the UI | **Done** |
 | 4 Inspection engine | Template builder and versioning, evaluation engine, sampling, execution, approval, disposition, report | **IQC usable end to end on a phone** | **Done** |
-| 5 Notifications and account email | In-app and email notifications, invitations, email verification, password reset, IP rate limiting, scheduled jobs | Inspection events notify the right people, and a user can join and recover an account by email | Next |
-| 6 NCR and CAPA | Lifecycles, containment, root cause, verification, closure | Failed inspection flows through to closed CAPA | |
+| 5 Notifications and account email | In-app and email notifications, invitations, email verification, password reset, IP rate limiting, scheduled jobs | Inspection events notify the right people, and a user can join and recover an account by email | **Done** |
+| 6 NCR and CAPA | Lifecycles, containment, root cause, verification, closure | Failed inspection flows through to closed CAPA | Next |
 | 7 Traceability | Batch graph, forward and backward trace, timeline, search | Raw material to dispatch traced | |
 | 8 Calibration and audit | Instruments, QR, calibration records, audits, findings | Overdue instruments notify and audit findings raise NCRs | |
 | 9 Analytics | Dashboard, scorecards, Pareto, PDF and Excel exports | Reports honour tenant and facility scope | |
@@ -28,18 +28,19 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 
 | Gap | Planned |
 |---|---|
-| No email verification or password reset, because no email delivery exists yet | Phase 5 |
-| New users receive an admin-set initial password rather than an invitation link, and are not forced to change it | Phase 5 |
-| Login throttling is per account only (10 failures, 15 minutes). Someone can deliberately lock out a known email, and there is no IP rate limit | Phase 5 |
+| Someone can still deliberately lock out a known email (10 failures, 15 minutes), though the IP limit slows it down. A reset link unlocks the account | Review after real use |
+| The IP rate limit is held per backend instance, so several instances multiply it. Shared limits need Redis or the load balancer | With production work |
+| An unverified email address only shows a reminder; it does not restrict the account | Decide before opening public registration |
+| A material receipt does not notify inspectors; they see it in the inspection queue | When a user needs it |
+| Notifications are polled once a minute, with no live push. Only email and in-app channels exist | When a user needs it |
+| Emails are plain text and sent in English only | Before customer launch |
 | Platform roles (`SUPER_ADMIN`, `PLATFORM_ADMIN`, `SUPPORT_ADMIN`) are not implemented | Phase 10, with the admin panel |
-| Expired `refresh_tokens` rows are not purged | Phase 5, with scheduled jobs |
-| Registration reveals that an email already has an account | Accepted for now; revisit with email verification |
+| Registration reveals that an email already has an account. Password reset and invitations do not | Accepted for now |
 | Sampling is fixed, percentage or every unit; AQL tables (such as ISO 2859-1) are not built | When a customer needs them |
 | A one-person organisation cannot finish an inspection, because the inspector cannot review their own work | Make it a tenant setting in Phase 9 |
 | The inspection report is a printable page, not a generated PDF | Phase 9, with PDF exports |
 | A template can only be chosen by hand; none is picked automatically for a material | When a user needs it |
 | Inspections start from received material only. IPQC and FQC need production batches | Phase 7, with traceability |
-| Inspection notifications are not sent yet | Phase 5 |
 | `tenant_settings` and supplier scorecards are not built | Phase 9 |
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | Lists show only active records, with no way to restore an archived one | When a user needs it |

@@ -33,10 +33,26 @@ export const changePasswordSchema = z.object({
   newPassword: password,
 });
 
-export const addMemberSchema = z.object({
+export const inviteSchema = z.object({
   email: z.email("Enter a valid email"),
-  fullName: z.string().trim().min(1, "Enter a name").max(200),
-  initialPassword: password.or(z.literal("")),
+});
+
+export const forgotPasswordSchema = z.object({
+  email: z.email("Enter a valid email"),
+});
+
+export const resetPasswordSchema = z.object({
+  newPassword: password,
+});
+
+export const acceptNewAccountSchema = z.object({
+  fullName: z.string().trim().min(1, "Enter your name").max(200),
+  password,
+});
+
+export const acceptExistingAccountSchema = z.object({
+  fullName: z.string(),
+  password: z.string().min(1, "Enter your password"),
 });
 
 export const roleSchema = z.object({
@@ -48,7 +64,10 @@ export type LoginValues = z.infer<typeof loginSchema>;
 export type RegisterValues = z.infer<typeof registerSchema>;
 export type OrganizationValues = z.infer<typeof organizationSchema>;
 export type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
-export type AddMemberValues = z.infer<typeof addMemberSchema>;
+export type InviteValues = z.infer<typeof inviteSchema>;
+export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
+export type AcceptInvitationValues = z.infer<typeof acceptNewAccountSchema>;
 export type RoleValues = z.infer<typeof roleSchema>;
 
 const decimal = z.string().trim().regex(DECIMAL_PATTERN, "Enter a number with at most 6 decimal places");

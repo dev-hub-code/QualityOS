@@ -3,7 +3,6 @@ package com.qualityos.identity.controller;
 import com.qualityos.common.response.ApiResponse;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
-import com.qualityos.identity.dto.UserRoleDtos.AddMemberRequest;
 import com.qualityos.identity.dto.UserRoleDtos.MemberResponse;
 import com.qualityos.identity.dto.UserRoleDtos.UpdateMemberRolesRequest;
 import com.qualityos.identity.service.UserManagementService;
@@ -43,12 +42,6 @@ public class UserController {
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "25") @Min(1) @Max(100) int size) {
         return ApiResponse.ok(users.list(PageRequest.of(page, size, Sort.by("createdAt"))));
-    }
-
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<MemberResponse> add(@Valid @RequestBody AddMemberRequest request) {
-        return ApiResponse.ok(users.add(request));
     }
 
     @PutMapping("/{membershipId}/roles")

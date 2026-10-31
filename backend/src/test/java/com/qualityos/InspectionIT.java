@@ -430,4 +430,53 @@ class InspectionIT extends MasterDataFixture {
                         "receiptItemId", item, "templateId", publishedTemplate(owner, full))))
                 .andExpect(status().isUnprocessableContent());
     }
+
+    private void assertTitles(Session session, String... titles) throws Exception {
+        List<String> found = JsonPath.read(body(as(session, get("/api/v1/notifications"))), "$.data.items[*].title");
+        assertThat(found).containsExactlyInAnyOrder(titles);
+    }
+
+    private String numberOf(Session session, String inspection) throws Exception {
+        return JsonPath.read(body(as(session, get("/api/v1/inspections/" + inspection))), "$.data.inspectionNumber");
+    }
+
+    @Test
+    void eachStepOfAnInspectionTellsTheRightPeople() throws Exception {
+        Session owner = register();
+        Session manager = addMember(owner, "QUALITY_MANAGER");
+        Session viewer = addMember(owner, "VIEWER");
+        Session inspector = addMember(owner, "QUALITY_INSPECTOR");
+        String template = publishedTemplate(owner, draft(2, 0, List.of(parameter("DIA", "MAJOR", "1", "2"))));
+
+        String id = startInspection(owner, template);
+        String number = numberOf(owner, id);
+        record(inspector, id, "DIA", 1, "1.5").andExpect(status().isOk());
+        record(inspector, id, "DIA", 2, "1.6").andExpect(status().isOk());
+        submit(inspector, id).andExpect(status().isOk());
+        assertTitles(manager, number + " is waiting for approval");
+        assertTitles(inspector);
+        assertTitles(viewer);
+
+        as(manager, postJson("/api/v1/inspections/" + id + "/send-back", Map.of("note", "Remeasure sample 2")))
+                .andExpect(status().isOk());
+        assertTitles(inspector, number + " was sent back");
+
+        submit(inspector, id).andExpect(status().isOk());
+        as(manager, postJson("/api/v1/inspections/" + id + "/approve", Map.of())).andExpect(status().isOk());
+        assertTitles(owner, number + " is waiting for approval", number + " is waiting for approval",
+                number + " needs a disposition");
+        dispose(owner, id, "ACCEPT").andExpect(status().isOk());
+        assertTitles(inspector, number + " was sent back", "Disposition recorded for " + number);
+        assertTitles(viewer);
+    }
+
+    @Test
+    void aCriticalFailureRaisesAnAlertInsteadOfARoutineReview() throws Exception {
+        Session owner = register();
+        Session manager = addMember(owner, "QUALITY_MANAGER");
+        String id = submittedInspection(owner, shaftTemplate(owner), "20.0", "25");
+
+        assertTitles(manager, "Critical failure on " + numberOf(owner, id));
+        as(manager, get("/api/v1/notifications")).andExpect(jsonPath("$.data.items[0].link").value("/inspections/" + id));
+    }
 }

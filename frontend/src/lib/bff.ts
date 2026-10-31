@@ -91,11 +91,24 @@ export function refreshTokens(refreshToken: string): Promise<Response> {
   });
 }
 
-/** Endpoints that return or accept tokens have dedicated routes, so that tokens stay out of the browser. */
+const PROXYABLE_AUTH_PATHS = new Set([
+  "me",
+  "change-password",
+  "password-reset/request",
+  "password-reset/confirm",
+  "email-verification/request",
+  "email-verification/confirm",
+  "invitations/preview",
+]);
+
+/**
+ * Endpoints that return session tokens have dedicated routes, so that those tokens stay out of the browser.
+ * The one-time tokens from email links are in the page's address already, and pass through here.
+ */
 export function isProxyablePath(segments: string[]): boolean {
   if (segments.some((segment) => segment === ".." || segment === ".")) return false;
   if (segments[0] !== "auth") return true;
-  return segments.length === 2 && ["me", "change-password"].includes(segments[1]);
+  return PROXYABLE_AUTH_PATHS.has(segments.slice(1).join("/"));
 }
 
 export function isTokenIssuingRequest(method: string, segments: string[]): boolean {

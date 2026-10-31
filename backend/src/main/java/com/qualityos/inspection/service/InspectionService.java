@@ -71,6 +71,7 @@ public class InspectionService implements AttachmentPolicy {
     private final AttachmentService attachments;
     private final DocumentNumberService numbers;
     private final AuditService audit;
+    private final InspectionAlerts inspectionAlerts;
     private final JsonMapper json;
 
     /** Lazy because the attachment service collects every policy, and this class is one. */
@@ -85,6 +86,7 @@ public class InspectionService implements AttachmentPolicy {
             @Lazy AttachmentService attachments,
             DocumentNumberService numbers,
             AuditService audit,
+            InspectionAlerts inspectionAlerts,
             JsonMapper json) {
         this.inspections = inspections;
         this.results = results;
@@ -96,6 +98,7 @@ public class InspectionService implements AttachmentPolicy {
         this.attachments = attachments;
         this.numbers = numbers;
         this.audit = audit;
+        this.inspectionAlerts = inspectionAlerts;
         this.json = json;
     }
 
@@ -231,6 +234,7 @@ public class InspectionService implements AttachmentPolicy {
             decide(id, "HOLD", "Automatic hold: a critical parameter failed.");
             audit.record("MATERIAL_HELD", ENTITY, id);
         }
+        inspectionAlerts.submitted(inspection, outcome.criticalFailure());
         return toDetail(inspection);
     }
 
@@ -241,17 +245,20 @@ public class InspectionService implements AttachmentPolicy {
         inspections.saveAndFlush(inspection);
         decide(id, "APPROVED", request.note());
         audit.record("INSPECTION_APPROVED", ENTITY, id, null, Map.of("result", inspection.getFinalResult()));
+        inspectionAlerts.approved(inspection);
         return toDetail(inspection);
     }
 
     @Transactional
     public InspectionDetail sendBack(UUID id, String note) {
         Inspection inspection = lock(id);
+        UUID inspector = inspection.getSubmittedBy();
         inspection.sendBack(TenantContext.getCurrentUserId());
         inspections.saveAndFlush(inspection);
         receipts.recordDisposition(inspection.getReceiptItemId(), null, false);
         decide(id, "SENT_BACK", note);
         audit.record("INSPECTION_SENT_BACK", ENTITY, id, null, Map.of("note", note));
+        inspectionAlerts.sentBack(inspection, inspector, note);
         return toDetail(inspection);
     }
 
@@ -270,6 +277,7 @@ public class InspectionService implements AttachmentPolicy {
         decide(id, decision.name(), request.note());
         audit.record("MATERIAL_DISPOSITION_RECORDED", ENTITY, id,
                 previous == null ? null : Map.of("disposition", previous), Map.of("disposition", decision));
+        inspectionAlerts.disposed(inspection);
         return toDetail(inspection);
     }
 

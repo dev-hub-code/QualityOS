@@ -47,6 +47,8 @@ public abstract class AbstractIntegrationTest {
         registry.add("DB_APP_PASSWORD", () -> "app");
         registry.add("DB_MIGRATION_USER", () -> "qualityos_migrator");
         registry.add("DB_MIGRATION_PASSWORD", () -> "migrator");
+        registry.add("JOBS_ENABLED", () -> "false");
+        registry.add("AUTH_RATE_LIMIT_PER_MINUTE", () -> "1000000");
     }
 
     @Autowired
@@ -60,6 +62,9 @@ public abstract class AbstractIntegrationTest {
 
     @Autowired
     protected JsonMapper json;
+
+    @Autowired
+    protected RecordingMailGateway mail;
 
     protected record Session(String email, UUID userId, UUID tenantId, String accessToken, String refreshToken) {
 
@@ -122,16 +127,28 @@ public abstract class AbstractIntegrationTest {
         return ids.getFirst();
     }
 
-    /** Adds a new member with one role and signs them in. */
+    /** Invites a new person, who accepts by email link, and signs them in. */
     protected Session addMember(Session admin, String roleCode) throws Exception {
         String email = uniqueEmail();
-        as(admin, postJson("/api/v1/users", Map.of(
-                        "email", email,
-                        "fullName", "Member",
-                        "initialPassword", PASSWORD,
-                        "roleIds", java.util.List.of(roleId(admin, roleCode)))))
-                .andExpect(status().isCreated());
+        String token = invite(admin, email, roleCode);
+        mvc.perform(postJson("/api/v1/auth/invitations/accept", Map.of(
+                        "token", token, "fullName", "Member", "password", PASSWORD)))
+                .andExpect(status().isOk());
         return login(email);
+    }
+
+    protected String invite(Session admin, String email, String roleCode) throws Exception {
+        as(admin, postJson("/api/v1/invitations", Map.of(
+                        "email", email, "roleIds", java.util.List.of(roleId(admin, roleCode)))))
+                .andExpect(status().isCreated());
+        return mail.awaitToken(email, "invited");
+    }
+
+    /** Adds someone who already has an account to another organisation, leaving their session as it was. */
+    protected void addExistingAccount(Session admin, Session account, String roleCode) throws Exception {
+        mvc.perform(postJson("/api/v1/auth/invitations/accept", Map.of(
+                        "token", invite(admin, account.email(), roleCode), "password", PASSWORD)))
+                .andExpect(status().isOk());
     }
 
     protected String membershipId(Session admin, UUID userId) throws Exception {
@@ -140,6 +157,14 @@ public abstract class AbstractIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         java.util.List<String> ids = JsonPath.read(body, "$.data.items[?(@.userId == '" + userId + "')].membershipId");
         return ids.getFirst();
+    }
+
+    /** Direct SQL under one tenant's row-level security, or none when {@code tenantId} is null. */
+    protected void asAppRole(UUID tenantId, java.util.function.Consumer<JdbcTemplate> work) {
+        inTransactionAs(tenantId, null, () -> {
+            work.accept(jdbc);
+            return null;
+        });
     }
 
     /** Runs raw SQL as the application role, with no help from the service layer or Hibernate. */

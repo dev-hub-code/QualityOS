@@ -12,6 +12,7 @@ public final class AuthDtos {
 
     private static final int MIN_PASSWORD = 10;
     private static final int MAX_PASSWORD = 128;
+    private static final int MAX_TOKEN = 200;
 
     private AuthDtos() {
     }
@@ -77,7 +78,7 @@ public final class AuthDtos {
         }
     }
 
-    public record UserSummary(UUID id, String email, String fullName) {
+    public record UserSummary(UUID id, String email, String fullName, boolean emailVerified) {
     }
 
     public record OrganizationSummary(UUID id, String name) {
@@ -89,5 +90,46 @@ public final class AuthDtos {
             boolean onboarded,
             Set<String> permissions,
             List<OrganizationSummary> organizations) {
+    }
+
+    public record PasswordResetRequest(@NotBlank @Email @Size(max = 254) String email) {
+
+        @Override
+        public String toString() {
+            return "PasswordResetRequest[" + email + "]";
+        }
+    }
+
+    public record PasswordResetConfirmation(
+            @NotBlank @Size(max = MAX_TOKEN) String token,
+            @NotBlank @Size(min = MIN_PASSWORD, max = MAX_PASSWORD) String newPassword) {
+
+        @Override
+        public String toString() {
+            return "PasswordResetConfirmation";
+        }
+    }
+
+    public record TokenRequest(@NotBlank @Size(max = MAX_TOKEN) String token) {
+
+        @Override
+        public String toString() {
+            return "TokenRequest";
+        }
+    }
+
+    /** @param fullName required when the invitation creates a new account */
+    public record AcceptInvitationRequest(
+            @NotBlank @Size(max = MAX_TOKEN) String token,
+            @Size(max = 200) String fullName,
+            @NotBlank @Size(min = 1, max = MAX_PASSWORD) String password) {
+
+        @Override
+        public String toString() {
+            return "AcceptInvitationRequest";
+        }
+    }
+
+    public record InvitationPreview(String organizationName, String email, boolean existingAccount) {
     }
 }

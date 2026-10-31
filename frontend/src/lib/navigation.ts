@@ -1,6 +1,8 @@
 import {
   Boxes,
+  ClipboardCheck,
   ClipboardList,
+  FileCog,
   Factory,
   LayoutDashboard,
   Package,
@@ -27,6 +29,8 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Products", href: "/products", icon: Package, anyPermission: ["PRODUCT_VIEW"] },
   { label: "Purchase orders", href: "/purchase-orders", icon: ClipboardList, anyPermission: ["PURCHASE_VIEW"] },
   { label: "Receipts", href: "/material-receipts", icon: PackageCheck, anyPermission: ["PURCHASE_VIEW"] },
+  { label: "Inspections", href: "/inspections", icon: ClipboardCheck, anyPermission: ["INSPECTION_VIEW"] },
+  { label: "Templates", href: "/inspection-templates", icon: FileCog, anyPermission: ["TEMPLATE_VIEW"] },
   { label: "Facilities", href: "/facilities", icon: Factory, anyPermission: ["FACILITY_VIEW"] },
   { label: "Users", href: "/users", icon: Users, anyPermission: ["USER_MANAGE"] },
   { label: "Roles", href: "/roles", icon: ShieldCheck, anyPermission: ["ROLE_MANAGE", "USER_MANAGE"] },

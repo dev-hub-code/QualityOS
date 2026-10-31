@@ -37,7 +37,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-svh flex-col md:flex-row">
-      <header className="flex items-center justify-between border-b px-4 py-3 md:hidden">
+      <header className="flex items-center justify-between border-b px-4 py-3 md:hidden print:hidden">
         <span className="font-heading font-semibold text-primary">QualityOS</span>
         <Button
           variant="ghost"
@@ -51,7 +51,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <aside
-        className={`${menuOpen ? "flex" : "hidden"} flex-col gap-4 border-b bg-muted/40 p-4 md:flex md:w-60 md:shrink-0 md:border-r md:border-b-0`}
+        className={`${menuOpen ? "flex" : "hidden"} flex-col gap-4 border-b bg-muted/40 p-4 md:flex md:w-60 md:shrink-0 md:border-r md:border-b-0 print:hidden`}
       >
         <span className="hidden font-heading text-lg font-semibold text-primary md:block">QualityOS</span>
 

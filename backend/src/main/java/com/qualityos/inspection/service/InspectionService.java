@@ -1,0 +1,395 @@
+package com.qualityos.inspection.service;
+
+import com.qualityos.common.attachment.AttachmentPolicy;
+import com.qualityos.common.attachment.AttachmentService;
+import com.qualityos.common.audit.AuditService;
+import com.qualityos.common.exception.BusinessRuleException;
+import com.qualityos.common.exception.ResourceNotFoundException;
+import com.qualityos.common.persistence.DocumentNumberService;
+import com.qualityos.common.persistence.Searches;
+import com.qualityos.common.response.PageResponse;
+import com.qualityos.common.security.Permissions;
+import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.inspection.dto.InspectionDtos.ApproveRequest;
+import com.qualityos.inspection.dto.InspectionDtos.CreateInspectionRequest;
+import com.qualityos.inspection.dto.InspectionDtos.DecisionResponse;
+import com.qualityos.inspection.dto.InspectionDtos.DispositionRequest;
+import com.qualityos.inspection.dto.InspectionDtos.ExecuteRequest;
+import com.qualityos.inspection.dto.InspectionDtos.InspectionDetail;
+import com.qualityos.inspection.dto.InspectionDtos.InspectionSummary;
+import com.qualityos.inspection.dto.InspectionDtos.ResultRequest;
+import com.qualityos.inspection.dto.InspectionDtos.ResultResponse;
+import com.qualityos.inspection.dto.TemplateDtos.ParameterSpec;
+import com.qualityos.inspection.dto.TemplateDtos.SpecSnapshot;
+import com.qualityos.inspection.entity.Inspection;
+import com.qualityos.inspection.entity.Inspection.Disposition;
+import com.qualityos.inspection.entity.Inspection.Evaluation;
+import com.qualityos.inspection.entity.InspectionApproval;
+import com.qualityos.inspection.entity.InspectionResult;
+import com.qualityos.inspection.entity.InspectionTemplate;
+import com.qualityos.inspection.entity.TemplateVersion;
+import com.qualityos.inspection.repository.InspectionApprovalRepository;
+import com.qualityos.inspection.repository.InspectionRepository;
+import com.qualityos.inspection.repository.InspectionResultRepository;
+import com.qualityos.inspection.service.EvaluationEngine.Outcome;
+import com.qualityos.inspection.service.EvaluationEngine.Value;
+import com.qualityos.material.dto.MaterialDtos.MaterialReference;
+import com.qualityos.material.service.MaterialService;
+import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceivedBatch;
+import com.qualityos.materialreceipt.service.MaterialReceiptService;
+import com.qualityos.supplier.dto.SupplierDtos.SupplierReference;
+import com.qualityos.supplier.service.SupplierService;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
+
+@Service
+public class InspectionService implements AttachmentPolicy {
+
+    private static final String ENTITY = "Inspection";
+    private static final String ATTACHMENT_TYPE = "INSPECTION";
+
+    private final InspectionRepository inspections;
+    private final InspectionResultRepository results;
+    private final InspectionApprovalRepository approvals;
+    private final InspectionTemplateService templates;
+    private final MaterialReceiptService receipts;
+    private final SupplierService suppliers;
+    private final MaterialService materials;
+    private final AttachmentService attachments;
+    private final DocumentNumberService numbers;
+    private final AuditService audit;
+    private final JsonMapper json;
+
+    /** Lazy because the attachment service collects every policy, and this class is one. */
+    InspectionService(
+            InspectionRepository inspections,
+            InspectionResultRepository results,
+            InspectionApprovalRepository approvals,
+            InspectionTemplateService templates,
+            MaterialReceiptService receipts,
+            SupplierService suppliers,
+            MaterialService materials,
+            @Lazy AttachmentService attachments,
+            DocumentNumberService numbers,
+            AuditService audit,
+            JsonMapper json) {
+        this.inspections = inspections;
+        this.results = results;
+        this.approvals = approvals;
+        this.templates = templates;
+        this.receipts = receipts;
+        this.suppliers = suppliers;
+        this.materials = materials;
+        this.attachments = attachments;
+        this.numbers = numbers;
+        this.audit = audit;
+        this.json = json;
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<InspectionSummary> list(
+            String search, Inspection.Status status, UUID supplierId, Pageable pageable) {
+        Specification<Inspection> filter =
+                Specification.<Inspection>where(Searches.contains(search, "inspectionNumber", "batchNumber"))
+                        .and(Searches.equalTo("status", status))
+                        .and(Searches.equalTo("supplierId", supplierId));
+        Page<Inspection> page = inspections.findAll(filter, pageable);
+        Map<UUID, SupplierReference> supplierNames = suppliers.references(page.map(Inspection::getSupplierId).toSet());
+        Map<UUID, MaterialReference> referenced = materials.references(page.map(Inspection::getMaterialId).toSet());
+        return PageResponse.from(page, inspection -> {
+            MaterialReference material = referenced.get(inspection.getMaterialId());
+            return new InspectionSummary(
+                    inspection.getId(),
+                    inspection.getInspectionNumber(),
+                    inspection.getInspectionType().name(),
+                    supplierNames.get(inspection.getSupplierId()).name(),
+                    material.code(),
+                    material.name(),
+                    inspection.getBatchNumber(),
+                    inspection.getStatus().name(),
+                    name(inspection.getEvaluatedResult()),
+                    name(inspection.getFinalResult()),
+                    name(inspection.getDisposition()),
+                    inspection.getCreatedAt());
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public InspectionDetail get(UUID id) {
+        return toDetail(inspections.findById(id).orElseThrow(() -> new ResourceNotFoundException(ENTITY, id)));
+    }
+
+    /** Freezes the specification in force today. Later template changes never reach this inspection. */
+    @Transactional
+    public InspectionDetail create(CreateInspectionRequest request) {
+        ReceivedBatch batch = receipts.batch(request.receiptItemId());
+        InspectionTemplate template = templates.requireUsableFor(request.templateId(), batch.materialId());
+        TemplateVersion version = templates.versionInForce(template.getId());
+        int samples = version.samplesFor(batch.quantity());
+        receipts.startInspection(batch.itemId());
+        Inspection inspection = new Inspection(
+                numbers.next("INS"),
+                template.getInspectionType(),
+                version.getId(),
+                json.writeValueAsString(templates.snapshot(template.getId(), version)),
+                batch.itemId(),
+                batch.supplierId(),
+                batch.facilityId(),
+                batch.materialId(),
+                batch.internalBatch(),
+                batch.quantity(),
+                samples);
+        inspections.saveAndFlush(inspection);
+        audit.record("INSPECTION_CREATED", ENTITY, inspection.getId());
+        return toDetail(inspection);
+    }
+
+    @Transactional
+    public InspectionDetail cancel(UUID id) {
+        Inspection inspection = lock(id);
+        inspection.cancel();
+        receipts.releaseInspection(inspection.getReceiptItemId());
+        inspections.saveAndFlush(inspection);
+        audit.record("INSPECTION_CANCELLED", ENTITY, id);
+        return toDetail(inspection);
+    }
+
+    /** Saves any number of values, which may be a partial entry. A changed value leaves an audit event. */
+    @Transactional
+    public InspectionDetail execute(UUID id, ExecuteRequest request) {
+        Inspection inspection = lock(id);
+        inspection.recordingResults();
+        inspections.saveAndFlush(inspection);
+        SpecSnapshot specification = specificationOf(inspection);
+        Map<String, ParameterSpec> parameters =
+                specification.parameters().stream().collect(Collectors.toMap(ParameterSpec::code, Function.identity()));
+        Map<String, InspectionResult> existing = new HashMap<>();
+        results.findByInspectionIdOrderByParameterCodeAscSampleNumberAsc(id)
+                .forEach(result -> existing.put(key(result.getParameterCode(), result.getSampleNumber()), result));
+
+        for (ResultRequest entry : request.results()) {
+            ParameterSpec parameter = parameters.get(entry.parameterCode());
+            if (parameter == null) {
+                throw new BusinessRuleException("%s is not part of this inspection.".formatted(entry.parameterCode()));
+            }
+            int allowedSamples = parameter.perSample() ? inspection.getSampleSize() : 1;
+            if (entry.sampleNumber() > allowedSamples) {
+                throw new BusinessRuleException(
+                        "%s has only %d sample(s).".formatted(parameter.code(), allowedSamples));
+            }
+            Value value = typedValue(parameter, entry);
+            InspectionResult result = existing.get(key(entry.parameterCode(), entry.sampleNumber()));
+            String previous = result == null ? null : result.displayValue();
+            if (result == null) {
+                result = new InspectionResult(id, parameter.code(), entry.sampleNumber());
+            }
+            result.record(value.numeric(), value.text(), value.bool(), value.date(),
+                    EvaluationEngine.evaluate(parameter, value), entry.remarks());
+            results.save(result);
+            if (previous != null && !previous.equals(result.displayValue())) {
+                audit.record("INSPECTION_RESULT_CHANGED", ENTITY, id,
+                        Map.of("parameter", parameter.code(), "sample", entry.sampleNumber(), "value", previous),
+                        Map.of("value", result.displayValue()));
+            }
+        }
+        results.flush();
+        audit.record("INSPECTION_EXECUTED", ENTITY, id);
+        return toDetail(inspection);
+    }
+
+    @Transactional
+    public InspectionDetail submit(UUID id) {
+        Inspection inspection = lock(id);
+        SpecSnapshot specification = specificationOf(inspection);
+        List<InspectionResult> recorded = results.findByInspectionIdOrderByParameterCodeAscSampleNumberAsc(id);
+        requireComplete(inspection, specification, recorded);
+
+        Map<String, List<Evaluation>> byParameter = recorded.stream().collect(Collectors.groupingBy(
+                InspectionResult::getParameterCode,
+                Collectors.mapping(InspectionResult::getEvaluation, Collectors.toList())));
+        Outcome outcome = EvaluationEngine.overall(
+                specification.parameters(), byParameter, specification.acceptanceNumber());
+        inspection.submit(outcome.evaluation(), outcome.criticalFailure(), TenantContext.getCurrentUserId());
+        inspections.saveAndFlush(inspection);
+        decide(id, "SUBMITTED", outcome.evaluation().name());
+        audit.record("INSPECTION_SUBMITTED", ENTITY, id, null, Map.of("evaluation", outcome.evaluation()));
+        if (outcome.criticalFailure()) {
+            receipts.recordDisposition(inspection.getReceiptItemId(), Disposition.HOLD.name(), false);
+            decide(id, "HOLD", "Automatic hold: a critical parameter failed.");
+            audit.record("MATERIAL_HELD", ENTITY, id);
+        }
+        return toDetail(inspection);
+    }
+
+    @Transactional
+    public InspectionDetail approve(UUID id, ApproveRequest request) {
+        Inspection inspection = lock(id);
+        inspection.approve(request.result(), TenantContext.getCurrentUserId());
+        inspections.saveAndFlush(inspection);
+        decide(id, "APPROVED", request.note());
+        audit.record("INSPECTION_APPROVED", ENTITY, id, null, Map.of("result", inspection.getFinalResult()));
+        return toDetail(inspection);
+    }
+
+    @Transactional
+    public InspectionDetail sendBack(UUID id, String note) {
+        Inspection inspection = lock(id);
+        inspection.sendBack(TenantContext.getCurrentUserId());
+        inspections.saveAndFlush(inspection);
+        receipts.recordDisposition(inspection.getReceiptItemId(), null, false);
+        decide(id, "SENT_BACK", note);
+        audit.record("INSPECTION_SENT_BACK", ENTITY, id, null, Map.of("note", note));
+        return toDetail(inspection);
+    }
+
+    /** A conditional release of failed material is an exception, so it must state why. */
+    @Transactional
+    public InspectionDetail dispose(UUID id, DispositionRequest request) {
+        Inspection inspection = lock(id);
+        Disposition decision = request.disposition();
+        if (decision == Disposition.CONDITIONAL_ACCEPTANCE && (request.note() == null || request.note().isBlank())) {
+            throw new BusinessRuleException("Conditional acceptance needs a justification.");
+        }
+        Disposition previous = inspection.getDisposition();
+        inspection.dispose(decision);
+        inspections.saveAndFlush(inspection);
+        receipts.recordDisposition(inspection.getReceiptItemId(), decision.name(), decision.isFinal());
+        decide(id, decision.name(), request.note());
+        audit.record("MATERIAL_DISPOSITION_RECORDED", ENTITY, id,
+                previous == null ? null : Map.of("disposition", previous), Map.of("disposition", decision));
+        return toDetail(inspection);
+    }
+
+    @Override
+    public String entityType() {
+        return ATTACHMENT_TYPE;
+    }
+
+    @Override
+    public String viewPermission() {
+        return Permissions.INSPECTION_VIEW;
+    }
+
+    @Override
+    public String managePermission() {
+        return Permissions.INSPECTION_EXECUTE;
+    }
+
+    @Override
+    public boolean parentExists(UUID entityId) {
+        return inspections.existsById(entityId);
+    }
+
+    /** Evidence cannot change once the inspection is submitted. */
+    @Override
+    public boolean locked(UUID entityId) {
+        return inspections.findById(entityId).map(inspection -> !inspection.isOpenForResults()).orElse(false);
+    }
+
+    private Inspection lock(UUID id) {
+        return inspections.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException(ENTITY, id));
+    }
+
+    private void decide(UUID id, String decision, String note) {
+        approvals.saveAndFlush(new InspectionApproval(id, decision, note));
+    }
+
+    private SpecSnapshot specificationOf(Inspection inspection) {
+        return json.readValue(inspection.getSpecSnapshot(), SpecSnapshot.class);
+    }
+
+    private static String key(String code, int sample) {
+        return code + "#" + sample;
+    }
+
+    private static Value typedValue(ParameterSpec parameter, ResultRequest entry) {
+        Value value = switch (parameter.dataType()) {
+            case NUMERIC -> new Value(entry.valueNumeric(), null, null, null);
+            case TEXT -> new Value(null, entry.valueText(), null, null);
+            case BOOLEAN -> new Value(null, null, entry.valueBoolean(), null);
+            case DATE -> new Value(null, null, null, entry.valueDate());
+        };
+        if (value.numeric() == null && value.bool() == null && value.date() == null
+                && (value.text() == null || value.text().isBlank())) {
+            throw new BusinessRuleException("%s needs a value of type %s."
+                    .formatted(parameter.code(), parameter.dataType()));
+        }
+        return value;
+    }
+
+    private void requireComplete(Inspection inspection, SpecSnapshot specification, List<InspectionResult> recorded) {
+        Map<String, Long> counts = recorded.stream()
+                .collect(Collectors.groupingBy(InspectionResult::getParameterCode, Collectors.counting()));
+        Set<String> evidence = Set.copyOf(attachments.categories(ATTACHMENT_TYPE, inspection.getId()));
+        List<String> problems = new ArrayList<>();
+        for (ParameterSpec parameter : specification.parameters()) {
+            long expected = parameter.perSample() ? inspection.getSampleSize() : 1;
+            if (parameter.mandatory() && counts.getOrDefault(parameter.code(), 0L) < expected) {
+                problems.add(parameter.code() + " is incomplete");
+            }
+            if (parameter.evidenceRequired() && !evidence.contains(parameter.code())) {
+                problems.add(parameter.code() + " needs evidence");
+            }
+        }
+        if (!problems.isEmpty()) {
+            throw new BusinessRuleException(String.join("; ", problems) + ".");
+        }
+    }
+
+    private InspectionDetail toDetail(Inspection inspection) {
+        ReceivedBatch batch = receipts.batch(inspection.getReceiptItemId());
+        return new InspectionDetail(
+                inspection.getId(),
+                inspection.getInspectionNumber(),
+                inspection.getInspectionType().name(),
+                inspection.getReceiptItemId(),
+                batch.supplierName(),
+                batch.materialCode(),
+                batch.materialName(),
+                inspection.getBatchNumber(),
+                inspection.getQuantity(),
+                inspection.getSampleSize(),
+                inspection.getStatus().name(),
+                name(inspection.getEvaluatedResult()),
+                name(inspection.getFinalResult()),
+                name(inspection.getDisposition()),
+                inspection.getSubmittedAt(),
+                inspection.getApprovedAt(),
+                specificationOf(inspection),
+                results.findByInspectionIdOrderByParameterCodeAscSampleNumberAsc(inspection.getId()).stream()
+                        .map(result -> new ResultResponse(
+                                result.getParameterCode(),
+                                result.getSampleNumber(),
+                                result.getValueNumeric(),
+                                result.getValueText(),
+                                result.getValueBoolean(),
+                                result.getValueDate(),
+                                result.getEvaluation().name(),
+                                result.getRemarks()))
+                        .toList(),
+                approvals.findByInspectionIdOrderByCreatedAtAsc(inspection.getId()).stream()
+                        .map(decision -> new DecisionResponse(
+                                decision.getDecision(),
+                                decision.getNote(),
+                                decision.getCreatedBy(),
+                                decision.getCreatedAt()))
+                        .toList());
+    }
+
+    private static String name(Enum<?> value) {
+        return value == null ? null : value.name();
+    }
+}

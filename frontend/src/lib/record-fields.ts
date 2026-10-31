@@ -51,3 +51,22 @@ export const productFields = (units: FieldOption[], categories: FieldOption[]): 
   { name: "uomId", label: "Unit", type: "select", required: true, options: units },
   { name: "categoryId", label: "Category", type: "select", options: categories },
 ];
+
+export const INSPECTION_TYPES: FieldOption[] = [
+  { value: "IQC", label: "Incoming (IQC)" },
+  { value: "IPQC", label: "In-process (IPQC)" },
+  { value: "FQC", label: "Final (FQC)" },
+  { value: "OQC", label: "Outgoing (OQC)" },
+  { value: "SUPPLIER", label: "Supplier" },
+  { value: "PACKAGING", label: "Packaging" },
+  { value: "VISUAL", label: "Visual" },
+  { value: "DIMENSIONAL", label: "Dimensional" },
+  { value: "FUNCTIONAL", label: "Functional" },
+];
+
+export const templateFields = (materials: FieldOption[]): FieldDef[] => [
+  { name: "code", label: "Code", required: true },
+  { name: "name", label: "Name", required: true },
+  { name: "inspectionType", label: "Type", type: "select", required: true, options: INSPECTION_TYPES },
+  { name: "materialId", label: "Material (blank for any)", type: "select", options: materials },
+];

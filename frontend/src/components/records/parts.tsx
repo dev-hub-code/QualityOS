@@ -10,8 +10,8 @@ import { api, ApiError, type PageResponse } from "@/lib/api";
 import { formatQuantity, type FieldDef, type FieldOption } from "@/lib/record-form";
 import type { Category, Facility, Material, Specification, Supplier, Unit } from "@/lib/types";
 
-const NEGATIVE = new Set(["REJECTED", "BLOCKED", "CANCELLED", "VOIDED"]);
-const POSITIVE = new Set(["APPROVED", "RECEIVED", "CLOSED", "NOT_REQUIRED"]);
+const NEGATIVE = new Set(["REJECTED", "REJECT", "BLOCKED", "CANCELLED", "VOIDED", "FAIL", "HOLD"]);
+const POSITIVE = new Set(["APPROVED", "RECEIVED", "CLOSED", "NOT_REQUIRED", "PASS", "ACCEPT", "PUBLISHED", "COMPLETED"]);
 
 export function StatusBadge({ status }: { status: string }) {
   const variant = NEGATIVE.has(status) ? "destructive" : POSITIVE.has(status) ? "default" : "secondary";

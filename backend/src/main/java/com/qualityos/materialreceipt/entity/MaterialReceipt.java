@@ -62,6 +62,9 @@ public class MaterialReceipt extends TenantOwnedEntity {
         if (status == Status.VOIDED) {
             throw new BusinessRuleException("This receipt is already void.");
         }
+        if (items.stream().anyMatch(MaterialReceiptItem::inspectionStarted)) {
+            throw new BusinessRuleException("This receipt has an inspection, so it cannot be voided.");
+        }
         status = Status.VOIDED;
         voidReason = reason;
         items.forEach(MaterialReceiptItem::cancelInspection);

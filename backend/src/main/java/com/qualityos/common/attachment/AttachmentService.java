@@ -16,6 +16,7 @@ import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -73,6 +74,7 @@ public class AttachmentService {
     @Transactional
     public AttachmentResponse upload(String entityType, UUID entityId, String category, MultipartFile file) {
         AttachmentPolicy policy = authorize(entityType, entityId, AttachmentPolicy::managePermission);
+        requireUnlocked(policy, entityId);
         if (file.isEmpty()) {
             throw new BusinessRuleException("The file is empty.");
         }
@@ -101,10 +103,28 @@ public class AttachmentService {
     @Transactional
     public void delete(UUID id) {
         Attachment attachment = load(id);
-        authorize(attachment.getEntityType(), attachment.getEntityId(), AttachmentPolicy::managePermission);
+        requireUnlocked(authorize(attachment.getEntityType(), attachment.getEntityId(), AttachmentPolicy::managePermission),
+                attachment.getEntityId());
         attachment.setDeletedAt(Instant.now());
         audit.record("ATTACHMENT_REMOVED", attachment.getEntityType(), attachment.getEntityId(),
                 Map.of("file", attachment.getFileName()), null);
+    }
+
+    /** @return the categories of a record's current attachments, one entry per file */
+    @Transactional(readOnly = true)
+    public List<String> categories(String entityType, UUID entityId) {
+        return attachments
+                .findByEntityTypeAndEntityIdAndDeletedAtIsNullOrderByCreatedAtDesc(entityType, entityId)
+                .stream()
+                .map(Attachment::getCategory)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private static void requireUnlocked(AttachmentPolicy policy, UUID entityId) {
+        if (policy.locked(entityId)) {
+            throw new BusinessRuleException("This record is closed, so its files cannot change.");
+        }
     }
 
     private Attachment load(UUID id) {

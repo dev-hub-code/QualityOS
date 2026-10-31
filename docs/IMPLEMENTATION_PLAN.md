@@ -8,8 +8,8 @@ account emails a real customer needs.
 | 1 Foundation | Project structure, Docker, Flyway, response model, errors, logging, OpenAPI, health | Stack starts and all checks pass | **Done** |
 | 2 Identity and tenancy | Registration, login, JWT, refresh rotation, onboarding, memberships, RBAC, TenantContext, RLS, audit log | Two organisations proven isolated by tests | **Done** |
 | 3 Master data | Facilities, departments, suppliers, products, materials, UoM, purchase orders, receipts, attachments | PO to receipt workflow in the UI | **Done** |
-| 4 Inspection engine | Template builder and versioning, evaluation engine, sampling, execution, approval, disposition, report | **IQC usable end to end on a phone** | Next |
-| 5 Notifications and account email | In-app and email notifications, invitations, email verification, password reset, IP rate limiting, scheduled jobs | Inspection events notify the right people, and a user can join and recover an account by email | |
+| 4 Inspection engine | Template builder and versioning, evaluation engine, sampling, execution, approval, disposition, report | **IQC usable end to end on a phone** | **Done** |
+| 5 Notifications and account email | In-app and email notifications, invitations, email verification, password reset, IP rate limiting, scheduled jobs | Inspection events notify the right people, and a user can join and recover an account by email | Next |
 | 6 NCR and CAPA | Lifecycles, containment, root cause, verification, closure | Failed inspection flows through to closed CAPA | |
 | 7 Traceability | Batch graph, forward and backward trace, timeline, search | Raw material to dispatch traced | |
 | 8 Calibration and audit | Instruments, QR, calibration records, audits, findings | Overdue instruments notify and audit findings raise NCRs | |
@@ -34,7 +34,12 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Platform roles (`SUPER_ADMIN`, `PLATFORM_ADMIN`, `SUPPORT_ADMIN`) are not implemented | Phase 10, with the admin panel |
 | Expired `refresh_tokens` rows are not purged | Phase 5, with scheduled jobs |
 | Registration reveals that an email already has an account | Accepted for now; revisit with email verification |
-| A receipt can be voided without restriction; voiding must be refused once inspection has started | Phase 4 |
+| Sampling is fixed, percentage or every unit; AQL tables (such as ISO 2859-1) are not built | When a customer needs them |
+| A one-person organisation cannot finish an inspection, because the inspector cannot review their own work | Make it a tenant setting in Phase 9 |
+| The inspection report is a printable page, not a generated PDF | Phase 9, with PDF exports |
+| A template can only be chosen by hand; none is picked automatically for a material | When a user needs it |
+| Inspections start from received material only. IPQC and FQC need production batches | Phase 7, with traceability |
+| Inspection notifications are not sent yet | Phase 5 |
 | `tenant_settings` and supplier scorecards are not built | Phase 9 |
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | Lists show only active records, with no way to restore an archived one | When a user needs it |

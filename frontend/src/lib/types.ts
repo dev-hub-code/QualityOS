@@ -265,3 +265,124 @@ export interface Receipt {
   voidReason: string | null;
   items: ReceiptItem[];
 }
+
+export interface ParameterSpec {
+  code: string;
+  name: string;
+  description: string | null;
+  dataType: "NUMERIC" | "TEXT" | "BOOLEAN" | "DATE";
+  uomId: string | null;
+  nominalValue: string | null;
+  minValue: string | null;
+  maxValue: string | null;
+  tolerance: string | null;
+  expectedText: string | null;
+  criticality: "CRITICAL" | "MAJOR" | "MINOR";
+  mandatory: boolean;
+  perSample: boolean;
+  evidenceRequired: boolean;
+  inspectionMethod: string | null;
+  remarks: string | null;
+}
+
+export interface TemplateSummary {
+  id: string;
+  code: string;
+  name: string;
+  inspectionType: string;
+  materialId: string | null;
+  publishedVersion: number | null;
+  hasDraft: boolean;
+}
+
+export interface TemplateVersion {
+  id: string;
+  versionNumber: number;
+  status: string;
+  changeNote: string | null;
+  samplingType: "FIXED" | "PERCENTAGE" | "FULL";
+  sampleSize: number | null;
+  samplePercent: string | null;
+  acceptanceNumber: number;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+  parameters: ParameterSpec[];
+}
+
+export interface TemplateDetail {
+  template: TemplateSummary;
+  versions: TemplateVersion[];
+}
+
+export interface ReceivedBatch {
+  itemId: string;
+  grnNumber: string;
+  receivedOn: string;
+  supplierName: string;
+  materialId: string;
+  materialCode: string;
+  materialName: string;
+  supplierBatch: string;
+  internalBatch: string;
+  quantity: string;
+}
+
+export interface InspectionSummary {
+  id: string;
+  inspectionNumber: string;
+  inspectionType: string;
+  supplierName: string;
+  materialCode: string;
+  materialName: string;
+  batchNumber: string;
+  status: string;
+  evaluatedResult: string | null;
+  finalResult: string | null;
+  disposition: string | null;
+}
+
+export interface InspectionResult {
+  parameterCode: string;
+  sampleNumber: number;
+  valueNumeric: string | null;
+  valueText: string | null;
+  valueBoolean: boolean | null;
+  valueDate: string | null;
+  evaluation: string;
+  remarks: string | null;
+}
+
+export interface InspectionDecision {
+  decision: string;
+  note: string | null;
+  decidedBy: string;
+  decidedAt: string;
+}
+
+export interface Inspection {
+  id: string;
+  inspectionNumber: string;
+  inspectionType: string;
+  supplierName: string;
+  materialCode: string;
+  materialName: string;
+  batchNumber: string;
+  quantity: string;
+  sampleSize: number;
+  status: string;
+  evaluatedResult: string | null;
+  finalResult: string | null;
+  disposition: string | null;
+  submittedAt: string | null;
+  approvedAt: string | null;
+  specification: {
+    templateCode: string;
+    templateName: string;
+    versionNumber: number;
+    samplingType: string;
+    acceptanceNumber: number;
+    parameters: ParameterSpec[];
+  };
+  results: InspectionResult[];
+  decisions: InspectionDecision[];
+}

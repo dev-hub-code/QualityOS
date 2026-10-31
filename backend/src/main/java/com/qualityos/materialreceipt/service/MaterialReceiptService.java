@@ -2,6 +2,7 @@ package com.qualityos.materialreceipt.service;
 
 import com.qualityos.common.attachment.AttachmentPolicy;
 import com.qualityos.common.audit.AuditService;
+import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.persistence.Searches;
@@ -15,7 +16,10 @@ import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceiptItemRequest;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceiptItemResponse;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceiptSummary;
 import com.qualityos.materialreceipt.entity.MaterialReceipt;
+import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceivedBatch;
 import com.qualityos.materialreceipt.entity.MaterialReceiptItem;
+import com.qualityos.materialreceipt.entity.MaterialReceiptItem.InspectionStatus;
+import com.qualityos.materialreceipt.repository.MaterialReceiptItemRepository;
 import com.qualityos.materialreceipt.repository.MaterialReceiptRepository;
 import com.qualityos.purchaseorder.dto.PurchaseOrderDtos.ReceiptLine;
 import com.qualityos.purchaseorder.dto.PurchaseOrderDtos.ReceiptTarget;
@@ -24,6 +28,7 @@ import com.qualityos.supplier.dto.SupplierDtos.SupplierReference;
 import com.qualityos.supplier.service.SupplierService;
 import java.math.BigDecimal;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -31,12 +36,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class MaterialReceiptService implements AttachmentPolicy {
 
     private final MaterialReceiptRepository receipts;
+    private final MaterialReceiptItemRepository items;
     private final PurchaseOrderService purchaseOrders;
     private final SupplierService suppliers;
     private final MaterialService materials;
@@ -45,12 +52,14 @@ public class MaterialReceiptService implements AttachmentPolicy {
 
     MaterialReceiptService(
             MaterialReceiptRepository receipts,
+            MaterialReceiptItemRepository items,
             PurchaseOrderService purchaseOrders,
             SupplierService suppliers,
             MaterialService materials,
             DocumentNumberService numbers,
             AuditService audit) {
         this.receipts = receipts;
+        this.items = items;
         this.purchaseOrders = purchaseOrders;
         this.suppliers = suppliers;
         this.materials = materials;
@@ -111,7 +120,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
         return toDetail(receipt);
     }
 
-    /** Takes the quantities back off the order. Must be refused once inspection has begun (Phase 4). */
+    /** Takes the quantities back off the order. Refused once an inspection exists. */
     @Transactional
     public ReceiptDetail voidReceipt(UUID id, String reason) {
         MaterialReceipt receipt = load(id);
@@ -121,6 +130,49 @@ public class MaterialReceiptService implements AttachmentPolicy {
         receipts.saveAndFlush(receipt);
         audit.record("MATERIAL_RECEIPT_VOIDED", "MaterialReceipt", id, null, Map.of("reason", reason));
         return toDetail(receipt);
+    }
+
+    /** The inspection queue. */
+    @Transactional(readOnly = true)
+    public PageResponse<ReceivedBatch> awaitingInspection(Pageable pageable) {
+        Page<MaterialReceiptItem> page = items.findByInspectionStatus(InspectionStatus.PENDING, pageable);
+        Map<UUID, SupplierReference> supplierNames = suppliers.references(
+                page.map(item -> item.getReceipt().getSupplierId()).toSet());
+        Map<UUID, MaterialReference> referenced =
+                materials.references(page.map(MaterialReceiptItem::getMaterialId).toSet());
+        return PageResponse.from(page, item -> toBatch(
+                item, supplierNames.get(item.getReceipt().getSupplierId()), referenced.get(item.getMaterialId())));
+    }
+
+    @Transactional(readOnly = true)
+    public ReceivedBatch batch(UUID itemId) {
+        MaterialReceiptItem item = loadItem(itemId);
+        return toBatch(
+                item,
+                suppliers.reference(item.getReceipt().getSupplierId()),
+                materials.references(Set.of(item.getMaterialId())).get(item.getMaterialId()));
+    }
+
+    /** Claims a batch for inspection. The item's version stops this racing with a void. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void startInspection(UUID itemId) {
+        MaterialReceiptItem item = loadItem(itemId);
+        if (item.getInspectionStatus() != InspectionStatus.PENDING) {
+            throw new BusinessRuleException("This batch is not awaiting inspection.");
+        }
+        item.updateInspection(InspectionStatus.IN_PROGRESS, null);
+        items.flush();
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void releaseInspection(UUID itemId) {
+        loadItem(itemId).updateInspection(InspectionStatus.PENDING, null);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordDisposition(UUID itemId, String disposition, boolean finalDecision) {
+        loadItem(itemId).updateInspection(
+                finalDecision ? InspectionStatus.COMPLETED : InspectionStatus.IN_PROGRESS, disposition);
     }
 
     @Override
@@ -141,6 +193,29 @@ public class MaterialReceiptService implements AttachmentPolicy {
     @Override
     public boolean parentExists(UUID entityId) {
         return receipts.existsById(entityId);
+    }
+
+    private MaterialReceiptItem loadItem(UUID id) {
+        return items.findWithReceipt(id).orElseThrow(() -> new ResourceNotFoundException("Received batch", id));
+    }
+
+    private static ReceivedBatch toBatch(
+            MaterialReceiptItem item, SupplierReference supplier, MaterialReference material) {
+        MaterialReceipt receipt = item.getReceipt();
+        return new ReceivedBatch(
+                item.getId(),
+                receipt.getId(),
+                receipt.getGrnNumber(),
+                receipt.getReceivedOn(),
+                supplier.id(),
+                supplier.name(),
+                receipt.getFacilityId(),
+                material.id(),
+                material.code(),
+                material.name(),
+                item.getSupplierBatch(),
+                item.getInternalBatch(),
+                item.getQuantity());
     }
 
     private MaterialReceipt load(UUID id) {
@@ -175,7 +250,8 @@ public class MaterialReceiptService implements AttachmentPolicy {
                             item.getInternalBatch(),
                             item.getQuantity(),
                             item.isInspectionRequired(),
-                            item.getInspectionStatus().name());
+                            item.getInspectionStatus().name(),
+                            item.getDisposition());
                 }).toList());
     }
 }

@@ -122,3 +122,9 @@ the others, and each run writes a row to `scheduled_job_executions`, kept for 30
 three runs, and reports `STALE` in health.
 
 A new job also needs an entry in `JobMonitor`, which holds its own list of what should be running.
+
+## Reporting
+
+`reporting` reads across modules with plain SQL, like the traceability search, and writes nothing except an audit row
+for each export. Row-level security limits every statement to the tenant. `ReportScope` adds the member's facilities,
+and anything with no facility fails that clause, so a limited member never sees what cannot be placed.

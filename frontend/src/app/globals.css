@@ -134,3 +134,14 @@
     @apply font-sans;
   }
 }
+
+/* Chart series, chosen for each theme and validated for colour vision. */
+.viz-root {
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+}
+
+.dark .viz-root {
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+}

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>{{report.title}}</title>
+<meta name="author" content="{{report.organizationName}}"/>
+<meta name="subject" content="{{report.title}}"/>
+<style>
+@page {
+  size: A4 landscape;
+  margin: 18mm 12mm 16mm 12mm;
+  @top-left { content: "{{report.title}}"; font: 8pt "Report Sans"; color: #555; }
+  @top-right { content: "Generated {{report.generatedLabel}}"; font: 8pt "Report Sans"; color: #555; }
+  @bottom-left { content: "{{footerName}}"; font: 8pt "Report Sans"; color: #555; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt "Report Sans"; color: #555; }
+}
+body { font-family: "Report Sans", "Report Devanagari", sans-serif; font-size: 9pt; color: #111; line-height: 1.35; }
+h1 { font-size: 17pt; margin: 0 0 2pt 0; }
+p { margin: 0 0 5pt 0; }
+.muted { color: #555; }
+table { width: 100%; border-collapse: collapse; -fs-table-paginate: paginate; table-layout: fixed; margin-top: 6pt; }
+thead { display: table-header-group; }
+tr { page-break-inside: avoid; }
+th { background: #e8e8e8; text-align: left; font-weight: 700; font-size: 7.5pt; }
+th, td { border: 0.5pt solid #888; padding: 2.5pt 4pt; vertical-align: top; }
+td { font-size: 8pt; word-wrap: break-word; }
+.num { text-align: right; }
+</style>
+</head>
+<body>
+<h1>{{report.title}}</h1>
+<p class="muted">{{report.organizationName}}, {{report.facilityLabel}}. {{report.periodLabel}}. {{rowCount}} rows.</p>
+<p class="muted">{{report.note}}</p>
+{{#report.truncated}}<p><b>This report stops at {{rowCount}} rows. Choose fewer dates to see the rest.</b></p>{{/report.truncated}}
+{{#empty}}<p>Nothing to report for this period.</p>{{/empty}}
+{{^empty}}<table>
+<thead><tr>{{#headings}}<th class="{{align}}" style="width:{{width}}%">{{label}}</th>{{/headings}}</tr></thead>
+<tbody>
+{{#rows}}<tr>{{#cells}}<td class="{{align}}">{{value}}</td>{{/cells}}</tr>
+{{/rows}}
+</tbody>
+</table>{{/empty}}
+</body>
+</html>

@@ -142,3 +142,8 @@ row-level security. `account_tokens` holds one-time password reset and email ver
 - **V16** adds `instruments`, the append-only `calibration_records` and `instrument_usages`, `audit_checklists`,
   `audit_checklist_items`, `audits`, `audit_items` (a copy of the questions, kept apart from later checklist changes),
   `audit_findings`, the `AUDIT_CLOSE` permission, and the audit source on `non_conformances`.
+
+## Phase 9: analytics (V17)
+
+No new tables. Analytics read existing records through row-level security. V17 adds date indexes on decided
+inspections, and on NCRs and CAPAs by creation and closure.

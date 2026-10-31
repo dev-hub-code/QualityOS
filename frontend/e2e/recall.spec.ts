@@ -50,7 +50,7 @@ test("a recall runs from the report through contact, acknowledgement and approve
   await expect(page.getByText("No customers match.")).toBeVisible();
   await page.getByLabel("Filter by status").selectOption("");
 
-  await page.getByRole("link", { name: "Report" }).click();
+  await page.getByRole("link", { name: "Report", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Product recall report/ })).toBeVisible();
   await expect(page.getByText(serial)).toBeVisible();
   await expect(page.getByRole("cell", { name: "Phone" })).toBeVisible();

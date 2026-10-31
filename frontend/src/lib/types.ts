@@ -1028,3 +1028,75 @@ export interface ReportTable {
   rows: (string | null)[][];
   truncated: boolean;
 }
+
+export type BillingCycle = "MONTHLY" | "ANNUAL";
+
+export interface Plan {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  monthlyPrice: number | null;
+  annualPrice: number | null;
+  taxPercent: number;
+  maxUsers: number | null;
+  maxFacilities: number | null;
+  features: string[];
+  trialDays: number;
+  graceDays: number;
+  active: boolean;
+  version: number;
+}
+
+export interface Subscription {
+  planCode: string;
+  planName: string;
+  state: "TRIAL" | "ACTIVE" | "GRACE" | "READ_ONLY";
+  billingCycle: BillingCycle | null;
+  endsAt: string;
+  readOnlyFrom: string;
+  cancelledAt: string | null;
+  users: number;
+  maxUsers: number | null;
+  facilities: number;
+  maxFacilities: number | null;
+  features: string[];
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  planName: string;
+  billingCycle: BillingCycle;
+  amount: number;
+  taxPercent: number;
+  taxAmount: number;
+  total: number;
+  status: "ISSUED" | "PAID" | "VOID";
+  issuedOn: string;
+  dueOn: string;
+  paidAt: string | null;
+}
+
+export interface Payment {
+  id: string;
+  invoiceId: string;
+  provider: string;
+  providerReference: string;
+  amount: number;
+  status: "SUCCEEDED" | "FAILED";
+  failureReason: string | null;
+  occurredAt: string;
+}
+
+export interface TenantSubscription {
+  tenantId: string;
+  organizationName: string;
+  subscription: Subscription;
+  openInvoices: Invoice[];
+}
+
+export interface OrganisationList {
+  total: number;
+  items: TenantSubscription[];
+}

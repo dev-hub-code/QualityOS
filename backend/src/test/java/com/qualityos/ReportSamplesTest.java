@@ -8,9 +8,15 @@ import com.qualityos.common.report.HtmlPdf;
 import com.qualityos.reporting.dto.ReportingDtos.Column;
 import com.qualityos.reporting.dto.ReportingDtos.ReportTable;
 import com.qualityos.reporting.service.ReportExporter;
+import com.qualityos.subscription.entity.Subscription;
+import com.qualityos.subscription.entity.SubscriptionInvoice;
+import com.qualityos.subscription.service.InvoicePdfRenderer;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
@@ -48,5 +54,25 @@ class ReportSamplesTest {
         byte[] excel = exporter.excel(table(120, true));
         Files.write(OUT.resolve("3-many-rows.xlsx"), excel);
         assertThat(excel).isNotEmpty();
+    }
+
+    @Test
+    void writesAnInvoiceSample() throws Exception {
+        SubscriptionInvoice invoice = new SubscriptionInvoice(UUID.randomUUID(), "BILL-2026-00001");
+        invoice.setPlanName("Growth");
+        invoice.setBillingCycle(Subscription.Cycle.ANNUAL);
+        invoice.setAmount(new BigDecimal("59990.00"));
+        invoice.setTaxPercent(new BigDecimal("18.00"));
+        invoice.setTaxAmount(new BigDecimal("10798.20"));
+        invoice.setTotal(new BigDecimal("70788.20"));
+        invoice.setBuyerName("Acme \"Forgings\" & Sons");
+        invoice.setBuyerGstin("27AAPFU0939F1ZV");
+        invoice.setBuyerAddress("Plot 12, MIDC Bhosari, Pune");
+        invoice.setIssuedOn(LocalDate.of(2026, 10, 31));
+        invoice.setDueOn(LocalDate.of(2026, 11, 7));
+        Files.createDirectories(OUT);
+        byte[] pdf = InvoicePdfRenderer.forSample(new HtmlPdf()).render(invoice);
+        Files.write(OUT.resolve("4-invoice.pdf"), pdf);
+        assertThat(pdf).isNotEmpty();
     }
 }

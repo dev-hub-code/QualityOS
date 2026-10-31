@@ -29,6 +29,9 @@ public final class Permissions {
     public static final String RECALL_MANAGE = "RECALL_MANAGE";
     public static final String RECALL_CLOSE = "RECALL_CLOSE";
     public static final String REPORT_VIEW = "REPORT_VIEW";
+    public static final String SUBSCRIPTION_MANAGE = "SUBSCRIPTION_MANAGE";
+    /** Not a role permission: held by those listed in platform_admins, whichever organisation they sign in to. */
+    public static final String PLATFORM_ADMIN = "PLATFORM_ADMIN";
     public static final String CALIBRATION_MANAGE = "CALIBRATION_MANAGE";
     public static final String CALIBRATION_VIEW = "CALIBRATION_VIEW";
     public static final String AUDIT_VIEW = "AUDIT_VIEW";
@@ -76,6 +79,8 @@ public final class Permissions {
         public static final String RECALL_MANAGE = "hasAuthority('RECALL_MANAGE')";
         public static final String RECALL_CLOSE = "hasAuthority('RECALL_CLOSE')";
         public static final String REPORT_VIEW = "hasAuthority('REPORT_VIEW')";
+        public static final String SUBSCRIPTION_MANAGE = "hasAuthority('SUBSCRIPTION_MANAGE')";
+        public static final String PLATFORM_ADMIN = "hasAuthority('PLATFORM_ADMIN')";
         public static final String CALIBRATION_VIEW = "hasAuthority('CALIBRATION_VIEW')";
         public static final String CALIBRATION_MANAGE = "hasAuthority('CALIBRATION_MANAGE')";
         public static final String AUDIT_VIEW = "hasAuthority('AUDIT_VIEW')";

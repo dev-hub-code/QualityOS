@@ -1,5 +1,6 @@
 "use client";
 
+import { SubscriptionBanner } from "@/components/billing/subscription-banner";
 import { LogOut, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -111,6 +112,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <main className="min-w-0 flex-1 p-4 md:p-8">
         {!me.user.emailVerified && <VerifyEmailBanner email={me.user.email} />}
+        <SubscriptionBanner />
         {children}
       </main>
     </div>

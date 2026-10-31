@@ -32,18 +32,21 @@ public class RoleService {
     private final UserRoleRepository userRoles;
     private final RoleMapper mapper;
     private final AuditService audit;
+    private final TenantAccessService access;
 
     RoleService(
             RoleRepository roles,
             PermissionRepository permissions,
             UserRoleRepository userRoles,
             RoleMapper mapper,
-            AuditService audit) {
+            AuditService audit,
+            TenantAccessService access) {
         this.roles = roles;
         this.permissions = permissions;
         this.userRoles = userRoles;
         this.mapper = mapper;
         this.audit = audit;
+        this.access = access;
     }
 
     @Transactional(readOnly = true)
@@ -102,7 +105,7 @@ public class RoleService {
     }
 
     private Set<Permission> resolve(Set<String> codes) {
-        AuthorityChecks.requireHolds(codes);
+        AuthorityChecks.requireHolds(codes, access.rolePermissions());
         List<Permission> found = permissions.findByCodeIn(codes);
         if (found.size() != codes.size()) {
             throw new BusinessRuleException("One or more permissions do not exist.");

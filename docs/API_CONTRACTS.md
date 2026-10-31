@@ -179,3 +179,34 @@ Slugs: `inspection`, `supplier-quality`, `material-rejection`, `ncr`, `capa`, `c
 `batch-traceability`. Each also needs the view permission for what it lists, or the call is a 403.
 
 How each figure is defined is in [ANALYTICS.md](ANALYTICS.md).
+
+## Subscription
+
+Reading `/api/v1/subscription` needs only membership. Everything else here needs `SUBSCRIPTION_MANAGE`.
+
+| Method | Path | Result |
+|---|---|---|
+| GET | `/api/v1/subscription` | Plan, state (`TRIAL`, `ACTIVE`, `GRACE`, `READ_ONLY`), usage and limits |
+| GET | `/api/v1/subscription/plans` | Plans on offer |
+| POST | `/api/v1/subscription/plan` | Raises an invoice, voiding any open one. Takes effect when paid. Also how to renew |
+| POST | `/api/v1/subscription/cancel`, `/resume` | Cancelling runs to the end of the period |
+| GET | `/api/v1/subscription/invoices`, `/invoices/{id}/pdf`, `/payments` | Billing history |
+
+## Platform administration
+
+All need `PLATFORM_ADMIN`, which only a row in `platform_admins` gives. The tenant id in these paths is an operator's
+choice of organisation, and the work runs under that organisation's tenant context.
+
+| Method | Path | Result |
+|---|---|---|
+| GET, PUT | `/api/v1/platform/plans`, `/plans/{id}` | Prices, limits, features, trial and grace days |
+| GET | `/api/v1/platform/organisations` | Each organisation's subscription and open invoices, up to 500, unpaid first, with the `total` |
+| POST | `/api/v1/platform/organisations/{id}/invoices` | Invoice at an agreed amount, for Enterprise |
+| POST | `/api/v1/platform/organisations/{id}/invoices/{invoiceId}/payments` | Records a payment. A repeated reference changes nothing |
+| POST | `/api/v1/platform/organisations/{id}/extend` | Adds days |
+
+To make someone a platform administrator, an operator runs this as a database superuser:
+
+```sql
+INSERT INTO platform_admins (user_id) SELECT id FROM users WHERE email = 'someone@example.com';
+```

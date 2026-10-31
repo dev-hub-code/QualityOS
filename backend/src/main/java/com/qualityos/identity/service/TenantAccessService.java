@@ -4,6 +4,7 @@ import com.qualityos.common.security.TenantAccessResolver;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.dto.AuthDtos.OrganizationSummary;
 import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -12,6 +13,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.qualityos.common.security.Permissions;
+import com.qualityos.subscription.service.PlanAccess;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -63,6 +66,8 @@ public class TenantAccessService implements TenantAccessResolver {
             ORDER BY u.full_name
             """;
 
+    private static final String PLATFORM_ADMIN = "SELECT 1 FROM platform_admins WHERE user_id = ?";
+
     private static final String OPEN_ACCOUNT = "SELECT 1 FROM users WHERE id = ? AND status <> 'DISABLED'";
 
     private static final String FIRST_LOCALE = """
@@ -75,10 +80,12 @@ public class TenantAccessService implements TenantAccessResolver {
             """;
 
     private final JdbcTemplate jdbc;
+    private final PlanAccess plan;
     private final TransactionTemplate readOnly;
 
-    TenantAccessService(JdbcTemplate jdbc, PlatformTransactionManager transactionManager) {
+    TenantAccessService(JdbcTemplate jdbc, PlanAccess plan, PlatformTransactionManager transactionManager) {
         this.jdbc = jdbc;
+        this.plan = plan;
         this.readOnly = new TransactionTemplate(transactionManager);
         this.readOnly.setReadOnly(true);
     }
@@ -91,11 +98,26 @@ public class TenantAccessService implements TenantAccessResolver {
 
     @Override
     public Optional<Set<String>> resolvePermissions(UUID tenantId, UUID userId) {
-        List<String> rows = TenantContext.callAs(tenantId, userId, () -> readOnly.execute(status ->
-                jdbc.queryForList(PERMISSIONS, String.class, tenantId, userId)));
-        return rows.isEmpty()
-                ? Optional.empty()
-                : Optional.of(rows.stream().filter(Objects::nonNull).collect(Collectors.toSet()));
+        return TenantContext.callAs(tenantId, userId, () -> readOnly.execute(status -> {
+            List<String> rows = jdbc.queryForList(PERMISSIONS, String.class, tenantId, userId);
+            if (rows.isEmpty()) {
+                return Optional.empty();
+            }
+            Set<String> granted = new HashSet<>(
+                    plan.narrow(tenantId, rows.stream().filter(Objects::nonNull).collect(Collectors.toSet())));
+            if (!jdbc.queryForList(PLATFORM_ADMIN, Integer.class, userId).isEmpty()) {
+                granted.add(Permissions.PLATFORM_ADMIN);
+            }
+            return Optional.of(granted);
+        }));
+    }
+
+    /** What the current member's roles give them, whatever the plan allows. Runs in the caller's transaction. */
+    public Set<String> rolePermissions() {
+        return jdbc.queryForList(PERMISSIONS, String.class, TenantContext.getCurrentTenantId(),
+                        TenantContext.getCurrentUserId()).stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
     }
 
     /** Must run with no open transaction. Row-level security admits a user's own memberships in any tenant. */

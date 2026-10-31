@@ -19,7 +19,7 @@ import lombok.Setter;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User extends AuditedEntity {
 
-    public enum Status { ACTIVE, DISABLED }
+    public enum Status { PENDING_VERIFICATION, ACTIVE, DISABLED }
 
     private String email;
     private String passwordHash;
@@ -37,5 +37,15 @@ public class User extends AuditedEntity {
         this.email = email;
         this.passwordHash = passwordHash;
         this.fullName = fullName;
+    }
+
+    /** Any proof of this mailbox counts, and it also finishes a sign-up that was waiting for it. */
+    public void markEmailVerified(Instant now) {
+        if (emailVerifiedAt == null) {
+            emailVerifiedAt = now;
+        }
+        if (status == Status.PENDING_VERIFICATION) {
+            status = Status.ACTIVE;
+        }
     }
 }

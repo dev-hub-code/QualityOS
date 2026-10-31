@@ -48,6 +48,13 @@ server:
   # Honour X-Forwarded-For from the web tier, for audit IP addresses. Tomcat trusts only private addresses.
   forward-headers-strategy: native
 
+app:
+  registration:
+    # Public deployments keep the first two as they are: the prod profile will not start otherwise.
+    email-verification-required: ${REGISTRATION_EMAIL_VERIFICATION_REQUIRED:true}
+    allow-unverified-login: ${REGISTRATION_ALLOW_UNVERIFIED_LOGIN:false}
+    verification-token-expiry-minutes: ${REGISTRATION_VERIFICATION_TOKEN_EXPIRY_MINUTES:30}
+
 qualityos:
   # The address users reach the web application on, used for links in emails.
   app-url: ${APP_URL:http://localhost:3000}

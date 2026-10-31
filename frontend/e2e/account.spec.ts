@@ -1,26 +1,14 @@
 import { expect, test } from "@playwright/test";
+import { signUp } from "./helpers";
 import { acceptInvitation, inviteUser, linkFromEmail } from "./mail";
 
 const PASSWORD = "correct-horse-battery";
 const NEW_PASSWORD = "another-long-password";
 const unique = () => `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
-async function registerOwner(page: import("@playwright/test").Page, email: string) {
-  await page.goto("/register");
-  await page.getByLabel("Organisation name").fill(`Acme ${unique()}`);
-  await page.getByLabel("Your name").fill("Asha Rao");
-  await page.getByLabel("Work email").fill(email);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Create organisation" }).click();
-  await expect(page).toHaveURL(/onboarding/);
-  await page.getByLabel("GSTIN").fill("27ABCDE1234F1Z5");
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page).toHaveURL(/dashboard/);
-}
-
 test("a forgotten password is reset by email", async ({ page, browser }) => {
   const email = `reset-${unique()}@example.com`;
-  await registerOwner(page, email);
+  await signUp(page, email);
 
   const visitor = await (await browser.newContext()).newPage();
   await visitor.goto("/login");
@@ -43,25 +31,39 @@ test("a forgotten password is reset by email", async ({ page, browser }) => {
   await expect(visitor).toHaveURL(/dashboard/);
 });
 
-test("a new owner confirms their email from the link", async ({ page }) => {
+test("a new owner cannot sign in until their email is confirmed", async ({ page }) => {
   const email = `verify-${unique()}@example.com`;
-  await registerOwner(page, email);
-  await expect(page.getByText("Please confirm your email address")).toBeVisible();
+  await page.goto("/register");
+  await page.getByLabel("Organisation name").fill(`Acme ${unique()}`);
+  await page.getByLabel("Your name").fill("Asha Rao");
+  await page.getByLabel("Work email").fill(email);
+  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Create organisation" }).click();
+  await expect(page.getByRole("heading", { name: "Check your inbox" })).toBeVisible();
 
-  await page.goto(await linkFromEmail(email, "/verify-email"));
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByText("Please confirm your email address first")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send a new link" })).toBeVisible();
+
+  const link = await linkFromEmail(email, "/verify-email");
+  await page.goto(link);
   await page.getByRole("button", { name: "Confirm email" }).click();
   await expect(page.getByText("Your email address is confirmed")).toBeVisible();
 
-  await page.getByRole("link", { name: "Continue" }).click();
-  await expect(page).toHaveURL(/dashboard/);
-  await expect(page.getByText("Please confirm your email address")).toHaveCount(0);
+  await page.reload();
+  await page.getByRole("button", { name: "Confirm email" }).click();
+  await expect(page.getByText("This link is not valid or has expired")).toBeVisible();
+  await expect(page.getByLabel("Email")).toBeVisible();
 });
 
 test("an invited person joins with their own password and sees no pending invitation left", async ({
   page,
   browser,
 }) => {
-  await registerOwner(page, `owner-${unique()}@example.com`);
+  await signUp(page);
   const email = `invited-${unique()}@example.com`;
   await inviteUser(page, email, "Viewer");
 

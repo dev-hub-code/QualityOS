@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { ResendVerification } from "@/components/auth/resend-verification";
 import { applyServerErrors } from "@/components/forms/apply-server-errors";
 import { Field, FormError } from "@/components/forms/field";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { registerSchema, type RegisterValues } from "@/lib/schemas";
 
 export default function RegisterPage() {
   const [formError, setFormError] = useState("");
+  const [pendingEmail, setPendingEmail] = useState("");
   const {
     register,
     handleSubmit,
@@ -22,11 +24,27 @@ export default function RegisterPage() {
   async function onSubmit(values: RegisterValues) {
     setFormError("");
     try {
-      await session.post("register", values);
-      hardNavigate("/onboarding");
+      const result = await session.post("register", values);
+      if (result?.verificationRequired) {
+        setPendingEmail(values.email);
+      } else {
+        hardNavigate("/onboarding");
+      }
     } catch (error) {
       setFormError(applyServerErrors(error, setError));
     }
+  }
+
+  if (pendingEmail) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-lg font-medium">Check your inbox</h1>
+        <p className="text-sm text-muted-foreground">
+          To finish, open the link we sent to {pendingEmail}. It works for a limited time.
+        </p>
+        <ResendVerification email={pendingEmail} />
+      </div>
+    );
   }
 
   return (

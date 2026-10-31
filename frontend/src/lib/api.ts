@@ -59,7 +59,7 @@ export const api = {
 /** Session endpoints handled by the web server itself. */
 export const session = {
   post: (path: string, body: unknown) =>
-    send<void>(`/api/auth/${path}`, { method: "POST", body: JSON.stringify(body) }),
+    send<{ verificationRequired?: boolean } | undefined>(`/api/auth/${path}`, { method: "POST", body: JSON.stringify(body) }),
 };
 
 /**

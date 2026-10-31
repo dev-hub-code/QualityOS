@@ -30,12 +30,13 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 |---|---|
 | Someone can still deliberately lock out a known email (10 failures, 15 minutes), though the IP limit slows it down. A reset link unlocks the account | Review after real use |
 | The IP rate limit is held per backend instance, so several instances multiply it. Shared limits need Redis or the load balancer | With production work |
-| An unverified email address only shows a reminder; it does not restrict the account | Decide before opening public registration |
+| An unconfirmed sign-up that never returns keeps its account and organisation. The address stays reserved, and a repeat sign-up just sends a new link | With a cleanup job |
+| Account-level audit events (verification, password reset) have no tenant, so no organisation can read them in-app | Phase 10, with the admin panel |
 | A material receipt does not notify inspectors; they see it in the inspection queue | When a user needs it |
 | Notifications are polled once a minute, with no live push. Only email and in-app channels exist | When a user needs it |
 | Emails are plain text and sent in English only | Before customer launch |
 | Platform roles (`SUPER_ADMIN`, `PLATFORM_ADMIN`, `SUPPORT_ADMIN`) are not implemented | Phase 10, with the admin panel |
-| Registration reveals that an email already has an account. Password reset and invitations do not | Accepted for now |
+| With verification switched off for private use, registration reveals that an email has an account | Private use only |
 | Sampling is fixed, percentage or every unit; AQL tables (such as ISO 2859-1) are not built | When a customer needs them |
 | A one-person organisation cannot finish an inspection, close an NCR or verify its own CAPA, because each needs a second person | Make it a tenant setting in Phase 9 |
 | NCR and CAPA workflows are fixed: a critical or major NCR always needs a closed CAPA and a verified fix. There are no per-tenant settings | Phase 9, with `tenant_settings` |

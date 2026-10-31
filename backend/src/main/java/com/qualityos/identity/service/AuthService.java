@@ -27,6 +27,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -54,6 +55,7 @@ public class AuthService {
     private final OrganizationProvisioningService provisioning;
     private final OrganizationService organizations;
     private final AccountEmailService accountEmails;
+    private final RegistrationProperties registration;
     private final AccessTokenIssuer accessTokens;
     private final PasswordEncoder passwordEncoder;
     private final AuditService audit;
@@ -68,6 +70,7 @@ public class AuthService {
             OrganizationProvisioningService provisioning,
             OrganizationService organizations,
             AccountEmailService accountEmails,
+            RegistrationProperties registration,
             AccessTokenIssuer accessTokens,
             PasswordEncoder passwordEncoder,
             AuditService audit,
@@ -79,6 +82,7 @@ public class AuthService {
         this.provisioning = provisioning;
         this.organizations = organizations;
         this.accountEmails = accountEmails;
+        this.registration = registration;
         this.accessTokens = accessTokens;
         this.passwordEncoder = passwordEncoder;
         this.audit = audit;
@@ -91,22 +95,51 @@ public class AuthService {
         return email.trim().toLowerCase(Locale.ROOT);
     }
 
-    public TokenResponse register(RegisterRequest request) {
+    /** Empty when the account must confirm its email address first, in which case no session exists yet. */
+    public Optional<TokenResponse> register(RegisterRequest request) {
         String email = normalizeEmail(request.email());
         String passwordHash = passwordEncoder.encode(request.password());
         User user = new User(email, passwordHash, request.fullName().trim());
         UUID tenantId = UuidV7.generate();
+        if (registration.blocksUnverified()) {
+            user.setStatus(User.Status.PENDING_VERIFICATION);
+            registerAwaitingVerification(user, tenantId, request.organizationName().trim());
+            return Optional.empty();
+        }
 
-        return TenantContext.callAs(tenantId, user.getId(), () -> tx.execute(status -> {
+        return Optional.of(TenantContext.callAs(tenantId, user.getId(), () -> tx.execute(status -> {
             if (users.findByEmail(email).isPresent()) {
                 throw new ConflictException("An account with this email already exists.");
             }
-            users.saveAndFlush(user);
-            provisioning.provision(tenantId, user.getId(), request.organizationName().trim());
-            audit.record("USER_REGISTERED", "User", user.getId());
-            accountEmails.sendVerification(user);
+            provision(user, tenantId, request.organizationName().trim());
             return issueSession(user.getId(), tenantId);
-        }));
+        })));
+    }
+
+    /** Answers the same for a taken address, so public sign-up cannot be used to discover accounts. */
+    private void registerAwaitingVerification(User user, UUID tenantId, String organizationName) {
+        boolean created;
+        try {
+            created = TenantContext.callAs(tenantId, user.getId(), () -> tx.execute(status -> {
+                if (users.findByEmail(user.getEmail()).isPresent()) {
+                    return false;
+                }
+                provision(user, tenantId, organizationName);
+                return true;
+            }));
+        } catch (DataIntegrityViolationException raced) {
+            created = false;
+        }
+        if (!created) {
+            accountEmails.resendVerification(user.getEmail());
+        }
+    }
+
+    private void provision(User user, UUID tenantId, String organizationName) {
+        users.saveAndFlush(user);
+        provisioning.provision(tenantId, user.getId(), organizationName);
+        audit.record("USER_REGISTERED", "User", user.getId());
+        accountEmails.sendVerification(user);
     }
 
     public TokenResponse login(LoginRequest request) {
@@ -135,11 +168,15 @@ public class AuthService {
     void requirePassword(User user, String password) {
         boolean passwordMatches = passwordEncoder.matches(password, user.getPasswordHash());
         boolean locked = user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now());
-        if (locked || !passwordMatches || user.getStatus() != User.Status.ACTIVE) {
+        if (locked || !passwordMatches || user.getStatus() == User.Status.DISABLED) {
             if (!locked && !passwordMatches) {
                 recordFailedLogin(user.getId());
             }
             throw invalidCredentials();
+        }
+        // Said only after the right password, so that it reveals nothing to anyone else.
+        if (user.getStatus() == User.Status.PENDING_VERIFICATION) {
+            throw new QualityOsException(ErrorCode.EMAIL_NOT_VERIFIED, "Please confirm your email address first.");
         }
     }
 

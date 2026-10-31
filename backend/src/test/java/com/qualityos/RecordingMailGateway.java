@@ -39,6 +39,19 @@ public class RecordingMailGateway implements MailGateway {
         return sent.stream().filter(message -> message.to().equals(normalized)).toList();
     }
 
+    /** Waits for a later email than the one that carried {@code previous}. */
+    public String awaitNewToken(String address, String subject, String previous) throws InterruptedException {
+        long deadline = System.nanoTime() + WAIT.toNanos();
+        while (System.nanoTime() < deadline) {
+            String token = awaitToken(address, subject);
+            if (!token.equals(previous)) {
+                return token;
+            }
+            Thread.sleep(20);
+        }
+        throw new AssertionError("No new email to " + address + " about " + subject);
+    }
+
     /** The token in the newest email to this address with this subject fragment. */
     public String awaitToken(String address, String subject) throws InterruptedException {
         long deadline = System.nanoTime() + WAIT.toNanos();

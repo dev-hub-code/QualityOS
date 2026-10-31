@@ -107,7 +107,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <main className="min-w-0 flex-1 p-4 md:p-8">
-        {!me.user.emailVerified && <VerifyEmailBanner />}
+        {!me.user.emailVerified && <VerifyEmailBanner email={me.user.email} />}
         {children}
       </main>
     </div>

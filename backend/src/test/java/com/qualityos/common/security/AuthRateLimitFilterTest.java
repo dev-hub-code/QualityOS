@@ -39,6 +39,14 @@ class AuthRateLimitFilterTest {
     }
 
     @Test
+    void coversTheEmailVerificationEndpoints() throws Exception {
+        AuthRateLimitFilter filter = filter(START);
+        assertThat(call(filter, "POST", "/api/v1/auth/verify-email", "10.0.0.1")).isEqualTo(200);
+        assertThat(call(filter, "POST", "/api/v1/auth/resend-verification", "10.0.0.1")).isEqualTo(200);
+        assertThat(call(filter, "POST", "/api/v1/auth/verify-email", "10.0.0.1")).isEqualTo(429);
+    }
+
+    @Test
     void countsEachAddressSeparately() throws Exception {
         AuthRateLimitFilter filter = filter(START);
         call(filter, "POST", "/api/v1/auth/login", "10.0.0.1");

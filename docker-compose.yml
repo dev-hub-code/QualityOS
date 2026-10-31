@@ -45,6 +45,8 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-QualityOS <no-reply@qualityos.local>}
       APP_URL: ${APP_URL:-http://localhost:3000}
+      REGISTRATION_EMAIL_VERIFICATION_REQUIRED: ${REGISTRATION_EMAIL_VERIFICATION_REQUIRED:-true}
+      REGISTRATION_ALLOW_UNVERIFIED_LOGIN: ${REGISTRATION_ALLOW_UNVERIFIED_LOGIN:-false}
       # Above the production default, because the browser tests all sign in from one address.
       AUTH_RATE_LIMIT_PER_MINUTE: ${AUTH_RATE_LIMIT_PER_MINUTE:-120}
     volumes:

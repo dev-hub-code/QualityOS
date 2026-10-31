@@ -97,11 +97,11 @@ class AccountEmailIT extends AbstractIntegrationTest {
         as(session, get("/api/v1/auth/me")).andExpect(jsonPath("$.data.user.emailVerified").value(false));
 
         String token = mail.awaitToken(session.email(), "Confirm");
-        mvc.perform(postJson("/api/v1/auth/email-verification/confirm", Map.of("token", token)))
+        mvc.perform(postJson("/api/v1/auth/verify-email", Map.of("token", token)))
                 .andExpect(status().isNoContent());
 
         as(session, get("/api/v1/auth/me")).andExpect(jsonPath("$.data.user.emailVerified").value(true));
-        as(session, postJson("/api/v1/auth/email-verification/request", Map.of()))
+        mvc.perform(postJson("/api/v1/auth/resend-verification", Map.of("email", session.email())))
                 .andExpect(status().isAccepted());
         Thread.sleep(200);
         assertThat(mail.to(session.email())).hasSize(1);

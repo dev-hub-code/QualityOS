@@ -48,6 +48,7 @@ public abstract class AbstractIntegrationTest {
         registry.add("DB_MIGRATION_USER", () -> "qualityos_migrator");
         registry.add("DB_MIGRATION_PASSWORD", () -> "migrator");
         registry.add("JOBS_ENABLED", () -> "false");
+        registry.add("REGISTRATION_EMAIL_VERIFICATION_REQUIRED", () -> "false");
         registry.add("AUTH_RATE_LIMIT_PER_MINUTE", () -> "1000000");
     }
 
@@ -165,6 +166,12 @@ public abstract class AbstractIntegrationTest {
             work.accept(jdbc);
             return null;
         });
+    }
+
+    /** Sees account-level audit events, which belong to no tenant and so are hidden from the application role. */
+    protected JdbcTemplate asDatabaseSuperuser() {
+        return new JdbcTemplate(new org.springframework.jdbc.datasource.DriverManagerDataSource(
+                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()));
     }
 
     /** Runs raw SQL as the application role, with no help from the service layer or Hibernate. */

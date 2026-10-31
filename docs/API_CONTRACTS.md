@@ -93,3 +93,19 @@ proxy refuses token-carrying endpoints, and refuses writes from another origin.
 | 10 | `/subscription`, `/platform/plans` |
 
 Contracts are finalised in OpenAPI as each phase is built.
+
+## Email verification
+
+| Endpoint | Access | Result |
+|---|---|---|
+| `POST /auth/register` | Public | `202` with `verificationRequired: true` and no session. The answer is the same for an address already in use. With verification off: `201` and a session |
+| `POST /auth/verify-email` | Public | `204`, or `422` with one message for invalid, expired and used links |
+| `POST /auth/resend-verification` | Public | Always `202` |
+| `GET /auth/verification-status` | Signed in | `emailVerified`, `verificationRequired` |
+
+Signing in with the right password before confirming returns `403 EMAIL_NOT_VERIFIED`. A wrong password gets the usual
+`401`. Links are stored hashed, work once, and replace earlier links. Resends are limited to one a minute and five an
+hour per account, on top of the IP limit.
+
+Settings are under `app.registration`. The `prod` profile refuses to start unless verification is required and
+unverified sign-in is off. Local Docker Compose enforces it too. Integration tests turn it off, except `EmailVerificationIT`.

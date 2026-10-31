@@ -110,6 +110,16 @@ public final class AuthDtos {
         }
     }
 
+    public record ResendVerificationRequest(@NotBlank @Email @Size(max = 254) String email) {
+    }
+
+    /** Sent instead of tokens when a new account must confirm its email address first. */
+    public record RegistrationPending(boolean verificationRequired) {
+    }
+
+    public record VerificationStatus(boolean emailVerified, boolean verificationRequired) {
+    }
+
     public record TokenRequest(@NotBlank @Size(max = MAX_TOKEN) String token) {
 
         @Override

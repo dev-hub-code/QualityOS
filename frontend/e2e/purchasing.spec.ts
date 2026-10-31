@@ -1,23 +1,9 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { signUp } from "./helpers";
 
-const PASSWORD = "correct-horse-battery";
-const unique = () => `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-
-async function startOrganization(page: Page) {
-  await page.goto("/register");
-  await page.getByLabel("Organisation name").fill(`Acme ${unique()}`);
-  await page.getByLabel("Your name").fill("Asha Rao");
-  await page.getByLabel("Work email").fill(`owner-${unique()}@example.com`);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Create organisation" }).click();
-  await expect(page).toHaveURL(/onboarding/);
-  await page.getByLabel("GSTIN").fill("27ABCDE1234F1Z5");
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page).toHaveURL(/dashboard/);
-}
 
 test("a supplier is approved, ordered from, and delivers in two batches", async ({ page }) => {
-  await startOrganization(page);
+  await signUp(page);
 
   await page.getByRole("link", { name: "Facilities" }).click();
   await page.getByRole("button", { name: "Add facility" }).click();

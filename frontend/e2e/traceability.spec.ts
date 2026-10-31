@@ -140,7 +140,7 @@ test("raw material is traced through production and inspection to the customer",
   // A dispatch recorded by mistake is reversed. It stays on the trace, and the customer no longer counts as affected.
   const traceUrl = page.url();
   await page.goto("/dispatches");
-  await step(page, "Reverse", (dialog) => dialog.getByLabel("Why this dispatch was wrong").fill("Wrong customer"));
+  await step(page, "Reverse", (dialog) => dialog.getByLabel("Why this dispatch never really happened").fill("Wrong customer"));
   await expect(page.getByText("reversed", { exact: true })).toBeVisible();
   await page.goto(traceUrl);
   await expect(page.getByText("reversed: Wrong customer", { exact: false }).first()).toBeVisible();
@@ -181,4 +181,76 @@ test("a wrong lot on a completed batch is corrected with approval", async ({ pag
 
   await page.goto(`/production-batches/${created.batch.id}`);
   await expect(page.getByText("Reversed: Weighed twice")).toBeVisible();
+});
+
+test("returned goods stay out of stock until an inspection accepts them", async ({ page, browser }) => {
+  test.setTimeout(90_000);
+  await signUp(page);
+  await prepare(page);
+  const managerEmail = `manager-${unique()}@example.com`;
+  await inviteUser(page, managerEmail, "Quality Manager");
+  const manager = await acceptInvitation(browser, managerEmail, "Meera Iyer", PASSWORD);
+  const owner = apiCaller(page);
+  const boss = apiCaller(manager);
+  const lots: { itemId: string }[] = await owner("GET", "/material-receipts/released-lots");
+  const products: { items: { id: string }[] } = await owner("GET", "/products");
+  const facilities: { items: { id: string }[] } = await owner("GET", "/facilities");
+  const templates: { items: { id: string }[] } = await owner("GET", "/inspection-templates");
+  const customers: { id: string }[] = await owner("GET", "/customers");
+  const made = await owner("POST", "/production-batches", {
+    productId: products.items[0].id,
+    facilityId: facilities.items[0].id,
+    plannedQuantity: "10",
+  });
+  const batchId = made.batch.id;
+  await owner("POST", `/production-batches/${batchId}/consume`, { receiptItemId: lots[0].itemId, quantity: "10" });
+  await owner("POST", `/production-batches/${batchId}/complete`, { producedQuantity: "10" });
+  const inspection = await owner("POST", "/inspections", { productionBatchId: batchId, templateId: templates.items[0].id });
+  await owner("POST", `/inspections/${inspection.id}/execute`, {
+    results: [{ parameterCode: "DIA", sampleNumber: 1, valueNumeric: "20.0" }],
+  });
+  await owner("POST", `/inspections/${inspection.id}/submit`);
+  await manager.goto("/dashboard");
+  await boss("POST", `/inspections/${inspection.id}/approve`);
+  await boss("POST", `/inspections/${inspection.id}/disposition`, { disposition: "ACCEPT" });
+  await owner("POST", "/dispatches", {
+    customerId: customers[0].id,
+    dispatchedOn: new Date().toISOString().slice(0, 10),
+    items: [{ productionBatchId: batchId, quantity: "10" }],
+  });
+
+  await page.goto("/dispatches");
+  await step(page, "Record return", async (dialog) => {
+    await dialog.getByLabel("Line", { exact: true }).selectOption({ index: 1 });
+    await dialog.getByLabel("Returned quantity").fill("4");
+    await dialog.getByLabel("Return reference").fill("RMA-1");
+    await dialog.getByLabel("Return date").fill(new Date().toISOString().slice(0, 10));
+    await dialog.getByLabel("Reason for return").fill("Scratched in transit");
+  });
+  await expect(page.getByText("(4 returned)")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Reverse", exact: true })).toHaveCount(0);
+
+  await page.goto(`/production-batches/${batchId}`);
+  await expect(page.getByText("Available").locator("..")).toContainText("0");
+
+  await page.goto("/dispatch-reversals");
+  await page.getByRole("link", { name: /^RET-/ }).click();
+  await page.getByRole("button", { name: "Inspect" }).click();
+  await page.getByLabel("Template").selectOption({ label: "FINAL – Final check" });
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page).toHaveURL(/inspections\//);
+  const returnInspection = page.url();
+  await page.getByLabel("DIA sample 1").fill("20.0");
+  await page.getByRole("button", { name: "Submit for approval" }).click();
+  await expect(page.getByText("submitted", { exact: true }).first()).toBeVisible();
+
+  await manager.goto(returnInspection);
+  await manager.getByRole("button", { name: "Approve" }).click();
+  await manager.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await step(manager, "Record disposition", (dialog) =>
+    dialog.getByLabel("Disposition", { exact: true }).selectOption("ACCEPT"),
+  );
+
+  await page.goto(`/production-batches/${batchId}`);
+  await expect(page.getByText("Available").locator("..")).toContainText("4");
 });

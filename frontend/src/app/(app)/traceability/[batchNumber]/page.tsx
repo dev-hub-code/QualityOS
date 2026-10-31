@@ -102,7 +102,7 @@ export default function TraceReportPage() {
   const [correcting, setCorrecting] = useState(false);
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<TraceReport>(path) });
   if (!data) return <QueryState error={error} />;
-  const { subject, backward, forward, dispatches, affectedCustomers, serialNumbers, timeline } = data;
+  const { subject, backward, forward, dispatches, returns, affectedCustomers, serialNumbers, timeline } = data;
   return (
     <div className="space-y-6">
       <PageHeader title={subject.batchNumber} subtitle={`${subject.code} – ${subject.name}`}>
@@ -130,6 +130,19 @@ export default function TraceReportPage() {
                 {dispatch.dispatchNumber} to {dispatch.customerName} on {dispatch.dispatchedOn}:{" "}
                 {dispatch.lines.map((line) => `${line.batchNumber} × ${formatQuantity(line.quantity)}`).join(", ")}
                 {dispatch.reversalReason && ` (reversed: ${dispatch.reversalReason})`}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+      {returns.length > 0 && (
+        <Section title="Returns">
+          <ul className="divide-y text-sm">
+            {returns.map((item) => (
+              <li key={item.id} className="flex flex-wrap items-center gap-2 py-2">
+                <RecordLink href={`/dispatch-reversals/${item.id}`}>{item.reversalNumber}</RecordLink>
+                {item.returnReference} from {item.customerName}
+                <StatusBadge status={item.status} />
               </li>
             ))}
           </ul>

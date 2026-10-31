@@ -17,6 +17,7 @@ import com.qualityos.traceability.dto.TraceabilityDtos.CorrectionImpact;
 import com.qualityos.traceability.dto.TraceabilityDtos.DispatchLine;
 import com.qualityos.traceability.dto.TraceabilityDtos.DispatchResponse;
 import com.qualityos.traceability.dto.TraceabilityDtos.ProductionBatchView;
+import com.qualityos.traceability.dto.TraceabilityDtos.ReversalView;
 import com.qualityos.traceability.dto.TraceabilityDtos.SearchHit;
 import com.qualityos.traceability.dto.TraceabilityDtos.TimelineEvent;
 import com.qualityos.traceability.dto.TraceabilityDtos.TraceEdge;
@@ -96,6 +97,7 @@ public class TraceabilityService {
     private final MaterialCorrectionRepository corrections;
     private final ProductionService production;
     private final DispatchService dispatches;
+    private final DispatchReturnService returns;
     private final MaterialReceiptService receipts;
     private final PurchaseOrderService purchaseOrders;
     private final ProductService products;
@@ -110,6 +112,7 @@ public class TraceabilityService {
             MaterialCorrectionRepository corrections,
             ProductionService production,
             DispatchService dispatches,
+            DispatchReturnService returns,
             MaterialReceiptService receipts,
             PurchaseOrderService purchaseOrders,
             ProductService products,
@@ -122,6 +125,7 @@ public class TraceabilityService {
         this.corrections = corrections;
         this.production = production;
         this.dispatches = dispatches;
+        this.returns = returns;
         this.receipts = receipts;
         this.purchaseOrders = purchaseOrders;
         this.products = products;
@@ -226,6 +230,7 @@ public class TraceabilityService {
 
         List<DispatchResponse> shipped = dispatches.forBatches(allBatches.stream()
                 .filter(id -> !upstreamBatches.contains(id)).toList());
+        List<ReversalView> returned = returns.forDispatches(shipped.stream().map(DispatchResponse::id).toList());
         List<String> customers = shipped.stream()
                 .filter(dispatch -> dispatch.reversalReason() == null)
                 .map(DispatchResponse::customerName)
@@ -257,13 +262,14 @@ public class TraceabilityService {
                 forward,
                 links,
                 shipped,
+                returned,
                 customers,
                 serials,
                 visibleInspections,
                 visibleNcrs,
                 visibleCapas,
                 timeline(lots.values(), views.values(), shipped, visibleInspections, visibleNcrs, visibleCapas,
-                        applied));
+                        applied, returned));
     }
 
     private static TraceEdge toEdge(
@@ -285,8 +291,13 @@ public class TraceabilityService {
             List<InspectionHistory> inspected,
             List<NcrHistory> raised,
             List<CapaHistory> corrective,
-            List<MaterialCorrection> applied) {
+            List<MaterialCorrection> applied,
+            List<ReversalView> returned) {
         List<TimelineEvent> events = new ArrayList<>();
+        returned.forEach(reversal -> events.add(new TimelineEvent(reversal.createdAt(), "RETURNED",
+                reversal.reversalNumber() + ": returned by " + reversal.customerName() + " against "
+                        + reversal.dispatchNumber(),
+                null, reversal.status(), "/dispatch-reversals/" + reversal.id())));
         applied.forEach(correction -> events.add(new TimelineEvent(correction.getAppliedAt(), "CORRECTED",
                 correction.getCorrectionNumber() + ": " + correction.getReason(), null, null,
                 "/material-corrections/" + correction.getId())));

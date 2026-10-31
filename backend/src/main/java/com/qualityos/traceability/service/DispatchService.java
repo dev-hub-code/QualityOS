@@ -17,12 +17,15 @@ import com.qualityos.traceability.dto.TraceabilityDtos.SaveCustomerRequest;
 import com.qualityos.traceability.entity.Customer;
 import com.qualityos.traceability.entity.DispatchItem;
 import com.qualityos.traceability.entity.DispatchRecord;
+import com.qualityos.traceability.entity.DispatchReversalItem;
 import com.qualityos.traceability.entity.FinishedProduct;
 import com.qualityos.traceability.entity.ProductionBatch;
 import com.qualityos.traceability.entity.TraceCorrection;
 import com.qualityos.traceability.repository.CustomerRepository;
 import com.qualityos.traceability.repository.DispatchItemRepository;
 import com.qualityos.traceability.repository.DispatchRecordRepository;
+import com.qualityos.traceability.repository.DispatchReversalItemRepository;
+import com.qualityos.traceability.repository.DispatchReversalRepository;
 import com.qualityos.traceability.repository.FinishedProductRepository;
 import com.qualityos.traceability.repository.ProductionBatchRepository;
 import com.qualityos.traceability.repository.TraceCorrectionRepository;
@@ -52,6 +55,8 @@ public class DispatchService {
     private final ProductionBatchRepository batches;
     private final FinishedProductRepository finishedProducts;
     private final TraceCorrectionRepository corrections;
+    private final DispatchReversalRepository reversals;
+    private final DispatchReversalItemRepository reversalItems;
     private final OrganizationService organizations;
     private final ProductionService production;
     private final DocumentNumberService numbers;
@@ -64,6 +69,8 @@ public class DispatchService {
             ProductionBatchRepository batches,
             FinishedProductRepository finishedProducts,
             TraceCorrectionRepository corrections,
+            DispatchReversalRepository reversals,
+            DispatchReversalItemRepository reversalItems,
             OrganizationService organizations,
             ProductionService production,
             DocumentNumberService numbers,
@@ -74,6 +81,8 @@ public class DispatchService {
         this.batches = batches;
         this.finishedProducts = finishedProducts;
         this.corrections = corrections;
+        this.reversals = reversals;
+        this.reversalItems = reversalItems;
         this.organizations = organizations;
         this.production = production;
         this.numbers = numbers;
@@ -141,6 +150,9 @@ public class DispatchService {
         if (corrections.existsByDispatchId(id)) {
             throw new BusinessRuleException("This dispatch was already reversed.");
         }
+        if (reversals.existsByDispatchId(id)) {
+            throw new BusinessRuleException("Goods have come back against this dispatch, so it really shipped.");
+        }
         List<DispatchItem> lines = items.findByDispatchIdIn(List.of(id));
         lines.stream()
                 .sorted(Comparator.comparing(DispatchItem::getProductionBatchId))
@@ -200,9 +212,13 @@ public class DispatchService {
                 .stream().collect(Collectors.toMap(Customer::getId, Function.identity()));
         Map<UUID, List<DispatchItem>> byDispatch =
                 lines.stream().collect(Collectors.groupingBy(DispatchItem::getDispatchId));
-        Map<UUID, TraceCorrection> reversals = corrections
+        Map<UUID, TraceCorrection> voided = corrections
                 .findByDispatchIdIn(records.stream().map(DispatchRecord::getId).toList()).stream()
                 .collect(Collectors.toMap(TraceCorrection::getDispatchId, Function.identity()));
+        Map<UUID, BigDecimal> returned = reversalItems
+                .findByDispatchItemIdIn(lines.stream().map(DispatchItem::getId).toList()).stream()
+                .collect(Collectors.toMap(
+                        DispatchReversalItem::getDispatchItemId, DispatchReversalItem::getQuantity, BigDecimal::add));
         return records.stream().collect(Collectors.toMap(Function.identity(), record -> new DispatchResponse(
                 record.getId(),
                 record.getDispatchNumber(),
@@ -211,12 +227,12 @@ public class DispatchService {
                 record.getReference(),
                 byDispatch.getOrDefault(record.getId(), List.of()).stream().map(line -> {
                     ProductionBatchView batch = shipped.get(line.getProductionBatchId());
-                    return new DispatchLine(
-                            batch.batchNumber(), batch.productCode(), batch.productName(), line.getQuantity());
+                    return new DispatchLine(line.getId(), batch.batchNumber(), batch.productCode(), batch.productName(),
+                            line.getQuantity(), returned.getOrDefault(line.getId(), BigDecimal.ZERO));
                 }).toList(),
                 record.getCreatedAt(),
-                reversals.containsKey(record.getId()) ? reversals.get(record.getId()).getReason() : null,
-                reversals.containsKey(record.getId()) ? reversals.get(record.getId()).getCreatedAt() : null)));
+                voided.containsKey(record.getId()) ? voided.get(record.getId()).getReason() : null,
+                voided.containsKey(record.getId()) ? voided.get(record.getId()).getCreatedAt() : null)));
     }
 
     private static CustomerResponse toResponse(Customer customer) {

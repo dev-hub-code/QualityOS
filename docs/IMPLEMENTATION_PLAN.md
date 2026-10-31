@@ -48,7 +48,8 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A template can only be chosen by hand; none is picked automatically for a material | When a user needs it |
 | Production batches take IPQC and FQC inspections only. OQC and the other template types have no production flow | When a user needs it |
 | A template cannot yet be limited to a product in the UI, and quantities consumed are not converted between units | When a user needs it |
-| A whole dispatch can be reversed, but not part of one | Partial dispatch reversal |
+| A customer who returned everything still shows as having received the batch. This is deliberate: a recall should reach them | By design |
+| The return screen takes one line at a time, though the API takes several. Credit notes and refunds are separate and not built | When a user needs it |
 | A lot's internal batch number cannot be corrected, because other records refer to it by number. It is generated, so it cannot be mistyped | By design |
 | A corrected lot keeps its original purchase order line, and a finished NCR keeps its original supplier and material | By design: history is preserved |
 | A correction of an inspected lot does not trigger reinspection. It needs two approvers, who decide whether to act | Review after real use |

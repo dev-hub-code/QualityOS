@@ -73,6 +73,8 @@ stay in `material_receipt_items`, which gains `consumed_quantity`, so no separat
   reversed by a new row in **`trace_corrections`** (V8), which holds the reason. Each record can be reversed once.
 - **`material_corrections`**, **`material_correction_items`** and **`material_correction_approvals`** (V9) keep the
   original and corrected values. Items and approvals are append-only, and a finished correction cannot be changed.
+- **`dispatch_reversals`** and **`dispatch_reversal_items`** (V10) record returns. A return references the dispatch and
+  never changes it. Stock comes back only when an inspection linked by `inspections.return_item_id` accepts the goods.
 - Check constraints stop a lot or batch giving out more than it holds, and stop anything leaving an unreleased batch.
 - `inspections` gains `production_batch_id`. Each inspection has exactly one subject, and a batch has one open inspection.
 

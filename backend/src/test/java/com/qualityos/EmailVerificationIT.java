@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.TestPropertySource;
@@ -60,8 +61,9 @@ class EmailVerificationIT extends AbstractIntegrationTest {
         assertThat(statusOf(email)).isEqualTo("PENDING_VERIFICATION");
 
         signIn(email)
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error.code").value("EMAIL_NOT_VERIFIED"));
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.data.verificationRequired").value(true))
+                .andExpect(jsonPath("$.data.refreshToken").doesNotExist());
 
         verify(mail.awaitToken(email, "Confirm")).andExpect(status().isNoContent());
         assertThat(statusOf(email)).isEqualTo("ACTIVE");
@@ -77,6 +79,75 @@ class EmailVerificationIT extends AbstractIntegrationTest {
         Thread.sleep(200);
         assertThat(mail.to(email)).extracting(message -> message.subject())
                 .containsExactly("Confirm your QualityOS email address", "Welcome to QualityOS");
+    }
+
+    private String pendingToken(String email) throws Exception {
+        return JsonPath.read(signIn(email).andExpect(status().isAccepted())
+                .andReturn().getResponse().getContentAsString(), "$.data.accessToken");
+    }
+
+    private ResultActions statusWith(String token) throws Exception {
+        return mvc.perform(get("/api/v1/auth/verification-status").header("Authorization", "Bearer " + token));
+    }
+
+    @Test
+    void aPendingAccountCanAskAboutItsOwnVerificationAndSeesItComplete() throws Exception {
+        String email = pendingAccount();
+        String token = pendingToken(email);
+        statusWith(token)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.emailVerified").value(false))
+                .andExpect(jsonPath("$.data.verificationRequired").value(true));
+
+        verify(mail.awaitToken(email, "Confirm")).andExpect(status().isNoContent());
+        statusWith(token).andExpect(jsonPath("$.data.emailVerified").value(true));
+    }
+
+    @Test
+    void aPendingSessionReachesNothingElse() throws Exception {
+        String token = pendingToken(pendingAccount());
+        for (String path : List.of("/api/v1/auth/me", "/api/v1/organizations/current", "/api/v1/notifications",
+                "/api/v1/suppliers", "/api/v1/dispatches", "/api/v1/traceability/search?q=x")) {
+            mvc.perform(get(path).header("Authorization", "Bearer " + token))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.error.code").value("EMAIL_NOT_VERIFIED"));
+        }
+        mvc.perform(postJson("/api/v1/organizations", Map.of("name", "Other"))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void aDisabledAccountLosesItsPendingSession() throws Exception {
+        String email = pendingAccount();
+        String token = pendingToken(email);
+        asAppRole(null, sql -> sql.update("UPDATE users SET status = 'DISABLED' WHERE email = ?", email.toLowerCase()));
+        statusWith(token).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void registrationNeverIssuesAToken() throws Exception {
+        signUp(uniqueEmail()).andExpect(jsonPath("$.data.accessToken").doesNotExist());
+    }
+
+    @Test
+    void verificationStatusIsNotPublicAndTakesNoAddress() throws Exception {
+        mvc.perform(get("/api/v1/auth/verification-status").param("email", pendingAccount()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void theOldVerificationRoutesAreGone() throws Exception {
+        for (String path : List.of("/api/v1/auth/email-verification/request", "/api/v1/auth/email-verification/confirm")) {
+            mvc.perform(postJson(path, Map.of("token", "x", "email", "a@example.com")))
+                    .andExpect(status().isUnauthorized());
+        }
+        String email = pendingAccount();
+        verify(mail.awaitToken(email, "Confirm")).andExpect(status().isNoContent());
+        String token = JsonPath.read(signIn(email).andReturn().getResponse().getContentAsString(), "$.data.accessToken");
+        mvc.perform(postJson("/api/v1/auth/email-verification/request", Map.of())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
     }
 
     @Test

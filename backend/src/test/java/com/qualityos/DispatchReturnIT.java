@@ -1,6 +1,7 @@
 package com.qualityos;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -12,6 +13,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessException;
@@ -29,6 +31,7 @@ class DispatchReturnIT extends TraceabilityFixture {
         String response = body(dispatch(customer(), batch, "1000", List.of()).andExpect(status().isCreated()));
         dispatch = idOf(response);
         line = JsonPath.read(response, "$.data.lines[0].id");
+        ship(dispatch).andExpect(status().isOk()).andExpect(jsonPath("$.data.shippedOn").value(TODAY));
     }
 
     private Map<String, Object> returnOf(String reference, String quantity, List<String> serials) {
@@ -161,6 +164,7 @@ class DispatchReturnIT extends TraceabilityFixture {
         String response = body(dispatch(customer(), serialBatch, "2", List.of(first, second)));
         dispatch = idOf(response);
         line = JsonPath.read(response, "$.data.lines[0].id");
+        ship(dispatch).andExpect(status().isOk());
         String path = "/api/v1/dispatches/" + dispatch + "/reversals";
 
         as(owner, postJson(path, returnOf("A", "1", List.of("UNKNOWN")))).andExpect(status().isUnprocessableContent());
@@ -183,17 +187,106 @@ class DispatchReturnIT extends TraceabilityFixture {
     }
 
     @Test
-    void returnsAndMistakeReversalsDoNotMix() throws Exception {
+    void aShippedDispatchCannotBeReversedAndStockStaysOut() throws Exception {
+        as(owner, postJson("/api/v1/dispatches/" + dispatch + "/reverse", Map.of("reason", "Mistake")))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(
+                        "These goods physically shipped. Record a customer return instead."));
+        assertAvailable("0.000000");
+    }
+
+    @Test
+    void aDispatchWithAReturnCannotBeReversed() throws Exception {
         recordReturn("RMA-1", "1").andExpect(status().isCreated());
         as(owner, postJson("/api/v1/dispatches/" + dispatch + "/reverse", Map.of("reason", "Mistake")))
                 .andExpect(status().isUnprocessableContent());
+        assertAvailable("0.000000");
+    }
 
+    @Test
+    void anUnshippedDispatchCanBeCancelledAndThenNeitherShipsNorReturns() throws Exception {
         String other = releasedBatch(releasedLot("5").id(), "5", "5");
         String voided = idOf(body(dispatch(customer(), other, "1", List.of()).andExpect(status().isCreated())));
-        as(owner, postJson("/api/v1/dispatches/" + voided + "/reverse", Map.of("reason", "Mistake")))
-                .andExpect(status().isOk());
         dispatch = voided;
         recordReturn("RMA-2", "1").andExpect(status().isUnprocessableContent());
+
+        as(owner, postJson("/api/v1/dispatches/" + voided + "/reverse", Map.of("reason", "Mistake")))
+                .andExpect(status().isOk());
+        ship(voided).andExpect(status().isUnprocessableContent());
+        recordReturn("RMA-2", "1").andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void aShipmentIsConfirmedOnceOnAPlausibleDate() throws Exception {
+        ship(dispatch).andExpect(status().isConflict());
+
+        String other = releasedBatch(releasedLot("5").id(), "5", "5");
+        String pending = idOf(body(dispatch(customer(), other, "1", List.of()).andExpect(status().isCreated())));
+        for (LocalDate date : List.of(LocalDate.now().plusDays(2), LocalDate.now().minusDays(2))) {
+            as(owner, postJson("/api/v1/dispatches/" + pending + "/shipment", Map.of("shippedOn", date.toString())))
+                    .andExpect(status().isUnprocessableContent());
+        }
+    }
+
+    @Test
+    void theDatabaseEnforcesTheShippingRules() throws Exception {
+        String other = releasedBatch(releasedLot("5").id(), "5", "5");
+        String pending = idOf(body(dispatch(customer(), other, "1", List.of()).andExpect(status().isCreated())));
+        String tenant = owner.tenantId().toString();
+        List<String> statements = List.of(
+                "INSERT INTO trace_corrections (id, tenant_id, dispatch_id, reason) VALUES ('%s', '%s', '%s', 'x')"
+                        .formatted(UUID.randomUUID(), tenant, dispatch),
+                ("INSERT INTO dispatch_reversals (id, tenant_id, reversal_number, dispatch_id, return_reference, "
+                        + "reversal_date, reason) VALUES ('%s', '%s', 'R', '%s', 'R', now(), 'x')")
+                        .formatted(UUID.randomUUID(), tenant, pending),
+                "UPDATE dispatch_shipments SET shipped_on = now()",
+                "DELETE FROM dispatch_shipments");
+        for (String sql : statements) {
+            assertThatThrownBy(() -> asAppRole(owner.tenantId(), statement -> statement.update(sql)))
+                    .as(sql).isInstanceOf(DataAccessException.class);
+        }
+    }
+
+    @Test
+    void heldGoodsStayOutOfStock() throws Exception {
+        String item = returnItem(recordReturn("RMA-1", "200"));
+        inspectReturn(item, "25", "HOLD");
+        assertAvailable("0.000000");
+        as(owner, get("/api/v1/dispatches/" + dispatch + "/reversals"))
+                .andExpect(jsonPath("$.data[0].status").value("PENDING_INSPECTION"))
+                .andExpect(jsonPath("$.data[0].items[0].disposition").value("HOLD"));
+    }
+
+    @Test
+    void aRecallStillReachesACustomerWhoReturnedEverythingAndTheNextCustomerToo() throws Exception {
+        String item = returnItem(recordReturn("RMA-1", "1000"));
+        inspectReturn(item, "20.0", "ACCEPT");
+        assertAvailable("1000.000000");
+
+        String second = idOfCustomer("Bajaj Auto");
+        dispatch(second, batch, "400", List.of()).andExpect(status().isCreated());
+
+        as(owner, get("/api/v1/traceability/batches/" + numberOf(batch)))
+                .andExpect(jsonPath("$.data.affectedCustomers", containsInAnyOrder("Tata Motors", "Bajaj Auto")))
+                .andExpect(jsonPath("$.data.dispatches.length()").value(2))
+                .andExpect(jsonPath("$.data.returns[0].items[0].status").value("ACCEPTED"));
+        as(owner, get("/api/v1/dispatches/" + dispatch + "/reversal-summary"))
+                .andExpect(jsonPath("$.data.status").value("FULLY_REVERSED"))
+                .andExpect(jsonPath("$.data.dispatchedQuantity").value("1000.000000"));
+    }
+
+    @Test
+    void anotherTenantAndViewersCannotConfirmAShipment() throws Exception {
+        String other = releasedBatch(releasedLot("5").id(), "5", "5");
+        String pending = idOf(body(dispatch(customer(), other, "1", List.of()).andExpect(status().isCreated())));
+        String path = "/api/v1/dispatches/" + pending + "/shipment";
+        as(addMember(owner, "VIEWER"), postJson(path, Map.of("shippedOn", TODAY))).andExpect(status().isForbidden());
+        as(register(), postJson(path, Map.of("shippedOn", TODAY))).andExpect(status().isNotFound());
+    }
+
+    private String idOfCustomer(String name) throws Exception {
+        return idOf(body(as(owner, postJson("/api/v1/customers", Map.of("code", code(), "name", name)))
+                .andExpect(status().isCreated())));
     }
 
     @Test

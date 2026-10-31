@@ -14,6 +14,7 @@ import com.qualityos.identity.dto.AuthDtos.ChangePasswordRequest;
 import com.qualityos.identity.dto.AuthDtos.LoginRequest;
 import com.qualityos.identity.dto.AuthDtos.MeResponse;
 import com.qualityos.identity.dto.AuthDtos.OrganizationSummary;
+import com.qualityos.identity.dto.AuthDtos.PendingVerificationSession;
 import com.qualityos.identity.dto.AuthDtos.RegisterRequest;
 import com.qualityos.identity.dto.AuthDtos.TokenResponse;
 import com.qualityos.identity.dto.AuthDtos.UserSummary;
@@ -147,7 +148,11 @@ public class AuthService {
         accountEmails.sendVerification(user);
     }
 
-    public TokenResponse login(LoginRequest request) {
+    /** Holds a full session, or else a session restricted to an account that is still pending. */
+    public record LoginResult(TokenResponse session, PendingVerificationSession pending) {
+    }
+
+    public LoginResult login(LoginRequest request) {
         String email = normalizeEmail(request.email());
         Optional<User> found = tx.execute(status -> users.findByEmail(email));
         if (found.isEmpty()) {
@@ -156,21 +161,35 @@ public class AuthService {
             throw invalidCredentials();
         }
         User user = found.get();
-        requirePassword(user, request.password());
+        checkPassword(user, request.password());
+        if (user.getStatus() == User.Status.PENDING_VERIFICATION) {
+            TenantContext.runAs(null, user.getId(), () -> tx.executeWithoutResult(status ->
+                    audit.record("PENDING_VERIFICATION_LOGIN", "User", user.getId())));
+            return new LoginResult(null, new PendingVerificationSession(
+                    accessTokens.issuePendingVerification(user.getId()), accessTokens.ttlSeconds(), true));
+        }
 
         UUID tenantId = chooseTenant(user.getId(), request.tenantId());
-        return TenantContext.callAs(tenantId, user.getId(), () -> tx.execute(status -> {
+        return new LoginResult(TenantContext.callAs(tenantId, user.getId(), () -> tx.execute(status -> {
             User current = users.findById(user.getId()).orElseThrow();
             current.setFailedLoginCount(0);
             current.setLockedUntil(null);
             current.setLastLoginAt(Instant.now());
             audit.record("USER_LOGGED_IN", "User", user.getId());
             return issueSession(user.getId(), tenantId);
-        }));
+        })), null);
     }
 
     /** Must run with no open transaction. Applies the same lockout rules wherever a password is presented. */
     void requirePassword(User user, String password) {
+        checkPassword(user, password);
+        // Said only after the right password, so that it reveals nothing to anyone else.
+        if (user.getStatus() == User.Status.PENDING_VERIFICATION) {
+            throw new QualityOsException(ErrorCode.EMAIL_NOT_VERIFIED, "Please confirm your email address first.");
+        }
+    }
+
+    private void checkPassword(User user, String password) {
         boolean passwordMatches = passwordEncoder.matches(password, user.getPasswordHash());
         boolean locked = user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now());
         if (locked || !passwordMatches || user.getStatus() == User.Status.DISABLED) {
@@ -178,10 +197,6 @@ public class AuthService {
                 recordFailedLogin(user.getId());
             }
             throw invalidCredentials();
-        }
-        // Said only after the right password, so that it reveals nothing to anyone else.
-        if (user.getStatus() == User.Status.PENDING_VERIFICATION) {
-            throw new QualityOsException(ErrorCode.EMAIL_NOT_VERIFIED, "Please confirm your email address first.");
         }
     }
 

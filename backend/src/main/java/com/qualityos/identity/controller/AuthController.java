@@ -1,6 +1,7 @@
 package com.qualityos.identity.controller;
 
 import com.qualityos.common.response.ApiResponse;
+import com.qualityos.common.security.TenantJwtAuthenticationConverter;
 import com.qualityos.identity.dto.AuthDtos.ChangePasswordRequest;
 import com.qualityos.identity.dto.AuthDtos.EmailLanguageRequest;
 import com.qualityos.identity.dto.AuthDtos.LoginRequest;
@@ -60,8 +61,11 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ApiResponse<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ApiResponse.ok(auth.login(request));
+    public ResponseEntity<ApiResponse<?>> login(@Valid @RequestBody LoginRequest request) {
+        AuthService.LoginResult result = auth.login(request);
+        return result.session() != null
+                ? ResponseEntity.ok(ApiResponse.ok(result.session()))
+                : ResponseEntity.accepted().body(ApiResponse.ok(result.pending()));
     }
 
     @PostMapping("/refresh")
@@ -136,6 +140,7 @@ public class AuthController {
     public ApiResponse<MeResponse> me(Authentication authentication) {
         Set<String> permissions = new TreeSet<>(authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
+                .filter(authority -> !authority.equals(TenantJwtAuthenticationConverter.MEMBER))
                 .toList());
         return ApiResponse.ok(auth.me(permissions));
     }

@@ -169,6 +169,18 @@ public abstract class AbstractIntegrationTest {
         });
     }
 
+    protected static String databaseUrl() {
+        return POSTGRES.getJdbcUrl();
+    }
+
+    protected static String superuser() {
+        return POSTGRES.getUsername();
+    }
+
+    protected static String superuserPassword() {
+        return POSTGRES.getPassword();
+    }
+
     /** Sees account-level audit events, which belong to no tenant and so are hidden from the application role. */
     protected JdbcTemplate asDatabaseSuperuser() {
         return new JdbcTemplate(new org.springframework.jdbc.datasource.DriverManagerDataSource(

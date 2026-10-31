@@ -130,3 +130,6 @@ row-level security. `account_tokens` holds one-time password reset and email ver
   `users.preferred_language` holds a person's email language. Tokens stay in `account_tokens` and email opt-outs in
   `notification_preferences`, so `email_verification_tokens` and `email_preferences` tables were not needed. Templates are
   files, so there is no `email_templates` table.
+- **`dispatch_shipments`** (V13) is the append-only proof that goods physically left. Triggers refuse a cancellation of a
+  shipped dispatch, a return on an unshipped one, and a shipment on a cancelled one. Dispatches from before V13 were
+  backfilled as shipped unless already cancelled.

@@ -9,7 +9,10 @@ import java.time.Clock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -42,15 +45,21 @@ public class SecurityConfig {
             @Value("${qualityos.security.auth-rate-limit-per-minute}") int authRateLimit) throws Exception {
         AuthenticationEntryPoint unauthenticated = (request, response, ex) ->
                 writeError(response, json, ErrorCode.UNAUTHENTICATED, "Authentication is required.");
-        AccessDeniedHandler denied = (request, response, ex) ->
+        AccessDeniedHandler denied = (request, response, ex) -> {
+            if (isPendingVerification()) {
+                writeError(response, json, ErrorCode.EMAIL_NOT_VERIFIED, "Please confirm your email address first.");
+            } else {
                 writeError(response, json, ErrorCode.FORBIDDEN, "You do not have permission to do this.");
+            }
+        };
 
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_PATHS).permitAll()
-                        .anyRequest().authenticated())
+                        .requestMatchers(HttpMethod.GET, "/api/v1/auth/verification-status").authenticated()
+                        .anyRequest().hasAuthority(TenantJwtAuthenticationConverter.MEMBER))
                 .oauth2ResourceServer(oauth -> oauth
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter))
                         .authenticationEntryPoint(unauthenticated)
@@ -68,6 +77,12 @@ public class SecurityConfig {
     @Bean
     PasswordEncoder passwordEncoder() {
         return Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();
+    }
+
+    private static boolean isPendingVerification() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(granted -> TenantJwtAuthenticationConverter.PENDING_VERIFICATION.equals(granted.getAuthority()));
     }
 
     private static void writeError(HttpServletResponse response, JsonMapper json, ErrorCode code, String message)

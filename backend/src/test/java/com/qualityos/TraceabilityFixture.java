@@ -121,6 +121,11 @@ abstract class TraceabilityFixture extends MasterDataFixture {
                 "items", List.of(Map.of("productionBatchId", batch, "quantity", quantity, "serialNumbers", serials)))));
     }
 
+    /** Confirms that the goods physically left. */
+    protected ResultActions ship(String dispatch) throws Exception {
+        return as(owner, postJson("/api/v1/dispatches/" + dispatch + "/shipment", Map.of("shippedOn", TODAY)));
+    }
+
     protected String numberOf(String batch) throws Exception {
         return JsonPath.read(body(as(owner, get("/api/v1/production-batches/" + batch))), "$.data.batch.batchNumber");
     }

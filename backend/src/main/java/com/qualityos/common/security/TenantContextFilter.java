@@ -24,7 +24,9 @@ public class TenantContextFilter extends OncePerRequestFilter {
             return;
         }
         UUID userId = UUID.fromString(token.getToken().getSubject());
-        UUID tenantId = UUID.fromString(token.getToken().getClaimAsString(TenantJwtAuthenticationConverter.TENANT_CLAIM));
+        // Only a token restricted to a pending account has no tenant, and such a token reaches no tenant data.
+        String tenant = token.getToken().getClaimAsString(TenantJwtAuthenticationConverter.TENANT_CLAIM);
+        UUID tenantId = tenant == null ? null : UUID.fromString(tenant);
         try (TenantContext.Scope ignored = TenantContext.open(tenantId, userId)) {
             chain.doFilter(request, response);
         }

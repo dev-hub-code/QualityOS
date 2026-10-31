@@ -20,12 +20,14 @@ import com.qualityos.traceability.entity.DispatchItem;
 import com.qualityos.traceability.entity.DispatchRecord;
 import com.qualityos.traceability.entity.DispatchReversal;
 import com.qualityos.traceability.entity.DispatchReversalItem;
+import com.qualityos.traceability.entity.DispatchShipment;
 import com.qualityos.traceability.entity.FinishedProduct;
 import com.qualityos.traceability.repository.CustomerRepository;
 import com.qualityos.traceability.repository.DispatchItemRepository;
 import com.qualityos.traceability.repository.DispatchRecordRepository;
 import com.qualityos.traceability.repository.DispatchReversalItemRepository;
 import com.qualityos.traceability.repository.DispatchReversalRepository;
+import com.qualityos.traceability.repository.DispatchShipmentRepository;
 import com.qualityos.traceability.repository.FinishedProductRepository;
 import com.qualityos.traceability.repository.ProductionBatchRepository;
 import com.qualityos.traceability.repository.TraceCorrectionRepository;
@@ -66,6 +68,7 @@ public class DispatchReturnService {
     private final ProductionBatchRepository batches;
     private final FinishedProductRepository finishedProducts;
     private final TraceCorrectionRepository corrections;
+    private final DispatchShipmentRepository shipments;
     private final ProductionService production;
     private final OrganizationService organizations;
     private final TenantAccessService access;
@@ -81,6 +84,7 @@ public class DispatchReturnService {
             ProductionBatchRepository batches,
             FinishedProductRepository finishedProducts,
             TraceCorrectionRepository corrections,
+            DispatchShipmentRepository shipments,
             ProductionService production,
             OrganizationService organizations,
             TenantAccessService access,
@@ -94,6 +98,7 @@ public class DispatchReturnService {
         this.batches = batches;
         this.finishedProducts = finishedProducts;
         this.corrections = corrections;
+        this.shipments = shipments;
         this.production = production;
         this.organizations = organizations;
         this.access = access;
@@ -125,17 +130,20 @@ public class DispatchReturnService {
         return dispatchIds.isEmpty() ? List.of() : views(reversals.findByDispatchIdInOrderByCreatedAt(dispatchIds));
     }
 
-    /** Takes the batch locks first, so that two returns against one dispatch are counted one after the other. */
+    /** Locks the dispatch first, so that two returns are counted one after the other and neither races a cancellation. */
     @Transactional
     public ReversalView create(UUID dispatchId, CreateReversalRequest request) {
-        DispatchRecord dispatch = requireDispatch(dispatchId);
+        DispatchRecord dispatch = dispatches.findForUpdate(dispatchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Dispatch", dispatchId));
         if (corrections.existsByDispatchId(dispatchId)) {
             throw new BusinessRuleException("This dispatch was reversed as a mistake, so nothing can come back.");
         }
+        DispatchShipment shipment = shipments.findByDispatchId(dispatchId).orElseThrow(() ->
+                new BusinessRuleException("Confirm this shipment before recording a return against it."));
         String reference = request.returnReference().trim();
         LocalDate today = LocalDate.now(ZoneId.of(organizations.getCurrent().timezone()));
-        if (request.reversalDate().isAfter(today) || request.reversalDate().isBefore(dispatch.getDispatchedOn())) {
-            throw new BusinessRuleException("The return date must fall between the dispatch and today.");
+        if (request.reversalDate().isAfter(today) || request.reversalDate().isBefore(shipment.getShippedOn())) {
+            throw new BusinessRuleException("The return date must fall between the shipment and today.");
         }
         Map<UUID, DispatchItem> lines = dispatchItems.findByDispatchIdIn(List.of(dispatchId)).stream()
                 .collect(Collectors.toMap(DispatchItem::getId, Function.identity()));

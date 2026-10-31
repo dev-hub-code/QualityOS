@@ -49,15 +49,21 @@ public class AnalyticsService {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ReportScope scopes;
+    private final AnalyticsCache cache;
 
-    AnalyticsService(NamedParameterJdbcTemplate jdbc, ReportScope scopes) {
+    AnalyticsService(NamedParameterJdbcTemplate jdbc, ReportScope scopes, AnalyticsCache cache) {
         this.jdbc = jdbc;
         this.scopes = scopes;
+        this.cache = cache;
     }
 
     @Transactional(readOnly = true)
     public Overview overview(LocalDate from, LocalDate to, UUID facilityId) {
         Resolved scope = scopes.resolve(from, to, facilityId);
+        return cache.get(scope, () -> compute(scope));
+    }
+
+    private Overview compute(Resolved scope) {
         MapSqlParameterSource params = scope.params();
         return new Overview(scope.from(), scope.to(), kpis(scope, params), inspectionTrend(scope, params),
                 suppliers(scope, params), defects(scope, params), products(scope, params), facilities(scope, params),

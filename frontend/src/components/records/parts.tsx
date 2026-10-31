@@ -89,8 +89,15 @@ export function useAction() {
   return { run: mutation.mutate, pending: mutation.isPending, message };
 }
 
+/** Lists that rarely change. A change made here refreshes them at once, since every action invalidates all queries. */
+const REFERENCE_STALE_TIME = 5 * 60_000;
+
 export function useUnits() {
-  const { data = [] } = useQuery({ queryKey: ["/units"], queryFn: () => api.get<Unit[]>("/units") });
+  const { data = [] } = useQuery({
+    queryKey: ["/units"],
+    queryFn: () => api.get<Unit[]>("/units"),
+    staleTime: REFERENCE_STALE_TIME,
+  });
   return {
     options: data.map((unit): FieldOption => ({ value: unit.id, label: `${unit.code} – ${unit.name}` })),
     label: (id: string | null) => data.find((unit) => unit.id === id)?.code ?? "",
@@ -101,6 +108,7 @@ export function useProductCategories(): FieldOption[] {
   const { data = [] } = useQuery({
     queryKey: ["/product-categories"],
     queryFn: () => api.get<Category[]>("/product-categories"),
+    staleTime: REFERENCE_STALE_TIME,
   });
   return data.map((category) => ({ value: category.id, label: category.name }));
 }
@@ -109,6 +117,7 @@ export function useSupplierCategories(): FieldOption[] {
   const { data = [] } = useQuery({
     queryKey: ["/suppliers/categories"],
     queryFn: () => api.get<Category[]>("/suppliers/categories"),
+    staleTime: REFERENCE_STALE_TIME,
   });
   return data.map((category) => ({ value: category.id, label: category.name }));
 }
@@ -137,6 +146,7 @@ export function useDefectCategories() {
   const { data = [] } = useQuery({
     queryKey: ["/defect-categories"],
     queryFn: () => api.get<DefectCategory[]>("/defect-categories"),
+    staleTime: REFERENCE_STALE_TIME,
   });
   return data.map((category): FieldOption => ({ value: category.id, label: `${category.code} – ${category.name}` }));
 }

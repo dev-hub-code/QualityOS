@@ -6,18 +6,26 @@ import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.organization.dto.OrganizationResponse;
 import com.qualityos.organization.service.OrganizationService;
+import com.qualityos.subscription.dto.SubscriptionDtos.InvoiceFilter;
+import com.qualityos.subscription.dto.SubscriptionDtos.InvoiceList;
+import com.qualityos.subscription.dto.SubscriptionDtos.InvoiceResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.OrganisationActivity;
 import com.qualityos.subscription.dto.SubscriptionDtos.OrganisationDetail;
 import com.qualityos.subscription.dto.SubscriptionDtos.OrganisationFilter;
 import com.qualityos.subscription.dto.SubscriptionDtos.OrganisationList;
 import com.qualityos.subscription.dto.SubscriptionDtos.OrganisationRow;
 import com.qualityos.subscription.dto.SubscriptionDtos.OrganisationUsage;
+import com.qualityos.subscription.dto.SubscriptionDtos.PaymentList;
 import com.qualityos.subscription.dto.SubscriptionDtos.PlatformDashboard;
+import com.qualityos.subscription.dto.SubscriptionDtos.PlatformInvoice;
+import com.qualityos.subscription.dto.SubscriptionDtos.PlatformPayment;
 import com.qualityos.subscription.dto.SubscriptionDtos.TenantSubscription;
+import com.qualityos.subscription.dto.SubscriptionDtos.TrialSummary;
+import com.qualityos.subscription.entity.SubscriptionInvoice;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -49,14 +57,19 @@ public class PlatformInsights {
     private static final int DEFAULT_DAYS = 30;
     private static final int RECENT_ACTIVITY = 20;
     private static final ZoneId ZONE = ZoneId.of("Asia/Kolkata");
-    private static final Set<String> STATES = Set.of("TRIAL", "ACTIVE", "GRACE", "READ_ONLY");
+    private static final Set<String> STATES = Set.of("TRIAL", "ACTIVE", "GRACE", "READ_ONLY", "SUSPENDED", "CANCELLED");
     private static final Set<String> SORTS = Set.of("NAME", "NEWEST", "ENDING");
     private static final String PAGE = "SELECT * FROM platform_organisation_page(?, ?, ?, ?, ?, ?, ?, ?, ?)";
     /** Names the organisation, because row-level security also shows an administrator their own memberships. */
+    private static final String INVOICES = "SELECT * FROM platform_invoice_page(?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    private static final String PAYMENTS = "SELECT * FROM platform_payment_page(?, ?, ?, ?, ?, ?)";
+    private static final Set<String> INVOICE_STATES = Set.of("ISSUED", "PAID", "VOID");
+    private static final Set<String> PAYMENT_STATES = Set.of("SUCCEEDED", "FAILED");
     private static final String CONTACT = """
             SELECT u.email FROM tenant_memberships m JOIN users u ON u.id = m.user_id
             WHERE m.tenant_id = ? ORDER BY m.created_at LIMIT 1
             """;
+    private static final String TENANT = "SELECT created_at, suspended_at, suspension_reason FROM tenants WHERE id = ?";
     private static final String USAGE = """
             SELECT (SELECT count(*) FROM inspections), (SELECT count(*) FROM non_conformances),
                    (SELECT count(*) FROM corrective_actions),
@@ -122,7 +135,8 @@ public class PlatformInsights {
                 .map(row -> inside(row.tenantId(), () -> new TenantSubscription(row.tenantId(), row.name(),
                         subscriptions.current(),
                         subscriptions.invoices().stream().filter(invoice -> invoice.status().equals("ISSUED")).toList(),
-                        row.gstin(), row.contactEmail(), row.registeredAt())))
+                        row.gstin(), row.contactEmail(), row.registeredAt(), row.subscriptionId(), row.suspendedAt(),
+                        row.nextDue())))
                 .toList());
     }
 
@@ -162,9 +176,85 @@ public class PlatformInsights {
 
     private static OrganisationRow row(ResultSet rows) throws SQLException {
         return new OrganisationRow(rows.getObject("tenant_id", UUID.class), rows.getString("name"),
-                rows.getString("gstin"), rows.getString("contact_email"), rows.getString("plan_name"),
-                rows.getString("state"), rows.getTimestamp("ends_at").toInstant(),
-                rows.getTimestamp("registered_at").toInstant(), rows.getLong("open_invoices"));
+                rows.getObject("subscription_id", UUID.class), rows.getString("gstin"), rows.getString("contact_email"),
+                rows.getString("plan_code"),
+                rows.getString("plan_name"), rows.getString("state"), rows.getString("billing_cycle"),
+                rows.getTimestamp("ends_at").toInstant(), instant(rows, "cancelled_at"), instant(rows, "suspended_at"),
+                rows.getTimestamp("registered_at").toInstant(), rows.getLong("open_invoices"),
+                rows.getObject("next_due", LocalDate.class));
+    }
+
+    private static Instant instant(ResultSet rows, String column) throws SQLException {
+        Timestamp value = rows.getTimestamp(column);
+        return value == null ? null : value.toInstant();
+    }
+
+    public InvoiceList invoices(InvoiceFilter filter, int page, int size) {
+        List<Long> total = new ArrayList<>();
+        List<PlatformInvoice> rows = invoiceRows(filter, size, page * size, total);
+        return new InvoiceList(total.isEmpty() ? 0 : total.getFirst().intValue(), rows);
+    }
+
+    /** Leaves a trace, because the file carries billing figures out of the platform. */
+    public List<PlatformInvoice> exportInvoices(InvoiceFilter filter) {
+        List<PlatformInvoice> rows = invoiceRows(filter, MAX_EXPORT, 0, new ArrayList<>());
+        tx.executeWithoutResult(status -> audit.record(
+                "INVOICES_EXPORTED", "SubscriptionInvoice", null, null, Map.of("rows", rows.size())));
+        return rows;
+    }
+
+    private List<PlatformInvoice> invoiceRows(InvoiceFilter filter, int limit, int offset, List<Long> total) {
+        if (filter.status() != null && !INVOICE_STATES.contains(filter.status())) {
+            throw new BusinessRuleException("Unknown status.");
+        }
+        return tx.execute(status -> jdbc.query(INVOICES, (rows, row) -> {
+            total.clear();
+            total.add(rows.getLong("total"));
+            return new PlatformInvoice(rows.getObject("id", UUID.class), rows.getObject("tenant_id", UUID.class),
+                    rows.getString("organisation"), rows.getString("invoice_number"), rows.getString("plan_name"),
+                    rows.getString("billing_cycle"), instant(rows, "period_starts_at"), instant(rows, "period_ends_at"),
+                    rows.getBigDecimal("amount"), rows.getBigDecimal("tax_amount"), rows.getBigDecimal("invoice_total"),
+                    rows.getBigDecimal("paid"), rows.getBigDecimal("outstanding"), rows.getString("status"),
+                    rows.getObject("issued_on", LocalDate.class), rows.getObject("due_on", LocalDate.class));
+        }, text(filter.q()), filter.status(), filter.overdue(), filter.from(), filter.to(), filter.min(), filter.max(),
+                limit, offset));
+    }
+
+    public PaymentList payments(String q, String state, LocalDate from, LocalDate to, int page, int size) {
+        if (state != null && !PAYMENT_STATES.contains(state)) {
+            throw new BusinessRuleException("Unknown status.");
+        }
+        List<Long> total = new ArrayList<>();
+        List<PlatformPayment> rows = tx.execute(status -> jdbc.query(PAYMENTS, (result, row) -> {
+            total.clear();
+            total.add(result.getLong("total"));
+            return new PlatformPayment(result.getObject("id", UUID.class), result.getObject("tenant_id", UUID.class),
+                    result.getString("organisation"), result.getObject("invoice_id", UUID.class),
+                    result.getString("invoice_number"), result.getString("provider"), result.getString("reference"),
+                    result.getString("method"), result.getBigDecimal("amount"), result.getString("status"),
+                    result.getString("failure_reason"), result.getObject("paid_on", LocalDate.class),
+                    result.getString("notes"), result.getString("recorded_by"), instant(result, "recorded_at"));
+        }, text(q), state, from, to, size, page * size));
+        return new PaymentList(total.isEmpty() ? 0 : total.getFirst().intValue(), rows);
+    }
+
+    public TrialSummary trialSummary() {
+        String figures = tx.execute(status -> jdbc.queryForObject(
+                "SELECT platform_trial_summary(?)::text", String.class, ZONE.getId()));
+        return json.readValue(figures, TrialSummary.class);
+    }
+
+    private static String text(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    /** For a platform administrator's copy, read under the organisation's own tenant context. */
+    public SubscriptionInvoice invoice(UUID tenant, UUID id) {
+        return inside(tenant, () -> subscriptions.invoice(id));
+    }
+
+    public InvoiceResponse invoiceDetail(UUID tenant, UUID id) {
+        return SubscriptionService.toResponse(invoice(tenant, id));
     }
 
     /** Figures and event names only. The content of an organisation's quality records stays out of this page. */
@@ -175,16 +265,17 @@ public class PlatformInsights {
         }
         return inside(tenant, () -> {
             OrganizationResponse organization = organizations.getCurrent();
-            Timestamp registered = jdbc.queryForObject("SELECT created_at FROM tenants WHERE id = ?", Timestamp.class, tenant);
             OrganisationUsage usage = jdbc.queryForObject(USAGE, (rows, row) -> new OrganisationUsage(
                     rows.getLong(1), rows.getLong(2), rows.getLong(3), rows.getLong(4), rows.getLong(5)));
             List<OrganisationActivity> activity = jdbc.query(ACTIVITY, (rows, row) -> new OrganisationActivity(
                     rows.getString(1), rows.getString(2), rows.getTimestamp(3).toInstant()), RECENT_ACTIVITY);
             List<String> contact = jdbc.queryForList(CONTACT, String.class, tenant);
-            return new OrganisationDetail(tenant, organization.name(), organization.legalName(), organization.gstin(),
+            return jdbc.queryForObject(TENANT, (rows, row) -> new OrganisationDetail(
+                    tenant, organization.name(), organization.legalName(), organization.gstin(),
                     contact.isEmpty() ? null : contact.getFirst(), organization.countryCode(), organization.timezone(),
-                    registered.toInstant(), subscriptions.current(), usage, subscriptions.invoices(),
-                    subscriptions.payments(), activity);
+                    rows.getTimestamp("created_at").toInstant(), instant(rows, "suspended_at"),
+                    rows.getString("suspension_reason"), subscriptions.current(), usage, subscriptions.invoices(),
+                    subscriptions.payments(), activity), tenant);
         });
     }
 

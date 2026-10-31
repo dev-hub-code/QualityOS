@@ -2,11 +2,15 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
+import { useState } from "react";
 import { formatDate, formatMoney } from "@/components/billing/subscription-banner";
-import { Details, PageHeader, QueryState, Section } from "@/components/records/parts";
+import { EXTEND_FIELDS, ReasonDialog, RecordPaymentDialog } from "@/components/platform/billing-dialogs";
+import { Details, PageHeader, QueryState, Section, useRefresh } from "@/components/records/parts";
+import { RecordDialog } from "@/components/records/record-dialog";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
-import type { OrganisationDetail } from "@/lib/types";
+import type { Invoice, OrganisationDetail } from "@/lib/types";
 
 const megabytes = (bytes: number) => `${(bytes / 1_048_576).toFixed(1)} MB`;
 const used = (count: number, limit: number | null) => (limit === null ? String(count) : `${count} of ${limit}`);
@@ -14,15 +18,51 @@ const used = (count: number, limit: number | null) => (limit === null ? String(c
 export default function PlatformOrganisationPage() {
   const { organisationId } = useParams<{ organisationId: string }>();
   const path = `/platform/organisations/${organisationId}`;
+  const refresh = useRefresh();
+  const [action, setAction] = useState<[string, string] | null>(null);
+  const [extending, setExtending] = useState(false);
+  const [paying, setPaying] = useState<Invoice | null>(null);
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<OrganisationDetail>(path) });
   if (!data) return <QueryState error={error} />;
   const { subscription, usage } = data;
+  const trialRunning = subscription.state === "TRIAL";
   const outstanding = data.invoices
     .filter((invoice) => invoice.status === "ISSUED")
     .reduce((sum, invoice) => sum + invoice.total, 0);
   return (
     <div className="space-y-6">
-      <PageHeader title={data.name} subtitle="Figures only. The content of this organisation's quality records is not shown here." />
+      <PageHeader title={data.name} subtitle="Figures only. The content of this organisation's quality records is not shown here.">
+        <Button variant="outline" onClick={() => setExtending(true)}>
+          Extend
+        </Button>
+        {trialRunning && (
+          <Button variant="outline" onClick={() => setAction(["End trial", `${path}/trial/end`])}>
+            End trial
+          </Button>
+        )}
+        {subscription.cancelledAt ? (
+          <Button variant="outline" onClick={() => setAction(["Resume subscription", `${path}/resume`])}>
+            Resume
+          </Button>
+        ) : (
+          <Button variant="outline" onClick={() => setAction(["Cancel subscription", `${path}/cancel`])}>
+            Cancel subscription
+          </Button>
+        )}
+        {data.suspendedAt ? (
+          <Button onClick={() => setAction(["Reactivate organisation", `${path}/reactivate`])}>Reactivate</Button>
+        ) : (
+          <Button variant="destructive" onClick={() => setAction(["Suspend organisation", `${path}/suspend`])}>
+            Suspend
+          </Button>
+        )}
+      </PageHeader>
+      {data.suspendedAt && (
+        <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm">
+          Suspended on {formatDate(data.suspendedAt)}: {data.suspensionReason}. Members cannot sign in. Their records are
+          untouched.
+        </p>
+      )}
       <div className="grid gap-4 xl:grid-cols-2">
         <Section title="Profile">
           <Details
@@ -84,6 +124,7 @@ export default function PlatformOrganisationPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Due</TableHead>
                 <TableHead className="text-right">Total</TableHead>
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -94,6 +135,19 @@ export default function PlatformOrganisationPage() {
                   <TableCell>{invoice.status.toLowerCase()}</TableCell>
                   <TableCell>{formatDate(invoice.dueOn)}</TableCell>
                   <TableCell className="text-right">{formatMoney(invoice.total)}</TableCell>
+                  <TableCell className="space-x-2 whitespace-nowrap text-right">
+                    {invoice.status === "ISSUED" && (
+                      <Button size="sm" variant="outline" onClick={() => setPaying(invoice)}>
+                        Record payment
+                      </Button>
+                    )}
+                    <a
+                      className={buttonVariants({ size: "sm", variant: "outline" })}
+                      href={`/api/v1${path}/invoices/${invoice.id}/pdf`}
+                    >
+                      PDF
+                    </a>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -107,7 +161,8 @@ export default function PlatformOrganisationPage() {
           <ul className="space-y-1 text-sm">
             {data.payments.map((payment) => (
               <li key={payment.id}>
-                {formatDate(payment.occurredAt)} {formatMoney(payment.amount)} {payment.status.toLowerCase()},{" "}
+                {formatDate(payment.paidOn ?? payment.occurredAt)} {formatMoney(payment.amount)}{" "}
+                {payment.status.toLowerCase()},{" "}
                 reference {payment.providerReference}
                 {payment.failureReason && `: ${payment.failureReason}`}
               </li>
@@ -115,6 +170,27 @@ export default function PlatformOrganisationPage() {
           </ul>
         )}
       </Section>
+      {action && <ReasonDialog title={action[0]} path={action[1]} onClose={() => setAction(null)} />}
+      {extending && (
+        <RecordDialog
+          title="Extend trial or subscription"
+          fields={EXTEND_FIELDS}
+          onClose={() => setExtending(false)}
+          onSubmit={async (values) => {
+            await api.post(`${path}/extend`, values);
+            await refresh();
+          }}
+        />
+      )}
+      {paying && (
+        <RecordPaymentDialog
+          tenantId={data.tenantId}
+          invoiceId={paying.id}
+          invoiceNumber={paying.invoiceNumber}
+          amount={paying.total}
+          onClose={() => setPaying(null)}
+        />
+      )}
     </div>
   );
 }

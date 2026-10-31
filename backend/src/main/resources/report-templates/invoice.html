@@ -33,11 +33,16 @@ table.lines { width: 100%; border-collapse: collapse; margin-top: 10pt; }
 <td><b>From</b><br/>{{sellerName}}{{#sellerAddress}}<br/>{{this}}{{/sellerAddress}}{{#sellerGstin}}<br/>GSTIN {{this}}{{/sellerGstin}}</td>
 <td><b>To</b><br/>{{invoice.buyerName}}{{#buyerAddress}}<br/>{{this}}{{/buyerAddress}}{{#buyerGstin}}<br/>GSTIN {{this}}{{/buyerGstin}}</td>
 </tr></table>
+{{#placeOfSupply}}<p class="muted">Place of supply {{this}}</p>{{/placeOfSupply}}
+{{#sacCode}}<p class="muted">SAC {{this}}</p>{{/sacCode}}
 <table class="lines">
 <thead><tr><th>Description</th><th class="num">Amount</th></tr></thead>
 <tbody>
 <tr><td>QualityOS {{invoice.planName}} plan, {{cycle}} subscription</td><td class="num">{{amount}}</td></tr>
-<tr><td>GST at {{invoice.taxPercent}}%</td><td class="num">{{tax}}</td></tr>
+{{#singleLine}}<tr><td>GST at {{invoice.taxPercent}}%</td><td class="num">{{tax}}</td></tr>{{/singleLine}}
+{{#cgst}}<tr><td>CGST at {{halfPercent}}%</td><td class="num">{{this}}</td></tr>{{/cgst}}
+{{#sgst}}<tr><td>SGST at {{halfPercent}}%</td><td class="num">{{this}}</td></tr>{{/sgst}}
+{{#igst}}<tr><td>IGST at {{invoice.taxPercent}}%</td><td class="num">{{this}}</td></tr>{{/igst}}
 <tr class="total"><td>Total</td><td class="num">{{total}}</td></tr>
 </tbody>
 </table>

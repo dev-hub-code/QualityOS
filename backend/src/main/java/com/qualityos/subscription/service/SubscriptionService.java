@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -60,6 +61,8 @@ public class SubscriptionService {
     private final TenantAccessService access;
     private final JdbcTemplate jdbc;
     private final AuditService audit;
+    private final String sellerGstin;
+    private final String sacCode;
 
     SubscriptionService(
             SubscriptionPlanRepository plans,
@@ -71,7 +74,9 @@ public class SubscriptionService {
             NotificationService notifications,
             TenantAccessService access,
             JdbcTemplate jdbc,
-            AuditService audit) {
+            AuditService audit,
+            @Value("${qualityos.billing.seller-gstin:}") String sellerGstin,
+            @Value("${qualityos.billing.sac-code:}") String sacCode) {
         this.plans = plans;
         this.subscriptions = subscriptions;
         this.invoices = invoices;
@@ -82,6 +87,8 @@ public class SubscriptionService {
         this.access = access;
         this.jdbc = jdbc;
         this.audit = audit;
+        this.sellerGstin = sellerGstin;
+        this.sacCode = sacCode;
     }
 
     /** Runs inside the transaction that creates the organisation. */
@@ -154,8 +161,14 @@ public class SubscriptionService {
 
     /** Runs under the tenant being invoiced. */
     @Transactional
+    /** With no amount, the plan's list price. The plan changes only once this invoice is paid. */
     public InvoiceResponse raiseCustom(CustomInvoiceRequest request) {
-        return toResponse(raise(plan(request.planId()), request.cycle(), request.amount()));
+        SubscriptionPlan plan = plan(request.planId());
+        BigDecimal amount = request.amount() != null ? request.amount() : plan.priceFor(request.cycle());
+        if (amount == null) {
+            throw new BusinessRuleException("This plan has no list price, so enter the agreed amount.");
+        }
+        return toResponse(raise(plan, request.cycle(), amount));
     }
 
     private SubscriptionInvoice raise(SubscriptionPlan plan, Subscription.Cycle cycle, BigDecimal amount) {
@@ -181,6 +194,14 @@ public class SubscriptionService {
         invoice.setBuyerName(Objects.requireNonNullElse(organization.legalName(), organization.name()));
         invoice.setBuyerGstin(organization.gstin());
         invoice.setBuyerAddress(organization.address());
+        GstBreakup gst = GstBreakup.of(sellerGstin, organization.gstin(), tax);
+        invoice.setTaxTreatment(gst.treatment());
+        invoice.setPlaceOfSupply(gst.placeOfSupply());
+        invoice.setCgstAmount(gst.cgst());
+        invoice.setSgstAmount(gst.sgst());
+        invoice.setIgstAmount(gst.igst());
+        invoice.setSacCode(sacCode.isBlank() ? null : sacCode);
+        invoice.setSellerGstin(sellerGstin.isBlank() ? null : sellerGstin);
         invoice.setIssuedOn(today);
         invoice.setDueOn(today.plusDays(PAYMENT_TERMS_DAYS));
         invoices.saveAndFlush(invoice);
@@ -230,7 +251,21 @@ public class SubscriptionService {
     public SubscriptionResponse extend(int days) {
         Subscription subscription = subscriptions.lockCurrent().orElseThrow(SubscriptionService::missing);
         subscription.extend(Duration.ofDays(days));
-        audit.record("SUBSCRIPTION_EXTENDED", "Subscription", subscription.getId(), null, Map.of("days", days));
+        audit.record(subscription.getStatus() == Subscription.Status.TRIALING ? "TRIAL_EXTENDED" : "SUBSCRIPTION_EXTENDED",
+                "Subscription", subscription.getId(), null, Map.of("days", days));
+        subscriptions.flush();
+        return current();
+    }
+
+    @Transactional
+    public SubscriptionResponse endTrial() {
+        Subscription subscription = subscriptions.lockCurrent().orElseThrow(SubscriptionService::missing);
+        Instant now = Instant.now();
+        if (subscription.getStatus() != Subscription.Status.TRIALING || !subscription.getCurrentPeriodEndsAt().isAfter(now)) {
+            throw new ConflictException("This organisation is not in a running trial.");
+        }
+        subscription.endTrial(now);
+        audit.record("TRIAL_ENDED", "Subscription", subscription.getId());
         subscriptions.flush();
         return current();
     }
@@ -245,7 +280,7 @@ public class SubscriptionService {
         return payments.findAllByOrderByOccurredAtDesc().stream()
                 .map(payment -> new PaymentResponse(payment.getId(), payment.getInvoiceId(), payment.getProvider(),
                         payment.getProviderReference(), payment.getAmount(), payment.getStatus().name(),
-                        payment.getFailureReason(), payment.getOccurredAt()))
+                        payment.getFailureReason(), payment.getOccurredAt(), payment.getMethod(), payment.getPaidOn()))
                 .toList();
     }
 
@@ -272,6 +307,10 @@ public class SubscriptionService {
         if (invoice.getStatus() != SubscriptionInvoice.Status.ISSUED) {
             throw new ConflictException("This invoice is not open for payment.");
         }
+        if (request.paidOn() != null
+                && request.paidOn().isAfter(LocalDate.now(ZoneId.of(organizations.getCurrent().timezone())))) {
+            throw new BusinessRuleException("The payment date cannot be in the future.");
+        }
         PaymentTransaction payment;
         if (request.failed()) {
             payment = new PaymentTransaction(invoiceId, provider, request.reference(), request.amount(),
@@ -284,6 +323,9 @@ public class SubscriptionService {
                     PaymentTransaction.Status.SUCCEEDED, null);
             markPaid(subscription, invoice);
         }
+        payment.setMethod(request.method().name());
+        payment.setPaidOn(request.paidOn());
+        payment.setNotes(request.notes());
         payments.saveAndFlush(payment);
         audit.record(request.failed() ? "PAYMENT_FAILED" : "PAYMENT_RECORDED", "PaymentTransaction", payment.getId(),
                 null, Map.of("invoice", invoice.getInvoiceNumber(), "provider", provider,
@@ -347,6 +389,8 @@ public class SubscriptionService {
         return new InvoiceResponse(invoice.getId(), invoice.getInvoiceNumber(), invoice.getPlanName(),
                 invoice.getBillingCycle(), invoice.getAmount(), invoice.getTaxPercent(), invoice.getTaxAmount(),
                 invoice.getTotal(), invoice.getStatus().name(), invoice.getIssuedOn(), invoice.getDueOn(),
-                invoice.getPaidAt());
+                invoice.getPaidAt(), invoice.getTaxTreatment(), invoice.getPlaceOfSupply(), invoice.getCgstAmount(),
+                invoice.getSgstAmount(), invoice.getIgstAmount(), invoice.getSacCode(), invoice.getSellerGstin(),
+                invoice.getBuyerName(), invoice.getBuyerGstin(), invoice.getPeriodStartsAt(), invoice.getPeriodEndsAt());
     }
 }

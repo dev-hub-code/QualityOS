@@ -1,6 +1,7 @@
 package com.qualityos.organization.service;
 
 import com.qualityos.common.audit.AuditService;
+import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.organization.dto.OrganizationResponse;
@@ -68,6 +69,34 @@ public class OrganizationService {
         tenants.saveAndFlush(tenant);
         audit.record("ORGANIZATION_UPDATED", "Organization", id, previous, snapshot(tenant));
         return mapper.toResponse(tenant);
+    }
+
+    /** Every member loses access on their next request. Nothing the organisation holds is touched. */
+    @Transactional
+    public void suspend(String reason) {
+        Tenant tenant = loadCurrent();
+        if (tenant.getStatus() == Tenant.Status.SUSPENDED) {
+            throw new ConflictException("This organisation is already suspended.");
+        }
+        tenant.setStatus(Tenant.Status.SUSPENDED);
+        tenant.setSuspendedAt(Instant.now());
+        tenant.setSuspensionReason(reason);
+        tenants.saveAndFlush(tenant);
+        audit.record("ORGANIZATION_SUSPENDED", "Organization", tenant.getId(), null, Map.of("reason", reason));
+    }
+
+    /** Only undoes an operator's suspension. A sign-up that expired has no one left to return. */
+    @Transactional
+    public void reactivate(String reason) {
+        Tenant tenant = loadCurrent();
+        if (tenant.getSuspendedAt() == null) {
+            throw new ConflictException("This organisation was not suspended by an operator.");
+        }
+        tenant.setStatus(Tenant.Status.ACTIVE);
+        tenant.setSuspendedAt(null);
+        tenant.setSuspensionReason(null);
+        tenants.saveAndFlush(tenant);
+        audit.record("ORGANIZATION_REACTIVATED", "Organization", tenant.getId(), null, Map.of("reason", reason));
     }
 
     private Tenant requireCurrent(UUID id) {

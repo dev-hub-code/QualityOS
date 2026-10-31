@@ -47,6 +47,13 @@ public class SubscriptionInvoice extends TenantOwnedEntity {
     private Instant paidAt;
     private Instant periodStartsAt;
     private Instant periodEndsAt;
+    private String taxTreatment;
+    private String placeOfSupply;
+    private BigDecimal cgstAmount;
+    private BigDecimal sgstAmount;
+    private BigDecimal igstAmount;
+    private String sacCode;
+    private String sellerGstin;
 
     public SubscriptionInvoice(UUID subscriptionId, String invoiceNumber) {
         this.subscriptionId = subscriptionId;

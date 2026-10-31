@@ -5,10 +5,13 @@ import com.qualityos.common.security.Permissions.Require;
 import com.qualityos.subscription.dto.SubscriptionDtos.CreatePlanRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.CustomInvoiceRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.ExtendRequest;
+import com.qualityos.subscription.dto.SubscriptionDtos.InvoiceFilter;
+import com.qualityos.subscription.dto.SubscriptionDtos.InvoiceList;
 import com.qualityos.subscription.dto.SubscriptionDtos.InvoiceResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.OrganisationDetail;
 import com.qualityos.subscription.dto.SubscriptionDtos.OrganisationFilter;
 import com.qualityos.subscription.dto.SubscriptionDtos.OrganisationList;
+import com.qualityos.subscription.dto.SubscriptionDtos.PaymentList;
 import com.qualityos.subscription.dto.SubscriptionDtos.PaymentResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.PlanActionRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.PlanActiveRequest;
@@ -16,9 +19,13 @@ import com.qualityos.subscription.dto.SubscriptionDtos.PlanImpact;
 import com.qualityos.subscription.dto.SubscriptionDtos.PlanResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.PlanVersion;
 import com.qualityos.subscription.dto.SubscriptionDtos.PlatformDashboard;
+import com.qualityos.subscription.dto.SubscriptionDtos.ReasonRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.RecordPaymentRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.SavePlanRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.SubscriptionResponse;
+import com.qualityos.subscription.dto.SubscriptionDtos.TrialSummary;
+import com.qualityos.subscription.entity.SubscriptionInvoice;
+import com.qualityos.subscription.service.InvoicePdfRenderer;
 import com.qualityos.subscription.service.PlanCatalogue;
 import com.qualityos.subscription.service.PlatformInsights;
 import com.qualityos.subscription.service.PlatformService;
@@ -26,6 +33,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -58,11 +66,14 @@ public class PlatformController {
     private final PlatformService platform;
     private final PlatformInsights insights;
     private final PlanCatalogue catalogue;
+    private final InvoicePdfRenderer renderer;
 
-    PlatformController(PlatformService platform, PlatformInsights insights, PlanCatalogue catalogue) {
+    PlatformController(
+            PlatformService platform, PlatformInsights insights, PlanCatalogue catalogue, InvoicePdfRenderer renderer) {
         this.platform = platform;
         this.insights = insights;
         this.catalogue = catalogue;
+        this.renderer = renderer;
     }
 
     @GetMapping("/plans")
@@ -178,6 +189,103 @@ public class PlatformController {
 
     @PostMapping("/organisations/{tenantId}/extend")
     public ApiResponse<SubscriptionResponse> extend(@PathVariable UUID tenantId, @Valid @RequestBody ExtendRequest request) {
-        return ApiResponse.ok(platform.extend(tenantId, request.days()));
+        return ApiResponse.ok(platform.extend(tenantId, request.days(), request.reason()));
+    }
+
+    @PostMapping("/organisations/{tenantId}/trial/end")
+    public ApiResponse<SubscriptionResponse> endTrial(@PathVariable UUID tenantId, @Valid @RequestBody ReasonRequest request) {
+        return ApiResponse.ok(platform.endTrial(tenantId, request.reason()));
+    }
+
+    @PostMapping("/organisations/{tenantId}/cancel")
+    public ApiResponse<SubscriptionResponse> cancel(@PathVariable UUID tenantId, @Valid @RequestBody ReasonRequest request) {
+        return ApiResponse.ok(platform.cancel(tenantId, request.reason()));
+    }
+
+    @PostMapping("/organisations/{tenantId}/resume")
+    public ApiResponse<SubscriptionResponse> resume(@PathVariable UUID tenantId, @Valid @RequestBody ReasonRequest request) {
+        return ApiResponse.ok(platform.resume(tenantId, request.reason()));
+    }
+
+    @PostMapping("/organisations/{tenantId}/suspend")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void suspend(@PathVariable UUID tenantId, @Valid @RequestBody ReasonRequest request) {
+        platform.suspend(tenantId, request.reason());
+    }
+
+    @PostMapping("/organisations/{tenantId}/reactivate")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void reactivate(@PathVariable UUID tenantId, @Valid @RequestBody ReasonRequest request) {
+        platform.reactivate(tenantId, request.reason());
+    }
+
+    @GetMapping("/organisations/{tenantId}/invoices/{invoiceId}")
+    public ApiResponse<InvoiceResponse> invoice(@PathVariable UUID tenantId, @PathVariable UUID invoiceId) {
+        return ApiResponse.ok(insights.invoiceDetail(tenantId, invoiceId));
+    }
+
+    @GetMapping("/organisations/{tenantId}/invoices/{invoiceId}/pdf")
+    public ResponseEntity<byte[]> invoicePdf(@PathVariable UUID tenantId, @PathVariable UUID invoiceId) {
+        SubscriptionInvoice invoice = insights.invoice(tenantId, invoiceId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + invoice.getInvoiceNumber() + ".pdf\"")
+                .body(renderer.render(invoice));
+    }
+
+    @GetMapping("/invoices")
+    public ApiResponse<InvoiceList> invoices(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "false") boolean overdue,
+            @RequestParam(required = false) LocalDate from,
+            @RequestParam(required = false) LocalDate to,
+            @RequestParam(required = false) BigDecimal min,
+            @RequestParam(required = false) BigDecimal max,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "25") @Min(1) @Max(100) int size) {
+        return ApiResponse.ok(insights.invoices(new InvoiceFilter(q, status, overdue, from, to, min, max), page, size));
+    }
+
+    @GetMapping(value = "/invoices/export", produces = "text/csv")
+    public ResponseEntity<String> exportInvoices(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "false") boolean overdue,
+            @RequestParam(required = false) LocalDate from,
+            @RequestParam(required = false) LocalDate to,
+            @RequestParam(required = false) BigDecimal min,
+            @RequestParam(required = false) BigDecimal max) {
+        StringBuilder csv = new StringBuilder(
+                "Invoice,Organisation,Plan,Subtotal,GST,Total,Paid,Outstanding,Status,Issued,Due\n");
+        insights.exportInvoices(new InvoiceFilter(q, status, overdue, from, to, min, max))
+                .forEach(row -> csv.append(Stream.of(row.invoiceNumber(), row.organisation(), row.planName(),
+                                row.amount().toPlainString(), row.taxAmount().toPlainString(),
+                                row.total().toPlainString(), row.paid().toPlainString(),
+                                row.outstanding().toPlainString(), row.status(), row.issuedOn().toString(),
+                                row.dueOn().toString())
+                        .map(PlatformController::cell)
+                        .collect(Collectors.joining(","))).append('\n'));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"invoices.csv\"")
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .body(csv.toString());
+    }
+
+    @GetMapping("/payments")
+    public ApiResponse<PaymentList> payments(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) LocalDate from,
+            @RequestParam(required = false) LocalDate to,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "25") @Min(1) @Max(100) int size) {
+        return ApiResponse.ok(insights.payments(q, status, from, to, page, size));
+    }
+
+    @GetMapping("/trials/summary")
+    public ApiResponse<TrialSummary> trialSummary() {
+        return ApiResponse.ok(insights.trialSummary());
     }
 }

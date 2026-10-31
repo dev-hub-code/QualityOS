@@ -7,10 +7,12 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Getter
 @Entity
@@ -30,6 +32,15 @@ public class PaymentTransaction extends TenantOwnedEntity {
 
     private String failureReason;
     private Instant occurredAt;
+
+    @Setter
+    private String method;
+
+    @Setter
+    private LocalDate paidOn;
+
+    @Setter
+    private String notes;
 
     public PaymentTransaction(
             UUID invoiceId, String provider, String reference, BigDecimal amount, Status status, String failureReason) {

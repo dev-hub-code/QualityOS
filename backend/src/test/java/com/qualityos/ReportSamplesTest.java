@@ -75,4 +75,30 @@ class ReportSamplesTest {
         Files.write(OUT.resolve("4-invoice.pdf"), pdf);
         assertThat(pdf).isNotEmpty();
     }
+
+    @Test
+    void anIntraStateInvoicePrintsCgstAndSgstInsteadOfOneLine() throws Exception {
+        SubscriptionInvoice invoice = new SubscriptionInvoice(UUID.randomUUID(), "BILL-2026-00002");
+        invoice.setPlanName("Growth");
+        invoice.setBillingCycle(Subscription.Cycle.MONTHLY);
+        invoice.setAmount(new BigDecimal("1000.00"));
+        invoice.setTaxPercent(new BigDecimal("18.00"));
+        invoice.setTaxAmount(new BigDecimal("180.00"));
+        invoice.setCgstAmount(new BigDecimal("90.00"));
+        invoice.setSgstAmount(new BigDecimal("90.00"));
+        invoice.setTotal(new BigDecimal("1180.00"));
+        invoice.setPlaceOfSupply("27");
+        invoice.setSacCode("998314");
+        invoice.setBuyerName("Acme Forgings");
+        invoice.setIssuedOn(LocalDate.of(2026, 10, 31));
+        invoice.setDueOn(LocalDate.of(2026, 11, 7));
+
+        byte[] pdf = InvoicePdfRenderer.forSample(new HtmlPdf()).render(invoice);
+
+        try (var document = org.apache.pdfbox.Loader.loadPDF(pdf)) {
+            assertThat(new org.apache.pdfbox.text.PDFTextStripper().getText(document))
+                    .contains("CGST at 9%", "SGST at 9%", "Place of supply 27", "SAC 998314")
+                    .doesNotContain("GST at 18");
+        }
+    }
 }

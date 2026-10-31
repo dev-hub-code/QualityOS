@@ -46,6 +46,13 @@ public class InvoicePdfRenderer {
                 ? "annual" : "monthly");
         model.put("amount", money(invoice.getAmount()));
         model.put("tax", money(invoice.getTaxAmount()));
+        model.put("cgst", amount(invoice.getCgstAmount()));
+        model.put("sgst", amount(invoice.getSgstAmount()));
+        model.put("igst", amount(invoice.getIgstAmount()));
+        model.put("singleLine", invoice.getCgstAmount() == null && invoice.getIgstAmount() == null);
+        model.put("halfPercent", invoice.getTaxPercent().divide(java.math.BigDecimal.valueOf(2)).stripTrailingZeros().toPlainString());
+        model.put("placeOfSupply", present(invoice.getPlaceOfSupply()));
+        model.put("sacCode", present(invoice.getSacCode()));
         model.put("total", money(invoice.getTotal()));
         model.put("paid", invoice.getStatus() == SubscriptionInvoice.Status.PAID);
         model.put("void", invoice.getStatus() == SubscriptionInvoice.Status.VOID);
@@ -61,6 +68,10 @@ public class InvoicePdfRenderer {
     /** A section in a template runs for an empty string, which would print a label with nothing after it. */
     private static List<String> present(String value) {
         return value == null || value.isBlank() ? List.of() : List.of(value);
+    }
+
+    private static List<String> amount(BigDecimal value) {
+        return value == null ? List.of() : List.of(money(value));
     }
 
     private static String money(BigDecimal value) {

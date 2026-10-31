@@ -16,6 +16,7 @@ import com.qualityos.subscription.dto.SubscriptionDtos.CustomInvoiceRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.InvoiceResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.PaymentResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.PlanResponse;
+import com.qualityos.subscription.dto.SubscriptionDtos.PublicPlan;
 import com.qualityos.subscription.dto.SubscriptionDtos.RecordPaymentRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.SubscriptionResponse;
 import com.qualityos.subscription.entity.PaymentTransaction;
@@ -117,6 +118,15 @@ public class SubscriptionService {
     @Transactional(readOnly = true)
     public List<PlanResponse> activePlans() {
         return plans.findByActiveTrueOrderByDisplayOrder().stream().map(SubscriptionService::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PublicPlan> publicPlans() {
+        return plans.findByActiveTrueOrderByDisplayOrder().stream()
+                .map(plan -> new PublicPlan(plan.getCode(), plan.getName(), plan.getDescription(),
+                        plan.getMonthlyPrice(), plan.getAnnualPrice(), plan.getMaxUsers(), plan.getMaxFacilities(),
+                        plan.getFeatures(), plan.getTrialDays()))
+                .toList();
     }
 
     static PlanResponse toResponse(SubscriptionPlan plan) {

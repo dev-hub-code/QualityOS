@@ -29,8 +29,9 @@ public class EmailService {
     private static final String DEFAULT_BRAND = "QualityOS";
     private static final int MAX_ATTEMPTS = 3;
     private static final String INSERT_LOG = """
-            INSERT INTO email_delivery_logs (id, tenant_id, recipient, template, language, status, attempt, error_type)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO email_delivery_logs (id, tenant_id, recipient, template, language, status, attempt, error_type,
+                                             notification_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     private final EmailRenderer renderer;
@@ -128,7 +129,7 @@ public class EmailService {
     /** A caller's open transaction is already bound to the request's tenant, and the row belongs with its outcome. */
     private void record(EmailRequest request, String status, int attempt, String errorType) {
         Runnable insert = () -> jdbc.update(INSERT_LOG, UuidV7.generate(), request.tenantId(), request.to(),
-                request.template().name(), request.language(), status, attempt, errorType);
+                request.template().name(), request.language(), status, attempt, errorType, request.notificationId());
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             insert.run();
         } else {

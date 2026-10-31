@@ -164,3 +164,11 @@ V23 adds `max_storage_mb`, `max_monthly_inspections`, `max_attachments` and `fea
 keeps each saved state of a plan. The application role can only add to that table. The `platform_*` functions that read
 across organisations run as the schema owner and raise an error unless the current user is in `platform_admins`.
 `platform_contracts_at` has no grant to the application role.
+
+## Control Center operators (V24)
+
+`platform_admins` gains `role`, `deactivated_at`, `added_by` and `reauthenticated_until`. Existing rows become
+`SUPER_ADMIN`. The application role still cannot write this table: only `platform_operator_add`,
+`platform_operator_change` and `platform_mark_reauthenticated` can, and each checks the caller at the database.
+`email_delivery_logs.notification_id` links attempts to a notification. `subscription_invoices.overdue_notified_at`
+keeps an invoice from being chased twice.

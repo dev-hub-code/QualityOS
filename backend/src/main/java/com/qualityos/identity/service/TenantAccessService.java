@@ -66,7 +66,7 @@ public class TenantAccessService implements TenantAccessResolver {
             ORDER BY u.full_name
             """;
 
-    private static final String PLATFORM_ADMIN = "SELECT 1 FROM platform_admins WHERE user_id = ?";
+    private static final String PLATFORM_ADMIN = "SELECT role FROM platform_admins WHERE user_id = ? AND deactivated_at IS NULL";
 
     private static final String OPEN_ACCOUNT = "SELECT 1 FROM users WHERE id = ? AND status <> 'DISABLED'";
 
@@ -105,9 +105,10 @@ public class TenantAccessService implements TenantAccessResolver {
             }
             Set<String> granted = new HashSet<>(
                     plan.narrow(tenantId, rows.stream().filter(Objects::nonNull).collect(Collectors.toSet())));
-            if (!jdbc.queryForList(PLATFORM_ADMIN, Integer.class, userId).isEmpty()) {
+            jdbc.queryForList(PLATFORM_ADMIN, String.class, userId).forEach(role -> {
                 granted.add(Permissions.PLATFORM_ADMIN);
-            }
+                granted.addAll(Permissions.PLATFORM_ROLES.getOrDefault(role, Set.of()));
+            });
             return Optional.of(granted);
         }));
     }

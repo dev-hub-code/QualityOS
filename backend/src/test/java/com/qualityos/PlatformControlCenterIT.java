@@ -39,7 +39,7 @@ class PlatformControlCenterIT extends AbstractIntegrationTest {
     void setUp() throws Exception {
         owner = register();
         admin = register();
-        asDatabaseSuperuser().update("INSERT INTO platform_admins (user_id) VALUES (?)", admin.userId());
+        asDatabaseSuperuser().update("INSERT INTO platform_admins (user_id, reauthenticated_until) VALUES (?, now() + INTERVAL '1 hour')", admin.userId());
     }
 
     private String body(org.springframework.test.web.servlet.ResultActions result) throws Exception {

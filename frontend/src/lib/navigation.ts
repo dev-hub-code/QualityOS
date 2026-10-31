@@ -38,6 +38,11 @@ import {
   Users,
   Workflow,
   type LucideIcon,
+  UserCog,
+  ScrollText,
+  Bell,
+  Mail,
+  Timer,
 } from "lucide-react";
 
 export interface NavItem {
@@ -99,6 +104,13 @@ export const CONTROL_CENTER_NAV: { heading: string; items: NavItem[] }[] = [
       { label: "Features", href: "/platform/features", icon: ToggleRight },
       { label: "Invoices", href: "/platform/invoices", icon: ReceiptText },
       { label: "Payments", href: "/platform/payments", icon: Banknote },
+    ] },
+  { heading: "Platform", items: [
+      { label: "Operators", href: "/platform/operators", icon: UserCog, anyPermission: ["PLATFORM_AUDIT_VIEW"] },
+      { label: "Audit log", href: "/platform/audit-logs", icon: ScrollText, anyPermission: ["PLATFORM_AUDIT_VIEW"] },
+      { label: "Notifications", href: "/platform/notifications", icon: Bell },
+      { label: "Email log", href: "/platform/email-logs", icon: Mail },
+      { label: "Jobs", href: "/platform/jobs", icon: Timer },
     ] },
 ];
 

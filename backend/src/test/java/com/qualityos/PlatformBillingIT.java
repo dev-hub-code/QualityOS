@@ -43,7 +43,7 @@ class PlatformBillingIT extends AbstractIntegrationTest {
     void setUp() throws Exception {
         owner = register();
         admin = register();
-        asDatabaseSuperuser().update("INSERT INTO platform_admins (user_id) VALUES (?)", admin.userId());
+        asDatabaseSuperuser().update("INSERT INTO platform_admins (user_id, reauthenticated_until) VALUES (?, now() + INTERVAL '1 hour')", admin.userId());
     }
 
     private String organisation(Session session) {

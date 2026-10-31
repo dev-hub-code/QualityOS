@@ -357,7 +357,12 @@ public class SubscriptionService {
 
     private void markPaid(Subscription subscription, SubscriptionInvoice invoice) {
         Instant now = Instant.now();
+        UUID previousPlan = subscription.getPlanId();
         Instant start = subscription.activate(invoice.getPlanId(), invoice.getBillingCycle(), now);
+        if (!previousPlan.equals(invoice.getPlanId())) {
+            notifications.notify(access.holdersOf(PlanAccess.SUBSCRIPTION_MANAGE), NotificationType.PLAN_CHANGED,
+                    "Plan changed", "Your organisation is now on the " + invoice.getPlanName() + " plan.", LINK);
+        }
         invoice.setStatus(SubscriptionInvoice.Status.PAID);
         invoice.setPaidAt(now);
         invoice.setPeriodStartsAt(start);
@@ -369,6 +374,21 @@ public class SubscriptionService {
 
     /** Sends the one notice now due, if any. Runs under the current tenant. */
     @Transactional
+    /** Each invoice is chased once. A paid or replaced invoice is no longer open, so nothing goes out for it. */
+    public int sendOverdueNotice() {
+        LocalDate today = LocalDate.now(ZoneId.of(organizations.getCurrent().timezone()));
+        return invoices.findByStatus(SubscriptionInvoice.Status.ISSUED)
+                .filter(invoice -> invoice.getOverdueNotifiedAt() == null && invoice.getDueOn().isBefore(today))
+                .map(invoice -> {
+                    invoice.setOverdueNotifiedAt(Instant.now());
+                    notifications.notify(access.holdersOf(PlanAccess.SUBSCRIPTION_MANAGE), NotificationType.INVOICE_OVERDUE,
+                            "Invoice overdue", "Invoice " + invoice.getInvoiceNumber() + " was due on "
+                                    + invoice.getDueOn() + ". Please pay it to keep your subscription.", LINK);
+                    return 1;
+                })
+                .orElse(0);
+    }
+
     public int sendExpiryNotice() {
         Subscription subscription = subscriptions.lockCurrent().orElseThrow(SubscriptionService::missing);
         SubscriptionPlan plan = plans.findById(subscription.getPlanId()).orElseThrow();

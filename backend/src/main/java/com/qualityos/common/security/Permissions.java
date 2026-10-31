@@ -1,5 +1,8 @@
 package com.qualityos.common.security;
 
+import java.util.Map;
+import java.util.Set;
+
 /** Permission codes seeded by migration, as constants for {@code @PreAuthorize}. */
 public final class Permissions {
 
@@ -32,6 +35,17 @@ public final class Permissions {
     public static final String SUBSCRIPTION_MANAGE = "SUBSCRIPTION_MANAGE";
     /** Not a role permission: held by those listed in platform_admins, whichever organisation they sign in to. */
     public static final String PLATFORM_ADMIN = "PLATFORM_ADMIN";
+    public static final String PLATFORM_BILLING_MANAGE = "PLATFORM_BILLING_MANAGE";
+    public static final String PLATFORM_CUSTOMER_MANAGE = "PLATFORM_CUSTOMER_MANAGE";
+    public static final String PLATFORM_OPERATOR_MANAGE = "PLATFORM_OPERATOR_MANAGE";
+    public static final String PLATFORM_AUDIT_VIEW = "PLATFORM_AUDIT_VIEW";
+    /** What each platform role adds to PLATFORM_ADMIN, which on its own only reads. */
+    public static final Map<String, Set<String>> PLATFORM_ROLES = Map.of(
+            "SUPER_ADMIN", Set.of(PLATFORM_BILLING_MANAGE, PLATFORM_CUSTOMER_MANAGE, PLATFORM_OPERATOR_MANAGE,
+                    PLATFORM_AUDIT_VIEW),
+            "BILLING_ADMIN", Set.of(PLATFORM_BILLING_MANAGE),
+            "SUPPORT_ADMIN", Set.of(PLATFORM_CUSTOMER_MANAGE),
+            "READ_ONLY_AUDITOR", Set.of(PLATFORM_AUDIT_VIEW));
     public static final String CALIBRATION_MANAGE = "CALIBRATION_MANAGE";
     public static final String CALIBRATION_VIEW = "CALIBRATION_VIEW";
     public static final String AUDIT_VIEW = "AUDIT_VIEW";
@@ -81,6 +95,12 @@ public final class Permissions {
         public static final String REPORT_VIEW = "hasAuthority('REPORT_VIEW')";
         public static final String SUBSCRIPTION_MANAGE = "hasAuthority('SUBSCRIPTION_MANAGE')";
         public static final String PLATFORM_ADMIN = "hasAuthority('PLATFORM_ADMIN')";
+        public static final String PLATFORM_BILLING_MANAGE = "hasAuthority('PLATFORM_BILLING_MANAGE')";
+        public static final String PLATFORM_CUSTOMER_MANAGE = "hasAuthority('PLATFORM_CUSTOMER_MANAGE')";
+        public static final String PLATFORM_OPERATOR_MANAGE = "hasAuthority('PLATFORM_OPERATOR_MANAGE')";
+        public static final String PLATFORM_AUDIT_VIEW = "hasAuthority('PLATFORM_AUDIT_VIEW')";
+        public static final String PLATFORM_ACCOUNT_MANAGE =
+                "hasAnyAuthority('PLATFORM_BILLING_MANAGE', 'PLATFORM_CUSTOMER_MANAGE')";
         public static final String CALIBRATION_VIEW = "hasAuthority('CALIBRATION_VIEW')";
         public static final String CALIBRATION_MANAGE = "hasAuthority('CALIBRATION_MANAGE')";
         public static final String AUDIT_VIEW = "hasAuthority('AUDIT_VIEW')";

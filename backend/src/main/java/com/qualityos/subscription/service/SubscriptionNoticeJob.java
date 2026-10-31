@@ -46,7 +46,7 @@ class SubscriptionNoticeJob {
             List<UUID> tenants =
                     tx.execute(status -> jdbc.queryForList("SELECT tenants_with_subscriptions_ending()", UUID.class));
             jobs.forEachTenant(context, tenants, tenant -> {
-                int sent = subscriptions.sendExpiryNotice();
+                int sent = subscriptions.sendExpiryNotice() + subscriptions.sendOverdueNotice();
                 context.processed(sent);
                 context.notified(sent);
             });

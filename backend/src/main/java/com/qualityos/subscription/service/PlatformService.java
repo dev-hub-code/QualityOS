@@ -46,6 +46,7 @@ public class PlatformService {
     private final OrganizationService organizations;
     private final JdbcTemplate jdbc;
     private final FeatureDefinitionRepository featureDefinitions;
+    private final PlatformStepUp stepUp;
     private final TransactionTemplate tx;
 
     PlatformService(
@@ -56,6 +57,7 @@ public class PlatformService {
             OrganizationService organizations,
             JdbcTemplate jdbc,
             FeatureDefinitionRepository featureDefinitions,
+            PlatformStepUp stepUp,
             PlatformTransactionManager transactionManager) {
         this.plans = plans;
         this.catalogue = catalogue;
@@ -64,6 +66,7 @@ public class PlatformService {
         this.organizations = organizations;
         this.jdbc = jdbc;
         this.featureDefinitions = featureDefinitions;
+        this.stepUp = stepUp;
         this.tx = new TransactionTemplate(transactionManager);
     }
 
@@ -75,6 +78,7 @@ public class PlatformService {
 
     /** Existing invoices keep the figures they were issued with. */
     public PlanResponse savePlan(UUID id, SavePlanRequest request) {
+        stepUp.require();
         return tx.execute(status -> {
             SubscriptionPlan plan = plans.findById(id)
                     .orElseThrow(() -> new ResourceNotFoundException("Plan", id.toString()));
@@ -139,11 +143,13 @@ public class PlatformService {
     }
 
     public InvoiceResponse raiseInvoice(UUID tenant, CustomInvoiceRequest request) {
+        stepUp.require();
         return inside(tenant, "RAISE_INVOICE", request.reason(), () -> subscriptions.raiseCustom(request));
     }
 
     /** A bank reference pays one invoice. A repeat on this one changes nothing, and elsewhere it is refused. */
     public PaymentResponse recordPayment(UUID tenant, UUID invoice, RecordPaymentRequest request) {
+        stepUp.require();
         Boolean elsewhere = tx.execute(status -> jdbc.queryForObject(
                 "SELECT platform_reference_used_elsewhere(?, ?)", Boolean.class, request.reference(), invoice));
         if (Boolean.TRUE.equals(elsewhere)) {
@@ -161,6 +167,7 @@ public class PlatformService {
     }
 
     public SubscriptionResponse cancel(UUID tenant, String reason) {
+        stepUp.require();
         return inside(tenant, "CANCEL", reason, subscriptions::cancel);
     }
 
@@ -170,6 +177,7 @@ public class PlatformService {
 
     /** Refuses the organisation the operator is signed in to, which would lock them out of this console. */
     public void suspend(UUID tenant, String reason) {
+        stepUp.require();
         if (tenant.equals(TenantContext.getCurrentTenantId())) {
             throw new BusinessRuleException("You cannot suspend the organisation you are signed in to.");
         }
@@ -180,6 +188,7 @@ public class PlatformService {
     }
 
     public void reactivate(UUID tenant, String reason) {
+        stepUp.require();
         inside(tenant, () -> {
             organizations.reactivate(reason);
             return null;

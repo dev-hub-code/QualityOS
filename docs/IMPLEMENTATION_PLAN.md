@@ -15,7 +15,7 @@ account emails a real customer needs.
 | 8 Calibration and audit | Instruments, QR, calibration records, audits, findings | Overdue instruments notify and audit findings raise NCRs | **Done** |
 | 9 Analytics | Dashboard, scorecards, Pareto, PDF and Excel exports | Reports honour tenant and facility scope | **Done** |
 | 10 Subscription | Plans, trials, limits, invoices | Limits enforced, prices editable by admin | **Done** |
-| 12 Control Center | Platform dashboard, plans, organisations, then billing, entitlements, operators and support. See [PLATFORM_ADMIN.md](PLATFORM_ADMIN.md) | Every acceptance item in the owner's brief | **Phases 1 to 3 built** |
+| 12 Control Center | Platform dashboard, plans, organisations, then billing, entitlements, operators and support. See [PLATFORM_ADMIN.md](PLATFORM_ADMIN.md) | Every acceptance item in the owner's brief | **Phases 1 to 4 built** |
 | 11 Production | Terraform, ECS, RDS, S3, Secrets Manager, CI/CD, monitoring, backups | Deployed and restore-tested | Deferred |
 
 Later: Module 12 (AI) after Phase 9, because it depends on accumulated data. SMS and WhatsApp stay behind
@@ -38,7 +38,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Notifications are polled once a minute, with no live push. Only email and in-app channels exist | When a user needs it |
 | Hindi and Marathi email text was machine-drafted and needs review by a native speaker before customers see it | Before customer launch |
 | Some notifications have no dedicated template (NCR ready for closure, CAPA actions, verification, send-back, corrections). Their email has a translated frame around English text | When a user needs it |
-| Email delivery is recorded in `email_delivery_logs`, but there is no screen for it. The app itself is still English only | With the next admin work |
+| The app itself is still English only | When a user needs it |
 | Organisation branding in email is the organisation name only. There is no logo upload | When a user needs it |
 | With verification switched off for private use, registration reveals that an email has an account | Private use only |
 | Sampling is fixed, percentage or every unit; AQL tables (such as ISO 2859-1) are not built | When a customer needs them |
@@ -67,7 +67,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | The recall PDF does not shape Devanagari: names stay readable, but conjuncts do not form correctly | Before Hindi or Marathi customer names matter |
 | A dispatch after a recall starts is not blocked. Its customer joins the recall when closure is requested or approved | Review after real use |
 | Recalls start from one batch in the UI, though the API takes several. Linking a CAPA is API only | When a user needs it |
-| Scheduled job history has no screen. A silent job shows as `STALE` in health and as a log warning | With the next admin work |
 | Recording an instrument on an inspection is optional, and applies to the whole inspection, not each measurement | Review after real use |
 | A failed calibration flags the inspections in doubt and notifies people, but does not raise an NCR or reopen them | Review after real use |
 | Audits are planned one at a time, with no recurring schedule or reminder before the date. A missed audit shows as overdue in the list | When a user needs it |
@@ -82,7 +81,10 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A plan change has no proration. A different plan starts on payment and the unused time on the old one is lost | Review after real use |
 | The starting user and facility limits, trial length, grace period and annual prices are placeholders, editable under Plans | Owner to confirm before launch |
 | Which features each plan includes is an interpretation of the brief's table. Starter has no dashboards or reports | Owner to confirm before launch |
-| The platform has one administrator level, listed in `platform_admins`. Separate roles and re-authentication are not built | Control Center Phase 4 |
+| Operator roles are enforced by the backend, but Control Center pages still show change buttons to roles that cannot use them. The action is refused with a message | Control Center Phase 5 |
+| Account emails, such as reset links, cannot be retried, because a resent link would have expired. Failed ones show in the email log | By design |
+| A platform maintenance announcement has no notice yet | Control Center Phase 5 |
+| Operators sign in with a password only. There is no second factor | Before customer launch |
 | Duplicate references are checked before saving, so two identical references saved at the same moment for different organisations could both pass | With a payment gateway |
 | Near-limit warnings show only in the Control Center and on the billing page. Customers get no notification or email before a limit stops them | When a user needs it |
 | Only `NCR_CAPA`, `REPORTS` and `ADVANCED` are enforced. A feature added in the Control Center is listed but restricts nothing until code enforces it | When a feature is sold |

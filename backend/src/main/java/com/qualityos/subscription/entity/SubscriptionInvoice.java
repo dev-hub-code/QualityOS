@@ -54,6 +54,8 @@ public class SubscriptionInvoice extends TenantOwnedEntity {
     private BigDecimal igstAmount;
     private String sacCode;
     private String sellerGstin;
+    @lombok.Setter
+    private Instant overdueNotifiedAt;
 
     public SubscriptionInvoice(UUID subscriptionId, String invoiceNumber) {
         this.subscriptionId = subscriptionId;

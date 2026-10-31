@@ -78,6 +78,13 @@ public class Notification extends TenantOwnedEntity {
         emailStatus = EmailStatus.SKIPPED;
     }
 
+    /** Starts the attempts again, for an operator who has dealt with whatever stopped it. */
+    public void emailRetried() {
+        emailStatus = EmailStatus.PENDING;
+        emailAttempts = 0;
+        emailNextAttemptAt = null;
+    }
+
     public void emailFailed(Instant now) {
         emailAttempts++;
         if (emailAttempts >= MAX_EMAIL_ATTEMPTS) {

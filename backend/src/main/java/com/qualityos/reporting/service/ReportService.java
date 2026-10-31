@@ -166,7 +166,7 @@ public class ReportService {
                     WHERE n.created_at >= :start AND n.created_at < :end%s ORDER BY n.created_at DESC
                     """.formatted(date("n.created_at"), date("n.closed_at"), AnalyticsService.NCRS,
                             AnalyticsService.NCR_FACILITY, scope.facility(AnalyticsService.NCR_FACILITY)),
-                    "NCRs raised in the period. One raised by hand has no facility, and appears only without a"
+                    "NCRs raised in the period. One raised by hand without a facility appears only without a"
                             + " facility limit.");
             case CAPA -> new Definition(
                     List.of(text("CAPA", 13), text("Title", 33), text("Status", 15), text("NCR", 13), text("Target", 9),
@@ -177,8 +177,8 @@ public class ReportService {
                     FROM %s
                     WHERE c.created_at >= :start AND c.created_at < :end%s ORDER BY c.created_at DESC
                     """.formatted(date("c.closed_at"), AnalyticsService.CAPA_OPEN, AnalyticsService.CAPAS,
-                            scope.facility(AnalyticsService.NCR_FACILITY)),
-                    "CAPAs opened in the period. A CAPA takes the facility of its NCR.");
+                            scope.facility(AnalyticsService.CAPA_FACILITY)),
+                    "CAPAs opened in the period. A CAPA takes the facility of its NCR, or the one chosen for it.");
             case CALIBRATION -> new Definition(
                     List.of(text("Instrument", 12), text("Name", 22), text("Category", 13), text("Facility", 14),
                             text("Status", 12), text("Last result", 9), text("Last calibrated", 9), text("Next due", 9)),

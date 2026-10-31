@@ -15,7 +15,7 @@ account emails a real customer needs.
 | 8 Calibration and audit | Instruments, QR, calibration records, audits, findings | Overdue instruments notify and audit findings raise NCRs | **Done** |
 | 9 Analytics | Dashboard, scorecards, Pareto, PDF and Excel exports | Reports honour tenant and facility scope | **Done** |
 | 10 Subscription | Plans, trials, limits, invoices | Limits enforced, prices editable by admin | **Done** |
-| 12 Control Center | Platform dashboard, plans, organisations, then billing, entitlements, operators and support. See [PLATFORM_ADMIN.md](PLATFORM_ADMIN.md) | Every acceptance item in the owner's brief | **Phase 1 built** |
+| 12 Control Center | Platform dashboard, plans, organisations, then billing, entitlements, operators and support. See [PLATFORM_ADMIN.md](PLATFORM_ADMIN.md) | Every acceptance item in the owner's brief | **Phases 1 and 2 built** |
 | 11 Production | Terraform, ECS, RDS, S3, Secrets Manager, CI/CD, monitoring, backups | Deployed and restore-tested | Deferred |
 
 Later: Module 12 (AI) after Phase 9, because it depends on accumulated data. SMS and WhatsApp stay behind
@@ -78,11 +78,12 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Key figures and charts show to anyone with `REPORT_VIEW`, as totals, even without the view permission for each kind of record. Lists and reports need that permission too | Review after real use |
 | Material rejection adds quantities as recorded, without converting units | When a user needs it |
 | No payment gateway yet. A platform administrator records each payment by hand, and no refund flow exists | When a gateway is chosen |
-| An invoice is not a GST tax invoice: it shows a single GST line with no CGST and SGST split, place of supply or HSN or SAC code. An accountant must review it, and the seller's details must be set, before it goes to a customer | Before the first paid customer |
+| CGST, SGST, IGST, place of supply and SAC are worked out from GSTINs, but no accountant has reviewed this. It does not cover exemptions, SEZ supplies, exports or an unregistered buyer. The seller's GSTIN and SAC must be set before an invoice goes to a customer | Before the first paid customer |
 | A plan change has no proration. A different plan starts on payment and the unused time on the old one is lost | Review after real use |
 | The starting user and facility limits, trial length, grace period and annual prices are placeholders, editable under Plans | Owner to confirm before launch |
 | Which features each plan includes is an interpretation of the brief's table. Starter has no dashboards or reports | Owner to confirm before launch |
 | The platform has one administrator level, listed in `platform_admins`. Separate roles and re-authentication are not built | Control Center Phase 4 |
+| Duplicate references are checked before saving, so two identical references saved at the same moment for different organisations could both pass | With a payment gateway |
 | An organisation's contact number is not recorded anywhere, so the Control Center cannot show it | Control Center Phase 5 |
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | Lists show only active records, with no way to restore an archived one | When a user needs it |

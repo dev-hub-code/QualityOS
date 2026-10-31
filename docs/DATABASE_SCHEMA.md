@@ -157,6 +157,8 @@ are tenant-owned with row-level security. An invoice copies its plan name, price
 changes afterwards. At most one invoice per tenant can be open, and a payment reference is unique per tenant and provider.
 
 V21 adds `currency`, `public_visible` and `archived_at` to `subscription_plans`, and `subscription_plan_versions`, which
+
+V22 adds `suspended_at` and `suspension_reason` to `tenants`, GST detail to `subscription_invoices`, and `method`, `paid_on` and `notes` to `payment_transactions`. Invoice and payment lists use `SECURITY DEFINER` functions that call `require_platform_admin()`, and renewal reminders skip suspended organisations.
 keeps each saved state of a plan. The application role can only add to that table. The `platform_*` functions that read
 across organisations run as the schema owner and raise an error unless the current user is in `platform_admins`.
 `platform_contracts_at` has no grant to the application role.

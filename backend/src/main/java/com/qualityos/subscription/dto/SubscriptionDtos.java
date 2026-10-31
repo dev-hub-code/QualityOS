@@ -100,8 +100,9 @@ public final class SubscriptionDtos {
     }
 
     public record OrganisationRow(
-            UUID tenantId, String name, String gstin, String contactEmail, String planName, String state,
-            Instant endsAt, Instant registeredAt, long openInvoices) {
+            UUID tenantId, String name, UUID subscriptionId, String gstin, String contactEmail, String planCode, String planName,
+            String state, String billingCycle, Instant endsAt, Instant cancelledAt, Instant suspendedAt,
+            Instant registeredAt, long openInvoices, LocalDate nextDue) {
     }
 
     public record OrganisationUsage(long inspections, long ncrs, long capas, long attachments, long attachmentBytes) {
@@ -119,6 +120,8 @@ public final class SubscriptionDtos {
             String countryCode,
             String timezone,
             Instant registeredAt,
+            Instant suspendedAt,
+            String suspensionReason,
             SubscriptionResponse subscription,
             OrganisationUsage usage,
             List<InvoiceResponse> invoices,
@@ -190,7 +193,18 @@ public final class SubscriptionDtos {
             String status,
             LocalDate issuedOn,
             LocalDate dueOn,
-            Instant paidAt) {
+            Instant paidAt,
+            String taxTreatment,
+            String placeOfSupply,
+            BigDecimal cgstAmount,
+            BigDecimal sgstAmount,
+            BigDecimal igstAmount,
+            String sacCode,
+            String sellerGstin,
+            String buyerName,
+            String buyerGstin,
+            Instant periodStartsAt,
+            Instant periodEndsAt) {
     }
 
     public record PaymentResponse(
@@ -201,29 +215,67 @@ public final class SubscriptionDtos {
             BigDecimal amount,
             String status,
             String failureReason,
-            Instant occurredAt) {
+            Instant occurredAt,
+            String method,
+            LocalDate paidOn) {
     }
+
+    public enum PaymentMethod { BANK_TRANSFER, UPI, NEFT, RTGS, IMPS, CHEQUE, OTHER }
 
     public record RecordPaymentRequest(
             @NotBlank @Size(max = 100) String reference,
             @NotNull @PositiveOrZero BigDecimal amount,
             boolean failed,
-            @Size(max = 300) String failureReason) {
+            @Size(max = 300) String failureReason,
+            @NotNull PaymentMethod method,
+            @NotNull LocalDate paidOn,
+            @Size(max = 500) String notes) {
+    }
+
+    /** Every operator action on an organisation says why. */
+    public record ReasonRequest(@NotBlank @Size(max = 500) String reason) {
+    }
+
+    public record InvoiceFilter(
+            String q, String status, boolean overdue, LocalDate from, LocalDate to, BigDecimal min, BigDecimal max) {
+    }
+
+    public record PlatformInvoice(
+            UUID id, UUID tenantId, String organisation, String invoiceNumber, String planName, String billingCycle,
+            Instant periodStartsAt, Instant periodEndsAt, BigDecimal amount, BigDecimal taxAmount, BigDecimal total,
+            BigDecimal paid, BigDecimal outstanding, String status, LocalDate issuedOn, LocalDate dueOn) {
+    }
+
+    public record InvoiceList(int total, List<PlatformInvoice> items) {
+    }
+
+    public record PlatformPayment(
+            UUID id, UUID tenantId, String organisation, UUID invoiceId, String invoiceNumber, String provider,
+            String reference, String method, BigDecimal amount, String status, String failureReason, LocalDate paidOn,
+            String notes, String recordedBy, Instant recordedAt) {
+    }
+
+    public record PaymentList(int total, List<PlatformPayment> items) {
+    }
+
+    public record TrialSummary(long endingIn3Days, long endingIn7Days, long convertedThisMonth, BigDecimal conversionRate) {
     }
 
     /** For a plan with no list price, such as Enterprise. */
     public record CustomInvoiceRequest(
-            @NotNull UUID planId, @NotNull Subscription.Cycle cycle, @NotNull @PositiveOrZero BigDecimal amount) {
+            @NotNull UUID planId, @NotNull Subscription.Cycle cycle, @PositiveOrZero BigDecimal amount,
+            @NotBlank @Size(max = 500) String reason) {
     }
 
     /** @param total every organisation matching the filter, of which items holds this page */
     public record OrganisationList(int total, List<TenantSubscription> items) {
     }
 
-    public record ExtendRequest(@Min(1) @Max(365) int days) {
+    public record ExtendRequest(@Min(1) @Max(365) int days, @NotBlank @Size(max = 500) String reason) {
     }
 
     public record TenantSubscription(UUID tenantId, String organizationName, SubscriptionResponse subscription,
-            List<InvoiceResponse> openInvoices, String gstin, String contactEmail, Instant registeredAt) {
+            List<InvoiceResponse> openInvoices, String gstin, String contactEmail, Instant registeredAt,
+            UUID subscriptionId, Instant suspendedAt, LocalDate nextDue) {
     }
 }

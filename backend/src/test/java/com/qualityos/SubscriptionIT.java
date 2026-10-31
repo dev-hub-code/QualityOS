@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.subscription.service.SubscriptionService;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +84,8 @@ class SubscriptionIT extends AbstractIntegrationTest {
     private org.springframework.test.web.servlet.ResultActions pay(String invoice, String reference, String amount)
             throws Exception {
         return as(admin, postJson(PLATFORM + "/organisations/" + owner.tenantId() + "/invoices/" + invoice + "/payments",
-                Map.of("reference", reference, "amount", amount, "failed", false)));
+                Map.of("reference", reference + "-" + owner.tenantId(), "amount", amount, "failed", false,
+                        "method", "NEFT", "paidOn", LocalDate.now().minusDays(1).toString())));
     }
 
     private int notices(Session session) {
@@ -156,7 +158,7 @@ class SubscriptionIT extends AbstractIntegrationTest {
     void aMemberCannotReachThePlatformConsole() throws Exception {
         as(owner, get(PLATFORM + "/plans")).andExpect(status().isForbidden());
         as(owner, get(PLATFORM + "/organisations")).andExpect(status().isForbidden());
-        as(owner, postJson(PLATFORM + "/organisations/" + owner.tenantId() + "/extend", Map.of("days", 30)))
+        as(owner, postJson(PLATFORM + "/organisations/" + owner.tenantId() + "/extend", Map.of("days", 30, "reason", "Goodwill")))
                 .andExpect(status().isForbidden());
     }
 
@@ -209,7 +211,8 @@ class SubscriptionIT extends AbstractIntegrationTest {
     void aFailedPaymentIsRecordedAndChangesNothingElse() throws Exception {
         String invoice = request("GROWTH", "MONTHLY");
         as(admin, postJson(PLATFORM + "/organisations/" + owner.tenantId() + "/invoices/" + invoice + "/payments",
-                        Map.of("reference", "UPI-9", "amount", "7078.82", "failed", true, "failureReason", "Declined")))
+                        Map.of("reference", "UPI-9-" + owner.tenantId(), "amount", "7078.82", "failed", true,
+                                "failureReason", "Declined", "method", "UPI", "paidOn", LocalDate.now().minusDays(1).toString())))
                 .andExpect(status().isCreated());
         as(owner, get(BASE + "/payments")).andExpect(jsonPath("$.data[0].status").value("FAILED"));
         as(owner, get(BASE)).andExpect(jsonPath("$.data.planCode").value("PROFESSIONAL"));
@@ -233,7 +236,7 @@ class SubscriptionIT extends AbstractIntegrationTest {
                 .andExpect(status().isUnprocessableEntity());
         String invoice = JsonPath.read(body(as(admin, postJson(
                         PLATFORM + "/organisations/" + owner.tenantId() + "/invoices",
-                        Map.of("planId", planId("ENTERPRISE"), "cycle", "ANNUAL", "amount", "500000")))
+                        Map.of("planId", planId("ENTERPRISE"), "cycle", "ANNUAL", "amount", "500000", "reason", "Agreed rate")))
                 .andExpect(status().isCreated())), "$.data.id");
         pay(invoice, "RTGS-1", "590000.00").andExpect(status().isCreated());
         as(owner, get(BASE))
@@ -248,7 +251,8 @@ class SubscriptionIT extends AbstractIntegrationTest {
         as(stranger, get(BASE + "/invoices")).andExpect(jsonPath("$.data.length()").value(0));
         as(stranger, get(BASE + "/invoices/" + invoice + "/pdf")).andExpect(status().isNotFound());
         as(admin, postJson(PLATFORM + "/organisations/" + stranger.tenantId() + "/invoices/" + invoice + "/payments",
-                        Map.of("reference", "X", "amount", "7078.82", "failed", false)))
+                        Map.of("reference", "X", "amount", "7078.82", "failed", false, "method", "NEFT",
+                                "paidOn", LocalDate.now().minusDays(1).toString())))
                 .andExpect(status().isNotFound());
     }
 
@@ -349,11 +353,11 @@ class SubscriptionIT extends AbstractIntegrationTest {
     @Test
     void anAdminCanGiveMoreTimeAndTheOrganisationSeesThatTheyDid() throws Exception {
         endedDaysAgo(owner, 20);
-        as(admin, postJson(PLATFORM + "/organisations/" + owner.tenantId() + "/extend", Map.of("days", 30)))
+        as(admin, postJson(PLATFORM + "/organisations/" + owner.tenantId() + "/extend", Map.of("days", 30, "reason", "Goodwill")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.state").value("TRIAL"));
         assertThat(asDatabaseSuperuser().queryForObject(
-                "SELECT count(*) FROM audit_logs WHERE tenant_id = ? AND action = 'SUBSCRIPTION_EXTENDED'",
+                "SELECT count(*) FROM audit_logs WHERE tenant_id = ? AND action = 'TRIAL_EXTENDED'",
                 Integer.class, owner.tenantId())).isEqualTo(1);
     }
 

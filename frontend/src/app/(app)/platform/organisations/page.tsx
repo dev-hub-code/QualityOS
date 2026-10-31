@@ -6,6 +6,7 @@ import { useState } from "react";
 import { formatDate, formatMoney } from "@/components/billing/subscription-banner";
 import { PageHeader, QueryState, useAction, useRefresh } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
+import { EXTEND_FIELDS, RecordPaymentDialog, REASON_FIELD } from "@/components/platform/billing-dialogs";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,11 +15,6 @@ import { api } from "@/lib/api";
 import type { FieldDef } from "@/lib/record-form";
 import type { Invoice, OrganisationList, Plan } from "@/lib/types";
 
-const PAYMENT: FieldDef[] = [
-  { name: "reference", label: "Bank or UTR reference", required: true },
-  { name: "amount", label: "Amount received", type: "decimal", required: true },
-];
-const EXTEND: FieldDef[] = [{ name: "days", label: "Extra days", type: "decimal", required: true }];
 
 const PAGE_SIZE = 25;
 const NO_FILTER = { q: "", plan: "", state: "", unpaid: "", registeredFrom: "", registeredTo: "", sort: "" };
@@ -69,7 +65,8 @@ export default function PlatformOrganisationsPage() {
         { value: "ANNUAL", label: "Annual" },
       ],
     },
-    { name: "amount", label: "Amount before GST", type: "decimal", required: true },
+    { name: "amount", label: "Amount before GST (blank for list price)", type: "decimal" },
+    REASON_FIELD,
   ];
   return (
     <div className="space-y-6">
@@ -176,7 +173,7 @@ export default function PlatformOrganisationsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.items.map(({ tenantId, organizationName, subscription, openInvoices }) => (
+            {data.items.map(({ tenantId, organizationName, subscription, openInvoices, suspendedAt }) => (
               <TableRow key={tenantId}>
                 <TableCell>
                   <Link className="underline" href={`/platform/organisations/${tenantId}`}>
@@ -184,7 +181,7 @@ export default function PlatformOrganisationsPage() {
                   </Link>
                 </TableCell>
                 <TableCell>{subscription.planName}</TableCell>
-                <TableCell>{subscription.state.replace("_", " ").toLowerCase()}</TableCell>
+                <TableCell>{suspendedAt ? "suspended" : subscription.state.replace("_", " ").toLowerCase()}</TableCell>
                 <TableCell>{formatDate(subscription.endsAt)}</TableCell>
                 <TableCell>
                   {openInvoices.map((invoice) => (
@@ -220,25 +217,18 @@ export default function PlatformOrganisationsPage() {
         </Button>
       </div>
       {paying && (
-        <RecordDialog
-          title={`Record payment for ${paying.invoice.invoiceNumber}`}
-          fields={PAYMENT}
-          record={{ amount: paying.invoice.total.toFixed(2) }}
+        <RecordPaymentDialog
+          tenantId={paying.tenantId}
+          invoiceId={paying.invoice.id}
+          invoiceNumber={paying.invoice.invoiceNumber}
+          amount={paying.invoice.total}
           onClose={() => setPaying(null)}
-          onSubmit={async (values) => {
-            await api.post(`${path}/${paying.tenantId}/invoices/${paying.invoice.id}/payments`, {
-              ...values,
-              failed: false,
-            });
-            setPaying(null);
-            await refresh();
-          }}
         />
       )}
       {extending && (
         <RecordDialog
           title="Extend subscription"
-          fields={EXTEND}
+          fields={EXTEND_FIELDS}
           onClose={() => setExtending(null)}
           onSubmit={async (values) => {
             await api.post(`${path}/${extending}/extend`, values);

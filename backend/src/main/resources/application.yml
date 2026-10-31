@@ -65,6 +65,8 @@ qualityos:
     seller-name: ${BILLING_SELLER_NAME:QualityOS}
     seller-gstin: ${BILLING_SELLER_GSTIN:}
     seller-address: ${BILLING_SELLER_ADDRESS:}
+    # Confirm with an accountant. Printed on invoices only when set.
+    sac-code: ${BILLING_SAC_CODE:}
   mail:
     from: ${MAIL_FROM:QualityOS <no-reply@qualityos.local>}
     # A language here needs a folder in resources/email-templates, and any file it lacks falls back to English.

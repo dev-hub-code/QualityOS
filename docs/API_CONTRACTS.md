@@ -212,9 +212,17 @@ choice of organisation, and the work runs under that organisation's tenant conte
 | GET | `/api/v1/platform/organisations` | `q` (name, email, GSTIN), `plan`, `state`, `unpaid`, `registeredFrom`, `registeredTo`, `sort` (`NAME`, `NEWEST`, `ENDING`), `page`, `size` up to 100. Unpaid first by default |
 | GET | `/api/v1/platform/organisations/export` | The same filters as CSV, up to 5,000 rows. Leaves an audit event |
 | GET | `/api/v1/platform/organisations/{id}` | Profile, subscription, usage counts, invoices, payments, recent event names |
-| POST | `/api/v1/platform/organisations/{id}/invoices` | Invoice at an agreed amount, for Enterprise |
-| POST | `/api/v1/platform/organisations/{id}/invoices/{invoiceId}/payments` | Records a payment. A repeated reference changes nothing |
-| POST | `/api/v1/platform/organisations/{id}/extend` | Adds days |
+| POST | `/api/v1/platform/organisations/{id}/invoices` | Needs `planId`, `cycle` and `reason`. `amount` is optional and defaults to the list price |
+| POST | `/api/v1/platform/organisations/{id}/invoices/{invoiceId}/payments` | Needs `reference`, `amount`, `failed`, `method` and `paidOn`, with optional `notes`. The amount must equal the invoice total, and a reference pays one invoice across the platform |
+| POST | `/api/v1/platform/organisations/{id}/extend` | Adds days. Needs `days` and `reason` |
+| POST | `/api/v1/platform/organisations/{id}/trial/end` | Ends a running trial, so grace starts now. Needs `reason` |
+| POST | `/api/v1/platform/organisations/{id}/cancel`, `/resume` | Needs `reason` |
+| POST | `/api/v1/platform/organisations/{id}/suspend`, `/reactivate` | Needs `reason`. 204. Records are untouched |
+| GET | `/api/v1/platform/organisations/{id}/invoices/{invoiceId}`, `/pdf` | One invoice with its GST detail, or its PDF |
+| GET | `/api/v1/platform/invoices` | `q`, `status`, `overdue`, `from`, `to`, `min`, `max`, `page`, `size`. Includes paid and outstanding |
+| GET | `/api/v1/platform/invoices/export` | The same filters as CSV, up to 5,000 rows. Leaves an audit event |
+| GET | `/api/v1/platform/payments` | `q` (reference, invoice, organisation), `status`, `from`, `to`, `page`, `size` |
+| GET | `/api/v1/platform/trials/summary` | Trials ending in 3 and 7 days, converted this month, conversion rate |
 
 To make someone a platform administrator, an operator runs this as a database superuser:
 

@@ -1099,6 +1099,8 @@ export interface OrganisationDetail {
   countryCode: string;
   timezone: string;
   registeredAt: string;
+  suspendedAt: string | null;
+  suspensionReason: string | null;
   subscription: Subscription;
   usage: { inspections: number; ncrs: number; capas: number; attachments: number; attachmentBytes: number };
   invoices: Invoice[];
@@ -1134,6 +1136,17 @@ export interface Invoice {
   issuedOn: string;
   dueOn: string;
   paidAt: string | null;
+  taxTreatment: "INTRA_STATE" | "INTER_STATE" | "UNDETERMINED" | null;
+  placeOfSupply: string | null;
+  cgstAmount: number | null;
+  sgstAmount: number | null;
+  igstAmount: number | null;
+  sacCode: string | null;
+  sellerGstin: string | null;
+  buyerName: string;
+  buyerGstin: string | null;
+  periodStartsAt: string | null;
+  periodEndsAt: string | null;
 }
 
 export interface Payment {
@@ -1145,6 +1158,8 @@ export interface Payment {
   status: "SUCCEEDED" | "FAILED";
   failureReason: string | null;
   occurredAt: string;
+  method: string | null;
+  paidOn: string | null;
 }
 
 export interface TenantSubscription {
@@ -1155,9 +1170,66 @@ export interface TenantSubscription {
   gstin: string | null;
   contactEmail: string | null;
   registeredAt: string;
+  subscriptionId: string;
+  suspendedAt: string | null;
+  nextDue: string | null;
 }
 
 export interface OrganisationList {
   total: number;
   items: TenantSubscription[];
+}
+
+export interface PlatformInvoice {
+  id: string;
+  tenantId: string;
+  organisation: string;
+  invoiceNumber: string;
+  planName: string;
+  billingCycle: BillingCycle;
+  periodStartsAt: string | null;
+  periodEndsAt: string | null;
+  amount: number;
+  taxAmount: number;
+  total: number;
+  paid: number;
+  outstanding: number;
+  status: Invoice["status"];
+  issuedOn: string;
+  dueOn: string;
+}
+
+export interface InvoiceList {
+  total: number;
+  items: PlatformInvoice[];
+}
+
+export interface PlatformPayment {
+  id: string;
+  tenantId: string;
+  organisation: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  provider: string;
+  reference: string;
+  method: string | null;
+  amount: number;
+  status: Payment["status"];
+  failureReason: string | null;
+  paidOn: string | null;
+  notes: string | null;
+  recordedBy: string | null;
+  recordedAt: string;
+}
+
+export interface PaymentList {
+  total: number;
+  items: PlatformPayment[];
+}
+
+export interface TrialSummary {
+  endingIn3Days: number;
+  endingIn7Days: number;
+  convertedThisMonth: number;
+  conversionRate: number | null;
 }

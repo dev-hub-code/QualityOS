@@ -86,3 +86,45 @@ paid time has not run out. An undone cancellation is not counted.
 cd backend && ./mvnw verify -Dit.test='PlatformControlCenterIT,SubscriptionIT' -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false
 cd frontend && npx playwright test e2e/billing.spec.ts
 ```
+
+## Billing operations
+
+### Subscription lifecycle
+
+The stored states stay `TRIALING` and `ACTIVE`. Everything else follows from dates, so access stays right even if no job has run. Each operation goes through `SubscriptionService` or `OrganizationService`.
+
+| Operation | How it happens | Effect |
+|---|---|---|
+| Start | Registration | A trial on the default plan |
+| Activate, renew, convert to paid, change plan | Raise an invoice, then record its payment | The plan and period change only when the invoice is paid |
+| Extend trial, subscription or grace | Extend, with a reason | Moves the end date. Grace and read-only follow from it |
+| End trial | End trial, with a reason | The trial ends now and grace starts |
+| Cancel, resume | With a reason | Marks the subscription. Access continues to the end of the period |
+| Suspend, restore | With a reason | Members lose access on their next request. No record is changed or deleted |
+
+`Expired` means grace or read-only, and a read-only organisation keeps read and export access. Only an operator's suspension can be reactivated: a sign-up that expired has nobody left to return to it. An operator cannot suspend the organisation they are signed in to.
+
+Every action writes an audit row in that organisation's trail, with its reason.
+
+### Payments
+
+Payments are recorded by hand against one invoice, and the amount must equal the invoice total, because partial payments are not part of the financial model. Failed attempts are kept and listed under the Failed filter. These are what needs following up.
+
+A reference pays one invoice across the whole platform, ignoring case. Repeating it on the same invoice returns the first payment. The check reads existing payments, so two identical references saved at the same moment for different organisations could both pass it.
+
+There is no gateway. `SubscriptionService.settle` already takes a provider name and treats a repeated reference as a retry, so a gateway's webhook can call it. It needs its own signature check when one is chosen.
+
+### GST on invoices
+
+**This is not reviewed by an accountant, and QualityOS does not claim GST compliance.**
+
+From this release, an invoice stores its tax treatment when issued, by comparing the state codes opening the seller's and buyer's GSTINs:
+
+| Seller and buyer | Invoice shows |
+|---|---|
+| Same state | CGST and SGST, half each |
+| Different states | IGST |
+| Either GSTIN missing | One GST line, and the treatment stays undetermined |
+
+It does not handle exemptions, SEZ supplies, exports or an unregistered buyer's place of supply. Invoices issued earlier keep their single GST line. Set `BILLING_SELLER_GSTIN` and `BILLING_SAC_CODE` once an accountant has confirmed them.
+

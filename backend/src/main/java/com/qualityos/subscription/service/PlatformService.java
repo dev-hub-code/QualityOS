@@ -5,6 +5,7 @@ import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.organization.service.OrganizationService;
 import com.qualityos.subscription.dto.SubscriptionDtos.CustomInvoiceRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.InvoiceResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.PaymentResponse;
@@ -20,6 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -37,6 +39,8 @@ public class PlatformService {
     private final PlanCatalogue catalogue;
     private final SubscriptionService subscriptions;
     private final AuditService audit;
+    private final OrganizationService organizations;
+    private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
 
     PlatformService(
@@ -44,11 +48,15 @@ public class PlatformService {
             PlanCatalogue catalogue,
             SubscriptionService subscriptions,
             AuditService audit,
+            OrganizationService organizations,
+            JdbcTemplate jdbc,
             PlatformTransactionManager transactionManager) {
         this.plans = plans;
         this.catalogue = catalogue;
         this.subscriptions = subscriptions;
         this.audit = audit;
+        this.organizations = organizations;
+        this.jdbc = jdbc;
         this.tx = new TransactionTemplate(transactionManager);
     }
 
@@ -111,15 +119,60 @@ public class PlatformService {
     }
 
     public InvoiceResponse raiseInvoice(UUID tenant, CustomInvoiceRequest request) {
-        return inside(tenant, () -> subscriptions.raiseCustom(request));
+        return inside(tenant, "RAISE_INVOICE", request.reason(), () -> subscriptions.raiseCustom(request));
     }
 
+    /** A bank reference pays one invoice. A repeat on this one changes nothing, and elsewhere it is refused. */
     public PaymentResponse recordPayment(UUID tenant, UUID invoice, RecordPaymentRequest request) {
+        Boolean elsewhere = tx.execute(status -> jdbc.queryForObject(
+                "SELECT platform_reference_used_elsewhere(?, ?)", Boolean.class, request.reference(), invoice));
+        if (Boolean.TRUE.equals(elsewhere)) {
+            throw new ConflictException("This reference is already used on another invoice.");
+        }
         return inside(tenant, () -> subscriptions.settle(invoice, PROVIDER_MANUAL, request));
     }
 
-    public SubscriptionResponse extend(UUID tenant, int days) {
-        return inside(tenant, () -> subscriptions.extend(days));
+    public SubscriptionResponse extend(UUID tenant, int days, String reason) {
+        return inside(tenant, "EXTEND", reason, () -> subscriptions.extend(days));
+    }
+
+    public SubscriptionResponse endTrial(UUID tenant, String reason) {
+        return inside(tenant, "END_TRIAL", reason, subscriptions::endTrial);
+    }
+
+    public SubscriptionResponse cancel(UUID tenant, String reason) {
+        return inside(tenant, "CANCEL", reason, subscriptions::cancel);
+    }
+
+    public SubscriptionResponse resume(UUID tenant, String reason) {
+        return inside(tenant, "RESUME", reason, subscriptions::resume);
+    }
+
+    /** Refuses the organisation the operator is signed in to, which would lock them out of this console. */
+    public void suspend(UUID tenant, String reason) {
+        if (tenant.equals(TenantContext.getCurrentTenantId())) {
+            throw new BusinessRuleException("You cannot suspend the organisation you are signed in to.");
+        }
+        inside(tenant, () -> {
+            organizations.suspend(reason);
+            return null;
+        });
+    }
+
+    public void reactivate(UUID tenant, String reason) {
+        inside(tenant, () -> {
+            organizations.reactivate(reason);
+            return null;
+        });
+    }
+
+    /** Runs in one transaction with its audit row, in the organisation's own trail. */
+    private <T> T inside(UUID tenant, String action, String reason, Supplier<T> work) {
+        return inside(tenant, () -> {
+            T result = work.get();
+            audit.record("PLATFORM_ACTION", "Organisation", tenant, null, Map.of("action", action, "reason", reason));
+            return result;
+        });
     }
 
     private <T> T inside(UUID tenant, Supplier<T> work) {

@@ -53,6 +53,12 @@ public class Subscription extends TenantOwnedEntity {
         cancelledAt = null;
     }
 
+    /** The grace period starts now, as if the trial had run out by itself. */
+    public void endTrial(Instant at) {
+        currentPeriodEndsAt = at;
+        lastNoticeDays = null;
+    }
+
     public void extend(Duration by) {
         currentPeriodEndsAt = currentPeriodEndsAt.plus(by);
         lastNoticeDays = null;

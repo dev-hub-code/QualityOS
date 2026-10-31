@@ -121,3 +121,59 @@ test("billing fits a phone", async ({ page }) => {
   await expect(page.getByText("Choose Growth")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
 });
+
+test("a platform admin suspends a customer, brings them back, and reconciles a payment", async ({ page, browser }) => {
+  test.setTimeout(60_000);
+  const ownerEmail = `billing-${unique()}@example.com`;
+  await signUp(page, ownerEmail);
+  const me: { organizations: { name: string }[] } = await apiCaller(page)("GET", "/auth/me");
+  const organization = me.organizations[0].name;
+
+  const context = await browser.newContext();
+  const admin = await context.newPage();
+  const adminEmail = `admin-${unique()}@example.com`;
+  await signUp(admin, adminEmail);
+  makePlatformAdmin(adminEmail);
+
+  await admin.goto("/platform/subscriptions");
+  await admin.getByLabel("Search").fill(ownerEmail);
+  await admin.getByRole("link", { name: organization }).click();
+
+  await admin.getByRole("button", { name: "Suspend" }).click();
+  await admin.getByLabel("Reason").fill("Awaiting confirmation of the account holder");
+  await admin.getByRole("button", { name: "Save" }).click();
+  await expect(admin.getByText(/Suspended on .*Awaiting confirmation of the account holder/)).toBeVisible();
+  await page.reload();
+  await expect(page).toHaveURL(/login/);
+
+  await admin.getByRole("button", { name: "Reactivate" }).click();
+  await admin.getByLabel("Reason").fill("Confirmed by phone");
+  await admin.getByRole("button", { name: "Save" }).click();
+  await expect(admin.getByRole("button", { name: "Suspend" })).toBeVisible();
+
+  await admin.goto("/platform/organisations");
+  await admin.getByLabel("Search name, email or GSTIN").fill(ownerEmail);
+  await admin.getByRole("row", { name: organization }).getByRole("button", { name: "Raise invoice" }).click();
+  await admin.getByRole("dialog").getByLabel("Plan").selectOption({ label: "Growth" });
+  await admin.getByLabel("Billing period").selectOption("MONTHLY");
+  await admin.getByLabel("Reason").fill("Moving from trial");
+  await admin.getByRole("button", { name: "Save" }).click();
+
+  await admin.goto("/platform/invoices");
+  await admin.getByLabel("Invoice or organisation").fill(organization);
+  const row = admin.getByRole("row", { name: organization });
+  await row.getByRole("button", { name: "View" }).click();
+  await expect(admin.getByText("Taxable value")).toBeVisible();
+  await admin.keyboard.press("Escape");
+  await row.getByRole("button", { name: "Record payment" }).click();
+  const utr = `UTR-${Date.now()}`;
+  await admin.getByLabel("Bank or UTR reference").fill(utr);
+  await admin.getByLabel("Payment method").selectOption("UPI");
+  await admin.getByRole("button", { name: "Save" }).click();
+  await expect(row.getByRole("cell", { name: "paid", exact: true })).toBeVisible();
+
+  await admin.goto("/platform/payments");
+  await admin.getByLabel("UTR, invoice or organisation").fill(utr);
+  await expect(admin.getByRole("row", { name: organization })).toContainText(adminEmail);
+  await context.close();
+});

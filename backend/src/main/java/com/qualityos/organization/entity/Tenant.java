@@ -36,6 +36,9 @@ public class Tenant extends AuditedEntity {
     @Enumerated(EnumType.STRING)
     private Status status = Status.ACTIVE;
 
+    private Instant suspendedAt;
+    private String suspensionReason;
+
     public Tenant(UUID id, String name) {
         setId(id);
         this.name = name;

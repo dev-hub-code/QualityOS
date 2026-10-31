@@ -13,6 +13,7 @@ import com.qualityos.purchaseorder.service.PurchaseOrderService;
 import com.qualityos.quality.dto.QualityDtos.CapaHistory;
 import com.qualityos.quality.dto.QualityDtos.NcrHistory;
 import com.qualityos.quality.service.NcrService;
+import com.qualityos.traceability.dto.TraceabilityDtos.CorrectionImpact;
 import com.qualityos.traceability.dto.TraceabilityDtos.DispatchLine;
 import com.qualityos.traceability.dto.TraceabilityDtos.DispatchResponse;
 import com.qualityos.traceability.dto.TraceabilityDtos.ProductionBatchView;
@@ -23,9 +24,11 @@ import com.qualityos.traceability.dto.TraceabilityDtos.TraceNode;
 import com.qualityos.traceability.dto.TraceabilityDtos.TraceReport;
 import com.qualityos.traceability.entity.BatchRelationship;
 import com.qualityos.traceability.entity.FinishedProduct;
+import com.qualityos.traceability.entity.MaterialCorrection;
 import com.qualityos.traceability.entity.ProductionBatch;
 import com.qualityos.traceability.repository.BatchRelationshipRepository;
 import com.qualityos.traceability.repository.FinishedProductRepository;
+import com.qualityos.traceability.repository.MaterialCorrectionRepository;
 import com.qualityos.traceability.repository.ProductionBatchRepository;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -90,6 +93,7 @@ public class TraceabilityService {
     private final ProductionBatchRepository batches;
     private final BatchRelationshipRepository relationships;
     private final FinishedProductRepository finishedProducts;
+    private final MaterialCorrectionRepository corrections;
     private final ProductionService production;
     private final DispatchService dispatches;
     private final MaterialReceiptService receipts;
@@ -103,6 +107,7 @@ public class TraceabilityService {
             ProductionBatchRepository batches,
             BatchRelationshipRepository relationships,
             FinishedProductRepository finishedProducts,
+            MaterialCorrectionRepository corrections,
             ProductionService production,
             DispatchService dispatches,
             MaterialReceiptService receipts,
@@ -114,6 +119,7 @@ public class TraceabilityService {
         this.batches = batches;
         this.relationships = relationships;
         this.finishedProducts = finishedProducts;
+        this.corrections = corrections;
         this.production = production;
         this.dispatches = dispatches;
         this.receipts = receipts;
@@ -228,6 +234,10 @@ public class TraceabilityService {
                 .map(FinishedProduct::getSerialNumber)
                 .toList();
 
+        Set<UUID> traced = new HashSet<>(allLots);
+        traced.addAll(allBatches);
+        List<MaterialCorrection> applied = corrections.findAppliedFor(orNone(traced));
+
         boolean seesInspections = permissions.contains(Permissions.INSPECTION_VIEW);
         boolean seesNcrs = permissions.contains(Permissions.NCR_VIEW);
         boolean seesCapas = permissions.contains(Permissions.CAPA_VIEW);
@@ -252,7 +262,8 @@ public class TraceabilityService {
                 visibleInspections,
                 visibleNcrs,
                 visibleCapas,
-                timeline(lots.values(), views.values(), shipped, visibleInspections, visibleNcrs, visibleCapas));
+                timeline(lots.values(), views.values(), shipped, visibleInspections, visibleNcrs, visibleCapas,
+                        applied));
     }
 
     private static TraceEdge toEdge(
@@ -273,8 +284,12 @@ public class TraceabilityService {
             List<DispatchResponse> shipped,
             List<InspectionHistory> inspected,
             List<NcrHistory> raised,
-            List<CapaHistory> corrective) {
+            List<CapaHistory> corrective,
+            List<MaterialCorrection> applied) {
         List<TimelineEvent> events = new ArrayList<>();
+        applied.forEach(correction -> events.add(new TimelineEvent(correction.getAppliedAt(), "CORRECTED",
+                correction.getCorrectionNumber() + ": " + correction.getReason(), null, null,
+                "/material-corrections/" + correction.getId())));
         lots.forEach(lot -> events.add(new TimelineEvent(
                 lot.receivedOn().atStartOfDay().toInstant(ZoneOffset.UTC), "RECEIVED",
                 "Received " + lot.materialCode() + " from " + lot.supplierName() + " on " + lot.grnNumber(),
@@ -312,6 +327,34 @@ public class TraceabilityService {
         return events;
     }
 
+    /** How far a lot has gone: the batches it reached, and the customers who still hold what was made from it. */
+    @Transactional(readOnly = true)
+    public CorrectionImpact lotImpact(UUID lotId, boolean inspected) {
+        Set<UUID> reached = downstream("parent_lot_id", lotId);
+        return impact(inspected, reached, reached);
+    }
+
+    /** How far a batch has gone: later batches that used it, and customers who hold it or what was made from it. */
+    @Transactional(readOnly = true)
+    public CorrectionImpact batchImpact(UUID batchId) {
+        Set<UUID> later = downstream("parent_batch_id", batchId);
+        Set<UUID> shipped = new HashSet<>(later);
+        shipped.add(batchId);
+        return impact(false, later, shipped);
+    }
+
+    private CorrectionImpact impact(boolean inspected, Set<UUID> later, Set<UUID> shipped) {
+        return new CorrectionImpact(
+                inspected,
+                production.views(later).stream().map(ProductionBatchView::batchNumber).sorted().toList(),
+                dispatches.forBatches(shipped).stream()
+                        .filter(dispatch -> dispatch.reversalReason() == null)
+                        .map(DispatchResponse::customerName)
+                        .distinct()
+                        .sorted()
+                        .toList());
+    }
+
     private Set<UUID> downstream(String parentColumn, UUID id) {
         UUID tenantId = TenantContext.getCurrentTenantId();
         return Set.copyOf(jdbc.queryForList(DOWNSTREAM.formatted(parentColumn), UUID.class, tenantId, id, tenantId));
@@ -327,13 +370,13 @@ public class TraceabilityService {
     }
 
     private static TraceNode node(LotView lot, Map<UUID, String> orderNumbers) {
-        return new TraceNode(LOT, lot.internalBatch(), lot.materialCode(), lot.materialName(), lot.quantity(),
+        return new TraceNode(lot.itemId(), LOT, lot.internalBatch(), lot.materialCode(), lot.materialName(), lot.quantity(),
                 lot.disposition() != null ? lot.disposition() : lot.inspectionStatus(), lot.supplierName(),
                 lot.supplierBatch(), lot.grnNumber(), orderNumbers.get(lot.purchaseOrderId()));
     }
 
     private static TraceNode node(ProductionBatchView batch) {
-        return new TraceNode(BATCH, batch.batchNumber(), batch.productCode(), batch.productName(),
+        return new TraceNode(batch.id(), BATCH, batch.batchNumber(), batch.productCode(), batch.productName(),
                 batch.producedQuantity() != null ? batch.producedQuantity() : batch.plannedQuantity(),
                 batch.status(), null, null, null, null);
     }

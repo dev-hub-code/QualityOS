@@ -27,4 +27,13 @@ public interface NonConformanceRepository
             order by n.createdAt
             """)
     List<NonConformance> findForTrace(Collection<UUID> inspectionIds, Collection<String> batchNumbers);
+
+    @Query("""
+            select n from NonConformance n
+            where n.inspectionId in :inspectionIds
+              and n.status not in (com.qualityos.quality.entity.NonConformance.Status.CLOSED,
+                                   com.qualityos.quality.entity.NonConformance.Status.REJECTED,
+                                   com.qualityos.quality.entity.NonConformance.Status.CANCELLED)
+            """)
+    List<NonConformance> findOpenByInspectionIdIn(Collection<UUID> inspectionIds);
 }

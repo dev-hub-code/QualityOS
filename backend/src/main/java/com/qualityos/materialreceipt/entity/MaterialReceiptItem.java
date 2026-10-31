@@ -95,6 +95,22 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
         consumedQuantity = consumedQuantity.subtract(amount);
     }
 
+    /** Corrections only. The original values stay on the correction that changed them. */
+    public void correct(UUID materialId, String supplierBatch, BigDecimal quantity) {
+        if (materialId != null) {
+            this.materialId = materialId;
+        }
+        if (supplierBatch != null) {
+            this.supplierBatch = supplierBatch;
+        }
+        if (quantity != null) {
+            if (quantity.compareTo(consumedQuantity) < 0) {
+                throw new BusinessRuleException("Batch " + internalBatch + " has already used more than " + quantity + ".");
+            }
+            this.quantity = quantity;
+        }
+    }
+
     public void updateInspection(InspectionStatus status, String disposition) {
         this.inspectionStatus = status;
         this.disposition = disposition;

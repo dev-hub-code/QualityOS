@@ -1,11 +1,23 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "next/navigation";
-import { PageHeader, QueryState, RecordLink, Section, StatusBadge } from "@/components/records/parts";
+import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
+import {
+  PageHeader,
+  QueryState,
+  RecordLink,
+  Section,
+  StatusBadge,
+  useApprovedSuppliers,
+  useMaterials,
+} from "@/components/records/parts";
+import { RecordDialog } from "@/components/records/record-dialog";
+import { Button } from "@/components/ui/button";
+import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
-import { formatQuantity } from "@/lib/record-form";
-import type { TimelineEvent, TraceNode, TraceReport } from "@/lib/types";
+import { formatQuantity, type FieldDef } from "@/lib/record-form";
+import type { CorrectionDetail, TimelineEvent, TraceNode, TraceReport } from "@/lib/types";
 
 function Node({ node }: { node: TraceNode }) {
   return (
@@ -59,15 +71,48 @@ function Timeline({ events }: { events: TimelineEvent[] }) {
   );
 }
 
+function CorrectLotDialog({ lot, onClose }: { lot: TraceNode; onClose: () => void }) {
+  const router = useRouter();
+  const materials = useMaterials();
+  const suppliers = useApprovedSuppliers();
+  const fields: FieldDef[] = [
+    { name: "materialId", label: "Correct material", type: "select", options: materials },
+    { name: "supplierId", label: "Correct supplier (changes the whole receipt)", type: "select", options: suppliers },
+    { name: "supplierBatch", label: "Correct supplier batch" },
+    { name: "quantity", label: "Correct quantity", type: "decimal" },
+    { name: "reason", label: "Why this record is wrong", type: "textarea", required: true },
+  ];
+  return (
+    <RecordDialog
+      title={`Request correction of ${lot.batchNumber}`}
+      fields={fields}
+      onClose={onClose}
+      onSubmit={async (values) => {
+        const created = await api.post<CorrectionDetail>("/material-corrections", { ...values, receiptItemId: lot.id });
+        router.push(`/material-corrections/${created.id}`);
+      }}
+    />
+  );
+}
+
 export default function TraceReportPage() {
   const { batchNumber } = useParams<{ batchNumber: string }>();
   const path = `/traceability/batches/${batchNumber}`;
+  const canCorrect = usePermission("MATERIAL_CORRECTION_REQUEST");
+  const [correcting, setCorrecting] = useState(false);
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<TraceReport>(path) });
   if (!data) return <QueryState error={error} />;
   const { subject, backward, forward, dispatches, affectedCustomers, serialNumbers, timeline } = data;
   return (
     <div className="space-y-6">
-      <PageHeader title={subject.batchNumber} subtitle={`${subject.code} – ${subject.name}`} />
+      <PageHeader title={subject.batchNumber} subtitle={`${subject.code} – ${subject.name}`}>
+        {canCorrect && subject.kind === "LOT" && (
+          <Button variant="outline" onClick={() => setCorrecting(true)}>
+            Request correction
+          </Button>
+        )}
+      </PageHeader>
+      {correcting && <CorrectLotDialog lot={subject} onClose={() => setCorrecting(false)} />}
       {affectedCustomers.length > 0 && (
         <p className="rounded-lg border p-3 text-sm">
           <span className="font-medium">Customers who received this:</span> {affectedCustomers.join(", ")}

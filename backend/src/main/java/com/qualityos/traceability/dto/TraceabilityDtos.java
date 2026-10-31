@@ -51,6 +51,69 @@ public final class TraceabilityDtos {
     public record AddSerialsRequest(@NotEmpty @Size(max = 1000) List<@NotBlank @Size(max = 100) String> serialNumbers) {
     }
 
+    public record ConsumptionRef(UUID id, UUID childBatchId, UUID lotId, UUID parentBatchId, BigDecimal quantity) {
+    }
+
+    /** Names one target: a lot, or a consumption. The change fields left null stay as they are. */
+    public record CreateCorrectionRequest(
+            UUID receiptItemId,
+            UUID consumptionId,
+            @NotBlank @Size(max = 1000) String reason,
+            UUID materialId,
+            UUID supplierId,
+            @Size(max = 100) String supplierBatch,
+            @Positive @Digits(integer = 12, fraction = 6) BigDecimal quantity,
+            UUID correctedLotId) {
+    }
+
+    /** @param impactAcknowledged required when the material has gone further than the lot itself */
+    public record ApproveCorrectionRequest(@Size(max = 1000) String note, boolean impactAcknowledged) {
+    }
+
+    public record CorrectionNoteRequest(@NotBlank @Size(max = 1000) String note) {
+    }
+
+    public record CorrectionChange(String field, String originalValue, String correctedValue) {
+    }
+
+    public record CorrectionApprovalView(String approverName, String note, Instant at) {
+    }
+
+    /** How far the material has gone. Anything here calls for a second approver. */
+    public record CorrectionImpact(boolean inspected, List<String> batches, List<String> customers) {
+    }
+
+    public record CorrectionSummary(
+            UUID id,
+            String correctionNumber,
+            String targetType,
+            String status,
+            String subject,
+            String reason,
+            String requestedByName,
+            Instant createdAt) {
+    }
+
+    public record CorrectionDetail(
+            UUID id,
+            String correctionNumber,
+            String targetType,
+            String status,
+            String subject,
+            UUID productionBatchId,
+            String reason,
+            UUID requestedBy,
+            String requestedByName,
+            Instant createdAt,
+            boolean additionalApproval,
+            int approvalsNeeded,
+            List<CorrectionChange> changes,
+            List<CorrectionApprovalView> approvals,
+            CorrectionImpact impact,
+            String decisionNote,
+            Instant appliedAt) {
+    }
+
     public record ProductionBatchView(
             UUID id,
             String batchNumber,
@@ -120,6 +183,7 @@ public final class TraceabilityDtos {
 
     /** A lot or a production batch in a trace. */
     public record TraceNode(
+            UUID id,
             String kind,
             String batchNumber,
             String code,

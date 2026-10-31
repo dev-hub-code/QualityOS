@@ -20,4 +20,6 @@ public interface InspectionRepository extends JpaRepository<Inspection, UUID>, J
 
     List<Inspection> findByReceiptItemIdInOrProductionBatchIdInOrderByCreatedAt(
             Collection<UUID> receiptItemIds, Collection<UUID> productionBatchIds);
+
+    List<Inspection> findByReceiptItemIdIn(Collection<UUID> receiptItemIds);
 }

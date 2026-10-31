@@ -20,6 +20,7 @@ import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import { inspectionTypeFor, parseSerials, toConsumeRequest } from "@/lib/traceability";
 import type {
   BatchDetail,
+  CorrectionDetail,
   Inspection,
   ProductionBatch,
   ReleasedLot,
@@ -66,6 +67,35 @@ function ConsumeDialog({ path, batchId, onClose }: { path: string; batchId: stri
   );
 }
 
+function CorrectConsumptionDialog({ consumptionId, onClose }: { consumptionId: string; onClose: () => void }) {
+  const router = useRouter();
+  const { data: lots = [] } = useQuery({ queryKey: [LOTS], queryFn: () => api.get<ReleasedLot[]>(LOTS) });
+  const fields: FieldDef[] = [
+    {
+      name: "correctedLotId",
+      label: "Lot actually used",
+      type: "select",
+      options: lots.map((lot) => ({
+        value: lot.itemId,
+        label: `${lot.internalBatch} – ${lot.materialCode} (${formatQuantity(lot.remainingQuantity)} left)`,
+      })),
+    },
+    { name: "quantity", label: "Quantity actually used", type: "decimal" },
+    { name: "reason", label: "Why this entry is wrong", type: "textarea", required: true },
+  ];
+  return (
+    <RecordDialog
+      title="Request correction"
+      fields={fields}
+      onClose={onClose}
+      onSubmit={async (values) => {
+        const created = await api.post<CorrectionDetail>("/material-corrections", { ...values, consumptionId });
+        router.push(`/material-corrections/${created.id}`);
+      }}
+    />
+  );
+}
+
 function InspectDialog({ batch, type, onClose }: { batch: ProductionBatch; type: string; onClose: () => void }) {
   const router = useRouter();
   const refresh = useRefresh();
@@ -107,7 +137,9 @@ export default function ProductionBatchPage() {
   const canManage = usePermission("TRACEABILITY_MANAGE");
   const canInspect = usePermission("INSPECTION_CREATE");
   const [open, setOpen] = useState<"consume" | "complete" | "serials" | "inspect" | null>(null);
+  const canCorrect = usePermission("MATERIAL_CORRECTION_REQUEST");
   const [reversing, setReversing] = useState<string | null>(null);
+  const [correcting, setCorrecting] = useState<string | null>(null);
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<BatchDetail>(path) });
   if (!data) return <QueryState error={error} />;
 
@@ -168,6 +200,11 @@ export default function ProductionBatchPage() {
                     Reverse
                   </Button>
                 )}
+                {canCorrect && !used.reversalReason && (
+                  <Button variant="ghost" size="sm" onClick={() => setCorrecting(used.id)}>
+                    Request correction
+                  </Button>
+                )}
               </span>
             </li>
           ))}
@@ -178,6 +215,7 @@ export default function ProductionBatchPage() {
           <p className="text-sm break-words">{serialNumbers.join(", ")}</p>
         </Section>
       )}
+      {correcting && <CorrectConsumptionDialog consumptionId={correcting} onClose={() => setCorrecting(null)} />}
       {reversing && (
         <RecordDialog
           title="Reverse material used"

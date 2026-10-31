@@ -17,6 +17,7 @@ import com.qualityos.traceability.dto.TraceabilityDtos.BatchDetail;
 import com.qualityos.traceability.dto.TraceabilityDtos.CompleteBatchRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.ConsumeRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.Consumption;
+import com.qualityos.traceability.dto.TraceabilityDtos.ConsumptionRef;
 import com.qualityos.traceability.dto.TraceabilityDtos.CreateBatchRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.ProductionBatchView;
 import com.qualityos.traceability.entity.BatchRelationship;
@@ -27,11 +28,13 @@ import com.qualityos.traceability.repository.BatchRelationshipRepository;
 import com.qualityos.traceability.repository.FinishedProductRepository;
 import com.qualityos.traceability.repository.ProductionBatchRepository;
 import com.qualityos.traceability.repository.TraceCorrectionRepository;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -165,6 +168,39 @@ public class ProductionService {
         return detail(id);
     }
 
+    /**
+     * Applies an approved correction of material used, at any stage of the batch. The old entry is reversed rather
+     * than edited, and the replacement joins the genealogy, so every trace that passes through this batch follows it.
+     *
+     * @param replacementLot the lot actually used, or null to keep the same source
+     * @return the replacement entry
+     */
+    @Transactional
+    public UUID replaceConsumption(UUID relationshipId, UUID replacementLot, BigDecimal quantity, String reason) {
+        BatchRelationship edge = relationships.findById(relationshipId)
+                .orElseThrow(() -> new ResourceNotFoundException("Consumption", relationshipId));
+        lock(edge.getChildBatchId());
+        if (corrections.existsByBatchRelationshipId(relationshipId)) {
+            throw new BusinessRuleException("This entry was already reversed.");
+        }
+        if (edge.getParentLotId() != null) {
+            receipts.restore(edge.getParentLotId(), edge.getQuantity());
+        } else {
+            lock(edge.getParentBatchId()).returnUsed(edge.getQuantity());
+        }
+        UUID lot = replacementLot != null ? replacementLot : edge.getParentLotId();
+        if (lot != null) {
+            receipts.consume(lot, quantity);
+        } else {
+            lock(edge.getParentBatchId()).use(quantity);
+        }
+        corrections.save(TraceCorrection.ofConsumption(relationshipId, reason));
+        BatchRelationship replacement = relationships.save(new BatchRelationship(
+                lot, lot == null ? edge.getParentBatchId() : null, edge.getChildBatchId(), quantity));
+        audit.record("BATCH_CONSUMPTION_CORRECTED", ENTITY, edge.getChildBatchId(), null, Map.of("reason", reason));
+        return replacement.getId();
+    }
+
     @Transactional
     public BatchDetail complete(UUID id, CompleteBatchRequest request) {
         ProductionBatch batch = lock(id);
@@ -184,7 +220,7 @@ public class ProductionService {
         }
         Set<String> serials = new HashSet<>(request.serialNumbers().stream().map(String::trim).toList());
         long total = finishedProducts.countByProductionBatchId(id) + serials.size();
-        if (java.math.BigDecimal.valueOf(total).compareTo(batch.getProducedQuantity()) > 0) {
+        if (BigDecimal.valueOf(total).compareTo(batch.getProducedQuantity()) > 0) {
             throw new BusinessRuleException("This batch has more serial numbers than units.");
         }
         if (!finishedProducts.findBySerialNumberIn(serials).isEmpty()) {
@@ -209,6 +245,15 @@ public class ProductionService {
         batches.saveAndFlush(batch);
         audit.record("PRODUCTION_BATCH_STATUS_CHANGED", ENTITY, id,
                 Map.of("status", previous), Map.of("status", batch.getStatus()));
+    }
+
+    /** @return the consumption, as long as it still stands */
+    @Transactional(readOnly = true)
+    public Optional<ConsumptionRef> activeConsumption(UUID relationshipId) {
+        return relationships.findById(relationshipId)
+                .filter(edge -> !corrections.existsByBatchRelationshipId(relationshipId))
+                .map(edge -> new ConsumptionRef(
+                        edge.getId(), edge.getChildBatchId(), edge.getParentLotId(), edge.getParentBatchId(), edge.getQuantity()));
     }
 
     private List<Consumption> consumptions(UUID id) {

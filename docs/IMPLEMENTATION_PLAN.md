@@ -48,7 +48,10 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A template can only be chosen by hand; none is picked automatically for a material | When a user needs it |
 | Production batches take IPQC and FQC inspections only. OQC and the other template types have no production flow | When a user needs it |
 | A template cannot yet be limited to a product in the UI, and quantities consumed are not converted between units | When a user needs it |
-| A whole dispatch can be reversed, but not part of one. Material used can only be reversed while its batch is in progress, so a mistake found after completion cannot be corrected | Before customer launch |
+| A whole dispatch can be reversed, but not part of one | Partial dispatch reversal |
+| A lot's internal batch number cannot be corrected, because other records refer to it by number. It is generated, so it cannot be mistyped | By design |
+| A corrected lot keeps its original purchase order line, and a finished NCR keeps its original supplier and material | By design: history is preserved |
+| A correction of an inspected lot does not trigger reinspection. It needs two approvers, who decide whether to act | Review after real use |
 | Naming serial numbers on a dispatch is optional, so a batch can ship without saying which units went. A trace then shows the customer by batch, not by unit | Review after real use |
 | A trace finds who received a batch, but there is no recall workflow | When a user needs it |
 | `tenant_settings` and supplier scorecards are not built | Phase 9 |

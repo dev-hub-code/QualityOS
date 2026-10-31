@@ -100,6 +100,7 @@ public final class MaterialReceiptDtos {
             String grnNumber,
             LocalDate receivedOn,
             UUID purchaseOrderId,
+            UUID supplierId,
             String supplierName,
             UUID materialId,
             String materialCode,
@@ -111,5 +112,13 @@ public final class MaterialReceiptDtos {
             String inspectionStatus,
             String disposition,
             boolean released) {
+    }
+
+    /** The approved values for a lot. A null leaves that field as it is. */
+    public record LotCorrection(UUID materialId, UUID supplierId, String supplierBatch, BigDecimal quantity) {
+    }
+
+    /** @param affectedItems the lots whose supplier or material changed, for updating what refers to them */
+    public record AppliedLotCorrection(List<UUID> affectedItems) {
     }
 }

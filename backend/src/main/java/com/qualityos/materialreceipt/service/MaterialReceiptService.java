@@ -16,6 +16,8 @@ import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceiptItemRequest;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceiptItemResponse;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceiptSummary;
 import com.qualityos.materialreceipt.entity.MaterialReceipt;
+import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.AppliedLotCorrection;
+import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.LotCorrection;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.LotView;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceivedBatch;
 import com.qualityos.materialreceipt.entity.MaterialReceiptItem;
@@ -34,6 +36,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -185,6 +188,41 @@ public class MaterialReceiptService implements AttachmentPolicy {
         items.flush();
     }
 
+    /**
+     * Applies an approved correction. A supplier belongs to the whole receipt, so it moves every lot on it. A
+     * change of quantity also moves the purchase order's received total, which keeps the two in step.
+     */
+    @Transactional
+    public AppliedLotCorrection correct(UUID itemId, LotCorrection correction) {
+        MaterialReceiptItem item = items.findForUpdate(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Batch", itemId));
+        MaterialReceipt receipt = item.getReceipt();
+        if (receipt.getStatus() == MaterialReceipt.Status.VOIDED) {
+            throw new BusinessRuleException("This receipt was voided.");
+        }
+        Set<UUID> affected = new HashSet<>();
+        if (correction.materialId() != null) {
+            affected.add(itemId);
+        }
+        if (correction.supplierId() != null) {
+            suppliers.requireApproved(correction.supplierId());
+            receipt.correctSupplier(correction.supplierId());
+            receipt.getItems().forEach(line -> affected.add(line.getId()));
+        }
+        if (correction.quantity() != null) {
+            BigDecimal change = correction.quantity().subtract(item.getQuantity());
+            Map<UUID, BigDecimal> moved = Map.of(item.getPurchaseOrderItemId(), change.abs());
+            if (change.signum() > 0) {
+                purchaseOrders.recordReceipt(receipt.getPurchaseOrderId(), moved);
+            } else if (change.signum() < 0) {
+                purchaseOrders.reverseReceipt(receipt.getPurchaseOrderId(), moved);
+            }
+        }
+        item.correct(correction.materialId(), correction.supplierBatch(), correction.quantity());
+        items.flush();
+        return new AppliedLotCorrection(List.copyOf(affected));
+    }
+
     @Transactional(readOnly = true)
     public List<LotView> releasedLots(UUID materialId) {
         return lots(items.findLots(materialId).stream()
@@ -225,6 +263,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
                     receipt.getGrnNumber(),
                     receipt.getReceivedOn(),
                     receipt.getPurchaseOrderId(),
+                    receipt.getSupplierId(),
                     supplierNames.get(receipt.getSupplierId()).name(),
                     material.id(),
                     material.code(),

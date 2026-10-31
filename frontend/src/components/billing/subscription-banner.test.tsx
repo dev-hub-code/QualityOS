@@ -15,7 +15,7 @@ const subscription = (state: Subscription["state"], endsAt: string): Subscriptio
   maxUsers: 5,
   facilities: 1,
   maxFacilities: 1,
-  features: [],
+  features: [], storageBytes: 0, maxStorageMb: null, inspectionsThisMonth: 0, maxMonthlyInspections: null, attachments: 0, maxAttachments: null,
 });
 
 describe("subscriptionNotice", () => {

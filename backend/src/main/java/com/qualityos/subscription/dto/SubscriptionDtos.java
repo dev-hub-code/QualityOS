@@ -1,5 +1,6 @@
 package com.qualityos.subscription.dto;
 
+import com.qualityos.subscription.entity.FeatureDefinition;
 import com.qualityos.subscription.entity.Subscription;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -42,7 +43,11 @@ public final class SubscriptionDtos {
             String currency,
             boolean publicVisible,
             Instant archivedAt,
-            int displayOrder) {
+            int displayOrder,
+            Integer maxStorageMb,
+            Integer maxMonthlyInspections,
+            Integer maxAttachments,
+            Map<String, Object> featureValues) {
     }
 
     public record PublicPlan(
@@ -54,7 +59,8 @@ public final class SubscriptionDtos {
             Integer maxUsers,
             Integer maxFacilities,
             List<String> features,
-            int trialDays) {
+            int trialDays,
+            List<String> featureNames) {
     }
 
     public record SavePlanRequest(
@@ -65,6 +71,9 @@ public final class SubscriptionDtos {
             @NotNull @DecimalMin("0") @DecimalMax("100") BigDecimal taxPercent,
             @Positive Integer maxUsers,
             @Positive Integer maxFacilities,
+            @Positive Integer maxStorageMb,
+            @Positive Integer maxMonthlyInspections,
+            @Positive Integer maxAttachments,
             @NotNull Set<String> features,
             @Min(0) @Max(365) int trialDays,
             @Min(0) @Max(90) int graceDays,
@@ -142,6 +151,68 @@ public final class SubscriptionDtos {
      *
      * @param mrr contracted recurring revenue today, without tax. {@code collected} is money actually received
      */
+    public record CreateFeatureRequest(
+            @NotBlank @Pattern(regexp = "[A-Z][A-Z0-9_]{1,29}", message = "Use capital letters, digits and underscores.")
+            String code,
+            @NotBlank @Size(max = 100) String name,
+            @Size(max = 300) String description,
+            @NotNull FeatureDefinition.ValueType valueType,
+            boolean defaultEnabled) {
+    }
+
+    public record UpdateFeatureRequest(
+            @NotBlank @Size(max = 100) String name,
+            @Size(max = 300) String description,
+            boolean defaultEnabled,
+            @NotNull Long version) {
+    }
+
+    public record FeatureActiveRequest(
+            boolean active, @NotNull Long version, @NotBlank @Size(max = 500) String reason) {
+    }
+
+    /** {@code reason} is needed once a plan has subscribers, as for any other change to it. */
+    public record AssignFeatureRequest(
+            @NotNull UUID planId, boolean included, Object value, @NotNull Long version, @Size(max = 500) String reason) {
+    }
+
+    /** {@code enforced} says whether leaving this out of a plan actually restricts anything. */
+    public record FeatureResponse(
+            String code, String name, String description, FeatureDefinition.ValueType valueType, boolean active,
+            boolean defaultEnabled, boolean enforced, long organisations, long version) {
+    }
+
+    public record FeatureOrganisation(UUID tenantId, String name, String planName) {
+    }
+
+    public record FeatureOrganisationList(int total, List<FeatureOrganisation> items) {
+    }
+
+    public record UsageRow(
+            UUID tenantId, String name, String planName, List<String> features, long users, Integer maxUsers,
+            long facilities, Integer maxFacilities, long storageBytes, Integer maxStorageMb, long inspections,
+            Integer maxMonthlyInspections, long attachments, Integer maxAttachments, String level, String upgradeTo) {
+    }
+
+    public record UsageList(int total, List<UsageRow> items) {
+    }
+
+    public record UsageHistory(
+            LocalDate takenOn, long users, long facilities, long storageBytes, long inspections, long attachments) {
+    }
+
+    public record RevenueByPlan(String name, BigDecimal mrr) {
+    }
+
+    /** docs/PLATFORM_ADMIN.md defines each figure. */
+    public record PlatformAnalytics(
+            LocalDate from, LocalDate to, BigDecimal mrr, BigDecimal arr, BigDecimal openingMrr, long openingCustomers,
+            long closingCustomers, long newCustomers, long registered, long converted, BigDecimal trialConversion,
+            long lostCustomers, BigDecimal customerChurn, BigDecimal revenueLost, BigDecimal revenueChurn,
+            BigDecimal averageRevenue, List<RevenueByPlan> revenueByPlan, List<PlanShare> plans, BigDecimal outstanding,
+            BigDecimal collected, BigDecimal collectionRate, List<DashboardMonth> months) {
+    }
+
     public record PlatformDashboard(
             LocalDate from,
             LocalDate to,
@@ -175,7 +246,13 @@ public final class SubscriptionDtos {
             Integer maxUsers,
             long facilities,
             Integer maxFacilities,
-            List<String> features) {
+            List<String> features,
+            long storageBytes,
+            Integer maxStorageMb,
+            long inspectionsThisMonth,
+            Integer maxMonthlyInspections,
+            long attachments,
+            Integer maxAttachments) {
     }
 
     public record ChangePlanRequest(@NotNull UUID planId, @NotNull Subscription.Cycle cycle) {

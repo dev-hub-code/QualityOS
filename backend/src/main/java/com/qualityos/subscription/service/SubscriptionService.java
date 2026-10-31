@@ -22,7 +22,9 @@ import com.qualityos.subscription.dto.SubscriptionDtos.SubscriptionResponse;
 import com.qualityos.subscription.entity.PaymentTransaction;
 import com.qualityos.subscription.entity.Subscription;
 import com.qualityos.subscription.entity.SubscriptionInvoice;
+import com.qualityos.subscription.entity.FeatureDefinition;
 import com.qualityos.subscription.entity.SubscriptionPlan;
+import com.qualityos.subscription.repository.FeatureDefinitionRepository;
 import com.qualityos.subscription.repository.PaymentTransactionRepository;
 import com.qualityos.subscription.repository.SubscriptionInvoiceRepository;
 import com.qualityos.subscription.repository.SubscriptionPlanRepository;
@@ -37,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -49,6 +52,7 @@ public class SubscriptionService {
 
     private static final String LINK = "/settings/billing";
     private static final int PAYMENT_TERMS_DAYS = 7;
+    private static final long MEGABYTE = 1_048_576L;
     private static final List<Integer> NOTICE_DAYS = List.of(7, 3, 1, 0);
 
     private final SubscriptionPlanRepository plans;
@@ -61,6 +65,7 @@ public class SubscriptionService {
     private final TenantAccessService access;
     private final JdbcTemplate jdbc;
     private final AuditService audit;
+    private final FeatureDefinitionRepository features;
     private final String sellerGstin;
     private final String sacCode;
 
@@ -75,6 +80,7 @@ public class SubscriptionService {
             TenantAccessService access,
             JdbcTemplate jdbc,
             AuditService audit,
+            FeatureDefinitionRepository features,
             @Value("${qualityos.billing.seller-gstin:}") String sellerGstin,
             @Value("${qualityos.billing.sac-code:}") String sacCode) {
         this.plans = plans;
@@ -87,6 +93,7 @@ public class SubscriptionService {
         this.access = access;
         this.jdbc = jdbc;
         this.audit = audit;
+        this.features = features;
         this.sellerGstin = sellerGstin;
         this.sacCode = sacCode;
     }
@@ -107,7 +114,9 @@ public class SubscriptionService {
         return new SubscriptionResponse(plan.getCode(), plan.getName(), state(subscription, plan),
                 subscription.getBillingCycle(), subscription.getCurrentPeriodEndsAt(), readOnlyFrom,
                 subscription.getCancelledAt(), used(PlanLimits.MEMBERS), plan.getMaxUsers(),
-                used(PlanLimits.FACILITIES), plan.getMaxFacilities(), plan.getFeatures());
+                used(PlanLimits.FACILITIES), plan.getMaxFacilities(), plan.getFeatures(), used(PlanLimits.STORAGE),
+                plan.getMaxStorageMb(), used(PlanLimits.INSPECTIONS), plan.getMaxMonthlyInspections(),
+                used(PlanLimits.ATTACHMENTS), plan.getMaxAttachments());
     }
 
     private static String state(Subscription subscription, SubscriptionPlan plan) {
@@ -129,11 +138,15 @@ public class SubscriptionService {
 
     @Transactional(readOnly = true)
     public List<PublicPlan> publicPlans() {
+        Map<String, String> names = features.findAllByOrderByName().stream()
+                .filter(FeatureDefinition::isActive)
+                .collect(Collectors.toMap(FeatureDefinition::getCode, FeatureDefinition::getName));
         return plans.findByActiveTrueOrderByDisplayOrder().stream()
                 .filter(SubscriptionPlan::isPublicVisible)
                 .map(plan -> new PublicPlan(plan.getCode(), plan.getName(), plan.getDescription(),
                         plan.getMonthlyPrice(), plan.getAnnualPrice(), plan.getMaxUsers(), plan.getMaxFacilities(),
-                        plan.getFeatures(), plan.getTrialDays()))
+                        plan.getFeatures(), plan.getTrialDays(),
+                        plan.getFeatures().stream().filter(names::containsKey).map(names::get).toList()))
                 .toList();
     }
 
@@ -142,7 +155,8 @@ public class SubscriptionService {
                 plan.getMonthlyPrice(), plan.getAnnualPrice(), plan.getTaxPercent(), plan.getMaxUsers(),
                 plan.getMaxFacilities(), plan.getFeatures(), plan.getTrialDays(), plan.getGraceDays(), plan.isActive(),
                 plan.getVersion(), plan.getCurrency(), plan.isPublicVisible(), plan.getArchivedAt(),
-                plan.getDisplayOrder());
+                plan.getDisplayOrder(), plan.getMaxStorageMb(), plan.getMaxMonthlyInspections(), plan.getMaxAttachments(),
+                plan.getFeatureValues());
     }
 
     /** Also how a subscription is renewed: choose the same plan. */
@@ -215,6 +229,14 @@ public class SubscriptionService {
         if (plan.getMaxUsers() != null && used(PlanLimits.MEMBERS) > plan.getMaxUsers()) {
             throw new BusinessRuleException("The " + plan.getName() + " plan allows " + plan.getMaxUsers()
                     + " users. Remove some users or pending invitations first.");
+        }
+        if (plan.getMaxAttachments() != null && used(PlanLimits.ATTACHMENTS) > plan.getMaxAttachments()) {
+            throw new BusinessRuleException("The " + plan.getName() + " plan allows " + plan.getMaxAttachments()
+                    + " attachments. Remove some first.");
+        }
+        if (plan.getMaxStorageMb() != null && used(PlanLimits.STORAGE) > plan.getMaxStorageMb() * MEGABYTE) {
+            throw new BusinessRuleException("The " + plan.getName() + " plan allows " + plan.getMaxStorageMb()
+                    + " MB of storage. Remove some attachments first.");
         }
         if (plan.getMaxFacilities() != null && used(PlanLimits.FACILITIES) > plan.getMaxFacilities()) {
             throw new BusinessRuleException("The " + plan.getName() + " plan allows " + plan.getMaxFacilities()

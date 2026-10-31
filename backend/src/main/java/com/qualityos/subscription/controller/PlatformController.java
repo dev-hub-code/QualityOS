@@ -5,7 +5,16 @@ import com.qualityos.common.security.Permissions.Require;
 import com.qualityos.subscription.dto.SubscriptionDtos.CreatePlanRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.CustomInvoiceRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.ExtendRequest;
+import com.qualityos.subscription.dto.SubscriptionDtos.AssignFeatureRequest;
+import com.qualityos.subscription.dto.SubscriptionDtos.CreateFeatureRequest;
+import com.qualityos.subscription.dto.SubscriptionDtos.FeatureActiveRequest;
+import com.qualityos.subscription.dto.SubscriptionDtos.FeatureOrganisationList;
+import com.qualityos.subscription.dto.SubscriptionDtos.FeatureResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.InvoiceFilter;
+import com.qualityos.subscription.dto.SubscriptionDtos.PlatformAnalytics;
+import com.qualityos.subscription.dto.SubscriptionDtos.UpdateFeatureRequest;
+import com.qualityos.subscription.dto.SubscriptionDtos.UsageHistory;
+import com.qualityos.subscription.dto.SubscriptionDtos.UsageList;
 import com.qualityos.subscription.dto.SubscriptionDtos.InvoiceList;
 import com.qualityos.subscription.dto.SubscriptionDtos.InvoiceResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.OrganisationDetail;
@@ -25,7 +34,9 @@ import com.qualityos.subscription.dto.SubscriptionDtos.SavePlanRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.SubscriptionResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.TrialSummary;
 import com.qualityos.subscription.entity.SubscriptionInvoice;
+import com.qualityos.subscription.service.FeatureCatalogue;
 import com.qualityos.subscription.service.InvoicePdfRenderer;
+import com.qualityos.subscription.service.PlatformUsage;
 import com.qualityos.subscription.service.PlanCatalogue;
 import com.qualityos.subscription.service.PlatformInsights;
 import com.qualityos.subscription.service.PlatformService;
@@ -35,7 +46,9 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -67,13 +80,22 @@ public class PlatformController {
     private final PlatformInsights insights;
     private final PlanCatalogue catalogue;
     private final InvoicePdfRenderer renderer;
+    private final PlatformUsage usage;
+    private final FeatureCatalogue features;
 
     PlatformController(
-            PlatformService platform, PlatformInsights insights, PlanCatalogue catalogue, InvoicePdfRenderer renderer) {
+            PlatformService platform,
+            PlatformInsights insights,
+            PlanCatalogue catalogue,
+            InvoicePdfRenderer renderer,
+            PlatformUsage usage,
+            FeatureCatalogue features) {
         this.platform = platform;
         this.insights = insights;
         this.catalogue = catalogue;
         this.renderer = renderer;
+        this.usage = usage;
+        this.features = features;
     }
 
     @GetMapping("/plans")
@@ -122,6 +144,118 @@ public class PlatformController {
     public ApiResponse<PlatformDashboard> dashboard(
             @RequestParam(required = false) LocalDate from, @RequestParam(required = false) LocalDate to) {
         return ApiResponse.ok(insights.dashboard(from, to));
+    }
+
+    @GetMapping("/analytics")
+    public ApiResponse<PlatformAnalytics> analytics(
+            @RequestParam(required = false) LocalDate from, @RequestParam(required = false) LocalDate to) {
+        return ApiResponse.ok(insights.analytics(from, to));
+    }
+
+    @GetMapping(value = "/analytics/export", produces = "text/csv")
+    public ResponseEntity<String> exportAnalytics(
+            @RequestParam(required = false) LocalDate from, @RequestParam(required = false) LocalDate to) {
+        PlatformAnalytics figures = insights.exportAnalytics(from, to);
+        Map<String, Object> rows = new LinkedHashMap<>();
+        rows.put("From", figures.from());
+        rows.put("To", figures.to());
+        rows.put("MRR (INR)", figures.mrr());
+        rows.put("ARR (INR)", figures.arr());
+        rows.put("Opening MRR (INR)", figures.openingMrr());
+        rows.put("New customers", figures.newCustomers());
+        rows.put("Registered", figures.registered());
+        rows.put("Trial conversion %", figures.trialConversion());
+        rows.put("Lost customers", figures.lostCustomers());
+        rows.put("Customer churn %", figures.customerChurn());
+        rows.put("Revenue lost (INR)", figures.revenueLost());
+        rows.put("Revenue churn %", figures.revenueChurn());
+        rows.put("Average revenue per organisation (INR)", figures.averageRevenue());
+        rows.put("Outstanding (INR)", figures.outstanding());
+        rows.put("Collected (INR)", figures.collected());
+        rows.put("Collection rate %", figures.collectionRate());
+        figures.revenueByPlan().forEach(plan -> rows.put("MRR: " + plan.name(), plan.mrr()));
+        StringBuilder csv = new StringBuilder("Metric,Value\n");
+        rows.forEach((metric, value) -> csv.append(cell(metric)).append(',')
+                .append(cell(value == null ? "" : value.toString())).append('\n'));
+        return csvFile("analytics.csv", csv);
+    }
+
+    @GetMapping("/usage")
+    public ApiResponse<UsageList> usage(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String alert,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "25") @Min(1) @Max(100) int size) {
+        return ApiResponse.ok(usage.page(q, alert, page, size));
+    }
+
+    @GetMapping(value = "/usage/export", produces = "text/csv")
+    public ResponseEntity<String> exportUsage(
+            @RequestParam(required = false) String q, @RequestParam(required = false) String alert) {
+        StringBuilder csv = new StringBuilder("Organisation,Plan,Users,User limit,Facilities,Facility limit,"
+                + "Storage bytes,Storage limit MB,Inspections this month,Inspection limit,Attachments,Attachment limit,"
+                + "Level,Suggested plan\n");
+        usage.export(q, alert).forEach(row -> csv.append(Stream.of(row.name(), row.planName(), text(row.users()),
+                        text(row.maxUsers()), text(row.facilities()), text(row.maxFacilities()), text(row.storageBytes()),
+                        text(row.maxStorageMb()), text(row.inspections()), text(row.maxMonthlyInspections()),
+                        text(row.attachments()), text(row.maxAttachments()), row.level(), row.upgradeTo())
+                .map(PlatformController::cell)
+                .collect(Collectors.joining(","))).append('\n'));
+        return csvFile("usage.csv", csv);
+    }
+
+    private static String text(Object value) {
+        return value == null ? "" : value.toString();
+    }
+
+    private static ResponseEntity<String> csvFile(String name, StringBuilder csv) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + name + "\"")
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .body(csv.toString());
+    }
+
+    @GetMapping("/organisations/{tenantId}/usage/history")
+    public ApiResponse<List<UsageHistory>> usageHistory(
+            @PathVariable UUID tenantId, @RequestParam(defaultValue = "30") @Min(1) @Max(366) int days) {
+        return ApiResponse.ok(usage.history(tenantId, days));
+    }
+
+    @GetMapping("/features")
+    public ApiResponse<List<FeatureResponse>> features() {
+        return ApiResponse.ok(features.list());
+    }
+
+    @PostMapping("/features")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<FeatureResponse> createFeature(@Valid @RequestBody CreateFeatureRequest request) {
+        return ApiResponse.ok(features.create(request));
+    }
+
+    @PutMapping("/features/{code}")
+    public ApiResponse<FeatureResponse> updateFeature(
+            @PathVariable String code, @Valid @RequestBody UpdateFeatureRequest request) {
+        return ApiResponse.ok(features.update(code, request));
+    }
+
+    @PostMapping("/features/{code}/active")
+    public ApiResponse<FeatureResponse> setFeatureActive(
+            @PathVariable String code, @Valid @RequestBody FeatureActiveRequest request) {
+        return ApiResponse.ok(features.setActive(code, request));
+    }
+
+    @PostMapping("/features/{code}/plans")
+    public ApiResponse<PlanResponse> assignFeature(
+            @PathVariable String code, @Valid @RequestBody AssignFeatureRequest request) {
+        return ApiResponse.ok(features.assign(code, request));
+    }
+
+    @GetMapping("/features/{code}/organisations")
+    public ApiResponse<FeatureOrganisationList> featureOrganisations(
+            @PathVariable String code,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "25") @Min(1) @Max(100) int size) {
+        return ApiResponse.ok(features.organisations(code, page, size));
     }
 
     @GetMapping("/organisations")

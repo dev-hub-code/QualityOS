@@ -159,6 +159,8 @@ changes afterwards. At most one invoice per tenant can be open, and a payment re
 V21 adds `currency`, `public_visible` and `archived_at` to `subscription_plans`, and `subscription_plan_versions`, which
 
 V22 adds `suspended_at` and `suspension_reason` to `tenants`, GST detail to `subscription_invoices`, and `method`, `paid_on` and `notes` to `payment_transactions`. Invoice and payment lists use `SECURITY DEFINER` functions that call `require_platform_admin()`, and renewal reminders skip suspended organisations.
+
+V23 adds `max_storage_mb`, `max_monthly_inspections`, `max_attachments` and `feature_values` to `subscription_plans`, and the tables `feature_definitions` and `organisation_usage_snapshots`. The application role cannot read snapshots directly: `record_usage_snapshots()` writes them and `platform_usage_history()` reads them.
 keeps each saved state of a plan. The application role can only add to that table. The `platform_*` functions that read
 across organisations run as the schema owner and raise an error unless the current user is in `platform_admins`.
 `platform_contracts_at` has no grant to the application role.

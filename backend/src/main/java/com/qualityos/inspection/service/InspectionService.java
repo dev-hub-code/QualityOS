@@ -65,6 +65,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import com.qualityos.subscription.service.PlanLimits;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
@@ -72,6 +73,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class InspectionService implements AttachmentPolicy {
 
+    private final PlanLimits limits;
     private static final String ENTITY = "Inspection";
     private static final String ATTACHMENT_TYPE = "INSPECTION";
 
@@ -95,6 +97,7 @@ public class InspectionService implements AttachmentPolicy {
 
     /** Lazy because the attachment service collects every policy, and this class is one. */
     InspectionService(
+            PlanLimits limits,
             InspectionRepository inspections,
             InspectionResultRepository results,
             InspectionApprovalRepository approvals,
@@ -112,6 +115,7 @@ public class InspectionService implements AttachmentPolicy {
             DispatchReturnService returns,
             JsonMapper json,
             FacilityScope scope) {
+        this.limits = limits;
         this.scope = scope;
         this.instruments = instruments;
         this.inspections = inspections;
@@ -263,6 +267,7 @@ public class InspectionService implements AttachmentPolicy {
     }
 
     private Inspection save(Inspection inspection) {
+        limits.requireInspectionPlace();
         scope.requireAllowed(inspection.getFacilityId(), ENTITY, inspection.getInspectionNumber());
         inspections.saveAndFlush(inspection);
         audit.record("INSPECTION_CREATED", ENTITY, inspection.getId());

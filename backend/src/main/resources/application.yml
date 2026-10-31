@@ -84,6 +84,9 @@ qualityos:
     calibration-reminders:
       initial-delay: PT5M
       interval: PT1H
+    usage-snapshots:
+      initial-delay: PT7M
+      interval: PT6H
     subscription-notices:
       initial-delay: PT6M
       interval: PT1H

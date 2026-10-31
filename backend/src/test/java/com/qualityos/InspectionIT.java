@@ -121,6 +121,32 @@ class InspectionIT extends MasterDataFixture {
     }
 
     @Test
+    void theMonthlyInspectionLimitStopsTheNextStartButNotTheLotOrEarlierWork() throws Exception {
+        Session owner = register();
+        String template = shaftTemplate(owner);
+        String plan = "M" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
+        asDatabaseSuperuser().update("""
+                INSERT INTO subscription_plans (id, code, name, description, tax_percent, active, max_monthly_inspections, features)
+                SELECT gen_random_uuid(), ?, 'Metered', '', tax_percent, false, 1, features FROM subscription_plans
+                WHERE code = 'PROFESSIONAL'
+                """, plan);
+        asDatabaseSuperuser().update("""
+                UPDATE subscriptions SET plan_id = (SELECT id FROM subscription_plans WHERE code = ?) WHERE tenant_id = ?
+                """, plan, owner.tenantId());
+
+        String first = startInspection(owner, template);
+        String item = receivedItem(owner);
+        as(owner, postJson("/api/v1/inspections", Map.of("receiptItemId", item, "templateId", template)))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message", org.hamcrest.Matchers.containsString("1 inspections a month")));
+
+        as(owner, get("/api/v1/inspections/" + first)).andExpect(status().isOk());
+        as(owner, get("/api/v1/material-receipts/awaiting-inspection"))
+                .andExpect(jsonPath("$.data.items[?(@.itemId == '" + item + "')]").isNotEmpty());
+        as(owner, get("/api/v1/subscription")).andExpect(jsonPath("$.data.inspectionsThisMonth").value(1));
+    }
+
+    @Test
     void passingMaterialFlowsFromReceiptToAcceptance() throws Exception {
         Session owner = register();
         Session manager = addMember(owner, "QUALITY_MANAGER");

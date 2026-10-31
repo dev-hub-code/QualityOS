@@ -4,11 +4,11 @@ import { Pricing, type PublicPlan } from "./pricing";
 
 const STARTER: PublicPlan = {
   code: "STARTER", name: "Starter", description: "Basic", monthlyPrice: 3111, annualPrice: 31110, maxUsers: 1,
-  maxFacilities: 1, features: [], trialDays: 14,
+  maxFacilities: 1, features: [], trialDays: 14, featureNames: [],
 };
 const ENTERPRISE: PublicPlan = {
   ...STARTER, code: "ENTERPRISE", name: "Enterprise", monthlyPrice: null, annualPrice: null, maxUsers: null,
-  maxFacilities: null, features: ["ADVANCED"],
+  maxFacilities: null, features: ["ADVANCED"], featureNames: ["Traceability, recalls, calibration and audits"],
 };
 
 describe("Pricing", () => {

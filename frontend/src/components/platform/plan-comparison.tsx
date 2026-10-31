@@ -1,26 +1,23 @@
 import { formatMoney } from "@/components/billing/subscription-banner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { Plan } from "@/lib/types";
-
-export const PLAN_FEATURES = [
-  ["NCR_CAPA", "NCR and CAPA"],
-  ["REPORTS", "Dashboards and reports"],
-  ["ADVANCED", "Traceability, recalls, calibration and audits"],
-];
+import type { Feature, Plan } from "@/lib/types";
 
 const money = (value: number | null) => (value === null ? "Custom" : formatMoney(value));
 const limit = (value: number | null) => value ?? "No limit";
 
-export function PlanComparison({ plans }: { plans: Plan[] }) {
+export function PlanComparison({ plans, features }: { plans: Plan[]; features: Feature[] }) {
   const rows: [string, (plan: Plan) => string | number][] = [
     ["Monthly", (plan) => money(plan.monthlyPrice)],
     ["Annual", (plan) => money(plan.annualPrice)],
     ["Users", (plan) => limit(plan.maxUsers)],
     ["Facilities", (plan) => limit(plan.maxFacilities)],
+    ["Storage (MB)", (plan) => limit(plan.maxStorageMb)],
+    ["Inspections a month", (plan) => limit(plan.maxMonthlyInspections)],
+    ["Attachments", (plan) => limit(plan.maxAttachments)],
     ["Trial days", (plan) => plan.trialDays],
     ["Grace days", (plan) => plan.graceDays],
-    ...PLAN_FEATURES.map(([code, label]): [string, (plan: Plan) => string] => [
-      label,
+    ...features.map(({ code, name }): [string, (plan: Plan) => string] => [
+      name,
       (plan) => (plan.features.includes(code) ? "Included" : "Not included"),
     ]),
   ];

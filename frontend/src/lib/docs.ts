@@ -994,6 +994,7 @@ export const DOC_PAGES: DocPage[] = [
         list: [
           "The Control Center link only appears for platform administrators.",
           "Suspending an organisation stops its members signing in, but changes none of its records. Every action there needs a reason.",
+          "A plan decides what an organisation has bought, and a person's role decides what they may do. Both are checked.",
           "Changing a plan that has subscribers needs a reason, and shows how many organisations it reaches.",
         ],
       },

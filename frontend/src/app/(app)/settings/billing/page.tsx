@@ -7,6 +7,7 @@ import { PageHeader, QueryState, Section, StatusBadge, useAction } from "@/compo
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
+import { storageText, usageText } from "@/lib/usage";
 import type { BillingCycle, Invoice, Payment, Plan, Subscription } from "@/lib/types";
 
 const STATE: Record<Subscription["state"], string> = {
@@ -93,6 +94,18 @@ export default function BillingPage() {
           <div>
             <dt className="text-muted-foreground">Facilities</dt>
             <dd>{limit(current.facilities, current.maxFacilities)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Storage</dt>
+            <dd>{storageText(current.storageBytes, current.maxStorageMb)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Inspections this month</dt>
+            <dd>{usageText(current.inspectionsThisMonth, current.maxMonthlyInspections)}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Attachments</dt>
+            <dd>{usageText(current.attachments, current.maxAttachments)}</dd>
           </div>
         </dl>
         <div className="mt-4">

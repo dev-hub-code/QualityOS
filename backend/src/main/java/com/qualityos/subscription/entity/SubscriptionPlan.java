@@ -6,7 +6,9 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -32,9 +34,16 @@ public class SubscriptionPlan extends AuditedEntity {
     private BigDecimal taxPercent;
     private Integer maxUsers;
     private Integer maxFacilities;
+    private Integer maxStorageMb;
+    private Integer maxMonthlyInspections;
+    private Integer maxAttachments;
 
     @JdbcTypeCode(SqlTypes.ARRAY)
     private List<String> features;
+
+    /** Values for the features that have one, by code. A feature's presence in {@link #features} is what enables it. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    private Map<String, Object> featureValues = new HashMap<>();
 
     private int trialDays;
     private int graceDays;

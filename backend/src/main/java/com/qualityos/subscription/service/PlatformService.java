@@ -13,14 +13,18 @@ import com.qualityos.subscription.dto.SubscriptionDtos.PlanResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.RecordPaymentRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.SavePlanRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.SubscriptionResponse;
+import com.qualityos.subscription.entity.FeatureDefinition;
 import com.qualityos.subscription.entity.SubscriptionPlan;
+import com.qualityos.subscription.repository.FeatureDefinitionRepository;
 import com.qualityos.subscription.repository.SubscriptionPlanRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -41,6 +45,7 @@ public class PlatformService {
     private final AuditService audit;
     private final OrganizationService organizations;
     private final JdbcTemplate jdbc;
+    private final FeatureDefinitionRepository featureDefinitions;
     private final TransactionTemplate tx;
 
     PlatformService(
@@ -50,6 +55,7 @@ public class PlatformService {
             AuditService audit,
             OrganizationService organizations,
             JdbcTemplate jdbc,
+            FeatureDefinitionRepository featureDefinitions,
             PlatformTransactionManager transactionManager) {
         this.plans = plans;
         this.catalogue = catalogue;
@@ -57,6 +63,7 @@ public class PlatformService {
         this.audit = audit;
         this.organizations = organizations;
         this.jdbc = jdbc;
+        this.featureDefinitions = featureDefinitions;
         this.tx = new TransactionTemplate(transactionManager);
     }
 
@@ -73,8 +80,12 @@ public class PlatformService {
                     .orElseThrow(() -> new ResourceNotFoundException("Plan", id.toString()));
             catalogue.requireCurrent(plan, request.version());
             catalogue.requireReasonWhenInUse(plan, request.reason());
-            if (!PlanAccess.FEATURES.keySet().containsAll(request.features())) {
-                throw new BusinessRuleException("A plan can only include known features.");
+            Set<String> offered = featureDefinitions.findAllByOrderByName().stream()
+                    .filter(FeatureDefinition::isActive)
+                    .map(FeatureDefinition::getCode)
+                    .collect(Collectors.toSet());
+            if (!request.features().stream().allMatch(code -> offered.contains(code) || plan.getFeatures().contains(code))) {
+                throw new BusinessRuleException("A plan can only include active features.");
             }
             Map<String, Object> before = figures(plan);
             plan.setName(request.name().trim());
@@ -84,7 +95,13 @@ public class PlatformService {
             plan.setTaxPercent(request.taxPercent());
             plan.setMaxUsers(request.maxUsers());
             plan.setMaxFacilities(request.maxFacilities());
+            plan.setMaxStorageMb(request.maxStorageMb());
+            plan.setMaxMonthlyInspections(request.maxMonthlyInspections());
+            plan.setMaxAttachments(request.maxAttachments());
             plan.setFeatures(new ArrayList<>(request.features()));
+            Map<String, Object> values = new HashMap<>(plan.getFeatureValues());
+            values.keySet().retainAll(request.features());
+            plan.setFeatureValues(values);
             plan.setTrialDays(request.trialDays());
             plan.setGraceDays(request.graceDays());
             plan.setActive(request.active());
@@ -114,6 +131,9 @@ public class PlatformService {
                 "taxPercent", plan.getTaxPercent().toPlainString(),
                 "maxUsers", String.valueOf(plan.getMaxUsers()),
                 "maxFacilities", String.valueOf(plan.getMaxFacilities()),
+                "maxStorageMb", String.valueOf(plan.getMaxStorageMb()),
+                "maxMonthlyInspections", String.valueOf(plan.getMaxMonthlyInspections()),
+                "maxAttachments", String.valueOf(plan.getMaxAttachments()),
                 "features", String.join(",", plan.getFeatures()),
                 "active", plan.isActive());
     }

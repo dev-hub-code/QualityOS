@@ -223,6 +223,14 @@ choice of organisation, and the work runs under that organisation's tenant conte
 | GET | `/api/v1/platform/invoices/export` | The same filters as CSV, up to 5,000 rows. Leaves an audit event |
 | GET | `/api/v1/platform/payments` | `q` (reference, invoice, organisation), `status`, `from`, `to`, `page`, `size` |
 | GET | `/api/v1/platform/trials/summary` | Trials ending in 3 and 7 days, converted this month, conversion rate |
+| GET | `/api/v1/platform/analytics`, `/analytics/export` | `from`, `to`. Business figures, or as CSV. The export leaves an audit event |
+| GET | `/api/v1/platform/usage`, `/usage/export` | `q`, `alert` (`NEAR`, `REACHED`), `page`, `size`. The export runs to 5,000 rows and leaves an audit event |
+| GET | `/api/v1/platform/organisations/{id}/usage/history` | `days`, default 30, up to 366 |
+| GET, POST | `/api/v1/platform/features` | The catalogue, with `enforced` and how many organisations have each. POST needs `code`, `name`, `valueType`, `defaultEnabled` |
+| PUT | `/api/v1/platform/features/{code}` | `name`, `description`, `defaultEnabled`, `version` |
+| POST | `/api/v1/platform/features/{code}/active` | `active`, `version`, `reason` |
+| POST | `/api/v1/platform/features/{code}/plans` | `planId`, `included`, `value`, `version`, and `reason` when the plan has subscribers |
+| GET | `/api/v1/platform/features/{code}/organisations` | `page`, `size` |
 
 To make someone a platform administrator, an operator runs this as a database superuser:
 

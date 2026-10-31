@@ -12,7 +12,9 @@ import com.qualityos.subscription.dto.SubscriptionDtos.PlanActiveRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.PlanImpact;
 import com.qualityos.subscription.dto.SubscriptionDtos.PlanResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.PlanVersion;
+import com.qualityos.subscription.entity.FeatureDefinition;
 import com.qualityos.subscription.entity.SubscriptionPlan;
+import com.qualityos.subscription.repository.FeatureDefinitionRepository;
 import com.qualityos.subscription.repository.SubscriptionPlanRepository;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -39,6 +41,7 @@ public class PlanCatalogue {
     private final SubscriptionPlanRepository plans;
     private final AuditService audit;
     private final JdbcTemplate jdbc;
+    private final FeatureDefinitionRepository features;
     private final JsonMapper json;
     private final TransactionTemplate tx;
 
@@ -46,17 +49,27 @@ public class PlanCatalogue {
             SubscriptionPlanRepository plans,
             AuditService audit,
             JdbcTemplate jdbc,
+            FeatureDefinitionRepository features,
             JsonMapper json,
             PlatformTransactionManager transactionManager) {
         this.plans = plans;
         this.audit = audit;
         this.jdbc = jdbc;
+        this.features = features;
         this.json = json;
         this.tx = new TransactionTemplate(transactionManager);
     }
 
     public PlanResponse create(CreatePlanRequest request) {
-        return tx.execute(status -> add(new SubscriptionPlan(request.code(), request.name().trim()), "PLAN_CREATED"));
+        return tx.execute(status -> add(withDefaultFeatures(new SubscriptionPlan(request.code(), request.name().trim())), "PLAN_CREATED"));
+    }
+
+    private SubscriptionPlan withDefaultFeatures(SubscriptionPlan plan) {
+        plan.setFeatures(new ArrayList<>(features.findAllByOrderByName().stream()
+                .filter(feature -> feature.isActive() && feature.isDefaultEnabled())
+                .map(FeatureDefinition::getCode)
+                .toList()));
+        return plan;
     }
 
     public PlanResponse duplicate(UUID id, CreatePlanRequest request) {
@@ -69,7 +82,11 @@ public class PlanCatalogue {
             copy.setTaxPercent(source.getTaxPercent());
             copy.setMaxUsers(source.getMaxUsers());
             copy.setMaxFacilities(source.getMaxFacilities());
+            copy.setMaxStorageMb(source.getMaxStorageMb());
+            copy.setMaxMonthlyInspections(source.getMaxMonthlyInspections());
+            copy.setMaxAttachments(source.getMaxAttachments());
             copy.setFeatures(new ArrayList<>(source.getFeatures()));
+            copy.setFeatureValues(new HashMap<>(source.getFeatureValues()));
             copy.setTrialDays(source.getTrialDays());
             copy.setGraceDays(source.getGraceDays());
             return add(copy, "PLAN_DUPLICATED");
@@ -171,7 +188,11 @@ public class PlanCatalogue {
         snapshot.put("taxPercent", plan.getTaxPercent());
         snapshot.put("maxUsers", plan.getMaxUsers());
         snapshot.put("maxFacilities", plan.getMaxFacilities());
+        snapshot.put("maxStorageMb", plan.getMaxStorageMb());
+        snapshot.put("maxMonthlyInspections", plan.getMaxMonthlyInspections());
+        snapshot.put("maxAttachments", plan.getMaxAttachments());
         snapshot.put("features", plan.getFeatures());
+        snapshot.put("featureValues", plan.getFeatureValues());
         snapshot.put("trialDays", plan.getTrialDays());
         snapshot.put("graceDays", plan.getGraceDays());
         snapshot.put("active", plan.isActive());

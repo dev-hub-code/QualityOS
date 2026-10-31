@@ -1,23 +1,17 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
 import { MonthBars, RankBars } from "@/components/analytics/charts";
 import { rate } from "@/components/analytics/kpi-tiles";
 import { formatMoney } from "@/components/billing/subscription-banner";
+import { usePeriod } from "@/components/platform/period-select";
 import { PageHeader, QueryState, Section } from "@/components/records/parts";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
-import { presetPeriod, PERIODS, type PeriodName } from "@/lib/platform-period";
 import type { PlatformDashboard } from "@/lib/types";
 
 export default function PlatformDashboardPage() {
-  const [preset, setPreset] = useState<PeriodName | "CUSTOM">("LAST_30");
-  const [custom, setCustom] = useState(() => presetPeriod("LAST_30"));
-  const period = preset === "CUSTOM" ? custom : presetPeriod(preset);
-  const query = new URLSearchParams(period).toString();
+  const { query, controls } = usePeriod();
   const { data, error } = useQuery({
     queryKey: ["/platform/dashboard", query],
     queryFn: () => api.get<PlatformDashboard>(`/platform/dashboard?${query}`),
@@ -26,46 +20,7 @@ export default function PlatformDashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Dashboard" subtitle="Recurring revenue is what is under contract. Collected is money received." />
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="platform-period">Period</Label>
-          <select
-            id="platform-period"
-            className="h-9 rounded-md border bg-background px-2 text-sm"
-            value={preset}
-            onChange={(event) => setPreset(event.target.value as PeriodName | "CUSTOM")}
-          >
-            {PERIODS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-            <option value="CUSTOM">Custom dates</option>
-          </select>
-        </div>
-        {preset === "CUSTOM" && (
-          <>
-            <div className="space-y-1.5">
-              <Label htmlFor="platform-from">From</Label>
-              <Input
-                id="platform-from"
-                type="date"
-                value={custom.from}
-                onChange={(event) => setCustom({ ...custom, from: event.target.value })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="platform-to">To</Label>
-              <Input
-                id="platform-to"
-                type="date"
-                value={custom.to}
-                onChange={(event) => setCustom({ ...custom, to: event.target.value })}
-              />
-            </div>
-          </>
-        )}
-      </div>
+      {controls}
       {!data ? (
         <QueryState error={error} />
       ) : (

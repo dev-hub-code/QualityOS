@@ -128,3 +128,49 @@ From this release, an invoice stores its tax treatment when issued, by comparing
 
 It does not handle exemptions, SEZ supplies, exports or an unregistered buyer's place of supply. Invoices issued earlier keep their single GST line. Set `BILLING_SELLER_GSTIN` and `BILLING_SAC_CODE` once an accountant has confirmed them.
 
+## Features
+
+A feature is something a plan can include. Keep this apart from roles: a plan decides what an organisation has bought, a role decides what a person may do, and both are checked.
+
+Plans keep their `features` list, and any value sits beside it in `feature_values`. A value is a number, text or structured JSON. A blank number means unlimited.
+
+**A feature only restricts anything once the product enforces it.** Enforcement is code, in `PlanAccess`, and today covers `NCR_CAPA`, `REPORTS` and `ADVANCED`. The Features page marks anything else "Listed only, not enforced": it appears on plans and the website, but leaving it out takes nothing away.
+
+An inactive feature cannot be added to another plan. Plans that have it keep it, and an enforced feature stays enforced. On a plan with subscribers, a change needs a reason, reaches them at once, and joins the plan's history.
+
+## Usage limits
+
+| Limit | Counted | Checked when |
+|---|---|---|
+| Users | Active members plus pending invitations | Adding or inviting |
+| Facilities | Facilities not archived | Adding |
+| Storage | Bytes in attachments not removed | Uploading, before the file is stored |
+| Attachments | Attachments not removed | Uploading, before the file is stored |
+| Inspections a month | Inspections started since the 1st, in the organisation's time zone | Starting an inspection |
+
+Blank means no limit, and every plan starts blank. Each check holds a lock on the organisation's subscription, so two requests cannot both take the last place. A refused inspection leaves the lot waiting: nothing is released or changed. A removed attachment stops counting, although its file is kept as evidence, so the disk holds more than the figure shows.
+
+Usage is near a limit from 80%, and reaches it at 100%. A suggested plan is the next one offered that would fit what the organisation uses now. Daily history comes from a job that runs every six hours and replaces that day's row, so history starts on the day this is deployed.
+
+API requests are not limited. There is no customer API to meter, so a limit would mean nothing.
+
+## Analytics definitions
+
+All amounts are in Indian rupees, without GST, and plans can only be priced in rupees. A period runs from the start of its first day to the end of its last, in India time.
+
+| Figure | Definition |
+|---|---|
+| MRR | The same as the dashboard, at the end of the period: each organisation's latest paid invoice covering that moment, with annual invoices divided by 12. Cancelled subscriptions are left out |
+| ARR | MRR times 12 |
+| New customers | Organisations whose first paid invoice falls in the period |
+| Average revenue per organisation | MRR divided by paying organisations at the end of the period |
+| Customer churn | Organisations paying at the start and not at the end, as a share of those paying at the start |
+| Revenue churn | Monthly revenue lost from organisations paying at the start, through leaving or moving to less, as a share of MRR at the start. Upgrades and new customers do not offset it |
+| Trial conversion | Of organisations registered in the period, the share with a paid invoice by now. A recent period looks low because its trials have not finished |
+| Revenue by plan | MRR by the plan name on each invoice |
+| Subscription distribution | Organisations by current plan, including trials |
+| Outstanding receivables | The total of all issued invoices not yet paid, today, whatever the period |
+| Payment collection rate | The same as the dashboard: paid value as a share of invoices issued in the period, leaving out void ones |
+
+A suspended organisation's contract still counts towards MRR until it ends or is cancelled.
+

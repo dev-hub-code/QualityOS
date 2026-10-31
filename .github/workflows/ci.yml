@@ -98,11 +98,6 @@ jobs:
   security:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      TRIVY: >-
-        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:/repo -w /repo
-        aquasec/trivy:0.58.2
-      TRIVY_FLAGS: --quiet --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -114,13 +109,10 @@ jobs:
         working-directory: frontend
         run: npm audit --omit=dev --audit-level=high
       - name: Scan dependencies
-        run: | # shellcheck disable=SC2086
-          $TRIVY fs $TRIVY_FLAGS --scanners vuln backend
+        run: .github/scripts/trivy.sh fs --scanners vuln backend
       - name: Build images
         run: docker compose build backend frontend
       - name: Scan backend image
-        run: | # shellcheck disable=SC2086
-          $TRIVY image $TRIVY_FLAGS qualityos-backend:latest
+        run: .github/scripts/trivy.sh image qualityos-backend:latest
       - name: Scan frontend image
-        run: | # shellcheck disable=SC2086
-          $TRIVY image $TRIVY_FLAGS qualityos-frontend:latest
+        run: .github/scripts/trivy.sh image qualityos-frontend:latest

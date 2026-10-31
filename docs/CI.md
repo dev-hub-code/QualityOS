@@ -9,7 +9,7 @@
 | `e2e` | Playwright against the Docker Compose stack |
 | `security` | `npm audit` on production dependencies, then Trivy on dependencies and both container images. Fails on a high or critical issue with a published fix |
 
-The Trivy version is pinned in the workflow, and the frontend image carries no npm at runtime.
+The Trivy version is pinned in `.github/scripts/trivy.sh`, and the frontend image carries no npm at runtime.
 
 Dependabot opens weekly update pull requests against `dev`.
 

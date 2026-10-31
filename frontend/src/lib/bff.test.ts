@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
-import { isProxyablePath, isTokenIssuingRequest, isTrustedOrigin, returnedHeaders } from "./bff";
+import { forwardedHeaders, isProxyablePath, isTokenIssuingRequest, isTrustedOrigin, returnedHeaders } from "./bff";
 
 function request(method: string, headers: Record<string, string>) {
   return new NextRequest("http://app.test/api/v1/users", { method, headers });
@@ -37,6 +37,13 @@ describe("isTokenIssuingRequest", () => {
     expect(isTokenIssuingRequest("POST", ["organizations"])).toBe(true);
     expect(isTokenIssuingRequest("GET", ["organizations"])).toBe(false);
     expect(isTokenIssuingRequest("PUT", ["organizations", "1"])).toBe(false);
+  });
+});
+
+describe("forwardedHeaders", () => {
+  it("keeps only the address added by the proxy", () => {
+    const headers = forwardedHeaders(request("POST", { "x-forwarded-for": "198.51.100.7, 203.0.113.9" }));
+    expect(headers.get("x-forwarded-for")).toBe("203.0.113.9");
   });
 });
 

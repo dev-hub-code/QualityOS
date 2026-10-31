@@ -42,7 +42,7 @@ layers, so that one mistake does not expose data.
 |---|---|
 | Scheduled jobs | Read the tenant list through a narrow privileged path, then process each with `TenantContext.runAs(tenantId, ...)` in its own transaction |
 | Tables queried before a tenant is known | `users` and `refresh_tokens` have no RLS and are reached only by identity services. A user's own memberships and organisation names are readable through the `app.user_id` setting |
-| Platform admins (Phase 9) | Separate `/api/v1/platform/**` endpoints, using a distinct role with an explicit policy, and every access audited. No silent impersonation |
+| Platform admins (Phase 10) | Separate `/api/v1/platform/**` endpoints, using a distinct role with an explicit policy, and every access audited. No silent impersonation |
 | Attachments | Stored under an opaque key. Downloads load the parent record first (so tenant and permission checks apply), then issue a short-lived presigned URL |
 | Reports and exports | Same services and RLS as the API, plus facility scoping |
 | Logs and audit | `audit_logs` has RLS and the app role has only `INSERT` and `SELECT` on it |

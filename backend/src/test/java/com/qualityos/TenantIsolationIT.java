@@ -152,6 +152,108 @@ class TenantIsolationIT extends AbstractIntegrationTest {
         as(switched, get("/api/v1/auth/me")).andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void masterDataAndPurchasingAreInvisibleAcrossTenants() throws Exception {
+        var fixture = new Object() {
+            String supplier;
+            String order;
+        };
+        MasterDataHelper helper = new MasterDataHelper();
+        fixture.supplier = helper.supplier(tenantA);
+        fixture.order = helper.order(tenantA, fixture.supplier);
+        String material = helper.material(tenantA);
+        String facility = helper.facility(tenantA);
+
+        for (String path : List.of(
+                "/api/v1/suppliers/" + fixture.supplier,
+                "/api/v1/purchase-orders/" + fixture.order,
+                "/api/v1/materials/" + material,
+                "/api/v1/facilities/" + facility)) {
+            as(tenantB, get(path)).andExpect(status().isNotFound());
+        }
+        for (String path : List.of(
+                "/api/v1/suppliers", "/api/v1/purchase-orders", "/api/v1/materials", "/api/v1/facilities",
+                "/api/v1/material-receipts")) {
+            as(tenantB, get(path)).andExpect(jsonPath("$.data.totalItems").value(0));
+        }
+        as(tenantB, postJson("/api/v1/suppliers/" + fixture.supplier + "/submit", Map.of()))
+                .andExpect(status().isNotFound());
+        as(tenantB, postJson("/api/v1/purchase-orders/" + fixture.order + "/issue", Map.of()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void ordersCannotReferenceAnotherTenantsRecords() throws Exception {
+        MasterDataHelper helper = new MasterDataHelper();
+        String foreignSupplier = helper.supplier(tenantA);
+        String foreignFacility = helper.facility(tenantA);
+        String foreignMaterial = helper.material(tenantA);
+        String ownSupplier = helper.supplier(tenantB);
+        String ownFacility = helper.facility(tenantB);
+        String ownMaterial = helper.material(tenantB);
+
+        as(tenantB, postJson("/api/v1/purchase-orders", helper.order(foreignSupplier, ownFacility, ownMaterial)))
+                .andExpect(status().isNotFound());
+        as(tenantB, postJson("/api/v1/purchase-orders", helper.order(ownSupplier, foreignFacility, ownMaterial)))
+                .andExpect(status().isNotFound());
+        as(tenantB, postJson("/api/v1/purchase-orders", helper.order(ownSupplier, ownFacility, foreignMaterial)))
+                .andExpect(status().isNotFound());
+    }
+
+    /** A material from one tenant cannot be attached to another's supplier row, even with raw SQL. */
+    @Test
+    void compositeForeignKeysHoldForPurchasing() throws Exception {
+        MasterDataHelper helper = new MasterDataHelper();
+        String foreignSupplier = helper.supplier(tenantA);
+        String ownFacility = helper.facility(tenantB);
+
+        assertThatThrownBy(() -> inTransactionAs(tenantB.tenantId(), tenantB.userId(), () -> jdbc.update("""
+                INSERT INTO purchase_orders (id, tenant_id, po_number, supplier_id, facility_id, order_date)
+                VALUES (?, ?, 'PO-X', ?::uuid, ?::uuid, current_date)
+                """, UuidV7.generate(), tenantB.tenantId(), foreignSupplier, ownFacility)))
+                .isInstanceOf(DataAccessException.class)
+                .rootCause().hasMessageContaining("fk_purchase_orders_supplier_id");
+    }
+
+    private class MasterDataHelper {
+
+        private String id(org.springframework.test.web.servlet.ResultActions result) throws Exception {
+            return JsonPath.read(result.andReturn().getResponse().getContentAsString(), "$.data.id");
+        }
+
+        private String unique() {
+            return UUID.randomUUID().toString().substring(0, 8);
+        }
+
+        String supplier(Session session) throws Exception {
+            return id(as(session, postJson("/api/v1/suppliers", Map.of("code", unique(), "name", "S"))));
+        }
+
+        String facility(Session session) throws Exception {
+            return id(as(session, postJson("/api/v1/facilities", Map.of("code", unique(), "name", "F"))));
+        }
+
+        String material(Session session) throws Exception {
+            String units = as(session, get("/api/v1/units")).andReturn().getResponse().getContentAsString();
+            List<String> kg = JsonPath.read(units, "$.data[?(@.code == 'KG')].id");
+            return id(as(session, postJson("/api/v1/materials",
+                    Map.of("code", unique(), "name", "M", "uomId", kg.getFirst(), "inspectionRequired", true))));
+        }
+
+        Map<String, Object> order(String supplier, String facility, String material) {
+            return Map.of(
+                    "supplierId", supplier,
+                    "facilityId", facility,
+                    "orderDate", "2026-11-01",
+                    "items", List.of(Map.of("materialId", material, "quantity", "5")));
+        }
+
+        String order(Session session, String supplier) throws Exception {
+            return id(as(session, postJson("/api/v1/purchase-orders",
+                    order(supplier, facility(session), material(session)))));
+        }
+    }
+
     // --- Row-level security, with the application layer bypassed ---
 
     @Test

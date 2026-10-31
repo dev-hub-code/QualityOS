@@ -25,7 +25,8 @@ export interface PageResponse<T> {
 async function send<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
-    headers: init?.body ? { "content-type": "application/json" } : undefined,
+    // The browser sets the multipart boundary itself.
+    headers: typeof init?.body === "string" ? { "content-type": "application/json" } : undefined,
   });
   if (response.status === 204) {
     return undefined as T;
@@ -52,6 +53,7 @@ export const api = {
   put: <T>(path: string, body: unknown) =>
     send<T>(`/api/v1${path}`, { method: "PUT", body: JSON.stringify(body) }),
   delete: <T>(path: string) => send<T>(`/api/v1${path}`, { method: "DELETE" }),
+  upload: <T>(path: string, form: FormData) => send<T>(`/api/v1${path}`, { method: "POST", body: form }),
 };
 
 /** Session endpoints handled by the web server itself. */

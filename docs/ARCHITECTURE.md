@@ -4,7 +4,7 @@
 
 ```
 Browser ──> Next.js (web + BFF) ──> Spring Boot modular monolith ──> PostgreSQL
-                                          └──> S3 (attachments, Phase 4 onward)
+                                          └──> S3 (attachments, with production work)
 ```
 
 - **Modular monolith.** One deployable. Modules sit under `com.qualityos.<module>` and are the future
@@ -59,9 +59,9 @@ Checked against Maven Central and npm on 2026-10-31, then proven by building and
 | Next 16 renamed `middleware` to `proxy` | `src/proxy.ts` |
 | Next 16.4 template enables `cacheComponents` | Kept. Data is dynamic by default; use `use cache` deliberately |
 | shadcn now generates Base UI components and the `cn` package (published by shadcn; new, version 0.5) | Kept. Replace with `clsx` + `tailwind-merge` if it proves unstable |
-| TanStack Table is now v9, shadcn's data-table recipe may target v8 | Check when first used in Phase 3 |
+| TanStack Table is pinned to v8 | v9 changed the API and shadcn recipes target v8. Revisit on a planned upgrade |
 
-Libraries with no use yet (TanStack Table, Recharts) are added in the phase that uses them.
+Libraries with no use yet (Recharts) are added in the phase that uses them.
 
 ## Key decisions
 
@@ -92,7 +92,7 @@ Libraries with no use yet (TanStack Table, Recharts) are added in the phase that
 
 ## Assumptions and open decisions
 
-- Data residency: AWS `ap-south-1` (Mumbai) assumed. Confirm if Phase 10 (deferred) goes ahead.
+- Data residency: AWS `ap-south-1` (Mumbai) assumed. Confirm if Phase 11 (deferred) goes ahead.
 - Payment gateway is deferred (Razorpay or similar), behind an interface.
 - GST invoice requirements need review by an accountant before invoices are issued to customers.
 - Offline inspection is not in the brief. Shop floors with poor connectivity may need it; revisit after

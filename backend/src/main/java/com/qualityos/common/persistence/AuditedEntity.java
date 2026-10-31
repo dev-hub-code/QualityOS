@@ -7,10 +7,12 @@ import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.Version;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
@@ -44,4 +46,11 @@ public abstract class AuditedEntity {
 
     @LastModifiedBy
     private UUID updatedBy;
+
+    /** Rejects an update based on an outdated read, sent back by the client as {@code version}. */
+    public void requireVersion(Long expected) {
+        if (!Objects.equals(expected, version)) {
+            throw new OptimisticLockingFailureException("Stale version of " + getClass().getSimpleName());
+        }
+    }
 }

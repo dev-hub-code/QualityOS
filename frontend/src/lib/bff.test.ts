@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
-import { isProxyablePath, isTokenIssuingRequest, isTrustedOrigin } from "./bff";
+import { isProxyablePath, isTokenIssuingRequest, isTrustedOrigin, returnedHeaders } from "./bff";
 
 function request(method: string, headers: Record<string, string>) {
   return new NextRequest("http://app.test/api/v1/users", { method, headers });
@@ -46,5 +46,24 @@ describe("isTrustedOrigin", () => {
     expect(isTrustedOrigin(request("POST", { origin: "http://evil.test", host: "app.test" }))).toBe(false);
     expect(isTrustedOrigin(request("POST", { host: "app.test" }))).toBe(false);
     expect(isTrustedOrigin(request("POST", { origin: "null", host: "app.test" }))).toBe(false);
+  });
+});
+
+describe("returnedHeaders", () => {
+  it("keeps the headers that make downloads safe, and nothing else", () => {
+    const upstream = new Response("x", {
+      headers: {
+        "content-type": "application/pdf",
+        "content-disposition": "attachment; filename=cert.pdf",
+        "x-content-type-options": "nosniff",
+        "set-cookie": "leak=1",
+      },
+    });
+
+    const headers = returnedHeaders(upstream);
+
+    expect(headers.get("content-disposition")).toContain("attachment");
+    expect(headers.get("x-content-type-options")).toBe("nosniff");
+    expect(headers.get("set-cookie")).toBeNull();
   });
 });

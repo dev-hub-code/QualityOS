@@ -9,6 +9,7 @@ import {
   isTokenIssuingRequest,
   isTrustedOrigin,
   refreshTokens,
+  returnedHeaders,
   setSessionCookies,
   type TokenResponse,
 } from "@/lib/bff";
@@ -53,10 +54,8 @@ async function forward(
   const hasBody = upstream.status !== 204 && upstream.status !== 304;
   const response = new NextResponse(hasBody ? await upstream.arrayBuffer() : null, {
     status: upstream.status,
-    headers: { "content-type": upstream.headers.get("content-type") ?? "application/json" },
+    headers: returnedHeaders(upstream),
   });
-  const correlationId = upstream.headers.get("x-correlation-id");
-  if (correlationId) response.headers.set("x-correlation-id", correlationId);
 
   if (renewed) setSessionCookies(response, renewed);
   if (upstream.status === 401) clearSessionCookies(response);

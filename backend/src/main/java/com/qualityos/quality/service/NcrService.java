@@ -261,6 +261,13 @@ public class NcrService implements AttachmentPolicy {
         return transition(id, reason, ncr -> ncr.cancel(reason));
     }
 
+    @Transactional
+    public void correctSubjects(Collection<UUID> inspectionIds, UUID supplierId, UUID materialId) {
+        if (!inspectionIds.isEmpty()) {
+            ncrs.findOpenByInspectionIdIn(inspectionIds).forEach(ncr -> ncr.correctSubject(supplierId, materialId));
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<NcrHistory> history(Collection<UUID> inspectionIds, Collection<String> batchNumbers) {
         Collection<UUID> inspections = inspectionIds.isEmpty() ? List.of(new UUID(0, 0)) : inspectionIds;

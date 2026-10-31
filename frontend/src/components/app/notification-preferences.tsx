@@ -13,6 +13,8 @@ const LABELS: Record<string, string> = {
   INSPECTION_SENT_BACK: "My inspection is sent back",
   INSPECTION_AWAITING_DISPOSITION: "An inspection needs a disposition",
   INSPECTION_DISPOSITION_RECORDED: "A disposition is recorded on my inspection",
+  MATERIAL_CORRECTION_AWAITING_APPROVAL: "A material correction needs approval",
+  MATERIAL_CORRECTION_DECIDED: "A material correction is approved or rejected",
   NCR_RAISED: "An NCR is raised",
   NCR_ASSIGNED: "An NCR is assigned to me",
   NCR_AWAITING_CLOSURE: "An NCR is ready for closure",

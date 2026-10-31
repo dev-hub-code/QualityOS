@@ -237,6 +237,20 @@ public class InspectionService implements AttachmentPolicy {
                 .toList();
     }
 
+    /** Whether a lot has been inspected, which raises the bar for correcting it. */
+    @Transactional(readOnly = true)
+    public boolean hasInspection(UUID receiptItemId) {
+        return !inspections.findByReceiptItemIdIn(List.of(receiptItemId)).isEmpty();
+    }
+
+    /** Keeps inspections of corrected lots, and their open NCRs, pointing at the right supplier and material. */
+    @Transactional
+    public void correctSubjects(Collection<UUID> receiptItemIds, UUID supplierId, UUID materialId) {
+        List<Inspection> affected = inspections.findByReceiptItemIdIn(receiptItemIds);
+        affected.forEach(inspection -> inspection.correctSubject(supplierId, materialId));
+        ncrs.correctSubjects(affected.stream().map(Inspection::getId).toList(), supplierId, materialId);
+    }
+
     private static Collection<UUID> orNone(Collection<UUID> ids) {
         return ids.isEmpty() ? List.of(new UUID(0, 0)) : ids;
     }

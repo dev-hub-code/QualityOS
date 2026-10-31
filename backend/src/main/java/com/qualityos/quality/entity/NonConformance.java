@@ -155,4 +155,14 @@ public class NonConformance extends TenantOwnedEntity {
     private BusinessRuleException refused(String action) {
         return new BusinessRuleException("An NCR in status " + status + " cannot be " + action + ".");
     }
+
+    /** Corrections only. Finished NCRs are left as they were closed. */
+    public void correctSubject(UUID supplierId, UUID materialId) {
+        if (supplierId != null) {
+            this.supplierId = supplierId;
+        }
+        if (materialId != null) {
+            this.materialId = materialId;
+        }
+    }
 }

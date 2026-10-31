@@ -559,6 +559,7 @@ export interface SearchHit {
 }
 
 export interface TraceNode {
+  id: string;
   kind: "LOT" | "PRODUCTION_BATCH";
   batchNumber: string;
   code: string;
@@ -588,4 +589,26 @@ export interface TraceReport {
   affectedCustomers: string[];
   serialNumbers: string[];
   timeline: TimelineEvent[];
+}
+
+export interface CorrectionSummary {
+  id: string;
+  correctionNumber: string;
+  targetType: "LOT" | "CONSUMPTION";
+  status: string;
+  subject: string;
+  reason: string;
+  requestedByName: string | null;
+}
+
+export interface CorrectionDetail extends CorrectionSummary {
+  productionBatchId: string | null;
+  requestedBy: string;
+  additionalApproval: boolean;
+  approvalsNeeded: number;
+  changes: { field: string; originalValue: string | null; correctedValue: string }[];
+  approvals: { approverName: string | null; note: string | null; at: string }[];
+  impact: { inspected: boolean; batches: string[]; customers: string[] } | null;
+  decisionNote: string | null;
+  appliedAt: string | null;
 }

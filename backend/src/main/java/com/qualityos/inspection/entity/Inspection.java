@@ -104,6 +104,16 @@ public class Inspection extends TenantOwnedEntity {
         this.sampleSize = sampleSize;
     }
 
+    /** Corrections only: the results stand, and only the record of what was inspected changes. */
+    public void correctSubject(UUID supplierId, UUID materialId) {
+        if (supplierId != null) {
+            this.supplierId = supplierId;
+        }
+        if (materialId != null) {
+            this.materialId = materialId;
+        }
+    }
+
     public boolean isOpenForResults() {
         return status == Status.PENDING || status == Status.IN_PROGRESS;
     }

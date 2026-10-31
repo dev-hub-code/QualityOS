@@ -58,6 +58,11 @@ public class MaterialReceipt extends TenantOwnedEntity {
         this.notes = notes;
     }
 
+    /** Corrections only. The original supplier stays on the correction that changed it. */
+    public void correctSupplier(UUID supplierId) {
+        this.supplierId = supplierId;
+    }
+
     public void voidReceipt(String reason) {
         if (status == Status.VOIDED) {
             throw new BusinessRuleException("This receipt is already void.");

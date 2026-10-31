@@ -146,3 +146,39 @@ test("raw material is traced through production and inspection to the customer",
   await expect(page.getByText("reversed: Wrong customer", { exact: false }).first()).toBeVisible();
   await expect(page.getByText("Customers who received this:")).toHaveCount(0);
 });
+
+test("a wrong lot on a completed batch is corrected with approval", async ({ page, browser }) => {
+  test.setTimeout(90_000);
+  await signUp(page);
+  await prepare(page);
+  const call = apiCaller(page);
+  const lots: { itemId: string }[] = await call("GET", "/material-receipts/released-lots");
+  const products: { items: { id: string }[] } = await call("GET", "/products");
+  const facilities: { items: { id: string }[] } = await call("GET", "/facilities");
+  const created = await call("POST", "/production-batches", {
+    productId: products.items[0].id,
+    facilityId: facilities.items[0].id,
+    plannedQuantity: "5",
+  });
+  await call("POST", `/production-batches/${created.batch.id}/consume`, { receiptItemId: lots[0].itemId, quantity: "5" });
+  await call("POST", `/production-batches/${created.batch.id}/complete`, { producedQuantity: "5" });
+  const managerEmail = `manager-${unique()}@example.com`;
+  await inviteUser(page, managerEmail, "Quality Manager");
+  const manager = await acceptInvitation(browser, managerEmail, "Meera Iyer", PASSWORD);
+
+  await page.goto(`/production-batches/${created.batch.id}`);
+  await page.getByRole("button", { name: "Request correction" }).click();
+  await page.getByRole("dialog").getByLabel("Quantity actually used").fill("6");
+  await page.getByRole("dialog").getByLabel("Why this entry is wrong").fill("Weighed twice");
+  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await expect(page).toHaveURL(/material-corrections\/.+/);
+  await page.getByRole("button", { name: "Submit for approval" }).click();
+  await expect(page.getByText("Someone other than you must approve this.")).toBeVisible();
+
+  await manager.goto(page.url());
+  await step(manager, "Approve", (dialog) => dialog.getByLabel("Note").fill("Checked the scale log"));
+  await expect(manager.getByText("applied", { exact: true }).first()).toBeVisible();
+
+  await page.goto(`/production-batches/${created.batch.id}`);
+  await expect(page.getByText("Reversed: Weighed twice")).toBeVisible();
+});

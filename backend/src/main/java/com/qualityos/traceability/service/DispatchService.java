@@ -7,6 +7,7 @@ import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.organization.service.OrganizationService;
+import com.qualityos.traceability.dto.TraceabilityDtos.ConfirmShipmentRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.CreateDispatchRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.CustomerResponse;
 import com.qualityos.traceability.dto.TraceabilityDtos.DispatchItemRequest;
@@ -18,6 +19,7 @@ import com.qualityos.traceability.entity.Customer;
 import com.qualityos.traceability.entity.DispatchItem;
 import com.qualityos.traceability.entity.DispatchRecord;
 import com.qualityos.traceability.entity.DispatchReversalItem;
+import com.qualityos.traceability.entity.DispatchShipment;
 import com.qualityos.traceability.entity.FinishedProduct;
 import com.qualityos.traceability.entity.ProductionBatch;
 import com.qualityos.traceability.entity.TraceCorrection;
@@ -26,6 +28,7 @@ import com.qualityos.traceability.repository.DispatchItemRepository;
 import com.qualityos.traceability.repository.DispatchRecordRepository;
 import com.qualityos.traceability.repository.DispatchReversalItemRepository;
 import com.qualityos.traceability.repository.DispatchReversalRepository;
+import com.qualityos.traceability.repository.DispatchShipmentRepository;
 import com.qualityos.traceability.repository.FinishedProductRepository;
 import com.qualityos.traceability.repository.ProductionBatchRepository;
 import com.qualityos.traceability.repository.TraceCorrectionRepository;
@@ -56,6 +59,7 @@ public class DispatchService {
     private final FinishedProductRepository finishedProducts;
     private final TraceCorrectionRepository corrections;
     private final DispatchReversalRepository reversals;
+    private final DispatchShipmentRepository shipments;
     private final DispatchReversalItemRepository reversalItems;
     private final OrganizationService organizations;
     private final ProductionService production;
@@ -70,6 +74,7 @@ public class DispatchService {
             FinishedProductRepository finishedProducts,
             TraceCorrectionRepository corrections,
             DispatchReversalRepository reversals,
+            DispatchShipmentRepository shipments,
             DispatchReversalItemRepository reversalItems,
             OrganizationService organizations,
             ProductionService production,
@@ -82,6 +87,7 @@ public class DispatchService {
         this.finishedProducts = finishedProducts;
         this.corrections = corrections;
         this.reversals = reversals;
+        this.shipments = shipments;
         this.reversalItems = reversalItems;
         this.organizations = organizations;
         this.production = production;
@@ -144,14 +150,33 @@ public class DispatchService {
      * stays with the reason. Traces keep showing it as reversed, and no longer count its customer as affected.
      */
     @Transactional
+    public DispatchResponse confirmShipment(UUID id, ConfirmShipmentRequest request) {
+        DispatchRecord dispatch = lock(id);
+        if (corrections.existsByDispatchId(id)) {
+            throw new BusinessRuleException("This dispatch was cancelled, so it cannot ship.");
+        }
+        if (shipments.existsByDispatchId(id)) {
+            throw new ConflictException("This shipment is already confirmed.");
+        }
+        LocalDate today = LocalDate.now(ZoneId.of(organizations.getCurrent().timezone()));
+        if (request.shippedOn().isAfter(today) || request.shippedOn().isBefore(dispatch.getDispatchedOn())) {
+            throw new BusinessRuleException("The shipping date must fall between the dispatch and today.");
+        }
+        String carrier = request.carrierReference() == null ? null : request.carrierReference().trim();
+        shipments.saveAndFlush(new DispatchShipment(id, request.shippedOn(), carrier));
+        audit.record("DISPATCH_SHIPPED", "DispatchRecord", id);
+        return responses(List.of(dispatch)).get(dispatch);
+    }
+
+    /** Only for a dispatch that never physically happened. Goods a customer held come back through a return instead. */
+    @Transactional
     public DispatchResponse reverse(UUID id, String reason) {
-        DispatchRecord dispatch = dispatches.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Dispatch", id));
+        DispatchRecord dispatch = lock(id);
         if (corrections.existsByDispatchId(id)) {
             throw new BusinessRuleException("This dispatch was already reversed.");
         }
-        if (reversals.existsByDispatchId(id)) {
-            throw new BusinessRuleException("Goods have come back against this dispatch, so it really shipped.");
+        if (shipments.existsByDispatchId(id) || reversals.existsByDispatchId(id)) {
+            throw new BusinessRuleException("These goods physically shipped. Record a customer return instead.");
         }
         List<DispatchItem> lines = items.findByDispatchIdIn(List.of(id));
         lines.stream()
@@ -215,6 +240,9 @@ public class DispatchService {
         Map<UUID, TraceCorrection> voided = corrections
                 .findByDispatchIdIn(records.stream().map(DispatchRecord::getId).toList()).stream()
                 .collect(Collectors.toMap(TraceCorrection::getDispatchId, Function.identity()));
+        Map<UUID, DispatchShipment> confirmed = shipments
+                .findByDispatchIdIn(records.stream().map(DispatchRecord::getId).toList()).stream()
+                .collect(Collectors.toMap(DispatchShipment::getDispatchId, Function.identity()));
         Map<UUID, BigDecimal> returned = reversalItems
                 .findByDispatchItemIdIn(lines.stream().map(DispatchItem::getId).toList()).stream()
                 .collect(Collectors.toMap(
@@ -232,10 +260,16 @@ public class DispatchService {
                 }).toList(),
                 record.getCreatedAt(),
                 voided.containsKey(record.getId()) ? voided.get(record.getId()).getReason() : null,
-                voided.containsKey(record.getId()) ? voided.get(record.getId()).getCreatedAt() : null)));
+                voided.containsKey(record.getId()) ? voided.get(record.getId()).getCreatedAt() : null,
+                confirmed.containsKey(record.getId()) ? confirmed.get(record.getId()).getShippedOn() : null,
+                confirmed.containsKey(record.getId()) ? confirmed.get(record.getId()).getCarrierReference() : null)));
     }
 
     private static CustomerResponse toResponse(Customer customer) {
         return new CustomerResponse(customer.getId(), customer.getCode(), customer.getName(), customer.getGstin());
+    }
+
+    private DispatchRecord lock(UUID id) {
+        return dispatches.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Dispatch", id));
     }
 }

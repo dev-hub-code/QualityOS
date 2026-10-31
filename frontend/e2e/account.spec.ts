@@ -45,15 +45,31 @@ test("a new owner cannot sign in until their email is confirmed", async ({ page 
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByText("Please confirm your email address first")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Confirm your email address" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Send a new link" })).toBeVisible();
 
-  const link = await linkFromEmail(email, "/verify-email");
-  await page.goto(link);
-  await page.getByRole("button", { name: "Confirm email" }).click();
-  await expect(page.getByText("Your email address is confirmed")).toBeVisible();
+  // The restricted session is an HttpOnly cookie, cannot be refreshed, and opens nothing.
+  const cookies = await page.context().cookies();
+  expect(cookies.find((cookie) => cookie.name === "qos_access")?.httpOnly).toBe(true);
+  expect(cookies.find((cookie) => cookie.name === "qos_refresh")).toBeUndefined();
+  await page.goto("/dashboard");
+  await expect(page).toHaveURL(/login/);
+  expect(await page.evaluate(() => fetch("/api/v1/auth/me").then((response) => response.status))).toBe(403);
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
 
-  await page.reload();
+  // Confirming in another tab shows up here, through the restricted session.
+  const link = await linkFromEmail(email, "/verify-email");
+  const mailTab = await page.context().newPage();
+  await mailTab.goto(link);
+  await mailTab.getByRole("button", { name: "Confirm email" }).click();
+  await expect(mailTab.getByText("Your email address is confirmed")).toBeVisible();
+  await expect(page.getByText("Your email is confirmed. You can sign in now.")).toBeVisible({ timeout: 10_000 });
+  await mailTab.close();
+
+  await page.goto(link);
+
   await page.getByRole("button", { name: "Confirm email" }).click();
   await expect(page.getByText("This link is not valid or has expired")).toBeVisible();
   await expect(page.getByLabel("Email")).toBeVisible();

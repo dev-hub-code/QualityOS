@@ -542,6 +542,8 @@ export interface BatchDetail {
 }
 
 export interface Dispatch {
+  shippedOn: string | null;
+  carrierReference: string | null;
   id: string;
   dispatchNumber: string;
   customerName: string;

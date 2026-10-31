@@ -85,7 +85,7 @@ proxy refuses token-carrying endpoints, and refuses writes from another origin.
 | 2 (built) | `/organizations`, `/users` (plus `/{membershipId}/roles`, `/activate`, `/deactivate`), `/roles`, `/permissions`, `/audit-logs` |
 | 3 (built) | `/facilities`, `/suppliers`, `/products`, `/materials`, `/purchase-orders`, `/material-receipts` |
 | 4 (built) | `/inspection-templates` (plus `/{id}/versions`, `/{id}/publish`), `/inspections` (plus `/{id}/execute`, `/submit`, `/approve`, `/send-back`, `/disposition`, `/cancel`), `/material-receipts/awaiting-inspection` |
-| 5 (built) | `/auth/password-reset/{request,confirm}`, `/auth/email-verification/{request,confirm}`, `/auth/invitations/{preview,accept}`, `/invitations` (plus `/{id}/resend`, `/{id}/revoke`), `/notifications` (plus `/unread-count`, `/{id}/read`, `/read-all`, `/preferences`). `POST /users` is removed: people join by invitation |
+| 5 (built) | `/auth/password-reset/{request,confirm}`, `/auth/verify-email`, `/auth/resend-verification`, `/auth/verification-status`, `/auth/invitations/{preview,accept}`, `/invitations` (plus `/{id}/resend`, `/{id}/revoke`), `/notifications` (plus `/unread-count`, `/{id}/read`, `/read-all`, `/preferences`). `POST /users` is removed: people join by invitation |
 | 6 (built) | `/ncrs` (plus `/{id}/assign`, `/containment`, `/investigation`, `/request-verification`, `/send-back`, `/close`, `/reject`, `/cancel`), `/capas` (plus `/{id}/start-analysis`, `/analysis`, `/finish-analysis`, `/actions`, `/actions/{actionId}/complete`, `/start-implementation`, `/submit-verification`, `/verify`, `/close`, `/cancel`), `/defect-categories`, `/quality/assignees` |
 | 7 (built) | `/production-batches` (plus `/{id}/consume`, `/{id}/consumptions/{consumptionId}/reverse`, `/complete`, `/serials`), `/customers`, `/dispatches` (plus `/{id}/reverse` for a dispatch that never happened, `/{id}/reversals`, `/{id}/reversal-summary`), `/dispatch-reversals`, `/material-corrections` (plus `/{id}/submit`, `/approve`, `/reject`, `/cancel`), `/batches/{id}/correction-history`, `/traceability/search`, `/traceability/batches/{batchNumber}`, `/traceability/products/{productId}`, `/material-receipts/released-lots`. `POST /inspections` now takes `productionBatchId` or `returnItemId` in place of `receiptItemId` |
 | 8 | `/instruments`, `/calibrations`, `/audits` |
@@ -101,13 +101,25 @@ Contracts are finalised in OpenAPI as each phase is built.
 | `POST /auth/register` | Public | `202` with `verificationRequired: true` and no session. The answer is the same for an address already in use. With verification off: `201` and a session |
 | `POST /auth/verify-email` | Public | `204`, or `422` with one message for invalid, expired and used links |
 | `POST /auth/resend-verification` | Public | Always `202` |
-| `GET /auth/verification-status` | Signed in | `emailVerified`, `verificationRequired` |
+| `GET /auth/verification-status` | Any session, including a pending one | `emailVerified`, `verificationRequired`. Not public |
 
-Signing in with the right password before confirming returns `403 EMAIL_NOT_VERIFIED`. A wrong password gets the usual
-`401`. Links are stored hashed, work once, and replace earlier links. Resends are limited to one a minute and five an
+The right password on an unconfirmed account returns `202` with a restricted access token: no tenant, no refresh token,
+and usable only on `verification-status`. Anything else returns `403 EMAIL_NOT_VERIFIED`. A wrong password gets the
+usual `401`. Registration never issues a token, because that would show whether an address was already taken. Links are stored hashed, work once, and replace earlier links. Resends are limited to one a minute and five an
 hour per account, on top of the IP limit.
 
 Settings are under `app.registration`. The `prod` profile refuses to start unless verification is required and
 unverified sign-in is off. Local Docker Compose enforces it too. Integration tests turn it off, except `EmailVerificationIT`.
 
 `PUT /auth/me/email-language` takes `language` (`en`, `hi`, `mr`, or null for the organisation default) and returns `204`.
+
+## Dispatch cancellation and customer returns
+
+| Action | Endpoint | Rule |
+|---|---|---|
+| Cancel a dispatch that never happened | `POST /dispatches/{id}/reverse` | Refused once a shipment is confirmed or any return exists. Restocks at once, because the goods never left |
+| Confirm goods left | `POST /dispatches/{id}/shipment` | Once only, and never on a cancelled dispatch |
+| Record a return | `POST /dispatches/{id}/reversals` | Needs a confirmed shipment. Stock returns only when an inspection accepts the goods |
+
+Dispatches, customers and return lines stay on the trace after a full return, so `affectedCustomers` includes everyone
+a shipment reached. Only a dispatch cancelled through `/reverse` drops out, because those goods never left.

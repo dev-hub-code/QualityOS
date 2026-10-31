@@ -59,7 +59,9 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A corrected lot keeps its original purchase order line, and a finished NCR keeps its original supplier and material | By design: history is preserved |
 | A correction of an inspected lot does not trigger reinspection. It needs two approvers, who decide whether to act | Review after real use |
 | Naming serial numbers on a dispatch is optional, so a batch can ship without saying which units went. A trace then shows the customer by batch, not by unit | Review after real use |
-| A trace finds who received a batch, but there is no recall workflow | When a user needs it |
+| A dispatch only counts as shipped once someone confirms it. Until then it can be cancelled, and it already shows on traces | Review after real use |
+| There is no lookup from one serial number to its customers. Traces work by batch; serial history is kept in dispatch and return lines | When a user needs it |
+| A trace finds who received a batch, but there is no recall workflow or recall report screen | When a user needs it |
 | `tenant_settings` and supplier scorecards are not built | Phase 9 |
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | Lists show only active records, with no way to restore an archived one | When a user needs it |

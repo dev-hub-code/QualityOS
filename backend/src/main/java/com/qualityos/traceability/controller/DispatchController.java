@@ -4,6 +4,7 @@ import com.qualityos.common.response.ApiResponse;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.response.Pages;
 import com.qualityos.common.security.Permissions.Require;
+import com.qualityos.traceability.dto.TraceabilityDtos.ConfirmShipmentRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.CreateDispatchRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.CreateReversalRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.CustomerResponse;
@@ -86,6 +87,13 @@ public class DispatchController {
     @PreAuthorize(Require.TRACEABILITY_MANAGE)
     public ApiResponse<DispatchResponse> reverse(@PathVariable UUID id, @Valid @RequestBody ReverseRequest request) {
         return ApiResponse.ok(dispatches.reverse(id, request.reason()));
+    }
+
+    @PostMapping("/dispatches/{id}/shipment")
+    @PreAuthorize(Require.TRACEABILITY_MANAGE)
+    public ApiResponse<DispatchResponse> confirmShipment(
+            @PathVariable UUID id, @Valid @RequestBody ConfirmShipmentRequest request) {
+        return ApiResponse.ok(dispatches.confirmShipment(id, request));
     }
 
     @PostMapping("/dispatches/{id}/reversals")

@@ -63,6 +63,8 @@ public class TenantAccessService implements TenantAccessResolver {
             ORDER BY u.full_name
             """;
 
+    private static final String OPEN_ACCOUNT = "SELECT 1 FROM users WHERE id = ? AND status <> 'DISABLED'";
+
     private static final String FIRST_LOCALE = """
             SELECT t.locale
             FROM tenant_memberships m
@@ -79,6 +81,12 @@ public class TenantAccessService implements TenantAccessResolver {
         this.jdbc = jdbc;
         this.readOnly = new TransactionTemplate(transactionManager);
         this.readOnly.setReadOnly(true);
+    }
+
+    @Override
+    public boolean isOpenAccount(UUID userId) {
+        return !TenantContext.callAs(null, userId, () -> readOnly.execute(status ->
+                jdbc.queryForList(OPEN_ACCOUNT, Integer.class, userId))).isEmpty();
     }
 
     @Override

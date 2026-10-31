@@ -20,10 +20,18 @@ function Row({ dispatch }: { dispatch: Dispatch }) {
   const refresh = useRefresh();
   const [reversing, setReversing] = useState(false);
   const [returning, setReturning] = useState(false);
+  const [shipping, setShipping] = useState(false);
   if (dispatch.reversalReason) return <StatusBadge status="REVERSED" />;
   if (!canManage) return null;
   const hasReturns = dispatch.lines.some((line) => Number(line.returnedQuantity) > 0);
-  const returnable = dispatch.lines.filter((line) => Number(line.returnedQuantity) < Number(line.quantity));
+  const shipped = dispatch.shippedOn !== null;
+  const returnable = shipped
+    ? dispatch.lines.filter((line) => Number(line.returnedQuantity) < Number(line.quantity))
+    : [];
+  const shipmentFields: FieldDef[] = [
+    { name: "shippedOn", label: "Shipped on", type: "date", required: true },
+    { name: "carrierReference", label: "Carrier or vehicle reference" },
+  ];
   const returnFields: FieldDef[] = [
     {
       name: "dispatchItemId",
@@ -38,7 +46,7 @@ function Row({ dispatch }: { dispatch: Dispatch }) {
     { name: "quantity", label: "Returned quantity", type: "decimal", required: true },
     { name: "serials", label: "Serial numbers, if tracked (one per line)", type: "textarea" },
     { name: "returnReference", label: "Return reference", required: true },
-    { name: "reversalDate", label: "Return date", type: "date", required: true },
+    { name: "reversalDate", label: "Date received", type: "date", required: true },
     { name: "reason", label: "Reason for return", type: "textarea", required: true },
   ];
   return (
@@ -48,10 +56,23 @@ function Row({ dispatch }: { dispatch: Dispatch }) {
           Record return
         </Button>
       )}
-      {!hasReturns && (
+      {!shipped && (
+        <Button variant="ghost" size="sm" onClick={() => setShipping(true)}>
+          Confirm shipment
+        </Button>
+      )}
+      {!shipped && !hasReturns && (
         <Button variant="ghost" size="sm" onClick={() => setReversing(true)}>
           Reverse
         </Button>
+      )}
+      {shipping && (
+        <RecordDialog
+          title={`Confirm shipment of ${dispatch.dispatchNumber}`}
+          fields={shipmentFields}
+          onClose={() => setShipping(false)}
+          onSubmit={(values) => api.post(`/dispatches/${dispatch.id}/shipment`, values).then(refresh)}
+        />
       )}
       {returning && (
         <RecordDialog

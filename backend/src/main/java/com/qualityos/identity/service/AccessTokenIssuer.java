@@ -24,18 +24,28 @@ class AccessTokenIssuer {
     }
 
     String issue(UUID userId, UUID tenantId) {
+        return encode(claims(userId).claim(TenantJwtAuthenticationConverter.TENANT_CLAIM, tenantId.toString()));
+    }
+
+    /** Has no tenant, and security allows it nothing beyond asking about its own verification. */
+    String issuePendingVerification(UUID userId) {
+        return encode(claims(userId).claim(TenantJwtAuthenticationConverter.PENDING_VERIFICATION_CLAIM, true));
+    }
+
+    private JwtClaimsSet.Builder claims(UUID userId) {
         Instant now = Instant.now();
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        return JwtClaimsSet.builder()
                 .id(UUID.randomUUID().toString())
                 .issuer(properties.issuer())
                 .audience(List.of(properties.audience()))
                 .subject(userId.toString())
-                .claim(TenantJwtAuthenticationConverter.TENANT_CLAIM, tenantId.toString())
                 .issuedAt(now)
-                .expiresAt(now.plus(properties.accessTokenTtl()))
-                .build();
+                .expiresAt(now.plus(properties.accessTokenTtl()));
+    }
+
+    private String encode(JwtClaimsSet.Builder claims) {
         JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).build();
-        return encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+        return encoder.encode(JwtEncoderParameters.from(header, claims.build())).getTokenValue();
     }
 
     long ttlSeconds() {

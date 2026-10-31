@@ -173,6 +173,11 @@ public final class TraceabilityDtos {
             @Size(max = 1000) List<@NotBlank @Size(max = 100) String> serialNumbers) {
     }
 
+    public record ConfirmShipmentRequest(
+            @NotNull LocalDate shippedOn,
+            @Size(max = 200) String carrierReference) {
+    }
+
     public record CreateReversalRequest(
             @NotBlank @Size(max = 100) String returnReference,
             @NotNull LocalDate reversalDate,
@@ -232,7 +237,9 @@ public final class TraceabilityDtos {
             List<DispatchLine> lines,
             Instant createdAt,
             String reversalReason,
-            Instant reversedAt) {
+            Instant reversedAt,
+            LocalDate shippedOn,
+            String carrierReference) {
     }
 
     /** @param matchedOn which field the term was found in */

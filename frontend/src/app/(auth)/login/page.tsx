@@ -4,16 +4,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { ResendVerification } from "@/components/auth/resend-verification";
+import { VerificationPending } from "@/components/auth/verification-pending";
 import { applyServerErrors } from "@/components/forms/apply-server-errors";
 import { Field, FormError } from "@/components/forms/field";
 import { Button } from "@/components/ui/button";
-import { ApiError, hardNavigate, session } from "@/lib/api";
+import { hardNavigate, session } from "@/lib/api";
 import { loginSchema, type LoginValues } from "@/lib/schemas";
 
 export default function LoginPage() {
   const [formError, setFormError] = useState("");
-  const [unverifiedEmail, setUnverifiedEmail] = useState("");
+  const [pendingEmail, setPendingEmail] = useState("");
   const {
     register,
     handleSubmit,
@@ -24,19 +24,25 @@ export default function LoginPage() {
   async function onSubmit(values: LoginValues) {
     setFormError("");
     try {
-      await session.post("login", values);
-      hardNavigate("/dashboard");
+      const result = await session.post("login", values);
+      if (result?.verificationRequired) {
+        setPendingEmail(values.email);
+      } else {
+        hardNavigate("/dashboard");
+      }
     } catch (error) {
       setFormError(applyServerErrors(error, setError));
-      setUnverifiedEmail(error instanceof ApiError && error.code === "EMAIL_NOT_VERIFIED" ? values.email : "");
     }
+  }
+
+  if (pendingEmail) {
+    return <VerificationPending email={pendingEmail} />;
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
       <h1 className="text-lg font-medium">Sign in</h1>
       <FormError message={formError} />
-      {unverifiedEmail && <ResendVerification email={unverifiedEmail} />}
       <Field label="Email" id="email" type="email" autoComplete="email" error={errors.email} {...register("email")} />
       <Field
         label="Password"

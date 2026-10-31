@@ -57,6 +57,7 @@ export const api = {
 };
 
 /** Session endpoints handled by the web server itself. */
+/** A session comes back as cookies, so all a page ever learns is whether email confirmation is still needed. */
 export const session = {
   post: (path: string, body: unknown) =>
     send<{ verificationRequired?: boolean } | undefined>(`/api/auth/${path}`, { method: "POST", body: JSON.stringify(body) }),

@@ -116,6 +116,19 @@ public final class AuthDtos {
     public record ResendVerificationRequest(@NotBlank @Email @Size(max = 254) String email) {
     }
 
+    /**
+     * For the right password on an account that has not confirmed its email address. The token can only ask about
+     * verification. It comes with no refresh token, and registration never issues one, because that would show
+     * whether an address was already taken.
+     */
+    public record PendingVerificationSession(String accessToken, long expiresInSeconds, boolean verificationRequired) {
+
+        @Override
+        public String toString() {
+            return "PendingVerificationSession";
+        }
+    }
+
     /** Sent instead of tokens when a new account must confirm its email address first. */
     public record RegistrationPending(boolean verificationRequired) {
     }

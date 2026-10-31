@@ -220,11 +220,16 @@ test("returned goods stay out of stock until an inspection accepts them", async 
   });
 
   await page.goto("/dispatches");
+  await expect(page.getByRole("button", { name: "Record return" })).toHaveCount(0);
+  await step(page, "Confirm shipment", (dialog) =>
+    dialog.getByLabel("Shipped on").fill(new Date().toISOString().slice(0, 10)),
+  );
+  await expect(page.getByRole("button", { name: "Reverse", exact: true })).toHaveCount(0);
   await step(page, "Record return", async (dialog) => {
     await dialog.getByLabel("Line", { exact: true }).selectOption({ index: 1 });
     await dialog.getByLabel("Returned quantity").fill("4");
     await dialog.getByLabel("Return reference").fill("RMA-1");
-    await dialog.getByLabel("Return date").fill(new Date().toISOString().slice(0, 10));
+    await dialog.getByLabel("Date received").fill(new Date().toISOString().slice(0, 10));
     await dialog.getByLabel("Reason for return").fill("Scratched in transit");
   });
   await expect(page.getByText("(4 returned)")).toBeVisible();

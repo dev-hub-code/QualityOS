@@ -14,6 +14,11 @@ export interface TokenResponse {
   tenantId: string;
 }
 
+export interface PendingVerificationSession {
+  accessToken: string;
+  expiresInSeconds: number;
+}
+
 export function backendUrl(): string {
   return process.env.BACKEND_URL ?? "http://localhost:8080";
 }
@@ -36,6 +41,11 @@ export function setSessionCookies(response: NextResponse, tokens: TokenResponse)
     ...cookieOptions(),
     maxAge: REFRESH_MAX_AGE_SECONDS,
   });
+}
+
+/** Only an access cookie: this token can do no more than ask about verification, and it cannot be refreshed. */
+export function setPendingVerificationCookie(response: NextResponse, token: PendingVerificationSession) {
+  response.cookies.set(ACCESS_COOKIE, token.accessToken, { ...cookieOptions(), maxAge: token.expiresInSeconds });
 }
 
 export function clearSessionCookies(response: NextResponse) {

@@ -13,7 +13,8 @@ import org.junit.jupiter.params.provider.FieldSource;
 
 class ModuleBoundariesTest {
 
-    static final List<String> MODULES = List.of("identity", "organization");
+    static final List<String> MODULES = List.of(
+            "identity", "organization", "supplier", "material", "product", "purchaseorder", "materialreceipt");
 
     private static final JavaClasses CLASSES = new ClassFileImporter()
             .withImportOption(new ImportOption.DoNotIncludeTests())

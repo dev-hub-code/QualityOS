@@ -1,4 +1,16 @@
-import { LayoutDashboard, Settings, ShieldCheck, Users, type LucideIcon } from "lucide-react";
+import {
+  Boxes,
+  ClipboardList,
+  Factory,
+  LayoutDashboard,
+  Package,
+  PackageCheck,
+  Settings,
+  ShieldCheck,
+  Truck,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 
 export interface NavItem {
   label: string;
@@ -10,6 +22,12 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Suppliers", href: "/suppliers", icon: Truck, anyPermission: ["SUPPLIER_VIEW"] },
+  { label: "Materials", href: "/materials", icon: Boxes, anyPermission: ["PRODUCT_VIEW"] },
+  { label: "Products", href: "/products", icon: Package, anyPermission: ["PRODUCT_VIEW"] },
+  { label: "Purchase orders", href: "/purchase-orders", icon: ClipboardList, anyPermission: ["PURCHASE_VIEW"] },
+  { label: "Receipts", href: "/material-receipts", icon: PackageCheck, anyPermission: ["PURCHASE_VIEW"] },
+  { label: "Facilities", href: "/facilities", icon: Factory, anyPermission: ["FACILITY_VIEW"] },
   { label: "Users", href: "/users", icon: Users, anyPermission: ["USER_MANAGE"] },
   { label: "Roles", href: "/roles", icon: ShieldCheck, anyPermission: ["ROLE_MANAGE", "USER_MANAGE"] },
   { label: "Settings", href: "/settings", icon: Settings },

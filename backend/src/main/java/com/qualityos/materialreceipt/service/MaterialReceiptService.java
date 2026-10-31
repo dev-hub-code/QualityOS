@@ -1,0 +1,181 @@
+package com.qualityos.materialreceipt.service;
+
+import com.qualityos.common.attachment.AttachmentPolicy;
+import com.qualityos.common.audit.AuditService;
+import com.qualityos.common.exception.ResourceNotFoundException;
+import com.qualityos.common.persistence.DocumentNumberService;
+import com.qualityos.common.persistence.Searches;
+import com.qualityos.common.response.PageResponse;
+import com.qualityos.common.security.Permissions;
+import com.qualityos.material.dto.MaterialDtos.MaterialReference;
+import com.qualityos.material.service.MaterialService;
+import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.CreateReceiptRequest;
+import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceiptDetail;
+import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceiptItemRequest;
+import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceiptItemResponse;
+import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceiptSummary;
+import com.qualityos.materialreceipt.entity.MaterialReceipt;
+import com.qualityos.materialreceipt.entity.MaterialReceiptItem;
+import com.qualityos.materialreceipt.repository.MaterialReceiptRepository;
+import com.qualityos.purchaseorder.dto.PurchaseOrderDtos.ReceiptLine;
+import com.qualityos.purchaseorder.dto.PurchaseOrderDtos.ReceiptTarget;
+import com.qualityos.purchaseorder.service.PurchaseOrderService;
+import com.qualityos.supplier.dto.SupplierDtos.SupplierReference;
+import com.qualityos.supplier.service.SupplierService;
+import java.math.BigDecimal;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class MaterialReceiptService implements AttachmentPolicy {
+
+    private final MaterialReceiptRepository receipts;
+    private final PurchaseOrderService purchaseOrders;
+    private final SupplierService suppliers;
+    private final MaterialService materials;
+    private final DocumentNumberService numbers;
+    private final AuditService audit;
+
+    MaterialReceiptService(
+            MaterialReceiptRepository receipts,
+            PurchaseOrderService purchaseOrders,
+            SupplierService suppliers,
+            MaterialService materials,
+            DocumentNumberService numbers,
+            AuditService audit) {
+        this.receipts = receipts;
+        this.purchaseOrders = purchaseOrders;
+        this.suppliers = suppliers;
+        this.materials = materials;
+        this.numbers = numbers;
+        this.audit = audit;
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<ReceiptSummary> list(String search, UUID purchaseOrderId, Pageable pageable) {
+        Specification<MaterialReceipt> filter =
+                Specification.<MaterialReceipt>where(Searches.contains(search, "grnNumber", "deliveryNote"))
+                        .and(Searches.equalTo("purchaseOrderId", purchaseOrderId));
+        Page<MaterialReceipt> page = receipts.findAll(filter, pageable);
+        Map<UUID, SupplierReference> supplierNames =
+                suppliers.references(page.map(MaterialReceipt::getSupplierId).toSet());
+        return PageResponse.from(page, receipt -> new ReceiptSummary(
+                receipt.getId(),
+                receipt.getGrnNumber(),
+                receipt.getPurchaseOrderId(),
+                receipt.getSupplierId(),
+                supplierNames.get(receipt.getSupplierId()).name(),
+                receipt.getReceivedOn(),
+                receipt.getStatus().name()));
+    }
+
+    @Transactional(readOnly = true)
+    public ReceiptDetail get(UUID id) {
+        return toDetail(load(id));
+    }
+
+    @Transactional
+    public ReceiptDetail create(CreateReceiptRequest request) {
+        Map<UUID, BigDecimal> totals = request.items().stream().collect(Collectors.toMap(
+                ReceiptItemRequest::purchaseOrderItemId, ReceiptItemRequest::quantity, BigDecimal::add));
+        ReceiptTarget target = purchaseOrders.recordReceipt(request.purchaseOrderId(), totals);
+        Map<UUID, ReceiptLine> lines =
+                target.lines().stream().collect(Collectors.toMap(ReceiptLine::itemId, Function.identity()));
+        Map<UUID, MaterialReference> referenced =
+                materials.references(target.lines().stream().map(ReceiptLine::materialId).toList());
+
+        MaterialReceipt receipt = new MaterialReceipt(
+                numbers.next("GRN"), target.purchaseOrderId(), target.supplierId(), target.facilityId(),
+                request.receivedOn(), request.deliveryNote(), request.notes());
+        for (ReceiptItemRequest item : request.items()) {
+            ReceiptLine line = lines.get(item.purchaseOrderItemId());
+            receipt.getItems().add(new MaterialReceiptItem(
+                    receipt,
+                    line.itemId(),
+                    line.materialId(),
+                    line.uomId(),
+                    item.supplierBatch().trim(),
+                    numbers.next("LOT"),
+                    item.quantity(),
+                    referenced.get(line.materialId()).inspectionRequired()));
+        }
+        receipts.saveAndFlush(receipt);
+        audit.record("MATERIAL_RECEIVED", "MaterialReceipt", receipt.getId());
+        return toDetail(receipt);
+    }
+
+    /** Takes the quantities back off the order. Must be refused once inspection has begun (Phase 4). */
+    @Transactional
+    public ReceiptDetail voidReceipt(UUID id, String reason) {
+        MaterialReceipt receipt = load(id);
+        receipt.voidReceipt(reason);
+        purchaseOrders.reverseReceipt(receipt.getPurchaseOrderId(), receipt.getItems().stream().collect(Collectors.toMap(
+                MaterialReceiptItem::getPurchaseOrderItemId, MaterialReceiptItem::getQuantity, BigDecimal::add)));
+        receipts.saveAndFlush(receipt);
+        audit.record("MATERIAL_RECEIPT_VOIDED", "MaterialReceipt", id, null, Map.of("reason", reason));
+        return toDetail(receipt);
+    }
+
+    @Override
+    public String entityType() {
+        return "MATERIAL_RECEIPT";
+    }
+
+    @Override
+    public String viewPermission() {
+        return Permissions.PURCHASE_VIEW;
+    }
+
+    @Override
+    public String managePermission() {
+        return Permissions.RECEIPT_MANAGE;
+    }
+
+    @Override
+    public boolean parentExists(UUID entityId) {
+        return receipts.existsById(entityId);
+    }
+
+    private MaterialReceipt load(UUID id) {
+        return receipts.findWithItems(id).orElseThrow(() -> new ResourceNotFoundException("Material receipt", id));
+    }
+
+    private ReceiptDetail toDetail(MaterialReceipt receipt) {
+        Map<UUID, MaterialReference> referenced = materials.references(
+                receipt.getItems().stream().map(MaterialReceiptItem::getMaterialId).collect(Collectors.toSet()));
+        return new ReceiptDetail(
+                receipt.getId(),
+                receipt.getGrnNumber(),
+                receipt.getPurchaseOrderId(),
+                receipt.getSupplierId(),
+                suppliers.reference(receipt.getSupplierId()).name(),
+                receipt.getFacilityId(),
+                receipt.getReceivedOn(),
+                receipt.getDeliveryNote(),
+                receipt.getNotes(),
+                receipt.getStatus().name(),
+                receipt.getVoidReason(),
+                receipt.getItems().stream().map(item -> {
+                    MaterialReference material = referenced.get(item.getMaterialId());
+                    return new ReceiptItemResponse(
+                            item.getId(),
+                            item.getPurchaseOrderItemId(),
+                            item.getMaterialId(),
+                            material.code(),
+                            material.name(),
+                            item.getUomId(),
+                            item.getSupplierBatch(),
+                            item.getInternalBatch(),
+                            item.getQuantity(),
+                            item.isInspectionRequired(),
+                            item.getInspectionStatus().name());
+                }).toList());
+    }
+}

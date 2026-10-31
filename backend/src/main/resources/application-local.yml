@@ -4,6 +4,7 @@ DB_APP_USER: qualityos_app
 DB_APP_PASSWORD: qualityos_app_local
 DB_MIGRATION_USER: qualityos_migrator
 DB_MIGRATION_PASSWORD: qualityos_migrator_local
+STORAGE_LOCAL_ROOT: ${java.io.tmpdir}/qualityos-attachments
 
 management:
   endpoint:

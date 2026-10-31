@@ -55,6 +55,18 @@ export function forwardedHeaders(request: NextRequest): Headers {
   return headers;
 }
 
+/** Headers carried from the backend's response to the browser. Downloads depend on the last two. */
+export function returnedHeaders(upstream: Response): Headers {
+  const headers = new Headers({
+    "content-type": upstream.headers.get("content-type") ?? "application/json",
+  });
+  for (const name of ["x-correlation-id", "content-disposition", "x-content-type-options"]) {
+    const value = upstream.headers.get(name);
+    if (value) headers.set(name, value);
+  }
+  return headers;
+}
+
 /**
  * Cookies alone authenticate a request, so a state-changing request must prove it came from this site.
  * SameSite=Lax already blocks most cross-site posts; this also covers same-site subdomains.

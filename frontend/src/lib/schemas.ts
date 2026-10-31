@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DECIMAL_PATTERN } from "@/lib/record-form";
 
 const password = z
   .string()
@@ -49,3 +50,38 @@ export type OrganizationValues = z.infer<typeof organizationSchema>;
 export type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 export type AddMemberValues = z.infer<typeof addMemberSchema>;
 export type RoleValues = z.infer<typeof roleSchema>;
+
+const decimal = z.string().trim().regex(DECIMAL_PATTERN, "Enter a number with at most 6 decimal places");
+const positiveDecimal = decimal.refine((value) => Number(value) > 0, "Must be above zero");
+
+export const purchaseOrderSchema = z.object({
+  supplierId: z.string().min(1, "Choose a supplier"),
+  facilityId: z.string().min(1, "Choose a facility"),
+  orderDate: z.string().min(1, "Order date is required"),
+  expectedDate: z.string(),
+  items: z
+    .array(
+      z.object({
+        materialId: z.string().min(1, "Choose a material"),
+        quantity: positiveDecimal,
+        unitPrice: decimal.or(z.literal("")),
+      }),
+    )
+    .min(1),
+});
+export type PurchaseOrderValues = z.infer<typeof purchaseOrderSchema>;
+
+export const receiptSchema = z.object({
+  receivedOn: z.string().min(1, "Date is required"),
+  deliveryNote: z.string().trim().max(100),
+  items: z
+    .array(
+      z.object({
+        purchaseOrderItemId: z.string().min(1),
+        supplierBatch: z.string().trim().min(1, "Enter the supplier's batch"),
+        quantity: positiveDecimal,
+      }),
+    )
+    .min(1),
+});
+export type ReceiptValues = z.infer<typeof receiptSchema>;

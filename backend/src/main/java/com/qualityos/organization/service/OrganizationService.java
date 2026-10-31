@@ -11,7 +11,6 @@ import com.qualityos.organization.repository.TenantRepository;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,9 +51,7 @@ public class OrganizationService {
     @Transactional
     public OrganizationResponse update(UUID id, UpdateOrganizationRequest request) {
         Tenant tenant = requireCurrent(id);
-        if (!request.version().equals(tenant.getVersion())) {
-            throw new OptimisticLockingFailureException("Stale organization version");
-        }
+        tenant.requireVersion(request.version());
         Map<String, Object> previous = snapshot(tenant);
         tenant.setName(request.name());
         tenant.setLegalName(request.legalName());

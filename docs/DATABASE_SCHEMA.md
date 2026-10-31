@@ -28,8 +28,8 @@ The brief's tables are included. **Bold** tables are additions, with the reason 
 **`refresh_tokens`** (hash, family, expiry, for rotation and reuse detection).
 
 ### Phase 3: master data
-`facilities`, `departments`, `tenant_settings`, `attachments`, **`document_sequences`** (per-tenant numbering
-for GRN, NCR, CAPA), `suppliers`, `supplier_contacts`, `supplier_documents`, `product_categories`, `products`, `materials`,
+`facilities`, `departments`, `attachments`, **`document_sequences`** (per-tenant numbering
+for GRN, NCR, CAPA), `suppliers`, `supplier_contacts`, `product_categories`, `products`, `materials`,
 `material_specifications`, `purchase_orders`, `purchase_order_items`, `material_receipts`,
 `material_receipt_items`, **`units_of_measure`** (configurable UoM), **`production_lines`**, **`shifts`**,
 **`supplier_categories`**, **`product_revisions`**, **`product_materials`** (mapping).
@@ -37,8 +37,7 @@ for GRN, NCR, CAPA), `suppliers`, `supplier_contacts`, `supplier_documents`, `pr
 ### Phase 4: inspection
 `inspection_templates`, `inspection_template_versions` (status, effective dates, immutable once published),
 `inspection_parameters`, `inspection_sampling_plans`, `inspections`, `inspection_results`,
-`inspection_approvals`, `inspection_attachments`, `notifications`,
-**`inspection_samples`** (one row per sample measured), **`notification_preferences`**.
+`inspection_approvals`, `inspection_attachments`, **`inspection_samples`** (one row per sample measured).
 
 Rules enforced in the database as well as in code:
 
@@ -50,19 +49,23 @@ Rules enforced in the database as well as in code:
 - `actual_value` is stored as typed columns (`value_numeric NUMERIC(18,6)`, `value_text`, `value_boolean`,
   `value_timestamp`) so results can be analysed.
 
-### Phase 5: quality issues
+### Phase 5: notifications and account email
+`notifications`, **`notification_preferences`**, plus tables for invitations and for password reset and
+email verification tokens, stored hashed like refresh tokens.
+
+### Phase 6: quality issues
 `non_conformances`, `ncr_attachments`, `corrective_actions`, `capa_actions`, `capa_verifications`,
 **`defect_categories`**, **`ncr_status_history`**, **`capa_status_history`**.
 
-### Phase 6: traceability
+### Phase 7: traceability
 `batches`, `batch_relationships` (parent, child, quantity: a directed graph walked with recursive CTEs),
 `production_batches`, `finished_products`, `dispatch_records`, **`customers`** (dispatch needs a recipient).
 
-### Phase 7: calibration and audit
+### Phase 8: calibration and audit
 `instruments`, `calibration_records`, `audits`, `audit_checklists`, `audit_findings`,
 **`audit_checklist_items`**, **`inspection_instruments`** (usage history).
 
-### Phase 9: subscription
+### Phase 10: subscription
 `subscription_plans` (`tenant_id`-free, prices editable by platform admins), `subscriptions`,
 `subscription_invoices`, `payment_transactions`, **`plan_features`** (limits).
 
@@ -87,3 +90,7 @@ erDiagram
     NON_CONFORMANCES ||--o{ CORRECTIVE_ACTIONS : resolved_by
     BATCHES ||--o{ BATCH_RELATIONSHIPS : links
 ```
+
+Phase 3 note: supplier, material, product and receipt documents all live in `attachments`, linked by
+`entity_type` and `entity_id`, so there is no `supplier_documents` table. `tenant_settings` moved to Phase 9.
+Quantities, measurements and prices use `NUMERIC(18,6)`, and the API refuses values that would need rounding.

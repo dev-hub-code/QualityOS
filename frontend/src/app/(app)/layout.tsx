@@ -1,5 +1,10 @@
+import { Suspense } from "react";
 import { AppShell } from "@/components/app/app-shell";
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
-  return <AppShell>{children}</AppShell>;
+  return (
+    <Suspense>
+      <AppShell>{children}</AppShell>
+    </Suspense>
+  );
 }

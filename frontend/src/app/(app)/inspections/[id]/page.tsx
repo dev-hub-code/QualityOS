@@ -6,16 +6,16 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
 import { AttachmentPanel } from "@/components/records/attachment-panel";
-import { Details, PageHeader, QueryState, Section, StatusBadge, useAction, useRefresh, useUnits } from "@/components/records/parts";
+import { Details, PageHeader, QueryState, RecordLink, Section, StatusBadge, useAction, useRefresh, useUnits } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useMe, usePermission } from "@/hooks/use-me";
-import { api } from "@/lib/api";
+import { api, type PageResponse } from "@/lib/api";
 import { requirement, sampleKey, samplesOf, toEntries, toFormValues } from "@/lib/inspection";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
-import type { Attachment, Inspection, ParameterSpec } from "@/lib/types";
+import type { Attachment, Inspection, NcrSummary, ParameterSpec } from "@/lib/types";
 
 const NOTE_FIELD: FieldDef = { name: "note", label: "Note" };
 const SEND_BACK_FIELDS: FieldDef[] = [{ ...NOTE_FIELD, label: "What needs correcting", required: true }];
@@ -257,6 +257,23 @@ function Review({ inspection }: { inspection: Inspection }) {
   );
 }
 
+function LinkedNcr({ inspectionId }: { inspectionId: string }) {
+  const allowed = usePermission("NCR_VIEW");
+  const query = `/ncrs?inspectionId=${inspectionId}`;
+  const { data } = useQuery({
+    queryKey: [query],
+    queryFn: () => api.get<PageResponse<NcrSummary>>(query),
+    enabled: allowed,
+  });
+  const ncr = data?.items[0];
+  if (!ncr) return null;
+  return (
+    <p className="text-sm">
+      Raised <RecordLink href={`/ncrs/${ncr.id}`}>{ncr.ncrNumber}</RecordLink> ({ncr.status.replaceAll("_", " ").toLowerCase()})
+    </p>
+  );
+}
+
 export default function InspectionPage() {
   const { id } = useParams<{ id: string }>();
   const path = `/inspections/${id}`;
@@ -303,6 +320,7 @@ export default function InspectionPage() {
           ]}
         />
       </Section>
+      <LinkedNcr inspectionId={id} />
       <Review inspection={inspection} />
       <Execution
         key={`${status}-${inspection.results.length}`}

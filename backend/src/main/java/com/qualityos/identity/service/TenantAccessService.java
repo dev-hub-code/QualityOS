@@ -3,7 +3,9 @@ package com.qualityos.identity.service;
 import com.qualityos.common.security.TenantAccessResolver;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.dto.AuthDtos.OrganizationSummary;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -53,6 +55,14 @@ public class TenantAccessService implements TenantAccessResolver {
             WHERE m.tenant_id = ? AND m.user_id = ? AND m.status = 'ACTIVE'
             """;
 
+    private static final String ACTIVE_MEMBERS = """
+            SELECT u.id, u.full_name
+            FROM tenant_memberships m
+            JOIN users u ON u.id = m.user_id AND u.status = 'ACTIVE'
+            WHERE m.tenant_id = ? AND m.status = 'ACTIVE'
+            ORDER BY u.full_name
+            """;
+
     private final JdbcTemplate jdbc;
     private final TransactionTemplate readOnly;
 
@@ -88,5 +98,14 @@ public class TenantAccessService implements TenantAccessResolver {
     public Optional<String> activeMemberEmail(UUID userId) {
         return jdbc.queryForList(ACTIVE_EMAIL, String.class, TenantContext.getCurrentTenantId(), userId)
                 .stream().findFirst();
+    }
+
+    /** Names of the current tenant's active members. Runs in the caller's transaction. */
+    public Map<UUID, String> activeMembers() {
+        Map<UUID, String> members = new LinkedHashMap<>();
+        jdbc.query(ACTIVE_MEMBERS, rs -> {
+            members.put(rs.getObject("id", UUID.class), rs.getString("full_name"));
+        }, TenantContext.getCurrentTenantId());
+        return members;
     }
 }

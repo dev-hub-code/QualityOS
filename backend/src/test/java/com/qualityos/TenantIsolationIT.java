@@ -234,6 +234,39 @@ class TenantIsolationIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void ncrsCapasAndCategoriesAreInvisibleAcrossTenants() throws Exception {
+        String ncr = JsonPath.read(as(tenantA, postJson("/api/v1/ncrs", Map.of(
+                        "title", "T", "description", "D", "severity", "MINOR")))
+                .andReturn().getResponse().getContentAsString(), "$.data.id");
+        String capa = JsonPath.read(as(tenantA, postJson("/api/v1/capas", Map.of(
+                        "ncrId", ncr, "title", "T", "problemStatement", "P", "ownerId", tenantA.userId(),
+                        "targetDate", java.time.LocalDate.now().plusDays(5).toString(),
+                        "effectivenessRequired", true)))
+                .andReturn().getResponse().getContentAsString(), "$.data.id");
+        String category = JsonPath.read(as(tenantA, postJson("/api/v1/defect-categories",
+                        Map.of("code", "C", "name", "N")))
+                .andReturn().getResponse().getContentAsString(), "$.data.id");
+
+        as(tenantB, get("/api/v1/ncrs/" + ncr)).andExpect(status().isNotFound());
+        as(tenantB, get("/api/v1/capas/" + capa)).andExpect(status().isNotFound());
+        as(tenantB, get("/api/v1/ncrs")).andExpect(jsonPath("$.data.totalItems").value(0));
+        as(tenantB, get("/api/v1/capas")).andExpect(jsonPath("$.data.totalItems").value(0));
+        as(tenantB, get("/api/v1/defect-categories")).andExpect(jsonPath("$.data.length()").value(0));
+        as(tenantB, postJson("/api/v1/ncrs/" + ncr + "/assign", Map.of("assigneeId", tenantB.userId())))
+                .andExpect(status().isNotFound());
+        as(tenantB, postJson("/api/v1/capas", Map.of(
+                        "ncrId", ncr, "title", "T", "problemStatement", "P", "ownerId", tenantB.userId(),
+                        "targetDate", java.time.LocalDate.now().plusDays(5).toString(),
+                        "effectivenessRequired", true)))
+                .andExpect(status().isNotFound());
+        as(tenantB, postJson("/api/v1/ncrs", Map.of(
+                        "title", "T", "description", "D", "severity", "MINOR", "defectCategoryId", category)))
+                .andExpect(status().isUnprocessableContent());
+        as(tenantA, postJson("/api/v1/ncrs/" + ncr + "/assign", Map.of("assigneeId", tenantB.userId())))
+                .andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
     void inspectionsAndTemplatesAreInvisibleAcrossTenants() throws Exception {
         MasterDataHelper helper = new MasterDataHelper();
         String template = JsonPath.read(as(tenantA, postJson("/api/v1/inspection-templates",

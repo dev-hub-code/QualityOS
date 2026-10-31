@@ -479,4 +479,37 @@ class InspectionIT extends MasterDataFixture {
         assertTitles(manager, "Critical failure on " + numberOf(owner, id));
         as(manager, get("/api/v1/notifications")).andExpect(jsonPath("$.data.items[0].link").value("/inspections/" + id));
     }
+
+    @Test
+    void aFailedInspectionRaisesOneNcrThatCarriesItsEvidence() throws Exception {
+        Session owner = register();
+        Session manager = addMember(owner, "QUALITY_MANAGER");
+        String id = submittedInspection(owner, shaftTemplate(owner), "20.0", "25");
+        as(manager, postJson("/api/v1/inspections/" + id + "/approve", Map.of())).andExpect(status().isOk());
+        dispose(manager, id, "HOLD").andExpect(status().isOk());
+        dispose(manager, id, "REJECT").andExpect(status().isOk());
+
+        as(owner, get("/api/v1/ncrs?inspectionId=" + id))
+                .andExpect(jsonPath("$.data.totalItems").value(1))
+                .andExpect(jsonPath("$.data.items[0].severity").value("CRITICAL"))
+                .andExpect(jsonPath("$.data.items[0].source").value("INSPECTION"))
+                .andExpect(jsonPath("$.data.items[0].status").value("OPEN"));
+        String ncr = JsonPath.read(body(as(owner, get("/api/v1/ncrs?inspectionId=" + id))), "$.data.items[0].id");
+        as(owner, get("/api/v1/ncrs/" + ncr))
+                .andExpect(jsonPath("$.data.description").value(org.hamcrest.Matchers.containsString("DIA")))
+                .andExpect(jsonPath("$.data.history[0].toStatus").value("OPEN"));
+        as(owner, postJson("/api/v1/ncrs/" + ncr + "/cancel", Map.of("note", "Not needed")))
+                .andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void acceptedMaterialRaisesNoNcr() throws Exception {
+        Session owner = register();
+        Session manager = addMember(owner, "QUALITY_MANAGER");
+        String id = submittedInspection(owner, shaftTemplate(owner), "20.0", "20.05");
+        as(manager, postJson("/api/v1/inspections/" + id + "/approve", Map.of())).andExpect(status().isOk());
+        dispose(manager, id, "ACCEPT").andExpect(status().isOk());
+
+        as(owner, get("/api/v1/ncrs")).andExpect(jsonPath("$.data.totalItems").value(0));
+    }
 }

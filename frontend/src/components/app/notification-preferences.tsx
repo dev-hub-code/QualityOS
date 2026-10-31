@@ -13,6 +13,13 @@ const LABELS: Record<string, string> = {
   INSPECTION_SENT_BACK: "My inspection is sent back",
   INSPECTION_AWAITING_DISPOSITION: "An inspection needs a disposition",
   INSPECTION_DISPOSITION_RECORDED: "A disposition is recorded on my inspection",
+  NCR_RAISED: "An NCR is raised",
+  NCR_ASSIGNED: "An NCR is assigned to me",
+  NCR_AWAITING_CLOSURE: "An NCR is ready for closure",
+  CAPA_ASSIGNED: "A CAPA is assigned to me or returned to planning",
+  CAPA_ACTION_ASSIGNED: "A CAPA action is assigned to me",
+  CAPA_AWAITING_VERIFICATION: "A CAPA needs effectiveness verification",
+  CAPA_OVERDUE: "My CAPA is overdue",
 };
 const PATH = "/notifications/preferences";
 

@@ -8,7 +8,7 @@ export interface FieldOption {
 export interface FieldDef {
   name: string;
   label: string;
-  type?: "text" | "email" | "date" | "time" | "decimal" | "select" | "checkbox";
+  type?: "text" | "textarea" | "email" | "date" | "time" | "decimal" | "select" | "checkbox";
   required?: boolean;
   options?: FieldOption[];
 }

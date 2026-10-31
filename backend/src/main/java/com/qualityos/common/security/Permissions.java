@@ -16,6 +16,13 @@ public final class Permissions {
     public static final String INSPECTION_VIEW = "INSPECTION_VIEW";
     public static final String INSPECTION_APPROVE = "INSPECTION_APPROVE";
     public static final String DISPOSITION_RECORD = "DISPOSITION_RECORD";
+    public static final String NCR_VIEW = "NCR_VIEW";
+    public static final String NCR_CREATE = "NCR_CREATE";
+    public static final String NCR_ASSIGN = "NCR_ASSIGN";
+    public static final String NCR_CLOSE = "NCR_CLOSE";
+    public static final String CAPA_VIEW = "CAPA_VIEW";
+    public static final String CAPA_MANAGE = "CAPA_MANAGE";
+    public static final String CAPA_APPROVE = "CAPA_APPROVE";
     public static final String INSPECTION_EXECUTE = "INSPECTION_EXECUTE";
 
     private Permissions() {
@@ -43,6 +50,13 @@ public final class Permissions {
         public static final String INSPECTION_EXECUTE = "hasAuthority('INSPECTION_EXECUTE')";
         public static final String INSPECTION_APPROVE = "hasAuthority('INSPECTION_APPROVE')";
         public static final String DISPOSITION_RECORD = "hasAuthority('DISPOSITION_RECORD')";
+        public static final String NCR_VIEW = "hasAuthority('NCR_VIEW')";
+        public static final String NCR_CREATE = "hasAuthority('NCR_CREATE')";
+        public static final String NCR_ASSIGN = "hasAuthority('NCR_ASSIGN')";
+        public static final String NCR_CLOSE = "hasAuthority('NCR_CLOSE')";
+        public static final String CAPA_VIEW = "hasAuthority('CAPA_VIEW')";
+        public static final String CAPA_MANAGE = "hasAuthority('CAPA_MANAGE')";
+        public static final String CAPA_APPROVE = "hasAuthority('CAPA_APPROVE')";
 
         private Require() {
         }

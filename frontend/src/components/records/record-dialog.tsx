@@ -19,6 +19,7 @@ interface RecordDialogProps {
 }
 
 const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm";
+const TEXTAREA_CLASS = "w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-sm";
 
 /** A dialog form for the many small records that need nothing beyond their fields. */
 export function RecordDialog({ title, fields, record, onSubmit, onClose }: RecordDialogProps) {
@@ -77,6 +78,17 @@ export function RecordDialog({ title, fields, record, onSubmit, onClose }: Recor
                       </option>
                     ))}
                   </select>
+                  {errors[field.name] && (
+                    <p className="text-sm text-destructive">{String(errors[field.name]?.message)}</p>
+                  )}
+                </div>
+              );
+            }
+            if (field.type === "textarea") {
+              return (
+                <div key={field.name} className="space-y-1.5">
+                  <Label htmlFor={id}>{field.label}</Label>
+                  <textarea id={id} rows={3} className={TEXTAREA_CLASS} {...register(field.name)} />
                   {errors[field.name] && (
                     <p className="text-sm text-destructive">{String(errors[field.name]?.message)}</p>
                   )}

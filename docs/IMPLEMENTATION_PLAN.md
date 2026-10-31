@@ -10,8 +10,8 @@ account emails a real customer needs.
 | 3 Master data | Facilities, departments, suppliers, products, materials, UoM, purchase orders, receipts, attachments | PO to receipt workflow in the UI | **Done** |
 | 4 Inspection engine | Template builder and versioning, evaluation engine, sampling, execution, approval, disposition, report | **IQC usable end to end on a phone** | **Done** |
 | 5 Notifications and account email | In-app and email notifications, invitations, email verification, password reset, IP rate limiting, scheduled jobs | Inspection events notify the right people, and a user can join and recover an account by email | **Done** |
-| 6 NCR and CAPA | Lifecycles, containment, root cause, verification, closure | Failed inspection flows through to closed CAPA | Next |
-| 7 Traceability | Batch graph, forward and backward trace, timeline, search | Raw material to dispatch traced | |
+| 6 NCR and CAPA | Lifecycles, containment, root cause, verification, closure | Failed inspection flows through to closed CAPA | **Done** |
+| 7 Traceability | Batch graph, forward and backward trace, timeline, search | Raw material to dispatch traced | Next |
 | 8 Calibration and audit | Instruments, QR, calibration records, audits, findings | Overdue instruments notify and audit findings raise NCRs | |
 | 9 Analytics | Dashboard, scorecards, Pareto, PDF and Excel exports | Reports honour tenant and facility scope | |
 | 10 Subscription | Plans, trials, limits, invoices | Limits enforced, prices editable by admin | |
@@ -37,7 +37,13 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Platform roles (`SUPER_ADMIN`, `PLATFORM_ADMIN`, `SUPPORT_ADMIN`) are not implemented | Phase 10, with the admin panel |
 | Registration reveals that an email already has an account. Password reset and invitations do not | Accepted for now |
 | Sampling is fixed, percentage or every unit; AQL tables (such as ISO 2859-1) are not built | When a customer needs them |
-| A one-person organisation cannot finish an inspection, because the inspector cannot review their own work | Make it a tenant setting in Phase 9 |
+| A one-person organisation cannot finish an inspection, close an NCR or verify its own CAPA, because each needs a second person | Make it a tenant setting in Phase 9 |
+| NCR and CAPA workflows are fixed: a critical or major NCR always needs a closed CAPA and a verified fix. There are no per-tenant settings | Phase 9, with `tenant_settings` |
+| An NCR raised on a held lot has no rejected quantity, and a later reject does not fill it in | Review after real use |
+| Completing a CAPA action needs `CAPA_MANAGE`, so an action owner without it must ask someone who has it | Review after real use |
+| Overdue reminders cover the CAPA as a whole, not each action | When a user needs it |
+| Only inspection failures raise NCRs automatically. Evidence is attached to the CAPA, not to each action | When a user needs it |
+| NCRs are not yet linked to supplier scorecards | Phase 9 |
 | The inspection report is a printable page, not a generated PDF | Phase 9, with PDF exports |
 | A template can only be chosen by hand; none is picked automatically for a material | When a user needs it |
 | Inspections start from received material only. IPQC and FQC need production batches | Phase 7, with traceability |

@@ -25,6 +25,14 @@ public class FacilityScope {
             WHERE m.user_id = ?
             """;
 
+    private static final String LIMITED_ELSEWHERE = """
+            SELECT m.user_id
+            FROM membership_facilities f
+            JOIN tenant_memberships m ON m.tenant_id = f.tenant_id AND m.id = f.membership_id
+            GROUP BY m.user_id
+            HAVING NOT bool_or(f.facility_id = ?)
+            """;
+
     private final JdbcTemplate jdbc;
 
     FacilityScope(JdbcTemplate jdbc) {
@@ -40,6 +48,15 @@ public class FacilityScope {
         }
         Set<UUID> assigned = new HashSet<>(jdbc.queryForList(ASSIGNED, UUID.class, user));
         return assigned.isEmpty() ? Optional.empty() : Optional.of(assigned);
+    }
+
+    /** Narrows a list of people to those who can open this facility's records, before anyone is told about one. */
+    @Transactional(readOnly = true)
+    public Set<UUID> allowedIn(UUID facilityId, Set<UUID> users) {
+        Set<UUID> limited = new HashSet<>(jdbc.queryForList(LIMITED_ELSEWHERE, UUID.class, facilityId));
+        Set<UUID> allowed = new HashSet<>(users);
+        allowed.removeAll(limited);
+        return allowed;
     }
 
     public boolean allows(UUID facilityId) {

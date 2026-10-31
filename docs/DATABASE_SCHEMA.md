@@ -139,3 +139,6 @@ row-level security. `account_tokens` holds one-time password reset and email ver
   permissions, `recalls`, `recall_batches`, `recall_contact_records`, the append-only `recall_contact_attempts` and
   `recall_acknowledgements`, the platform tables `scheduled_job_locks` and `scheduled_job_executions`, and
   `expire_unverified_accounts()`.
+- **V16** adds `instruments`, the append-only `calibration_records` and `instrument_usages`, `audit_checklists`,
+  `audit_checklist_items`, `audits`, `audit_items` (a copy of the questions, kept apart from later checklist changes),
+  `audit_findings`, the `AUDIT_CLOSE` permission, and the audit source on `non_conformances`.

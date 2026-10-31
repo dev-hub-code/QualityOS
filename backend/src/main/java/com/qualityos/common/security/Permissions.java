@@ -28,6 +28,11 @@ public final class Permissions {
     public static final String RECALL_VIEW = "RECALL_VIEW";
     public static final String RECALL_MANAGE = "RECALL_MANAGE";
     public static final String RECALL_CLOSE = "RECALL_CLOSE";
+    public static final String CALIBRATION_MANAGE = "CALIBRATION_MANAGE";
+    public static final String CALIBRATION_VIEW = "CALIBRATION_VIEW";
+    public static final String AUDIT_VIEW = "AUDIT_VIEW";
+    public static final String AUDIT_MANAGE = "AUDIT_MANAGE";
+    public static final String AUDIT_CLOSE = "AUDIT_CLOSE";
     public static final String MATERIAL_CORRECTION_REQUEST = "MATERIAL_CORRECTION_REQUEST";
     public static final String MATERIAL_CORRECTION_APPROVE = "MATERIAL_CORRECTION_APPROVE";
     public static final String INSPECTION_EXECUTE = "INSPECTION_EXECUTE";
@@ -69,6 +74,11 @@ public final class Permissions {
         public static final String RECALL_VIEW = "hasAuthority('RECALL_VIEW')";
         public static final String RECALL_MANAGE = "hasAuthority('RECALL_MANAGE')";
         public static final String RECALL_CLOSE = "hasAuthority('RECALL_CLOSE')";
+        public static final String CALIBRATION_VIEW = "hasAuthority('CALIBRATION_VIEW')";
+        public static final String CALIBRATION_MANAGE = "hasAuthority('CALIBRATION_MANAGE')";
+        public static final String AUDIT_VIEW = "hasAuthority('AUDIT_VIEW')";
+        public static final String AUDIT_MANAGE = "hasAuthority('AUDIT_MANAGE')";
+        public static final String AUDIT_CLOSE = "hasAuthority('AUDIT_CLOSE')";
         public static final String MATERIAL_CORRECTION_REQUEST = "hasAuthority('MATERIAL_CORRECTION_REQUEST')";
         public static final String MATERIAL_CORRECTION_APPROVE = "hasAuthority('MATERIAL_CORRECTION_APPROVE')";
 

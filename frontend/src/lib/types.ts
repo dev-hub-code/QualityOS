@@ -385,6 +385,7 @@ export interface Inspection {
     parameters: ParameterSpec[];
   };
   results: InspectionResult[];
+  instruments: UsedInstrument[];
   decisions: InspectionDecision[];
 }
 
@@ -452,6 +453,7 @@ export interface StatusChange {
 export interface Ncr extends NcrSummary {
   description: string;
   inspectionId: string | null;
+  auditId: string | null;
   defectCategoryId: string | null;
   defectCategoryName: string | null;
   rejectedQuantity: string | null;
@@ -832,4 +834,138 @@ export interface RecallReport {
   }[];
   ncrs: { id: string; ncrNumber: string; title: string; severity: string; status: string }[];
   history: RecallHistoryEntry[];
+}
+
+export interface UsedInstrument {
+  id: string;
+  instrumentCode: string;
+  name: string;
+  nextDueOn: string;
+}
+
+export interface Instrument {
+  id: string;
+  instrumentCode: string;
+  name: string;
+  category: string;
+  manufacturer: string | null;
+  model: string | null;
+  serialNumber: string | null;
+  facilityId: string;
+  location: string | null;
+  custodianId: string | null;
+  custodianName: string | null;
+  frequencyDays: number;
+  lastCalibratedOn: string | null;
+  nextDueOn: string;
+  status: "ACTIVE" | "OUT_OF_SERVICE" | "RETIRED";
+  statusReason: string | null;
+  dueState: "OK" | "DUE_SOON" | "OVERDUE";
+}
+
+export interface CalibrationRecord {
+  id: string;
+  calibratedOn: string;
+  result: "PASS" | "ADJUSTED" | "FAIL";
+  performedBy: string;
+  certificateNumber: string | null;
+  notes: string | null;
+  nextDueOn: string;
+  recordedAt: string;
+}
+
+export interface InstrumentUse {
+  inspectionId: string;
+  inspectionNumber: string;
+  usedOn: string;
+  suspect: boolean;
+}
+
+export interface ChecklistSummary {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export interface Checklist extends ChecklistSummary {
+  items: { position: number; question: string; clauseReference: string | null }[];
+}
+
+export interface AuditSummary {
+  id: string;
+  auditNumber: string;
+  auditType: string;
+  title: string;
+  status: string;
+  plannedOn: string;
+  leadAuditorName: string | null;
+  overdue: boolean;
+}
+
+export interface AuditItem {
+  id: string;
+  position: number;
+  question: string;
+  clauseReference: string | null;
+  result: "CONFORMING" | "NONCONFORMING" | "NOT_APPLICABLE" | null;
+  note: string | null;
+}
+
+export interface AuditFinding {
+  id: string;
+  number: number;
+  grade: string;
+  statement: string;
+  evidence: string;
+  clauseReference: string | null;
+  itemPosition: number | null;
+  ncr: {
+    id: string;
+    ncrNumber: string;
+    status: string;
+    finished: boolean;
+    capas: { id: string; capaNumber: string; title: string; status: string }[];
+  } | null;
+}
+
+export interface Audit {
+  id: string;
+  auditNumber: string;
+  auditType: string;
+  title: string;
+  scope: string;
+  facilityId: string;
+  facilityName: string;
+  supplierName: string | null;
+  productName: string | null;
+  checklistName: string | null;
+  plannedOn: string;
+  leadAuditorId: string;
+  leadAuditorName: string | null;
+  status: "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "PENDING_CLOSURE" | "CLOSED" | "CANCELLED";
+  summary: string | null;
+  closureRequestedBy: string | null;
+  closureRequestedByName: string | null;
+  closureNote: string | null;
+  closedByName: string | null;
+  closedAt: string | null;
+  cancelReason: string | null;
+  items: AuditItem[];
+  findings: AuditFinding[];
+  review: {
+    items: number;
+    answered: number;
+    conforming: number;
+    nonconforming: number;
+    notApplicable: number;
+    blockers: string[];
+  };
+}
+
+export interface AuditReport {
+  organizationName: string;
+  organizationLegalName: string | null;
+  organizationAddress: string | null;
+  generatedLabel: string;
+  audit: Audit;
 }

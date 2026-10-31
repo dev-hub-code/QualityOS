@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import com.qualityos.calibration.dto.CalibrationDtos.UsedInstrument;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -27,6 +28,9 @@ public final class InspectionDtos {
     }
 
     public record ExecuteRequest(@NotEmpty List<@Valid ResultRequest> results) {
+    }
+
+    public record RecordInstrumentsRequest(@NotEmpty @Size(max = 50) List<@NotNull UUID> instrumentIds) {
     }
 
     public record ResultRequest(
@@ -83,7 +87,8 @@ public final class InspectionDtos {
             Instant approvedAt,
             SpecSnapshot specification,
             List<ResultResponse> results,
-            List<DecisionResponse> decisions) {
+            List<DecisionResponse> decisions,
+            List<UsedInstrument> instruments) {
     }
 
     public record ResultResponse(

@@ -74,6 +74,9 @@ qualityos:
     capa-reminders:
       initial-delay: PT5M
       interval: PT1H
+    calibration-reminders:
+      initial-delay: PT5M
+      interval: PT1H
     unconfirmed-shipments:
       initial-delay: PT5M
       interval: PT1H

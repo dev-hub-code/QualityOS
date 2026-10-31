@@ -8,6 +8,7 @@ import com.qualityos.inspection.dto.InspectionDtos.ApproveRequest;
 import com.qualityos.inspection.dto.InspectionDtos.CreateInspectionRequest;
 import com.qualityos.inspection.dto.InspectionDtos.DispositionRequest;
 import com.qualityos.inspection.dto.InspectionDtos.ExecuteRequest;
+import com.qualityos.inspection.dto.InspectionDtos.RecordInstrumentsRequest;
 import com.qualityos.inspection.dto.InspectionDtos.InspectionDetail;
 import com.qualityos.inspection.dto.InspectionDtos.InspectionSummary;
 import com.qualityos.inspection.dto.InspectionDtos.SendBackRequest;
@@ -71,6 +72,13 @@ public class InspectionController {
     @PreAuthorize(Require.INSPECTION_CREATE)
     public ApiResponse<InspectionDetail> cancel(@PathVariable UUID id) {
         return ApiResponse.ok(inspections.cancel(id));
+    }
+
+    @PostMapping("/{id}/instruments")
+    @PreAuthorize(Require.INSPECTION_EXECUTE)
+    public ApiResponse<InspectionDetail> recordInstruments(
+            @PathVariable UUID id, @Valid @RequestBody RecordInstrumentsRequest request) {
+        return ApiResponse.ok(inspections.recordInstruments(id, request));
     }
 
     @PostMapping("/{id}/execute")

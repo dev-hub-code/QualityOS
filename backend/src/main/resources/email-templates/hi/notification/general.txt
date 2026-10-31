@@ -1,0 +1,8 @@
+Subject: {{title}}
+
+{{title}}
+
+नमस्ते {{recipientName}},
+{{body}}
+
+खोलें: {{actionUrl}}

@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.context.annotation.Primary;
@@ -20,14 +21,20 @@ public class RecordingMailGateway implements MailGateway {
     private static final Duration WAIT = Duration.ofSeconds(5);
 
     private final List<MailMessage> sent = new CopyOnWriteArrayList<>();
+    private final AtomicInteger failures = new AtomicInteger();
     private volatile boolean failing;
 
     @Override
     public void send(MailMessage message) {
-        if (failing) {
+        if (failing || failures.getAndUpdate(left -> Math.max(0, left - 1)) > 0) {
             throw new MailDeliveryException(new IllegalStateException("Mail server down"));
         }
         sent.add(message);
+    }
+
+    /** Fails this many sends, and then recovers. */
+    public void failNext(int count) {
+        failures.set(count);
     }
 
     public void setFailing(boolean failing) {

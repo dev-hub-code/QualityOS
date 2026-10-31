@@ -34,7 +34,11 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Account-level audit events (verification, password reset) have no tenant, so no organisation can read them in-app | Phase 10, with the admin panel |
 | A material receipt does not notify inspectors; they see it in the inspection queue | When a user needs it |
 | Notifications are polled once a minute, with no live push. Only email and in-app channels exist | When a user needs it |
-| Emails are plain text and sent in English only | Before customer launch |
+| Hindi and Marathi email text was machine-drafted and needs review by a native speaker before customers see it | Before customer launch |
+| Templates for CAPA due and closure, calibration, audit, subscription and payment exist, but nothing sends them yet. Calibration and audit arrive in Phase 8, subscription in Phase 10 | With those features |
+| Some notifications have no dedicated template (NCR ready for closure, CAPA actions, verification, send-back, corrections). Their email has a translated frame around English text | When a user needs it |
+| Email delivery is recorded in `email_delivery_logs`, but there is no screen for it. The app itself is still English only | Phase 9, with the admin panel |
+| Organisation branding in email is the organisation name only. There is no logo upload | When a user needs it |
 | Platform roles (`SUPER_ADMIN`, `PLATFORM_ADMIN`, `SUPPORT_ADMIN`) are not implemented | Phase 10, with the admin panel |
 | With verification switched off for private use, registration reveals that an email has an account | Private use only |
 | Sampling is fixed, percentage or every unit; AQL tables (such as ISO 2859-1) are not built | When a customer needs them |

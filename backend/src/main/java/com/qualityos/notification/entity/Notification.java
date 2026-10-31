@@ -2,16 +2,20 @@ package com.qualityos.notification.entity;
 
 import com.qualityos.common.persistence.TenantOwnedEntity;
 import com.qualityos.notification.service.NotificationType;
+import com.qualityos.common.mail.EmailContent;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Getter
 @Entity
@@ -38,6 +42,11 @@ public class Notification extends TenantOwnedEntity {
     @Enumerated(EnumType.STRING)
     private EmailStatus emailStatus;
 
+    private String emailTemplate;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    private Map<String, String> emailVariables;
+
     private int emailAttempts;
     private Instant emailNextAttemptAt;
 
@@ -48,6 +57,11 @@ public class Notification extends TenantOwnedEntity {
         this.body = body;
         this.link = link;
         this.emailStatus = email ? EmailStatus.PENDING : EmailStatus.NONE;
+    }
+
+    public void useEmail(EmailContent content) {
+        emailTemplate = content.template().name();
+        emailVariables = content.variables();
     }
 
     public void markRead(Instant now) {

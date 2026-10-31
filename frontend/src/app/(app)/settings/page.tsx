@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { EmailLanguage } from "@/components/app/email-language";
 import { NotificationPreferences } from "@/components/app/notification-preferences";
 import { OrganizationForm } from "@/components/app/organization-form";
 import { applyServerErrors } from "@/components/forms/apply-server-errors";
@@ -87,6 +88,7 @@ export default function SettingsPage() {
         <h2 className="font-medium">Your password</h2>
         <ChangePasswordForm />
       </section>
+      <EmailLanguage />
       <NotificationPreferences />
     </div>
   );

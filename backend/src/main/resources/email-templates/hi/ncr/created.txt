@@ -1,0 +1,9 @@
+Subject: NCR {{ncrNumber}} दर्ज किया गया
+
+एक गैर-अनुरूपता दर्ज की गई
+
+नमस्ते {{recipientName}},
+{{organizationName}} में {{ncrNumber}} दर्ज किया गया: {{ncrTitle}}।
+कृपया एक जिम्मेदार व्यक्ति नियुक्त करें।
+
+NCR खोलें: {{actionUrl}}

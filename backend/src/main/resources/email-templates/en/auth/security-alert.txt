@@ -1,0 +1,9 @@
+Subject: Security alert for your QualityOS account
+
+Your account was locked
+
+Hello {{recipientName}},
+After repeated failed sign-in attempts, your QualityOS account is locked for {{lockMinutes}} minutes.
+If this was not you, reset your password.
+
+Reset password: {{actionUrl}}

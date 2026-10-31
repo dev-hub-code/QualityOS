@@ -2,6 +2,7 @@ package com.qualityos.identity.controller;
 
 import com.qualityos.common.response.ApiResponse;
 import com.qualityos.identity.dto.AuthDtos.ChangePasswordRequest;
+import com.qualityos.identity.dto.AuthDtos.EmailLanguageRequest;
 import com.qualityos.identity.dto.AuthDtos.LoginRequest;
 import com.qualityos.identity.dto.AuthDtos.AcceptInvitationRequest;
 import com.qualityos.identity.dto.AuthDtos.InvitationPreview;
@@ -29,6 +30,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -122,6 +124,12 @@ public class AuthController {
     @PostMapping("/invitations/accept")
     public ApiResponse<TokenResponse> acceptInvitation(@Valid @RequestBody AcceptInvitationRequest request) {
         return ApiResponse.ok(invitations.accept(request));
+    }
+
+    @PutMapping("/me/email-language")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changeEmailLanguage(@Valid @RequestBody EmailLanguageRequest request) {
+        auth.changeEmailLanguage(request.language());
     }
 
     @GetMapping("/me")

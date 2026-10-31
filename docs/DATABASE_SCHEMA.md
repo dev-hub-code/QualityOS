@@ -125,3 +125,8 @@ row-level security. `account_tokens` holds one-time password reset and email ver
 - `tenants_with_pending_email()` is `SECURITY DEFINER`. Together with `tenants_with_overdue_capas()` (V6) it is the only
   cross-tenant read in the application, and it returns tenant ids and nothing else. The `delivery_scan` policy that lets it see rows applies to the schema owner, never to
   the application role. The delivery job then reads each tenant's rows under that tenant's own context.
+
+- **`email_delivery_logs`** (V12) has one row per delivery attempt. It is insert-only, and account emails have no tenant.
+  `users.preferred_language` holds a person's email language. Tokens stay in `account_tokens` and email opt-outs in
+  `notification_preferences`, so `email_verification_tokens` and `email_preferences` tables were not needed. Templates are
+  files, so there is no `email_templates` table.

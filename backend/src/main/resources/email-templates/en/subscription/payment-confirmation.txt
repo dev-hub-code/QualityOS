@@ -1,0 +1,8 @@
+Subject: Payment received for {{organizationName}}
+
+Payment received
+
+Hello {{recipientName}},
+We received payment of {{amount}} for {{organizationName}}. Thank you.
+
+View billing: {{actionUrl}}

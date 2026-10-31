@@ -1,0 +1,8 @@
+Subject: Critical failure on inspection {{inspectionNumber}}
+
+An inspection failed
+
+Hello {{recipientName}},
+A critical parameter failed on inspection {{inspectionNumber}} for batch {{batchNumber}}. The material stays on hold until an authorised person decides.
+
+Review inspection: {{actionUrl}}

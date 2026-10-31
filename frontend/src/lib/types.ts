@@ -4,7 +4,7 @@ export interface OrganizationSummary {
 }
 
 export interface Me {
-  user: { id: string; email: string; fullName: string; emailVerified: boolean };
+  user: { id: string; email: string; fullName: string; emailVerified: boolean; language: string | null };
   tenantId: string;
   onboarded: boolean;
   permissions: string[];

@@ -1,0 +1,8 @@
+Subject: Audit {{auditNumber}} is scheduled
+
+An audit is scheduled
+
+Hello {{recipientName}},
+Audit {{auditNumber}} is scheduled for {{dueDate}}.
+
+Open audit: {{actionUrl}}

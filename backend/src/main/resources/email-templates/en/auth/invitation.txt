@@ -1,0 +1,7 @@
+Subject: You have been invited to {{organizationName}} on QualityOS
+
+You have been invited
+
+You have been invited to join {{organizationName}} on QualityOS. The invitation works for seven days.
+
+Accept invitation: {{actionUrl}}

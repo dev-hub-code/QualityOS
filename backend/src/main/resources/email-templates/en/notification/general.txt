@@ -1,0 +1,8 @@
+Subject: {{title}}
+
+{{title}}
+
+Hello {{recipientName}},
+{{body}}
+
+Open: {{actionUrl}}

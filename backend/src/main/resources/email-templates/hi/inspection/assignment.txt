@@ -1,0 +1,8 @@
+Subject: निरीक्षण {{inspectionNumber}} पर आपकी कार्रवाई आवश्यक है
+
+एक निरीक्षण पर आपकी कार्रवाई आवश्यक है
+
+नमस्ते {{recipientName}},
+{{organizationName}} में बैच {{batchNumber}} का निरीक्षण {{inspectionNumber}} आपकी प्रतीक्षा में है।
+
+निरीक्षण खोलें: {{actionUrl}}

@@ -97,3 +97,19 @@ Libraries with no use yet (Recharts) are added in the phase that uses them.
 - GST invoice requirements need review by an accountant before invoices are issued to customers.
 - Offline inspection is not in the brief. Shop floors with poor connectivity may need it; revisit after
   the IQC pilot.
+
+## Email
+
+`common/mail/EmailService` is the only way email leaves the application. It chooses the language (the user's choice,
+then the organisation's default, then English), renders, sends, and writes one `email_delivery_logs` row per attempt.
+Bodies are never stored, because they can hold one-time links.
+
+Templates live in `resources/email-templates/<language>/<category>/`. Each has an HTML fragment and a `.txt` version,
+whose first line is the subject, and sits inside that language's `layout.html`. They use Mustache: `{{value}}` is
+escaped in HTML. A missing variable fails the send rather than leaving a blank.
+
+To add a language, add it to `qualityos.mail.languages` and add a folder. Any file it lacks falls back to English.
+
+Account emails retry three times in the background. Notification emails keep the existing retry schedule of about an
+hour. Notifications store their template and variables, not finished text, so the language is chosen when they are sent.
+

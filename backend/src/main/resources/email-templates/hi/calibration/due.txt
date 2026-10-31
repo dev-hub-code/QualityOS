@@ -1,0 +1,8 @@
+Subject: {{instrumentName}} का अंशांकन देय है
+
+अंशांकन देय है
+
+नमस्ते {{recipientName}},
+{{instrumentName}} का अंशांकन {{dueDate}} को देय है।
+
+उपकरण खोलें: {{actionUrl}}

@@ -1,0 +1,9 @@
+Subject: NCR {{ncrNumber}} नोंदवला आहे
+
+एक गैर-अनुरूपता नोंदवली आहे
+
+नमस्कार {{recipientName}},
+{{organizationName}} मध्ये {{ncrNumber}} नोंदवला आहे: {{ncrTitle}}.
+कृपया जबाबदार व्यक्ती नेमा.
+
+NCR उघडा: {{actionUrl}}

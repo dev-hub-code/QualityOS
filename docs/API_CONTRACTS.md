@@ -109,3 +109,5 @@ hour per account, on top of the IP limit.
 
 Settings are under `app.registration`. The `prod` profile refuses to start unless verification is required and
 unverified sign-in is off. Local Docker Compose enforces it too. Integration tests turn it off, except `EmailVerificationIT`.
+
+`PUT /auth/me/email-language` takes `language` (`en`, `hi`, `mr`, or null for the organisation default) and returns `204`.

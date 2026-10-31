@@ -1,0 +1,9 @@
+Subject: CAPA {{capaNumber}} तुम्हाला सोपवला आहे
+
+एक CAPA तुम्हाला सोपवला आहे
+
+नमस्कार {{recipientName}},
+{{capaNumber}} आता तुमच्याकडे आहे: {{capaTitle}}.
+त्याची अंतिम तारीख {{dueDate}} आहे.
+
+CAPA उघडा: {{actionUrl}}

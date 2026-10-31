@@ -1,0 +1,9 @@
+Subject: CAPA {{capaNumber}} was assigned to you
+
+A CAPA was assigned to you
+
+Hello {{recipientName}},
+{{capaNumber}} is now yours: {{capaTitle}}.
+It is due on {{dueDate}}.
+
+Open CAPA: {{actionUrl}}

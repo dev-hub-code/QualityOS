@@ -1,0 +1,8 @@
+Subject: Welcome to QualityOS
+
+Welcome to QualityOS
+
+Hello {{recipientName}},
+Your email address is confirmed and your account is ready. Sign in to finish setting up your organisation.
+
+Sign in: {{actionUrl}}

@@ -2,7 +2,9 @@ package com.qualityos.identity.service;
 
 import com.qualityos.common.audit.AuditService;
 import com.qualityos.common.exception.BusinessRuleException;
-import com.qualityos.common.mail.MailMessage;
+import com.qualityos.common.mail.EmailRequest;
+import com.qualityos.common.mail.EmailService;
+import com.qualityos.common.mail.EmailTemplate;
 import com.qualityos.common.mail.MailRequested;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.dto.AuthDtos.PasswordResetConfirmation;
@@ -15,6 +17,8 @@ import com.qualityos.identity.repository.RefreshTokenRepository;
 import com.qualityos.identity.repository.UserRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,6 +47,8 @@ public class AccountEmailService {
     private final PasswordEncoder passwordEncoder;
     private final AuditService audit;
     private final ApplicationEventPublisher events;
+    private final EmailService emails;
+    private final TenantAccessService access;
     private final TransactionTemplate tx;
     private final RegistrationProperties registration;
     private final String appUrl;
@@ -54,6 +60,8 @@ public class AccountEmailService {
             PasswordEncoder passwordEncoder,
             AuditService audit,
             ApplicationEventPublisher events,
+            EmailService emails,
+            TenantAccessService access,
             PlatformTransactionManager transactionManager,
             RegistrationProperties registration,
             @Value("${qualityos.app-url}") String appUrl) {
@@ -63,6 +71,8 @@ public class AccountEmailService {
         this.passwordEncoder = passwordEncoder;
         this.audit = audit;
         this.events = events;
+        this.emails = emails;
+        this.access = access;
         this.tx = new TransactionTemplate(transactionManager);
         this.registration = registration;
         this.appUrl = appUrl;
@@ -80,17 +90,7 @@ public class AccountEmailService {
                 return;
             }
             String token = issue(user.getId(), Purpose.PASSWORD_RESET, RESET_TTL);
-            events.publishEvent(new MailRequested(new MailMessage(
-                    user.getEmail(),
-                    "Reset your QualityOS password",
-                    """
-                    Someone asked to reset the password for this QualityOS account.
-
-                    Use this link within one hour:
-                    %s/reset-password?token=%s
-
-                    If this was not you, ignore this email. Your password has not changed.
-                    """.formatted(appUrl, token))));
+            mail(user, EmailTemplate.PASSWORD_RESET, "/reset-password?token=" + token, Map.of());
             audit.record("PASSWORD_RESET_REQUESTED", "User", user.getId());
         }));
     }
@@ -109,6 +109,7 @@ public class AccountEmailService {
             user.markEmailVerified(now);
             refreshTokens.revokeAllForUser(user.getId(), now);
             audit.record("PASSWORD_RESET", "User", user.getId());
+            sendPasswordChanged(user);
         }));
     }
 
@@ -136,9 +137,14 @@ public class AccountEmailService {
         TenantContext.runAs(null, token.getUserId(), () -> tx.executeWithoutResult(status -> {
             Instant now = Instant.now();
             consume(token, now);
-            users.findById(token.getUserId()).orElseThrow().markEmailVerified(now);
+            User user = users.findById(token.getUserId()).orElseThrow();
+            boolean firstTime = user.getStatus() == User.Status.PENDING_VERIFICATION;
+            user.markEmailVerified(now);
             tokens.invalidateOutstanding(token.getUserId(), Purpose.EMAIL_VERIFICATION, now);
             audit.record("EMAIL_VERIFIED", "User", token.getUserId());
+            if (firstTime) {
+                mail(user, EmailTemplate.WELCOME, "/login", Map.of());
+            }
         }));
     }
 
@@ -151,15 +157,28 @@ public class AccountEmailService {
     void sendVerification(User user) {
         String token = issue(user.getId(), Purpose.EMAIL_VERIFICATION, registration.verificationTtl());
         audit.record("EMAIL_VERIFICATION_SENT", "User", user.getId());
-        events.publishEvent(new MailRequested(new MailMessage(
-                user.getEmail(),
-                "Confirm your QualityOS email address",
-                """
-                Please confirm this email address for your QualityOS account:
-                %s/verify-email?token=%s
+        mail(user, EmailTemplate.VERIFICATION, "/verify-email?token=" + token,
+                Map.of("expiryMinutes", registration.verificationTokenExpiryMinutes()));
+    }
 
-                The link works for %d minutes.
-                """.formatted(appUrl, token, registration.verificationTokenExpiryMinutes()))));
+    /** Runs in the caller's transaction, so nothing is said about a change that did not happen. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    void sendPasswordChanged(User user) {
+        mail(user, EmailTemplate.PASSWORD_CHANGED, "/forgot-password", Map.of());
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    void sendAccountLocked(User user, Duration lock) {
+        mail(user, EmailTemplate.SECURITY_ALERT, "/forgot-password", Map.of("lockMinutes", lock.toMinutes()));
+    }
+
+    private void mail(User user, EmailTemplate template, String path, Map<String, Object> details) {
+        Map<String, Object> variables = new HashMap<>(details);
+        variables.put("recipientName", user.getFullName());
+        variables.put("actionUrl", appUrl + path);
+        String language = emails.language(
+                user.getPreferredLanguage(), access.firstOrganizationLocale(user.getId()).orElse(null));
+        events.publishEvent(new MailRequested(new EmailRequest(null, user.getEmail(), template, language, variables)));
     }
 
     private String issue(UUID userId, Purpose purpose, Duration ttl) {

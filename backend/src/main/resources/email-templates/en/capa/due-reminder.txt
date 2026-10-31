@@ -1,0 +1,8 @@
+Subject: CAPA {{capaNumber}} is due on {{dueDate}}
+
+A CAPA is due soon
+
+Hello {{recipientName}},
+{{capaNumber}} is due on {{dueDate}}: {{capaTitle}}.
+
+Open CAPA: {{actionUrl}}

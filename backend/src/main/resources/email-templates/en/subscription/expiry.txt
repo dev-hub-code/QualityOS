@@ -1,0 +1,8 @@
+Subject: Your QualityOS subscription ends on {{dueDate}}
+
+Your subscription is ending
+
+Hello {{recipientName}},
+The subscription for {{organizationName}} ends on {{dueDate}}.
+
+Manage subscription: {{actionUrl}}

@@ -1,0 +1,8 @@
+Subject: ऑडिट {{auditNumber}} नियोजित आहे
+
+एक ऑडिट नियोजित आहे
+
+नमस्कार {{recipientName}},
+ऑडिट {{auditNumber}} {{dueDate}} रोजी नियोजित आहे.
+
+ऑडिट उघडा: {{actionUrl}}

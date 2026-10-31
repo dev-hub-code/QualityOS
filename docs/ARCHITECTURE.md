@@ -120,3 +120,5 @@ time and a dead instance's lock lapses. A finished run holds the lock for 90% of
 same schedule does not repeat it. A failed run releases it at once. Tenant work runs per tenant, so one failure does not stop
 the others, and each run writes a row to `scheduled_job_executions`, kept for 30 days. `JobMonitor` warns when a job misses
 three runs, and reports `STALE` in health.
+
+A new job also needs an entry in `JobMonitor`, which holds its own list of what should be running.

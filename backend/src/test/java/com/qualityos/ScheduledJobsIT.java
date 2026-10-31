@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.reset;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.qualityos.common.job.JobMonitor;
 import com.qualityos.common.job.JobRunner;
@@ -97,6 +98,24 @@ class ScheduledJobsIT extends AbstractIntegrationTest {
         return capa.toString();
     }
 
+    private void overdueInstrument(Session session) throws Exception {
+        String created = as(session, postJson("/api/v1/facilities",
+                        Map.of("code", "F" + UUID.randomUUID().toString().substring(0, 8), "name", "Plant")))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String facility = com.jayway.jsonpath.JsonPath.read(created, "$.data.id");
+        as(session, postJson("/api/v1/instruments", Map.of("instrumentCode", "VC-1", "name", "Caliper",
+                        "category", "Dimensional", "facilityId", facility, "frequencyDays", 180,
+                        "nextDueOn", java.time.LocalDate.now().minusDays(2).toString())))
+                .andExpect(status().isCreated());
+    }
+
+    private int calibrationNotices(Session session) {
+        return asDatabaseSuperuser().queryForObject(
+                "SELECT count(*) FROM notifications WHERE tenant_id = ? AND type = 'CALIBRATION_OVERDUE'",
+                Integer.class, session.tenantId());
+    }
+
     private int capaNotices(Session session) {
         return asDatabaseSuperuser().queryForObject(
                 "SELECT count(*) FROM notifications WHERE tenant_id = ? AND type = 'CAPA_OVERDUE'",
@@ -106,7 +125,7 @@ class ScheduledJobsIT extends AbstractIntegrationTest {
     @Test
     void everyJobIsRegisteredAtStartupWithItsConfiguredInterval() {
         assertThat(clock.delays()).containsExactlyInAnyOrder(
-                Duration.ofSeconds(30), Duration.ofHours(1), Duration.ofHours(1), Duration.ofHours(24),
+                Duration.ofSeconds(30), Duration.ofHours(1), Duration.ofHours(1), Duration.ofHours(1), Duration.ofHours(24),
                 Duration.ofMinutes(15));
     }
 
@@ -153,6 +172,24 @@ class ScheduledJobsIT extends AbstractIntegrationTest {
         tickEverything();
         assertThat(capaNotices(one)).isEqualTo(1);
         assertThat(capaNotices(two)).isEqualTo(1);
+    }
+
+    @Test
+    void anOverdueInstrumentRemindsEachTenantOnceThroughTheSchedule() throws Exception {
+        Session one = register();
+        Session two = register();
+        overdueInstrument(one);
+        overdueInstrument(two);
+
+        tickEverything();
+        assertThat(calibrationNotices(one)).isEqualTo(1);
+        assertThat(calibrationNotices(two)).isEqualTo(1);
+        assertThat((String) lastRun("calibration-reminders").get("status")).isEqualTo("SUCCESS");
+        assertThat((Integer) lastRun("calibration-reminders").get("tenants_processed")).isGreaterThanOrEqualTo(2);
+
+        tickEverything();
+        assertThat(calibrationNotices(one)).isEqualTo(1);
+        assertThat(calibrationNotices(two)).isEqualTo(1);
     }
 
     @Test
@@ -285,7 +322,7 @@ class ScheduledJobsIT extends AbstractIntegrationTest {
         tickEverything();
         assertThat(monitor.stale(Instant.now())).isEmpty();
         assertThat(monitor.stale(Instant.now().plus(Duration.ofHours(4)))).containsKeys(
-                "capa-reminders", "unconfirmed-shipments", "notification-delivery");
+                "capa-reminders", "calibration-reminders", "unconfirmed-shipments", "notification-delivery");
         assertThat(monitor.stale(Instant.now().plus(Duration.ofHours(4)))).doesNotContainKey("account-maintenance");
     }
 }

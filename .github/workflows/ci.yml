@@ -45,8 +45,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: recall-report-samples
-          path: backend/target/recall-samples
+          name: report-samples
+          path: |
+            backend/target/recall-samples
+            backend/target/audit-samples
           retention-days: 14
       - name: Upload application
         uses: actions/upload-artifact@v4

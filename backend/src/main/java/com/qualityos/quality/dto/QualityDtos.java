@@ -46,6 +46,21 @@ public final class QualityDtos {
             @PositiveOrZero @Digits(integer = 12, fraction = 6) BigDecimal rejectedQuantity) {
     }
 
+    /** What an audit hands over when a finding raises an NCR. */
+    public record AuditFailure(
+            UUID auditId,
+            UUID findingId,
+            String auditNumber,
+            UUID supplierId,
+            boolean major,
+            String statement,
+            String description) {
+    }
+
+    /** How the correction of an audit finding stands. */
+    public record NcrOutcome(UUID id, String ncrNumber, String status, boolean finished, List<LinkedCapa> capas) {
+    }
+
     /** What an inspection hands over when it raises an NCR. */
     public record InspectionFailure(
             UUID inspectionId,
@@ -102,6 +117,7 @@ public final class QualityDtos {
             String severity,
             String source,
             UUID inspectionId,
+            UUID auditId,
             UUID supplierId,
             String supplierName,
             UUID materialId,

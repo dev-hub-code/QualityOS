@@ -13,8 +13,10 @@ import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.material.service.MaterialService;
 import com.qualityos.quality.dto.QualityDtos.Assignee;
+import com.qualityos.quality.dto.QualityDtos.AuditFailure;
 import com.qualityos.quality.dto.QualityDtos.CapaHistory;
 import com.qualityos.quality.dto.QualityDtos.NcrHistory;
+import com.qualityos.quality.dto.QualityDtos.NcrOutcome;
 import com.qualityos.quality.dto.QualityDtos.CreateNcrRequest;
 import com.qualityos.quality.dto.QualityDtos.DefectCategoryResponse;
 import com.qualityos.quality.dto.QualityDtos.InspectionFailure;
@@ -194,6 +196,35 @@ public class NcrService implements AttachmentPolicy {
                 "Inspection " + failure.inspectionNumber() + " failed",
                 failure.description(),
                 failure.rejectedQuantity()));
+    }
+
+    /** Joins the finding's transaction, so a finding cannot exist without its NCR. Repeats return the same NCR. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public UUID raiseFromAudit(AuditFailure failure) {
+        return ncrs.findByAuditFindingId(failure.findingId())
+                .orElseGet(() -> raise(NonConformance.fromAudit(
+                        numbers.next(NUMBER_PREFIX),
+                        failure.auditId(),
+                        failure.findingId(),
+                        failure.supplierId(),
+                        failure.major() ? NonConformance.Severity.MAJOR : NonConformance.Severity.MINOR,
+                        title(failure),
+                        failure.description())))
+                .getId();
+    }
+
+    /** Runs without a permission check of its own: the caller may see the audit, and this is how it stands. */
+    @Transactional(readOnly = true)
+    public Map<UUID, NcrOutcome> outcomes(Collection<UUID> ids) {
+        return ncrs.findAllById(ids).stream().collect(Collectors.toMap(NonConformance::getId, ncr -> new NcrOutcome(
+                ncr.getId(),
+                ncr.getNcrNumber(),
+                ncr.getStatus().name(),
+                ncr.getStatus().isFinished(),
+                capas.findByNcrIdOrderByCapaNumber(ncr.getId()).stream()
+                        .map(capa -> new LinkedCapa(
+                                capa.getId(), capa.getCapaNumber(), capa.getTitle(), capa.getStatus().name()))
+                        .toList())));
     }
 
     @Transactional
@@ -406,6 +437,7 @@ public class NcrService implements AttachmentPolicy {
                 ncr.getSeverity().name(),
                 ncr.getSource().name(),
                 ncr.getInspectionId(),
+                ncr.getAuditId(),
                 ncr.getSupplierId(),
                 ncr.getSupplierId() == null ? null : supplierNames(Set.of(ncr.getSupplierId())).get(ncr.getSupplierId()),
                 ncr.getMaterialId(),
@@ -425,6 +457,12 @@ public class NcrService implements AttachmentPolicy {
                 ncr.getClosedAt(),
                 linked,
                 changes);
+    }
+
+    private static String title(AuditFailure failure) {
+        String statement = failure.statement();
+        return "Audit %s: %s".formatted(
+                failure.auditNumber(), statement.length() > 150 ? statement.substring(0, 150) + "…" : statement);
     }
 
     private static String blankToNull(String value) {

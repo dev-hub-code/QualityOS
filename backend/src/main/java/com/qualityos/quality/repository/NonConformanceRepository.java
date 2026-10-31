@@ -20,6 +20,8 @@ public interface NonConformanceRepository
 
     Optional<NonConformance> findByInspectionId(UUID inspectionId);
 
+    Optional<NonConformance> findByAuditFindingId(UUID auditFindingId);
+
     /** NCRs an inspection raised, and those raised by hand against the batch. */
     @Query("""
             select n from NonConformance n

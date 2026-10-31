@@ -25,6 +25,12 @@ const LABELS: Record<string, string> = {
   CAPA_OVERDUE: "My CAPA is overdue",
   CAPA_CLOSED: "My CAPA is closed",
   DISPATCH_SHIPMENT_UNCONFIRMED: "Dispatches are waiting for shipment confirmation",
+  CALIBRATION_DUE_SOON: "An instrument is due for calibration",
+  CALIBRATION_OVERDUE: "An instrument is overdue for calibration",
+  CALIBRATION_FAILED: "An instrument fails calibration",
+  AUDIT_SCHEDULED: "An audit is scheduled for me",
+  AUDIT_FINDINGS: "An audit has findings",
+  AUDIT_AWAITING_CLOSURE: "An audit is ready for closure",
 };
 const PATH = "/notifications/preferences";
 

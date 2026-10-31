@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { InspectionInstruments } from "@/components/calibration/inspection-instruments";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
 import { AttachmentPanel } from "@/components/records/attachment-panel";
@@ -112,6 +113,7 @@ function Execution({ inspection, editable }: { inspection: Inspection; editable:
 
   return (
     <div className="space-y-4">
+      <InspectionInstruments inspection={inspection} editable={editable} />
       {parameters.map((parameter) => (
         <Section
           key={parameter.code}

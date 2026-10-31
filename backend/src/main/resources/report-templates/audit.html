@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Audit report {{report.audit.auditNumber}}</title>
+<meta name="author" content="{{report.organizationName}}"/>
+<meta name="subject" content="Quality audit report"/>
+<style>
+@page {
+  size: A4 landscape;
+  margin: 18mm 12mm 16mm 12mm;
+  @top-left { content: "{{report.audit.auditNumber}}"; font: 8pt "Report Sans"; color: #555; }
+  @top-right { content: "Generated {{report.generatedLabel}}"; font: 8pt "Report Sans"; color: #555; }
+  @bottom-left { content: "{{report.organizationName}}"; font: 8pt "Report Sans"; color: #555; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt "Report Sans"; color: #555; }
+}
+body { font-family: "Report Sans", "Report Devanagari", sans-serif; font-size: 9pt; color: #111; line-height: 1.35; }
+h1 { font-size: 17pt; margin: 0 0 2pt 0; }
+h2 { font-size: 11pt; margin: 14pt 0 5pt 0; border-bottom: 0.75pt solid #333; padding-bottom: 2pt;
+     page-break-after: avoid; -fs-page-break-min-height: 32mm; }
+p { margin: 0 0 5pt 0; }
+.muted { color: #555; }
+.pre { white-space: pre-wrap; }
+table { width: 100%; border-collapse: collapse; -fs-table-paginate: paginate; table-layout: fixed; }
+thead { display: table-header-group; }
+tr { page-break-inside: avoid; }
+th { background: #e8e8e8; text-align: left; font-weight: 700; font-size: 7.5pt; }
+th, td { border: 0.5pt solid #888; padding: 2.5pt 4pt; vertical-align: top; }
+td { font-size: 8.5pt; overflow-wrap: break-word; word-wrap: break-word; }
+.meta td { border: none; padding: 1pt 8pt 1pt 0; }
+.meta .label { width: 28mm; color: #555; }
+</style>
+</head>
+<body>
+<h1>Quality audit report</h1>
+<p class="muted">{{report.organizationName}}{{#report.organizationLegalName}} ({{.}}){{/report.organizationLegalName}}{{#report.organizationAddress}}, {{.}}{{/report.organizationAddress}}</p>
+
+<table class="meta">
+<tr><td class="label">Audit reference</td><td>{{report.audit.auditNumber}}</td><td class="label">Status</td><td>{{report.audit.status}}</td></tr>
+<tr><td class="label">Title</td><td>{{report.audit.title}}</td><td class="label">Type</td><td>{{report.audit.auditType}}</td></tr>
+<tr><td class="label">Facility</td><td>{{report.audit.facilityName}}</td><td class="label">Planned for</td><td>{{report.audit.plannedOn}}</td></tr>
+<tr><td class="label">Lead auditor</td><td>{{report.audit.leadAuditorName}}</td><td class="label">Checklist</td><td>{{report.audit.checklistName}}</td></tr>
+{{#report.audit.supplierName}}<tr><td class="label">Supplier</td><td>{{.}}</td><td></td><td></td></tr>{{/report.audit.supplierName}}
+{{#report.audit.productName}}<tr><td class="label">Product</td><td>{{.}}</td><td></td><td></td></tr>{{/report.audit.productName}}
+</table>
+
+<h2>Scope</h2>
+<p class="pre">{{report.audit.scope}}</p>
+{{#report.audit.summary}}<h2>Summary</h2>
+<p class="pre">{{.}}</p>{{/report.audit.summary}}
+
+<h2>Result</h2>
+<p>{{report.audit.review.answered}} of {{report.audit.review.items}} questions answered: {{report.audit.review.conforming}} conforming, {{report.audit.review.nonconforming}} nonconforming, {{report.audit.review.notApplicable}} not applicable.</p>
+
+{{#hasFindings}}
+<h2>Findings</h2>
+<table>
+<thead><tr><th style="width:4%">No.</th><th style="width:13%">Grade</th><th style="width:30%">Finding</th><th style="width:29%">Evidence</th><th style="width:8%">Clause</th><th style="width:16%">NCR and CAPA</th></tr></thead>
+<tbody>
+{{#report.audit.findings}}<tr><td>{{number}}</td><td>{{gradeLabel}}</td><td>{{statement}}</td><td>{{evidence}}</td><td>{{clauseReference}}</td><td>{{#ncr}}{{ncrNumber}} ({{status}}){{#capas}}<br/>{{capaNumber}} ({{status}}){{/capas}}{{/ncr}}</td></tr>
+{{/report.audit.findings}}
+</tbody>
+</table>
+{{/hasFindings}}
+
+<h2>Checklist</h2>
+<table>
+<thead><tr><th style="width:4%">No.</th><th style="width:48%">Question</th><th style="width:10%">Clause</th><th style="width:14%">Result</th><th style="width:24%">Note</th></tr></thead>
+<tbody>
+{{#report.audit.items}}<tr><td>{{position}}</td><td>{{question}}</td><td>{{clauseReference}}</td><td>{{resultLabel}}</td><td>{{note}}</td></tr>
+{{/report.audit.items}}
+</tbody>
+</table>
+
+{{#report.audit.closedByName}}<h2>Closure</h2>
+<p>Closed by {{.}}. {{report.audit.closureNote}}</p>{{/report.audit.closedByName}}
+
+<p class="muted" style="margin-top:12pt">This report records an organisation's own quality audit. It is not a certificate of compliance with any standard.</p>
+</body>
+</html>

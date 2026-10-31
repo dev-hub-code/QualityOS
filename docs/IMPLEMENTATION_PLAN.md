@@ -12,8 +12,8 @@ account emails a real customer needs.
 | 5 Notifications and account email | In-app and email notifications, invitations, email verification, password reset, IP rate limiting, scheduled jobs | Inspection events notify the right people, and a user can join and recover an account by email | **Done** |
 | 6 NCR and CAPA | Lifecycles, containment, root cause, verification, closure | Failed inspection flows through to closed CAPA | **Done** |
 | 7 Traceability | Batch graph, forward and backward trace, timeline, search | Raw material to dispatch traced | **Done** |
-| 8 Calibration and audit | Instruments, QR, calibration records, audits, findings | Overdue instruments notify and audit findings raise NCRs | Next |
-| 9 Analytics | Dashboard, scorecards, Pareto, PDF and Excel exports | Reports honour tenant and facility scope | |
+| 8 Calibration and audit | Instruments, QR, calibration records, audits, findings | Overdue instruments notify and audit findings raise NCRs | **Done** |
+| 9 Analytics | Dashboard, scorecards, Pareto, PDF and Excel exports | Reports honour tenant and facility scope | Next |
 | 10 Subscription | Plans, trials, limits, invoices | Limits enforced, prices editable by admin | |
 | 11 Production | Terraform, ECS, RDS, S3, Secrets Manager, CI/CD, monitoring, backups | Deployed and restore-tested | Deferred |
 
@@ -35,7 +35,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A material receipt does not notify inspectors; they see it in the inspection queue | When a user needs it |
 | Notifications are polled once a minute, with no live push. Only email and in-app channels exist | When a user needs it |
 | Hindi and Marathi email text was machine-drafted and needs review by a native speaker before customers see it | Before customer launch |
-| Templates for calibration, audit, subscription and payment exist, but nothing sends them yet. Calibration and audit arrive in Phase 8, subscription in Phase 10 | With those features |
+| Templates for subscription and payment exist, but nothing sends them yet | Phase 10 |
 | Some notifications have no dedicated template (NCR ready for closure, CAPA actions, verification, send-back, corrections). Their email has a translated frame around English text | When a user needs it |
 | Email delivery is recorded in `email_delivery_logs`, but there is no screen for it. The app itself is still English only | Phase 9, with the admin panel |
 | Organisation branding in email is the organisation name only. There is no logo upload | When a user needs it |
@@ -61,11 +61,16 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A correction of an inspected lot does not trigger reinspection. It needs two approvers, who decide whether to act | Review after real use |
 | Naming serial numbers on a dispatch is optional, so a batch can ship without saying which units went. A trace then shows the customer by batch, not by unit | Review after real use |
 | A dispatch only counts as shipped once someone confirms it. Traces flag it until then, and managers get a daily reminder after three days | Review after real use |
-| Facility limits cover production batches, traces, serial numbers and recalls. Lots, receipts, inspections, NCRs, CAPAs and dispatch lists are not limited yet | Next, before a customer relies on it |
+| Facility limits cover production batches, traces, serial numbers, recalls, instruments and audits. Lots, receipts, inspections, NCRs, CAPAs and dispatch lists are not limited yet | Next, before a customer relies on it |
 | The recall PDF does not shape Devanagari: names stay readable, but conjuncts do not form correctly | Before Hindi or Marathi customer names matter |
 | A dispatch after a recall starts is not blocked. Its customer joins the recall when closure is requested or approved | Review after real use |
 | Recalls start from one batch in the UI, though the API takes several. Linking a CAPA is API only | When a user needs it |
 | Scheduled job history has no screen. A silent job shows as `STALE` in health and as a log warning | Phase 9, with the admin panel |
+| Recording an instrument on an inspection is optional, and applies to the whole inspection, not each measurement | Review after real use |
+| A failed calibration flags the inspections in doubt and notifies people, but does not raise an NCR or reopen them | Review after real use |
+| Audits are planned one at a time, with no recurring schedule or reminder before the date. A missed audit shows as overdue in the list | When a user needs it |
+| A recorded audit finding cannot be edited. A wrong one is handled by cancelling its NCR, and it stays on the report | Review after real use |
+| The audit PDF and QR label are generated, but there is no calibration register report | Phase 9, with reports |
 | `tenant_settings` and supplier scorecards are not built | Phase 9 |
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | Lists show only active records, with no way to restore an archived one | When a user needs it |

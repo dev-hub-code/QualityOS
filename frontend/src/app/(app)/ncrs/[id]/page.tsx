@@ -128,7 +128,9 @@ export default function NcrPage() {
         <Details
           items={[
             ["Description", ncr.description],
-            ["Source", ncr.source === "INSPECTION" && ncr.inspectionId ? (
+            ["Source", ncr.source === "AUDIT" && ncr.auditId ? (
+              <RecordLink href={`/audits/${ncr.auditId}`}>Audit</RecordLink>
+            ) : ncr.source === "INSPECTION" && ncr.inspectionId ? (
               <RecordLink href={`/inspections/${ncr.inspectionId}`}>Inspection</RecordLink>
             ) : "Raised by hand"],
             ["Raised by", ncr.raisedByName],

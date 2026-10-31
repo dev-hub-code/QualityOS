@@ -29,7 +29,7 @@ public class NonConformance extends TenantOwnedEntity {
         }
     }
 
-    public enum Source { INSPECTION, MANUAL }
+    public enum Source { INSPECTION, MANUAL, AUDIT }
 
     public enum Severity { CRITICAL, MAJOR, MINOR }
 
@@ -42,6 +42,8 @@ public class NonConformance extends TenantOwnedEntity {
     private Source source;
 
     private UUID inspectionId;
+    private UUID auditId;
+    private UUID auditFindingId;
     private UUID supplierId;
     private UUID materialId;
     private String batchNumber;
@@ -60,6 +62,16 @@ public class NonConformance extends TenantOwnedEntity {
     private String outcomeNote;
     private Instant closedAt;
     private UUID closedBy;
+
+    /** An NCR that comes from an audit finding, which is how the audit follows its correction. */
+    public static NonConformance fromAudit(String ncrNumber, UUID auditId, UUID findingId, UUID supplierId,
+            Severity severity, String title, String description) {
+        NonConformance ncr = new NonConformance(ncrNumber, Source.AUDIT, null, supplierId, null, null, null, severity,
+                title, description, null);
+        ncr.auditId = auditId;
+        ncr.auditFindingId = findingId;
+        return ncr;
+    }
 
     public NonConformance(String ncrNumber, Source source, UUID inspectionId, UUID supplierId, UUID materialId,
             String batchNumber, UUID defectCategoryId, Severity severity, String title, String description,

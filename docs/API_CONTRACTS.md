@@ -147,3 +147,18 @@ a member's facilities answer 404.
 A sent email is an attempt with the outcome `NO_REPLY`. Only `REACHED` moves a customer to `CONTACTED`, and only an
 acknowledgement allows `RESOLVED`. Closing needs every customer resolved or covered by an exception, any linked CAPA closed,
 and a second person.
+
+| Calibration | Permission |
+|---|---|
+| `GET /instruments`, `GET /instruments/{id}`, `/calibrations`, `/usage`, `/qr.svg` | `CALIBRATION_VIEW` |
+| `POST /instruments`, `PUT /instruments/{id}`, `POST /instruments/{id}/status`, `POST /instruments/{id}/calibrations` | `CALIBRATION_MANAGE` |
+| `GET /instruments/usable`, `POST /inspections/{id}/instruments` | `INSPECTION_EXECUTE` |
+
+| Audits | Permission |
+|---|---|
+| `GET /audit-checklists`, `GET /audit-checklists/{id}`, `GET /audits`, `GET /audits/{id}`, `/report`, `/report.pdf` | `AUDIT_VIEW` |
+| `POST`, `PUT`, `DELETE /audit-checklists`; `POST /audits`, `PUT /audits/{id}`, `PUT .../items/{itemId}`, `POST .../start`, `/findings`, `/findings/{findingId}/ncr`, `/complete`, `/request-closure`, `/cancel` | `AUDIT_MANAGE` |
+| `POST /audits/{id}/send-back`, `POST /audits/{id}/close` | `AUDIT_CLOSE` |
+
+A major or minor nonconformity raises an NCR with the finding. An audit closes once its NCRs are finished, and needs a second
+person. The QR code holds only a link, which asks whoever scans it to sign in.

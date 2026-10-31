@@ -14,7 +14,9 @@ import com.qualityos.inspection.dto.InspectionDtos.ApproveRequest;
 import com.qualityos.inspection.dto.InspectionDtos.CreateInspectionRequest;
 import com.qualityos.inspection.dto.InspectionDtos.DecisionResponse;
 import com.qualityos.inspection.dto.InspectionDtos.DispositionRequest;
+import com.qualityos.calibration.service.InstrumentService;
 import com.qualityos.inspection.dto.InspectionDtos.ExecuteRequest;
+import com.qualityos.inspection.dto.InspectionDtos.RecordInstrumentsRequest;
 import com.qualityos.inspection.dto.InspectionDtos.InspectionDetail;
 import com.qualityos.inspection.dto.InspectionDtos.InspectionSummary;
 import com.qualityos.inspection.dto.InspectionDtos.ResultRequest;
@@ -81,6 +83,7 @@ public class InspectionService implements AttachmentPolicy {
     private final MaterialService materials;
     private final AttachmentService attachments;
     private final DocumentNumberService numbers;
+    private final InstrumentService instruments;
     private final AuditService audit;
     private final InspectionAlerts inspectionAlerts;
     private final NcrService ncrs;
@@ -100,11 +103,13 @@ public class InspectionService implements AttachmentPolicy {
             @Lazy AttachmentService attachments,
             DocumentNumberService numbers,
             AuditService audit,
+            InstrumentService instruments,
             InspectionAlerts inspectionAlerts,
             NcrService ncrs,
             ProductionService production,
             DispatchReturnService returns,
             JsonMapper json) {
+        this.instruments = instruments;
         this.inspections = inspections;
         this.results = results;
         this.approvals = approvals;
@@ -315,6 +320,17 @@ public class InspectionService implements AttachmentPolicy {
         }
         inspections.saveAndFlush(inspection);
         audit.record("INSPECTION_CANCELLED", ENTITY, id);
+        return toDetail(inspection);
+    }
+
+    /** Adds to the instruments behind these measurements. One that is overdue or out of service is refused. */
+    @Transactional
+    public InspectionDetail recordInstruments(UUID id, RecordInstrumentsRequest request) {
+        Inspection inspection = lock(id);
+        inspection.recordingResults();
+        inspections.saveAndFlush(inspection);
+        instruments.recordUse(id, inspection.getInspectionNumber(), Set.copyOf(request.instrumentIds()));
+        audit.record("INSPECTION_INSTRUMENTS_RECORDED", ENTITY, id);
         return toDetail(inspection);
     }
 
@@ -586,7 +602,8 @@ public class InspectionService implements AttachmentPolicy {
                                 decision.getNote(),
                                 decision.getCreatedBy(),
                                 decision.getCreatedAt()))
-                        .toList());
+                        .toList(),
+                instruments.usedBy(inspection.getId()));
     }
 
     private static String name(Enum<?> value) {

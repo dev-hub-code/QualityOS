@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.qualityos.inspection.dto.InspectionDtos.InspectionHistory;
 import com.qualityos.quality.dto.QualityDtos.NcrHistory;
+import com.qualityos.common.report.HtmlPdf;
 import com.qualityos.recall.dto.RecallDtos.ClosureReview;
 import com.qualityos.recall.dto.RecallDtos.HistoryEntry;
 import com.qualityos.recall.dto.RecallDtos.RecallDetail;
@@ -35,7 +36,7 @@ class RecallPdfSamplesTest {
     private static final String LONG_NAME = "Maharashtra Precision Automotive Components and Allied Engineering "
             + "Industries Private Limited (Chakan Plant Unit No. 2, Stores Receiving)";
 
-    private final RecallPdfRenderer renderer = new RecallPdfRenderer();
+    private final RecallPdfRenderer renderer = new RecallPdfRenderer(new HtmlPdf());
 
     private record Delivered(String name, int dispatched, int returned, String status, String exception, long attempts) {
     }

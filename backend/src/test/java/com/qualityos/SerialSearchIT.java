@@ -47,14 +47,6 @@ class SerialSearchIT extends TraceabilityFixture {
         return JsonPath.read(body(as(owner, get("/api/v1/production-batches/" + productionBatch))), "$.data.batch.facilityId");
     }
 
-    private void limit(Session member, String facility) throws Exception {
-        String users = body(as(owner, get("/api/v1/users?size=100")));
-        List<String> ids = JsonPath.read(users, "$.data.items[?(@.userId == '" + member.userId() + "')].membershipId");
-        as(owner, put("/api/v1/users/" + ids.getFirst() + "/facilities").contentType("application/json")
-                        .content(json.writeValueAsString(Map.of("facilityIds", List.of(facility)))))
-                .andExpect(status().isOk());
-    }
-
     @Test
     void findsAUnitByExactOrPartialNumberInAnyCase() throws Exception {
         search(owner, "?q=" + serial)

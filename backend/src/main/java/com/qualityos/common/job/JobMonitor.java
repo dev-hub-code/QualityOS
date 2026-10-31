@@ -36,12 +36,14 @@ public class JobMonitor implements HealthIndicator {
             PlatformTransactionManager transactionManager,
             @Value("${qualityos.jobs.notification-delivery.interval}") Duration delivery,
             @Value("${qualityos.jobs.capa-reminders.interval}") Duration capas,
+            @Value("${qualityos.jobs.calibration-reminders.interval}") Duration calibrations,
             @Value("${qualityos.jobs.unconfirmed-shipments.interval}") Duration shipments,
             @Value("${qualityos.jobs.account-maintenance.interval}") Duration accounts) {
         this.jdbc = jdbc;
         this.tx = new TransactionTemplate(transactionManager);
         expected.put("notification-delivery", delivery);
         expected.put("capa-reminders", capas);
+        expected.put("calibration-reminders", calibrations);
         expected.put("unconfirmed-shipments", shipments);
         expected.put("account-maintenance", accounts);
     }

@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import com.qualityos.subscription.service.PlanLimits;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -60,6 +61,7 @@ public class InvitationService {
     private final OrganizationService organizations;
     private final PasswordEncoder passwordEncoder;
     private final AuditService audit;
+    private final PlanLimits limits;
     private final ApplicationEventPublisher events;
     private final EmailService emails;
     private final TransactionTemplate tx;
@@ -76,11 +78,13 @@ public class InvitationService {
             OrganizationService organizations,
             PasswordEncoder passwordEncoder,
             AuditService audit,
+            PlanLimits limits,
             ApplicationEventPublisher events,
             EmailService emails,
             PlatformTransactionManager transactionManager,
             @Value("${qualityos.app-url}") String appUrl) {
         this.invitations = invitations;
+        this.limits = limits;
         this.users = users;
         this.memberships = memberships;
         this.roles = roles;
@@ -119,6 +123,7 @@ public class InvitationService {
             invitations.saveAndFlush(previous);
         });
 
+        limits.requireUserPlace();
         String secret = RefreshTokens.generate();
         Invitation invitation = invitations.saveAndFlush(new Invitation(
                 email, granted.stream().map(Role::getId).toList(), RefreshTokens.hash(secret), expiry()));

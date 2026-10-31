@@ -147,3 +147,10 @@ row-level security. `account_tokens` holds one-time password reset and email ver
 
 No new tables. Analytics read existing records through row-level security. V17 adds date indexes on decided
 inspections, and on NCRs and CAPAs by creation and closure.
+
+## Phase 10: subscriptions (V18, V19)
+
+`subscription_plans` and `platform_admins` belong to the platform and have no `tenant_id`. The application role can read
+`platform_admins` but not write it. `subscriptions` (one per tenant), `subscription_invoices` and `payment_transactions`
+are tenant-owned with row-level security. An invoice copies its plan name, prices and buyer details, so that it never
+changes afterwards. At most one invoice per tenant can be open, and a payment reference is unique per tenant and provider.

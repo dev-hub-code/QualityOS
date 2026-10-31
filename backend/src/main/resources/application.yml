@@ -60,6 +60,11 @@ app:
 qualityos:
   # The address users reach the web application on, used for links in emails.
   app-url: ${APP_URL:http://localhost:3000}
+  # The seller printed on invoices. Set these for the legal entity that bills before sending one to a customer.
+  billing:
+    seller-name: ${BILLING_SELLER_NAME:QualityOS}
+    seller-gstin: ${BILLING_SELLER_GSTIN:}
+    seller-address: ${BILLING_SELLER_ADDRESS:}
   mail:
     from: ${MAIL_FROM:QualityOS <no-reply@qualityos.local>}
     # A language here needs a folder in resources/email-templates, and any file it lacks falls back to English.
@@ -76,6 +81,9 @@ qualityos:
       interval: PT1H
     calibration-reminders:
       initial-delay: PT5M
+      interval: PT1H
+    subscription-notices:
+      initial-delay: PT6M
       interval: PT1H
     unconfirmed-shipments:
       initial-delay: PT5M

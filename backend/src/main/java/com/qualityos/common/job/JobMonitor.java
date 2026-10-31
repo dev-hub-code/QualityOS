@@ -37,6 +37,7 @@ public class JobMonitor implements HealthIndicator {
             @Value("${qualityos.jobs.notification-delivery.interval}") Duration delivery,
             @Value("${qualityos.jobs.capa-reminders.interval}") Duration capas,
             @Value("${qualityos.jobs.calibration-reminders.interval}") Duration calibrations,
+            @Value("${qualityos.jobs.subscription-notices.interval}") Duration subscriptions,
             @Value("${qualityos.jobs.unconfirmed-shipments.interval}") Duration shipments,
             @Value("${qualityos.jobs.account-maintenance.interval}") Duration accounts) {
         this.jdbc = jdbc;
@@ -44,6 +45,7 @@ public class JobMonitor implements HealthIndicator {
         expected.put("notification-delivery", delivery);
         expected.put("capa-reminders", capas);
         expected.put("calibration-reminders", calibrations);
+        expected.put("subscription-notices", subscriptions);
         expected.put("unconfirmed-shipments", shipments);
         expected.put("account-maintenance", accounts);
     }

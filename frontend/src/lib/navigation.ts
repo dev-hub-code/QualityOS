@@ -3,7 +3,9 @@ import {
   Building2,
   ClipboardCheck,
   ClipboardList,
+  Building,
   ChartColumn,
+  CreditCard,
   FileChartColumn,
   Gauge,
   ListTodo,
@@ -66,7 +68,10 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Facilities", href: "/facilities", icon: Factory, anyPermission: ["FACILITY_VIEW"] },
   { label: "Users", href: "/users", icon: Users, anyPermission: ["USER_MANAGE"] },
   { label: "Roles", href: "/roles", icon: ShieldCheck, anyPermission: ["ROLE_MANAGE", "USER_MANAGE"] },
+  { label: "Billing", href: "/settings/billing", icon: CreditCard, anyPermission: ["SUBSCRIPTION_MANAGE"] },
   { label: "Settings", href: "/settings", icon: Settings },
+  { label: "Plans", href: "/platform/plans", icon: Tags, anyPermission: ["PLATFORM_ADMIN"] },
+  { label: "Organisations", href: "/platform/organisations", icon: Building, anyPermission: ["PLATFORM_ADMIN"] },
 ];
 
 export function visibleNavItems(permissions: readonly string[], items = NAV_ITEMS): NavItem[] {

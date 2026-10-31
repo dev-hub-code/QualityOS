@@ -128,3 +128,17 @@ A new job also needs an entry in `JobMonitor`, which holds its own list of what 
 `reporting` reads across modules with plain SQL, like the traceability search, and writes nothing except an audit row
 for each export. Row-level security limits every statement to the tenant. `ReportScope` adds the member's facilities,
 and anything with no facility fails that clause, so a limited member never sees what cannot be placed.
+
+## Subscription
+
+`PlanAccess` narrows a member's permissions where they are resolved, so a plan's features and read-only mode reach every
+endpoint with no billing logic in controllers. A feature's permissions are removed, except that `_VIEW` permissions stay
+so that records made before a downgrade remain readable. Reports are the exception. Read-only leaves only `_VIEW` and
+`SUBSCRIPTION_MANAGE`. Anti-escalation checks compare against what a member's roles give, not the narrowed set.
+
+State follows from `current_period_ends_at`, so access stays right if no job runs. `SubscriptionNoticeJob` only sends
+notices. `SubscriptionService.settle` is the one way money reaches an invoice. A payment gateway would add a provider
+and call it from a verified callback under the invoice's tenant. A repeated reference is harmless.
+
+The platform console never bypasses row-level security. `platform_tenant_ids()` returns ids only, and each organisation
+is then read and changed under its own tenant context.

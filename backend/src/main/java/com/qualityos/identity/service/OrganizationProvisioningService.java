@@ -10,6 +10,7 @@ import com.qualityos.identity.repository.RoleRepository;
 import com.qualityos.identity.repository.UserRoleRepository;
 import com.qualityos.organization.service.OrganizationService;
 import java.util.UUID;
+import com.qualityos.subscription.service.SubscriptionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,13 +22,16 @@ class OrganizationProvisioningService {
     private final MembershipRepository memberships;
     private final RoleRepository roles;
     private final UserRoleRepository userRoles;
+    private final SubscriptionService subscriptions;
 
     OrganizationProvisioningService(
             OrganizationService organizations,
             MembershipRepository memberships,
             RoleRepository roles,
-            UserRoleRepository userRoles) {
+            UserRoleRepository userRoles,
+            SubscriptionService subscriptions) {
         this.organizations = organizations;
+        this.subscriptions = subscriptions;
         this.memberships = memberships;
         this.roles = roles;
         this.userRoles = userRoles;
@@ -41,5 +45,6 @@ class OrganizationProvisioningService {
                 new QualityOsException(ErrorCode.INTERNAL_ERROR, "Owner role is not seeded"));
         Membership membership = memberships.saveAndFlush(new Membership(ownerUserId));
         userRoles.save(new UserRole(membership.getId(), owner.getId()));
+        subscriptions.startTrial();
     }
 }

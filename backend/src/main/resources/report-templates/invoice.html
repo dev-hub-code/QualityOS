@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Invoice {{invoice.invoiceNumber}}</title>
+<style>
+@page {
+  size: A4;
+  margin: 20mm 16mm 18mm 16mm;
+  @bottom-left { content: "{{footerName}}"; font: 8pt "Report Sans"; color: #555; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt "Report Sans"; color: #555; }
+}
+body { font-family: "Report Sans", "Report Devanagari", sans-serif; font-size: 10pt; color: #111; line-height: 1.4; }
+h1 { font-size: 20pt; margin: 0 0 4pt 0; }
+p { margin: 0 0 6pt 0; }
+.muted { color: #555; }
+.parties { width: 100%; margin: 12pt 0; }
+.parties td { width: 50%; vertical-align: top; padding-right: 12pt; }
+table.lines { width: 100%; border-collapse: collapse; margin-top: 10pt; }
+.lines th, .lines td { border: 0.5pt solid #888; padding: 4pt 6pt; }
+.lines th { background: #e8e8e8; text-align: left; }
+.num { text-align: right; }
+.total td { font-weight: 700; }
+.stamp { font-weight: 700; font-size: 12pt; }
+</style>
+</head>
+<body>
+<h1>Invoice</h1>
+<p class="muted">{{invoice.invoiceNumber}}. Issued {{invoice.issuedOn}}. Due {{invoice.dueOn}}.</p>
+{{#paid}}<p class="stamp">Paid</p>{{/paid}}
+{{#void}}<p class="stamp">Void: replaced by a later invoice. Do not pay this one.</p>{{/void}}
+<table class="parties"><tr>
+<td><b>From</b><br/>{{sellerName}}{{#sellerAddress}}<br/>{{this}}{{/sellerAddress}}{{#sellerGstin}}<br/>GSTIN {{this}}{{/sellerGstin}}</td>
+<td><b>To</b><br/>{{invoice.buyerName}}{{#buyerAddress}}<br/>{{this}}{{/buyerAddress}}{{#buyerGstin}}<br/>GSTIN {{this}}{{/buyerGstin}}</td>
+</tr></table>
+<table class="lines">
+<thead><tr><th>Description</th><th class="num">Amount</th></tr></thead>
+<tbody>
+<tr><td>QualityOS {{invoice.planName}} plan, {{cycle}} subscription</td><td class="num">{{amount}}</td></tr>
+<tr><td>GST at {{invoice.taxPercent}}%</td><td class="num">{{tax}}</td></tr>
+<tr class="total"><td>Total</td><td class="num">{{total}}</td></tr>
+</tbody>
+</table>
+</body>
+</html>

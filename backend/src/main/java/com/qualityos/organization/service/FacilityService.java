@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import com.qualityos.subscription.service.PlanLimits;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -39,6 +40,7 @@ public class FacilityService {
     private final ShiftRepository shifts;
     private final FacilityMapper mapper;
     private final AuditService audit;
+    private final PlanLimits limits;
 
     FacilityService(
             FacilityRepository facilities,
@@ -46,7 +48,9 @@ public class FacilityService {
             ProductionLineRepository lines,
             ShiftRepository shifts,
             FacilityMapper mapper,
+            PlanLimits limits,
             AuditService audit) {
+        this.limits = limits;
         this.facilities = facilities;
         this.departments = departments;
         this.lines = lines;
@@ -81,6 +85,7 @@ public class FacilityService {
         if (facilities.existsByCode(code)) {
             throw new ConflictException("A facility with this code already exists.");
         }
+        limits.requireFacilityPlace();
         Facility facility = new Facility(code);
         apply(facility, request);
         facilities.saveAndFlush(facility);

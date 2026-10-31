@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.qualityos.subscription.service.PlanLimits;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +40,8 @@ public class UserManagementService {
     private final UserRoleRepository userRoles;
     private final RoleMapper roleMapper;
     private final AuditService audit;
+    private final TenantAccessService access;
+    private final PlanLimits limits;
     private final JdbcTemplate jdbc;
 
     UserManagementService(
@@ -48,6 +51,8 @@ public class UserManagementService {
             UserRoleRepository userRoles,
             RoleMapper roleMapper,
             AuditService audit,
+            TenantAccessService access,
+            PlanLimits limits,
             JdbcTemplate jdbc) {
         this.memberships = memberships;
         this.users = users;
@@ -55,6 +60,8 @@ public class UserManagementService {
         this.userRoles = userRoles;
         this.roleMapper = roleMapper;
         this.audit = audit;
+        this.access = access;
+        this.limits = limits;
         this.jdbc = jdbc;
     }
 
@@ -138,6 +145,9 @@ public class UserManagementService {
                 requireAnotherOwner();
             }
         }
+        if (active && membership.getStatus() != Membership.Status.ACTIVE) {
+            limits.requireUserPlace();
+        }
         membership.setStatus(active ? Membership.Status.ACTIVE : Membership.Status.INACTIVE);
         audit.record(active ? "MEMBER_ACTIVATED" : "MEMBER_DEACTIVATED", "Membership", membershipId);
     }
@@ -154,7 +164,7 @@ public class UserManagementService {
         AuthorityChecks.requireHolds(found.stream()
                 .flatMap(role -> role.getPermissions().stream())
                 .map(Permission::getCode)
-                .collect(Collectors.toSet()));
+                .collect(Collectors.toSet()), access.rolePermissions());
         return found;
     }
 

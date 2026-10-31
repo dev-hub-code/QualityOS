@@ -57,8 +57,12 @@ Rules enforced in the database as well as in code:
 email verification tokens, stored hashed like refresh tokens.
 
 ### Phase 6: quality issues
-`non_conformances`, `ncr_attachments`, `corrective_actions`, `capa_actions`, `capa_verifications`,
-**`defect_categories`**, **`ncr_status_history`**, **`capa_status_history`**.
+`non_conformances`, `corrective_actions`, `capa_actions`, `capa_verifications`, **`defect_categories`**,
+**`ncr_status_history`**, **`capa_status_history`** (V6). Evidence uses `attachments`.
+
+- Finished NCRs and CAPAs, status histories and verifications cannot be changed, enforced by triggers.
+- One inspection has at most one NCR, by a partial unique index.
+- `tenants_with_overdue_capas()` returns tenant ids only, on the same pattern as `tenants_with_pending_email()`.
 
 ### Phase 7: traceability
 `batches`, `batch_relationships` (parent, child, quantity: a directed graph walked with recursive CTEs),
@@ -108,6 +112,6 @@ row-level security. `account_tokens` holds one-time password reset and email ver
 - Every token is stored only as a SHA-256 hash.
 - An invitation token carries its tenant id so that it can be looked up under that tenant's row-level security. The id
   grants nothing, because the hash must also be found in that tenant.
-- `tenants_with_pending_email()` is `SECURITY DEFINER` and is the only cross-tenant read in the application. It returns
-  tenant ids and nothing else. The `delivery_scan` policy that lets it see rows applies to the schema owner, never to
+- `tenants_with_pending_email()` is `SECURITY DEFINER`. Together with `tenants_with_overdue_capas()` (V6) it is the only
+  cross-tenant read in the application, and it returns tenant ids and nothing else. The `delivery_scan` policy that lets it see rows applies to the schema owner, never to
   the application role. The delivery job then reads each tenant's rows under that tenant's own context.

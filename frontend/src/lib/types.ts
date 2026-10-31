@@ -414,3 +414,89 @@ export interface NotificationPreference {
   type: string;
   emailEnabled: boolean;
 }
+
+export interface Assignee {
+  id: string;
+  fullName: string;
+}
+
+export interface DefectCategory {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export interface NcrSummary {
+  id: string;
+  ncrNumber: string;
+  title: string;
+  status: string;
+  severity: string;
+  source: string;
+  supplierName: string | null;
+  materialName: string | null;
+  batchNumber: string | null;
+  assigneeName: string | null;
+  createdAt: string;
+}
+
+export interface StatusChange {
+  fromStatus: string | null;
+  toStatus: string;
+  note: string | null;
+  actorName: string;
+  at: string;
+}
+
+export interface Ncr extends NcrSummary {
+  description: string;
+  inspectionId: string | null;
+  defectCategoryId: string | null;
+  defectCategoryName: string | null;
+  rejectedQuantity: string | null;
+  assignedTo: string | null;
+  containmentAction: string | null;
+  rootCause: string | null;
+  outcomeNote: string | null;
+  raisedByName: string;
+  verificationRequestedBy: string | null;
+  closedAt: string | null;
+  capas: { id: string; capaNumber: string; title: string; status: string }[];
+  history: StatusChange[];
+}
+
+export interface CapaSummary {
+  id: string;
+  capaNumber: string;
+  title: string;
+  status: string;
+  ownerName: string | null;
+  targetDate: string;
+  overdue: boolean;
+}
+
+export interface CapaAction {
+  id: string;
+  actionType: "CORRECTIVE" | "PREVENTIVE";
+  description: string;
+  ownerName: string | null;
+  targetDate: string;
+  completedAt: string | null;
+  completionNote: string | null;
+}
+
+export interface Capa extends CapaSummary {
+  problemStatement: string;
+  ncrId: string | null;
+  ncrNumber: string | null;
+  rootCause: string | null;
+  fiveWhys: string[];
+  fishbone: Record<string, string[]>;
+  ownerId: string;
+  effectivenessRequired: boolean;
+  outcomeNote: string | null;
+  closedAt: string | null;
+  actions: CapaAction[];
+  verifications: { effective: boolean; method: string; note: string; verifiedBy: string; at: string }[];
+  history: StatusChange[];
+}

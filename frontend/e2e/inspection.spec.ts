@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { acceptInvitation, inviteUser } from "./mail";
 
 const PASSWORD = "correct-horse-battery";
@@ -67,6 +67,7 @@ test("a template is published, and a failed critical measurement never releases 
   page,
   browser,
 }) => {
+  test.setTimeout(90_000);
   await signUp(page);
   await receiveMaterial(page);
   const managerEmail = `manager-${unique()}@example.com`;
@@ -128,4 +129,79 @@ test("a template is published, and a failed critical measurement never releases 
   await manager.getByRole("link", { name: "Report" }).click();
   await expect(manager.getByRole("heading", { name: /Inspection report/ })).toBeVisible();
   await expect(manager.getByText("19.9 to 20.1").first()).toBeVisible();
+
+  // The failure now has an NCR, which runs through a verified CAPA to closure.
+  await manager.goto(url);
+  await manager.getByRole("link", { name: /^NCR-/ }).click();
+  await expect(manager).toHaveURL(/ncrs\//);
+  const ncrUrl = manager.url();
+
+  const step = async (who: Page, button: string, fill?: (dialog: Locator) => Promise<void>) => {
+    await who.getByRole("button", { name: button, exact: true }).click();
+    const dialog = who.getByRole("dialog");
+    await fill?.(dialog);
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).toBeHidden();
+  };
+
+  await manager.goto("/defect-categories");
+  await step(manager, "Add category", async (dialog) => {
+    await dialog.getByLabel("Code").fill("DIM");
+    await dialog.getByLabel("Name").fill("Dimensional");
+  });
+  await expect(manager.getByText("DIM – Dimensional")).toBeVisible();
+
+  await manager.goto(ncrUrl);
+  await step(manager, "Assign", (dialog) => dialog.getByLabel("Assign to").selectOption({ label: "Asha Rao" }).then(() => {}));
+  await step(manager, "Record containment", (dialog) => dialog.getByLabel("Containment action").fill("Lot quarantined"));
+  await step(manager, "Record root cause", async (dialog) => {
+    await dialog.getByLabel("Root cause").fill("Heat treatment drift");
+    await dialog.getByLabel("Defect category").selectOption({ label: "DIM – Dimensional" });
+  });
+
+  await manager.getByRole("button", { name: "Request verification" }).click();
+  await manager.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await expect(manager.getByRole("dialog").getByText("needs a closed CAPA")).toBeVisible();
+  await manager.goto(ncrUrl);
+
+  await manager.getByRole("button", { name: "Raise CAPA" }).click();
+  await manager.getByRole("dialog").getByLabel("Owner").selectOption({ label: "Asha Rao" });
+  await manager.getByRole("dialog").getByLabel("Target date").fill("2036-01-15");
+  await manager.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await expect(manager).toHaveURL(/capas\//);
+  const capaUrl = manager.url();
+
+  await page.goto(capaUrl);
+  await page.getByRole("button", { name: "Start analysis" }).click();
+  await page.getByLabel("Why 1").fill("Diameter oversize");
+  await page.getByLabel("Why 2").fill("Furnace drift");
+  await page.getByLabel("Machine").fill("Thermocouple aged");
+  await page.getByLabel("Root cause").fill("No thermocouple replacement schedule");
+  await page.getByRole("button", { name: "Finish analysis" }).click();
+  await step(page, "Add action", async (dialog) => {
+    await dialog.getByLabel("Type").selectOption("CORRECTIVE");
+    await dialog.getByLabel("Description").fill("Replace thermocouple");
+    await dialog.getByLabel("Owner").selectOption({ label: "Asha Rao" });
+    await dialog.getByLabel("Target date").fill("2036-01-10");
+  });
+  await page.getByRole("button", { name: "Start implementation" }).click();
+  await step(page, "Complete", (dialog) => dialog.getByLabel("What was done").fill("Replaced and calibrated"));
+  await page.getByRole("button", { name: "Submit for verification" }).click();
+  await expect(page.getByText("Someone other than the CAPA owner")).toBeVisible();
+
+  await manager.goto(capaUrl);
+  await step(manager, "Verify effectiveness", async (dialog) => {
+    await dialog.getByLabel("Result").selectOption("true");
+    await dialog.getByLabel("How it was checked").fill("Next three lots measured");
+    await dialog.getByLabel("Findings").fill("All within limits");
+  });
+  await step(manager, "Close CAPA", (dialog) => dialog.getByLabel("Closure note").fill("Effective"));
+  await expect(manager.getByText("closed", { exact: true }).first()).toBeVisible();
+
+  await page.goto(ncrUrl);
+  await step(page, "Request verification");
+  await manager.goto(ncrUrl);
+  await step(manager, "Close NCR", (dialog) => dialog.getByLabel("Closure note").fill("Verified on the floor"));
+  await expect(manager.getByText("closed", { exact: true }).first()).toBeVisible();
+  await expect(manager.getByRole("button", { name: "Raise CAPA" })).toHaveCount(0);
 });

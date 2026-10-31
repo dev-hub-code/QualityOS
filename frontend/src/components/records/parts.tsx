@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiError, type PageResponse } from "@/lib/api";
 import { formatQuantity, type FieldDef, type FieldOption } from "@/lib/record-form";
-import type { Category, Facility, Material, Specification, Supplier, Unit } from "@/lib/types";
+import type { Assignee, DefectCategory, Category, Facility, Material, Specification, Supplier, Unit } from "@/lib/types";
 
-const NEGATIVE = new Set(["REJECTED", "REJECT", "BLOCKED", "CANCELLED", "VOIDED", "FAIL", "HOLD"]);
-const POSITIVE = new Set(["APPROVED", "RECEIVED", "CLOSED", "NOT_REQUIRED", "PASS", "ACCEPT", "PUBLISHED", "COMPLETED"]);
+const NEGATIVE = new Set(["REJECTED", "REJECT", "BLOCKED", "CANCELLED", "VOIDED", "FAIL", "HOLD", "CRITICAL", "OVERDUE"]);
+const POSITIVE = new Set(["APPROVED", "RECEIVED", "CLOSED", "NOT_REQUIRED", "PASS", "ACCEPT", "PUBLISHED", "COMPLETED", "MINOR"]);
 
 export function StatusBadge({ status }: { status: string }) {
   const variant = NEGATIVE.has(status) ? "destructive" : POSITIVE.has(status) ? "default" : "secondary";
@@ -125,6 +125,22 @@ function useLookup<T extends { id: string; code: string; name: string }>(path: s
 }
 
 export const useApprovedSuppliers = () => useLookup<Supplier>("/suppliers", "&status=APPROVED");
+export function useAssignees() {
+  const { data = [] } = useQuery({
+    queryKey: ["/quality/assignees"],
+    queryFn: () => api.get<Assignee[]>("/quality/assignees"),
+  });
+  return data.map((person): FieldOption => ({ value: person.id, label: person.fullName }));
+}
+
+export function useDefectCategories() {
+  const { data = [] } = useQuery({
+    queryKey: ["/defect-categories"],
+    queryFn: () => api.get<DefectCategory[]>("/defect-categories"),
+  });
+  return data.map((category): FieldOption => ({ value: category.id, label: `${category.code} – ${category.name}` }));
+}
+
 export const useFacilities = () => useLookup<Facility>("/facilities");
 export const useMaterials = () => useLookup<Material>("/materials");
 

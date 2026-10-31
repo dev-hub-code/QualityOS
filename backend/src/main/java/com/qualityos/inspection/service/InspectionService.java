@@ -47,6 +47,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import com.qualityos.quality.dto.QualityDtos.InspectionFailure;
+import com.qualityos.quality.service.NcrService;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -72,6 +74,7 @@ public class InspectionService implements AttachmentPolicy {
     private final DocumentNumberService numbers;
     private final AuditService audit;
     private final InspectionAlerts inspectionAlerts;
+    private final NcrService ncrs;
     private final JsonMapper json;
 
     /** Lazy because the attachment service collects every policy, and this class is one. */
@@ -87,6 +90,7 @@ public class InspectionService implements AttachmentPolicy {
             DocumentNumberService numbers,
             AuditService audit,
             InspectionAlerts inspectionAlerts,
+            NcrService ncrs,
             JsonMapper json) {
         this.inspections = inspections;
         this.results = results;
@@ -99,6 +103,7 @@ public class InspectionService implements AttachmentPolicy {
         this.numbers = numbers;
         this.audit = audit;
         this.inspectionAlerts = inspectionAlerts;
+        this.ncrs = ncrs;
         this.json = json;
     }
 
@@ -278,6 +283,7 @@ public class InspectionService implements AttachmentPolicy {
         audit.record("MATERIAL_DISPOSITION_RECORDED", ENTITY, id,
                 previous == null ? null : Map.of("disposition", previous), Map.of("disposition", decision));
         inspectionAlerts.disposed(inspection);
+        raiseNcrIfNeeded(inspection, decision);
         return toDetail(inspection);
     }
 
@@ -313,6 +319,36 @@ public class InspectionService implements AttachmentPolicy {
 
     private void decide(UUID id, String decision, String note) {
         approvals.saveAndFlush(new InspectionApproval(id, decision, note));
+    }
+
+    /** Failed material always gets an NCR, however it was disposed of. So does good material rejected or reworked. */
+    private void raiseNcrIfNeeded(Inspection inspection, Disposition decision) {
+        boolean rejected = decision == Disposition.REJECT || decision == Disposition.REWORK;
+        if (inspection.getFinalResult() != Inspection.Result.FAIL && !rejected) {
+            return;
+        }
+        SpecSnapshot specification = specificationOf(inspection);
+        Map<String, Boolean> criticality = specification.parameters().stream()
+                .collect(Collectors.toMap(p -> p.code(), p -> "CRITICAL".equals(String.valueOf(p.criticality()))));
+        List<String> failed = results.findByInspectionIdOrderByParameterCodeAscSampleNumberAsc(inspection.getId())
+                .stream()
+                .filter(result -> result.getEvaluation() == Evaluation.FAIL)
+                .map(InspectionResult::getParameterCode)
+                .distinct()
+                .toList();
+        String description = failed.isEmpty()
+                ? "Material disposed of as " + decision + "."
+                : "Failed parameters: " + String.join(", ", failed) + ". Disposition: " + decision + ".";
+        ReceivedBatch batch = receipts.batch(inspection.getReceiptItemId());
+        ncrs.raiseFromInspection(new InspectionFailure(
+                inspection.getId(),
+                inspection.getInspectionNumber(),
+                inspection.getSupplierId(),
+                inspection.getMaterialId(),
+                inspection.getBatchNumber(),
+                failed.stream().anyMatch(code -> criticality.getOrDefault(code, false)),
+                description,
+                rejected ? batch.quantity() : null));
     }
 
     private SpecSnapshot specificationOf(Inspection inspection) {

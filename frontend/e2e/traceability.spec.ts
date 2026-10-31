@@ -109,9 +109,12 @@ test("raw material is traced through production and inspection to the customer",
   await step(page, "Record dispatch", async (dialog) => {
     await dialog.getByLabel("Customer").selectOption({ label: "TATA – Tata Motors" });
     await dialog.getByLabel("Date").fill(new Date().toISOString().slice(0, 10));
-    await dialog.getByLabel("Released batch").selectOption({ index: 1 });
-    await dialog.getByLabel("Quantity").fill("2");
-    await dialog.getByLabel("Serial numbers, if tracked (one per line)").fill("SN-1\nSN-2");
+    await dialog.getByRole("button", { name: "Add another batch" }).click();
+    await dialog.getByLabel("Released batch 1").selectOption({ index: 1 });
+    await dialog.getByLabel("Quantity 1").fill("2");
+    await dialog.getByLabel("Serial numbers 1, if tracked (one per line)").fill("SN-1\nSN-2");
+    await dialog.getByLabel("Released batch 2").selectOption({ index: 1 });
+    await dialog.getByLabel("Quantity 2").fill("3");
   });
   await expect(page.getByText("Tata Motors")).toBeVisible();
 
@@ -133,4 +136,13 @@ test("raw material is traced through production and inspection to the customer",
   await expect(page.getByText("Bharat Steels", { exact: false }).first()).toBeVisible();
   await expect(page.getByText("supplier batch HEAT-7", { exact: false }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /Inspection|FQC inspection/ }).first()).toBeVisible();
+
+  // A dispatch recorded by mistake is reversed. It stays on the trace, and the customer no longer counts as affected.
+  const traceUrl = page.url();
+  await page.goto("/dispatches");
+  await step(page, "Reverse", (dialog) => dialog.getByLabel("Why this dispatch was wrong").fill("Wrong customer"));
+  await expect(page.getByText("reversed", { exact: true })).toBeVisible();
+  await page.goto(traceUrl);
+  await expect(page.getByText("reversed: Wrong customer", { exact: false }).first()).toBeVisible();
+  await expect(page.getByText("Customers who received this:")).toHaveCount(0);
 });

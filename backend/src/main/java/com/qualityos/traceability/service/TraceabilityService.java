@@ -60,23 +60,28 @@ public class TraceabilityService {
 
     private static final String DOWNSTREAM = """
             WITH RECURSIVE down(batch_id) AS (
-                SELECT child_batch_id FROM batch_relationships WHERE tenant_id = ? AND %s = ?
+                SELECT r.child_batch_id FROM batch_relationships r
+                WHERE r.tenant_id = ? AND r.%s = ? AND NOT EXISTS (
+                    SELECT 1 FROM trace_corrections c WHERE c.batch_relationship_id = r.id)
                 UNION
                 SELECT r.child_batch_id FROM batch_relationships r
                 JOIN down d ON r.parent_batch_id = d.batch_id
-                WHERE r.tenant_id = ?
+                WHERE r.tenant_id = ? AND NOT EXISTS (
+                    SELECT 1 FROM trace_corrections c WHERE c.batch_relationship_id = r.id)
             )
             SELECT batch_id FROM down
             """;
 
     private static final String UPSTREAM = """
             WITH RECURSIVE up(batch_id) AS (
-                SELECT parent_batch_id FROM batch_relationships
-                WHERE tenant_id = ? AND child_batch_id = ? AND parent_batch_id IS NOT NULL
+                SELECT r.parent_batch_id FROM batch_relationships r
+                WHERE r.tenant_id = ? AND r.child_batch_id = ? AND r.parent_batch_id IS NOT NULL AND NOT EXISTS (
+                    SELECT 1 FROM trace_corrections c WHERE c.batch_relationship_id = r.id)
                 UNION
                 SELECT r.parent_batch_id FROM batch_relationships r
                 JOIN up u ON r.child_batch_id = u.batch_id
-                WHERE r.tenant_id = ? AND r.parent_batch_id IS NOT NULL
+                WHERE r.tenant_id = ? AND r.parent_batch_id IS NOT NULL AND NOT EXISTS (
+                    SELECT 1 FROM trace_corrections c WHERE c.batch_relationship_id = r.id)
             )
             SELECT batch_id FROM up
             """;
@@ -176,7 +181,7 @@ public class TraceabilityService {
         allBatches.addAll(upstreamBatches);
         allBatches.addAll(downstreamBatches);
 
-        List<BatchRelationship> edges = relationships.findByChildBatchIdInOrderByCreatedAt(orNone(allBatches));
+        List<BatchRelationship> edges = relationships.findActiveByChildBatchIdIn(orNone(allBatches));
         // Going backward, every lot that fed the chain counts. Going forward, only the lot being traced does.
         Set<UUID> backwardBatches = new HashSet<>(rootBatches);
         backwardBatches.addAll(upstreamBatches);
@@ -215,7 +220,10 @@ public class TraceabilityService {
 
         List<DispatchResponse> shipped = dispatches.forBatches(allBatches.stream()
                 .filter(id -> !upstreamBatches.contains(id)).toList());
-        List<String> customers = shipped.stream().map(DispatchResponse::customerName).distinct().sorted().toList();
+        List<String> customers = shipped.stream()
+                .filter(dispatch -> dispatch.reversalReason() == null)
+                .map(DispatchResponse::customerName)
+                .distinct().sorted().toList();
         List<String> serials = finishedProducts.findByProductionBatchIdInOrderBySerialNumber(orNone(allBatches)).stream()
                 .map(FinishedProduct::getSerialNumber)
                 .toList();
@@ -288,10 +296,18 @@ public class TraceabilityService {
                 ncr.ncrNumber() + ": " + ncr.title(), ncr.batchNumber(), ncr.status(), "/ncrs/" + ncr.id())));
         corrective.forEach(capa -> events.add(new TimelineEvent(capa.createdAt(), "CAPA",
                 capa.capaNumber() + ": " + capa.title(), null, capa.status(), "/capas/" + capa.id())));
-        shipped.forEach(dispatch -> events.add(new TimelineEvent(dispatch.createdAt(), "DISPATCHED",
-                "Dispatched to " + dispatch.customerName() + " on " + dispatch.dispatchNumber(),
-                dispatch.lines().stream().map(DispatchLine::batchNumber).distinct().collect(Collectors.joining(", ")),
-                null, null)));
+        shipped.forEach(dispatch -> {
+            String shippedBatches = dispatch.lines().stream()
+                    .map(DispatchLine::batchNumber).distinct().collect(Collectors.joining(", "));
+            events.add(new TimelineEvent(dispatch.createdAt(), "DISPATCHED",
+                    "Dispatched to " + dispatch.customerName() + " on " + dispatch.dispatchNumber(),
+                    shippedBatches, null, null));
+            if (dispatch.reversedAt() != null) {
+                events.add(new TimelineEvent(dispatch.reversedAt(), "DISPATCH_REVERSED",
+                        dispatch.dispatchNumber() + " reversed: " + dispatch.reversalReason(),
+                        shippedBatches, null, null));
+            }
+        });
         events.sort(Comparator.comparing(TimelineEvent::at));
         return events;
     }

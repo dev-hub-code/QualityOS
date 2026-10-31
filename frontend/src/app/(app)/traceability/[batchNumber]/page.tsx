@@ -84,6 +84,7 @@ export default function TraceReportPage() {
               <li key={dispatch.id} className="py-2">
                 {dispatch.dispatchNumber} to {dispatch.customerName} on {dispatch.dispatchedOn}:{" "}
                 {dispatch.lines.map((line) => `${line.batchNumber} × ${formatQuantity(line.quantity)}`).join(", ")}
+                {dispatch.reversalReason && ` (reversed: ${dispatch.reversalReason})`}
               </li>
             ))}
           </ul>

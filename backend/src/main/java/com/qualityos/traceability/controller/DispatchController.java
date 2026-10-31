@@ -7,6 +7,7 @@ import com.qualityos.common.security.Permissions.Require;
 import com.qualityos.traceability.dto.TraceabilityDtos.CreateDispatchRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.CustomerResponse;
 import com.qualityos.traceability.dto.TraceabilityDtos.DispatchResponse;
+import com.qualityos.traceability.dto.TraceabilityDtos.ReverseRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.SaveCustomerRequest;
 import com.qualityos.traceability.service.DispatchService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -73,5 +74,11 @@ public class DispatchController {
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<DispatchResponse> create(@Valid @RequestBody CreateDispatchRequest request) {
         return ApiResponse.ok(dispatches.create(request));
+    }
+
+    @PostMapping("/dispatches/{id}/reverse")
+    @PreAuthorize(Require.TRACEABILITY_MANAGE)
+    public ApiResponse<DispatchResponse> reverse(@PathVariable UUID id, @Valid @RequestBody ReverseRequest request) {
+        return ApiResponse.ok(dispatches.reverse(id, request.reason()));
     }
 }

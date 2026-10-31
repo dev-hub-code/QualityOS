@@ -177,6 +177,14 @@ public class MaterialReceiptService implements AttachmentPolicy {
         return lots(List.of(item)).getFirst();
     }
 
+    @Transactional
+    public void restore(UUID itemId, BigDecimal quantity) {
+        items.findForUpdate(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Batch", itemId))
+                .restore(quantity);
+        items.flush();
+    }
+
     @Transactional(readOnly = true)
     public List<LotView> releasedLots(UUID materialId) {
         return lots(items.findLots(materialId).stream()

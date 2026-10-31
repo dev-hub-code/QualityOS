@@ -107,6 +107,7 @@ export default function ProductionBatchPage() {
   const canManage = usePermission("TRACEABILITY_MANAGE");
   const canInspect = usePermission("INSPECTION_CREATE");
   const [open, setOpen] = useState<"consume" | "complete" | "serials" | "inspect" | null>(null);
+  const [reversing, setReversing] = useState<string | null>(null);
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<BatchDetail>(path) });
   if (!data) return <QueryState error={error} />;
 
@@ -155,11 +156,19 @@ export default function ProductionBatchPage() {
         {consumptions.length === 0 && <p className="text-sm text-muted-foreground">Nothing recorded yet.</p>}
         <ul className="divide-y text-sm">
           {consumptions.map((used) => (
-            <li key={used.sourceBatch + used.at} className="flex justify-between gap-3 py-2">
-              <span>
+            <li key={used.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+              <span className={used.reversalReason ? "text-muted-foreground line-through" : undefined}>
                 {used.sourceBatch} · {used.description}
               </span>
-              <span className="shrink-0">{formatQuantity(used.quantity)}</span>
+              <span className="flex shrink-0 items-center gap-2">
+                {formatQuantity(used.quantity)}
+                {used.reversalReason && <span className="text-muted-foreground">Reversed: {used.reversalReason}</span>}
+                {canManage && batch.status === "IN_PROGRESS" && !used.reversalReason && (
+                  <Button variant="ghost" size="sm" onClick={() => setReversing(used.id)}>
+                    Reverse
+                  </Button>
+                )}
+              </span>
             </li>
           ))}
         </ul>
@@ -168,6 +177,14 @@ export default function ProductionBatchPage() {
         <Section title="Serial numbers">
           <p className="text-sm break-words">{serialNumbers.join(", ")}</p>
         </Section>
+      )}
+      {reversing && (
+        <RecordDialog
+          title="Reverse material used"
+          fields={[{ name: "reason", label: "Why this entry was wrong", type: "textarea", required: true }]}
+          onClose={() => setReversing(null)}
+          onSubmit={(values) => api.post(`${path}/consumptions/${reversing}/reverse`, values).then(refresh)}
+        />
       )}
       {open === "consume" && <ConsumeDialog path={path} batchId={id} onClose={close} />}
       {open === "inspect" && inspectionType && <InspectDialog batch={batch} type={inspectionType} onClose={close} />}

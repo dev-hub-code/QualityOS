@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useForm, type FieldValues } from "react-hook-form";
 import { applyServerErrors } from "@/components/forms/apply-server-errors";
 import { Field, FormError } from "@/components/forms/field";
@@ -16,13 +16,15 @@ interface RecordDialogProps {
   record?: object;
   onSubmit: (values: Record<string, unknown>) => Promise<unknown>;
   onClose: () => void;
+  /** Shown under the fields, for forms that add fields of their own. */
+  extra?: ReactNode;
 }
 
 const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm";
 const TEXTAREA_CLASS = "w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-sm";
 
 /** A dialog form for the many small records that need nothing beyond their fields. */
-export function RecordDialog({ title, fields, record, onSubmit, onClose }: RecordDialogProps) {
+export function RecordDialog({ title, fields, record, onSubmit, onClose, extra }: RecordDialogProps) {
   const [formError, setFormError] = useState("");
   const schema = useMemo(() => recordSchema(fields), [fields]);
   const {
@@ -107,6 +109,7 @@ export function RecordDialog({ title, fields, record, onSubmit, onClose }: Recor
               />
             );
           })}
+          {extra}
           <Button type="submit" disabled={isSubmitting}>
             Save
           </Button>

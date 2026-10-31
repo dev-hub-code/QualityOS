@@ -10,6 +10,7 @@ import com.qualityos.traceability.dto.TraceabilityDtos.CompleteBatchRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.ConsumeRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.CreateBatchRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.ProductionBatchView;
+import com.qualityos.traceability.dto.TraceabilityDtos.ReverseRequest;
 import com.qualityos.traceability.entity.ProductionBatch;
 import com.qualityos.traceability.service.ProductionService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -69,6 +70,13 @@ public class ProductionController {
     @PreAuthorize(Require.TRACEABILITY_MANAGE)
     public ApiResponse<BatchDetail> consume(@PathVariable UUID id, @Valid @RequestBody ConsumeRequest request) {
         return ApiResponse.ok(production.consume(id, request));
+    }
+
+    @PostMapping("/{id}/consumptions/{consumptionId}/reverse")
+    @PreAuthorize(Require.TRACEABILITY_MANAGE)
+    public ApiResponse<BatchDetail> reverseConsumption(
+            @PathVariable UUID id, @PathVariable UUID consumptionId, @Valid @RequestBody ReverseRequest request) {
+        return ApiResponse.ok(production.reverseConsumption(id, consumptionId, request.reason()));
     }
 
     @PostMapping("/{id}/complete")

@@ -116,6 +116,16 @@ public class ProductionBatch extends TenantOwnedEntity {
         dispatchedQuantity = dispatchedQuantity.add(quantity);
     }
 
+    /** Corrections only: returns stock taken by a consumption that was reversed. */
+    public void returnUsed(BigDecimal quantity) {
+        usedQuantity = usedQuantity.subtract(quantity);
+    }
+
+    /** Corrections only: returns stock taken by a dispatch that was reversed. */
+    public void returnDispatched(BigDecimal quantity) {
+        dispatchedQuantity = dispatchedQuantity.subtract(quantity);
+    }
+
     private void requireAvailable(BigDecimal quantity) {
         if (status != Status.RELEASED) {
             throw new BusinessRuleException("Batch " + batchNumber + " has not been released.");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inspectionTypeFor, parseSerials, toConsumeRequest } from "./traceability";
+import { inspectionTypeFor, parseSerials, toConsumeRequest, toDispatchItems } from "./traceability";
 
 describe("parseSerials", () => {
   it("splits on lines and commas, and drops blanks and repeats", () => {
@@ -25,5 +25,15 @@ describe("toConsumeRequest", () => {
   it("names the right source", () => {
     expect(toConsumeRequest("lot:1", "2")).toEqual({ receiptItemId: "1", quantity: "2" });
     expect(toConsumeRequest("batch:9", "2")).toEqual({ parentBatchId: "9", quantity: "2" });
+  });
+});
+
+describe("toDispatchItems", () => {
+  it("collects each numbered line", () => {
+    const values = { customerId: "c", productionBatchId1: "a", quantity1: "2", serials1: "S1\nS2", productionBatchId2: "b", quantity2: "1" };
+    expect(toDispatchItems(values, 2)).toEqual([
+      { productionBatchId: "a", quantity: "2", serialNumbers: ["S1", "S2"] },
+      { productionBatchId: "b", quantity: "1", serialNumbers: [] },
+    ]);
   });
 });

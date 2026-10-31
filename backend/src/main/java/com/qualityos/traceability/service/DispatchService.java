@@ -6,6 +6,7 @@ import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.response.PageResponse;
+import com.qualityos.organization.service.OrganizationService;
 import com.qualityos.traceability.dto.TraceabilityDtos.CreateDispatchRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.CustomerResponse;
 import com.qualityos.traceability.dto.TraceabilityDtos.DispatchItemRequest;
@@ -18,13 +19,17 @@ import com.qualityos.traceability.entity.DispatchItem;
 import com.qualityos.traceability.entity.DispatchRecord;
 import com.qualityos.traceability.entity.FinishedProduct;
 import com.qualityos.traceability.entity.ProductionBatch;
+import com.qualityos.traceability.entity.TraceCorrection;
 import com.qualityos.traceability.repository.CustomerRepository;
 import com.qualityos.traceability.repository.DispatchItemRepository;
 import com.qualityos.traceability.repository.DispatchRecordRepository;
 import com.qualityos.traceability.repository.FinishedProductRepository;
 import com.qualityos.traceability.repository.ProductionBatchRepository;
+import com.qualityos.traceability.repository.TraceCorrectionRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
@@ -46,6 +51,8 @@ public class DispatchService {
     private final CustomerRepository customers;
     private final ProductionBatchRepository batches;
     private final FinishedProductRepository finishedProducts;
+    private final TraceCorrectionRepository corrections;
+    private final OrganizationService organizations;
     private final ProductionService production;
     private final DocumentNumberService numbers;
     private final AuditService audit;
@@ -56,6 +63,8 @@ public class DispatchService {
             CustomerRepository customers,
             ProductionBatchRepository batches,
             FinishedProductRepository finishedProducts,
+            TraceCorrectionRepository corrections,
+            OrganizationService organizations,
             ProductionService production,
             DocumentNumberService numbers,
             AuditService audit) {
@@ -64,6 +73,8 @@ public class DispatchService {
         this.customers = customers;
         this.batches = batches;
         this.finishedProducts = finishedProducts;
+        this.corrections = corrections;
+        this.organizations = organizations;
         this.production = production;
         this.numbers = numbers;
         this.audit = audit;
@@ -105,6 +116,10 @@ public class DispatchService {
         Customer customer = customers.findById(request.customerId())
                 .filter(found -> found.getArchivedAt() == null)
                 .orElseThrow(() -> new BusinessRuleException("This customer does not exist."));
+        LocalDate today = LocalDate.now(ZoneId.of(organizations.getCurrent().timezone()));
+        if (request.dispatchedOn().isAfter(today)) {
+            throw new BusinessRuleException("A dispatch cannot be dated in the future.");
+        }
         DispatchRecord dispatch = dispatches.saveAndFlush(new DispatchRecord(
                 numbers.next("DSP"), customer.getId(), request.dispatchedOn(), request.reference()));
         request.items().stream()
@@ -112,6 +127,30 @@ public class DispatchService {
                 .forEach(line -> ship(dispatch, line));
         audit.record("MATERIAL_DISPATCHED", "DispatchRecord", dispatch.getId(), null,
                 Map.of("number", dispatch.getDispatchNumber(), "customer", customer.getCode()));
+        return responses(List.of(dispatch)).get(dispatch);
+    }
+
+    /**
+     * Undoes a dispatch that was recorded by mistake. Stock and serial numbers return to their batches, and the record
+     * stays with the reason. Traces keep showing it as reversed, and no longer count its customer as affected.
+     */
+    @Transactional
+    public DispatchResponse reverse(UUID id, String reason) {
+        DispatchRecord dispatch = dispatches.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Dispatch", id));
+        if (corrections.existsByDispatchId(id)) {
+            throw new BusinessRuleException("This dispatch was already reversed.");
+        }
+        List<DispatchItem> lines = items.findByDispatchIdIn(List.of(id));
+        lines.stream()
+                .sorted(Comparator.comparing(DispatchItem::getProductionBatchId))
+                .forEach(line -> batches.findForUpdate(line.getProductionBatchId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Production batch", line.getProductionBatchId()))
+                        .returnDispatched(line.getQuantity()));
+        finishedProducts.findByDispatchItemIdIn(lines.stream().map(DispatchItem::getId).toList())
+                .forEach(unit -> unit.setDispatchItemId(null));
+        corrections.saveAndFlush(TraceCorrection.ofDispatch(id, reason.trim()));
+        audit.record("DISPATCH_REVERSED", "DispatchRecord", id, null, Map.of("reason", reason.trim()));
         return responses(List.of(dispatch)).get(dispatch);
     }
 
@@ -161,6 +200,9 @@ public class DispatchService {
                 .stream().collect(Collectors.toMap(Customer::getId, Function.identity()));
         Map<UUID, List<DispatchItem>> byDispatch =
                 lines.stream().collect(Collectors.groupingBy(DispatchItem::getDispatchId));
+        Map<UUID, TraceCorrection> reversals = corrections
+                .findByDispatchIdIn(records.stream().map(DispatchRecord::getId).toList()).stream()
+                .collect(Collectors.toMap(TraceCorrection::getDispatchId, Function.identity()));
         return records.stream().collect(Collectors.toMap(Function.identity(), record -> new DispatchResponse(
                 record.getId(),
                 record.getDispatchNumber(),
@@ -172,7 +214,9 @@ public class DispatchService {
                     return new DispatchLine(
                             batch.batchNumber(), batch.productCode(), batch.productName(), line.getQuantity());
                 }).toList(),
-                record.getCreatedAt())));
+                record.getCreatedAt(),
+                reversals.containsKey(record.getId()) ? reversals.get(record.getId()).getReason() : null,
+                reversals.containsKey(record.getId()) ? reversals.get(record.getId()).getCreatedAt() : null)));
     }
 
     private static CustomerResponse toResponse(Customer customer) {

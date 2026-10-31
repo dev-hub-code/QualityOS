@@ -26,6 +26,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +39,7 @@ public class UserManagementService {
     private final UserRoleRepository userRoles;
     private final RoleMapper roleMapper;
     private final AuditService audit;
+    private final JdbcTemplate jdbc;
 
     UserManagementService(
             MembershipRepository memberships,
@@ -45,13 +47,15 @@ public class UserManagementService {
             RoleRepository roles,
             UserRoleRepository userRoles,
             RoleMapper roleMapper,
-            AuditService audit) {
+            AuditService audit,
+            JdbcTemplate jdbc) {
         this.memberships = memberships;
         this.users = users;
         this.roles = roles;
         this.userRoles = userRoles;
         this.roleMapper = roleMapper;
         this.audit = audit;
+        this.jdbc = jdbc;
     }
 
     @Transactional(readOnly = true)
@@ -68,8 +72,8 @@ public class UserManagementService {
                 .collect(Collectors.groupingBy(
                         UserRole::getMembershipId,
                         Collectors.mapping(a -> rolesById.get(a.getRoleId()), Collectors.toList())));
-        return PageResponse.from(page, m -> toResponse(
-                m, usersById.get(m.getUserId()), rolesByMembership.getOrDefault(m.getId(), List.of())));
+        return PageResponse.from(page, m -> toResponse(m, usersById.get(m.getUserId()),
+                rolesByMembership.getOrDefault(m.getId(), List.of()), facilitiesOf(m.getId())));
     }
 
     @Transactional
@@ -88,7 +92,36 @@ public class UserManagementService {
         audit.record("MEMBER_ROLES_CHANGED", "Membership", membershipId,
                 Map.of("roles", codes(previous)), Map.of("roles", codes(granted)));
         User user = users.findById(membership.getUserId()).orElseThrow();
-        return toResponse(membership, user, granted.stream().map(roleMapper::toSummary).toList());
+        return toResponse(membership, user, granted.stream().map(roleMapper::toSummary).toList(),
+                facilitiesOf(membershipId));
+    }
+
+    @Transactional
+    public MemberResponse updateFacilities(UUID membershipId, Set<UUID> facilityIds) {
+        Membership membership = load(membershipId);
+        long known = jdbc.queryForList("SELECT id FROM facilities", UUID.class).stream()
+                .filter(facilityIds::contains).count();
+        if (known != facilityIds.size()) {
+            throw new BusinessRuleException("Choose facilities from this organisation.");
+        }
+        Set<UUID> previous = facilitiesOf(membershipId);
+        jdbc.update("DELETE FROM membership_facilities WHERE membership_id = ?", membershipId);
+        facilityIds.forEach(facility -> jdbc.update(
+                "INSERT INTO membership_facilities (id, tenant_id, membership_id, facility_id) VALUES (?, ?, ?, ?)",
+                UUID.randomUUID(), TenantContext.getCurrentTenantId(), membershipId, facility));
+        audit.record("MEMBER_FACILITIES_CHANGED", "Membership", membershipId,
+                Map.of("facilities", previous), Map.of("facilities", facilityIds));
+        User user = users.findById(membership.getUserId()).orElseThrow();
+        List<UUID> roleIds = userRoles.findByMembershipId(membershipId).stream().map(UserRole::getRoleId).toList();
+        return toResponse(membership, user,
+                roles.findVisibleByIds(roleIds, TenantContext.getCurrentTenantId()).stream()
+                        .map(roleMapper::toSummary).toList(),
+                facilityIds);
+    }
+
+    private Set<UUID> facilitiesOf(UUID membershipId) {
+        return Set.copyOf(jdbc.queryForList(
+                "SELECT facility_id FROM membership_facilities WHERE membership_id = ?", UUID.class, membershipId));
     }
 
     @Transactional
@@ -140,13 +173,15 @@ public class UserManagementService {
         return roles.stream().map(Role::getCode).toList();
     }
 
-    private static MemberResponse toResponse(Membership membership, User user, List<RoleSummary> roles) {
+    private static MemberResponse toResponse(
+            Membership membership, User user, List<RoleSummary> roles, Set<UUID> facilityIds) {
         return new MemberResponse(
                 membership.getId(),
                 user.getId(),
                 user.getEmail(),
                 user.getFullName(),
                 membership.getStatus().name(),
-                roles);
+                roles,
+                facilityIds);
     }
 }

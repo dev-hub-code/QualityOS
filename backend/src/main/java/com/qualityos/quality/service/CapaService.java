@@ -35,6 +35,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.springframework.data.domain.Page;
@@ -263,6 +264,12 @@ public class CapaService implements AttachmentPolicy {
             capa.setDueRemindedAt(now);
         });
         return due.size();
+    }
+
+    /** @return whether this CAPA has been closed, or empty when it does not exist */
+    @Transactional(readOnly = true)
+    public Optional<Boolean> isClosed(UUID id) {
+        return capas.findById(id).map(capa -> capa.getStatus() == CorrectiveAction.Status.CLOSED);
     }
 
     @Override

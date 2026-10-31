@@ -54,6 +54,8 @@ app:
     email-verification-required: ${REGISTRATION_EMAIL_VERIFICATION_REQUIRED:true}
     allow-unverified-login: ${REGISTRATION_ALLOW_UNVERIFIED_LOGIN:false}
     verification-token-expiry-minutes: ${REGISTRATION_VERIFICATION_TOKEN_EXPIRY_MINUTES:30}
+    # A sign-up unconfirmed for this long is emptied, which frees its address.
+    unverified-retention: ${REGISTRATION_UNVERIFIED_RETENTION:P30D}
 
 qualityos:
   # The address users reach the web application on, used for links in emails.
@@ -65,6 +67,21 @@ qualityos:
     retry-delay: ${MAIL_RETRY_DELAY:5s}
   jobs:
     enabled: ${JOBS_ENABLED:true}
+    # Each job waits initial-delay after startup, then interval after the end of each run.
+    notification-delivery:
+      initial-delay: PT30S
+      interval: PT30S
+    capa-reminders:
+      initial-delay: PT5M
+      interval: PT1H
+    unconfirmed-shipments:
+      initial-delay: PT5M
+      interval: PT1H
+    account-maintenance:
+      initial-delay: PT1H
+      interval: PT24H
+    monitor:
+      interval: PT15M
   storage:
     local-root: ${STORAGE_LOCAL_ROOT}
   security:

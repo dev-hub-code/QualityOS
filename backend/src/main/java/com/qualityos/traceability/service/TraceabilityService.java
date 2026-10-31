@@ -17,7 +17,9 @@ import com.qualityos.traceability.dto.TraceabilityDtos.CorrectionImpact;
 import com.qualityos.traceability.dto.TraceabilityDtos.DispatchLine;
 import com.qualityos.traceability.dto.TraceabilityDtos.DispatchResponse;
 import com.qualityos.traceability.dto.TraceabilityDtos.ProductionBatchView;
+import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.traceability.dto.TraceabilityDtos.RecallLine;
+import com.qualityos.traceability.dto.TraceabilityDtos.RecallScope;
 import com.qualityos.traceability.dto.TraceabilityDtos.ReversalView;
 import com.qualityos.traceability.dto.TraceabilityDtos.SearchHit;
 import com.qualityos.traceability.dto.TraceabilityDtos.SerialDelivery;
@@ -62,6 +64,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TraceabilityService {
 
+    private static final String SERIAL = "SERIAL";
     private static final int MIN_SEARCH = 2;
     private static final int SEARCH_LIMIT = 25;
     private static final String LOT = "LOT";
@@ -108,6 +111,7 @@ public class TraceabilityService {
     private final ProductService products;
     private final InspectionService inspections;
     private final NcrService ncrs;
+    private final FacilityScope scope;
 
     TraceabilityService(
             JdbcTemplate jdbc,
@@ -122,7 +126,8 @@ public class TraceabilityService {
             PurchaseOrderService purchaseOrders,
             ProductService products,
             InspectionService inspections,
-            NcrService ncrs) {
+            NcrService ncrs,
+            FacilityScope scope) {
         this.jdbc = jdbc;
         this.batches = batches;
         this.relationships = relationships;
@@ -136,6 +141,7 @@ public class TraceabilityService {
         this.products = products;
         this.inspections = inspections;
         this.ncrs = ncrs;
+        this.scope = scope;
     }
 
     /** Finds lots, batches and serial numbers by any number a person is likely to have in hand. */
@@ -149,10 +155,13 @@ public class TraceabilityService {
         Map<String, SearchHit> hits = new LinkedHashMap<>();
         finishedProducts.findBySerialNumberContainingIgnoreCaseOrderBySerialNumber(query, limit).forEach(unit -> {
             ProductionBatchView batch = production.batch(unit.getProductionBatchId());
-            hits.putIfAbsent(batch.batchNumber(), hit(batch, "Serial number " + unit.getSerialNumber()));
+            if (scope.allows(batch.facilityId())) {
+                hits.putIfAbsent(unit.getSerialNumber(), new SearchHit(batch.batchNumber(), unit.getSerialNumber(), SERIAL,
+                        batch.productCode() + " – " + batch.productName(), "Serial number " + unit.getSerialNumber()));
+            }
         });
         for (LotView lot : receipts.searchLots(query, SEARCH_LIMIT)) {
-            hits.putIfAbsent(lot.internalBatch(), new SearchHit(lot.internalBatch(), LOT,
+            hits.putIfAbsent(lot.internalBatch(), new SearchHit(lot.internalBatch(), null, LOT,
                     lot.materialCode() + " – " + lot.materialName(),
                     "Supplier batch " + lot.supplierBatch() + ", receipt " + lot.grnNumber()));
         }
@@ -163,12 +172,13 @@ public class TraceabilityService {
             found.addAll(batches.findByProductIdInOrderByBatchNumber(matchingProducts, limit));
         }
         production.views(found.stream().map(ProductionBatch::getId).collect(Collectors.toSet()))
+                .stream().filter(batch -> scope.allows(batch.facilityId()))
                 .forEach(batch -> hits.putIfAbsent(batch.batchNumber(), hit(batch, "Production batch")));
         return List.copyOf(hits.values());
     }
 
     private static SearchHit hit(ProductionBatchView batch, String matchedOn) {
-        return new SearchHit(batch.batchNumber(), BATCH, batch.productCode() + " – " + batch.productName(), matchedOn);
+        return new SearchHit(batch.batchNumber(), null, BATCH, batch.productCode() + " – " + batch.productName(), matchedOn);
     }
 
     @Transactional(readOnly = true)
@@ -176,6 +186,7 @@ public class TraceabilityService {
         Optional<ProductionBatch> batch = batches.findByBatchNumber(batchNumber);
         if (batch.isPresent()) {
             UUID id = batch.get().getId();
+            scope.require(Set.of(batch.get().getFacilityId()), "Batch", batchNumber);
             return build(Set.of(), Set.of(id), upstream(id), downstream("parent_batch_id", id), id, null, permissions);
         }
         LotView lot = receipts.lotByNumber(batchNumber)
@@ -233,7 +244,12 @@ public class TraceabilityService {
                 .filter(Objects::nonNull)
                 .toList();
 
-        List<DispatchResponse> shipped = dispatches.forBatches(allBatches.stream()
+        // A trace may lead into a facility this member cannot see. They see that it did, but not its units or customers.
+        Set<UUID> visibleBatches = views.values().stream()
+                .filter(view -> scope.allows(view.facilityId()))
+                .map(ProductionBatchView::id)
+                .collect(Collectors.toSet());
+        List<DispatchResponse> shipped = dispatches.forBatches(visibleBatches.stream()
                 .filter(id -> !upstreamBatches.contains(id)).toList());
         List<ReversalView> returned = returns.forDispatches(shipped.stream().map(DispatchResponse::id).toList());
         List<String> customers = shipped.stream()
@@ -249,7 +265,7 @@ public class TraceabilityService {
                 .filter(line -> line.shippedOn() == null)
                 .map(RecallLine::customerName)
                 .distinct().sorted().toList();
-        List<String> serials = finishedProducts.findByProductionBatchIdInOrderBySerialNumber(orNone(allBatches)).stream()
+        List<String> serials = finishedProducts.findByProductionBatchIdInOrderBySerialNumber(orNone(visibleBatches)).stream()
                 .map(FinishedProduct::getSerialNumber)
                 .toList();
 
@@ -414,15 +430,18 @@ public class TraceabilityService {
                 .toList();
         BigDecimal quantity = lines.stream().map(DispatchLine::quantity).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal returned = lines.stream().map(DispatchLine::returnedQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new RecallLine(dispatch.id(), dispatch.dispatchNumber(), dispatch.customerName(), dispatch.dispatchedOn(),
+        return new RecallLine(dispatch.id(), dispatch.dispatchNumber(), dispatch.customerId(), dispatch.customerName(),
+                dispatch.dispatchedOn(),
                 dispatch.shippedOn(), quantity, returned, quantity.subtract(returned));
     }
 
     /** Every customer a unit reached, oldest first. Traces follow batches, so this answers it for a single unit. */
     @Transactional(readOnly = true)
-    public SerialTrace serial(String serial) {
+    public SerialTrace serial(String serial, Set<String> permissions) {
         FinishedProduct unit = finishedProducts.findBySerialNumberIn(List.of(serial)).stream().findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Serial number", serial));
+        ProductionBatchView batch = production.batch(unit.getProductionBatchId());
+        scope.require(Set.of(batch.facilityId()), "Serial number", serial);
         Set<UUID> returnedLines = returns.returnedLines(serial);
         Set<UUID> lines = new HashSet<>(returnedLines);
         if (unit.getDispatchItemId() != null) {
@@ -434,7 +453,33 @@ public class TraceabilityService {
                         dispatch.dispatchedOn(), dispatch.shippedOn(), dispatch.lines().stream()
                                 .anyMatch(line -> returnedLines.contains(line.id()))))
                 .toList();
-        return new SerialTrace(serial, production.views(List.of(unit.getProductionBatchId())).getFirst().batchNumber(),
-                deliveries);
+        List<InspectionHistory> inspected = permissions.contains(Permissions.INSPECTION_VIEW)
+                ? inspections.history(Set.of(), Set.of(batch.id()))
+                : List.of();
+        return new SerialTrace(serial, batch.batchNumber(), batch.productCode(), batch.productName(), batch.status(),
+                batch.completedAt(), inspected, deliveries);
+    }
+
+    /** Everything a recall has to reach. Unlike a trace, a member must be able to see all of it to act on it. */
+    @Transactional(readOnly = true)
+    public RecallScope recallScope(Collection<UUID> roots, Set<String> permissions) {
+        Set<UUID> all = new HashSet<>(roots);
+        roots.forEach(id -> all.addAll(downstream("parent_batch_id", id)));
+        List<ProductionBatchView> views = production.views(all).stream()
+                .sorted(Comparator.comparing(ProductionBatchView::batchNumber))
+                .toList();
+        Set<String> numbers = views.stream().map(ProductionBatchView::batchNumber).collect(Collectors.toSet());
+        List<DispatchResponse> shipped = dispatches.forBatches(List.copyOf(all)).stream()
+                .filter(dispatch -> dispatch.reversalReason() == null)
+                .toList();
+        List<RecallLine> lines = shipped.stream().map(dispatch -> recallLine(dispatch, numbers)).toList();
+        List<String> serials = finishedProducts.findByProductionBatchIdInOrderBySerialNumber(all).stream()
+                .map(FinishedProduct::getSerialNumber)
+                .toList();
+        List<InspectionHistory> inspected = inspections.history(Set.of(), all);
+        List<NcrHistory> raised = ncrs.history(inspected.stream().map(InspectionHistory::id).toList(), List.copyOf(numbers));
+        return new RecallScope(views, shipped, lines, serials,
+                permissions.contains(Permissions.INSPECTION_VIEW) ? inspected : List.of(),
+                permissions.contains(Permissions.NCR_VIEW) ? raised : List.of());
     }
 }

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { applyServerErrors } from "@/components/forms/apply-server-errors";
 import { Field, FormError } from "@/components/forms/field";
+import { useFacilities } from "@/components/records/parts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -98,6 +99,56 @@ function AddMemberDialog({ roles, onClose }: { roles: Role[]; onClose: () => voi
   );
 }
 
+function FacilitiesDialog({ member, onClose }: { member: Member; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const facilities = useFacilities();
+  const [selected, setSelected] = useState(new Set(member.facilityIds));
+  const [formError, setFormError] = useState("");
+  async function save() {
+    try {
+      await api.put(`/users/${member.membershipId}/facilities`, { facilityIds: [...selected] });
+      await queryClient.invalidateQueries({ queryKey: ["users"] });
+      onClose();
+    } catch (error) {
+      setFormError(error instanceof ApiError ? error.message : "Could not save.");
+    }
+  }
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Facilities for {member.fullName}</DialogTitle>
+        </DialogHeader>
+        <FormError message={formError} />
+        <p className="text-sm text-muted-foreground">
+          Choose none to allow every facility. This limits batches, traces, serial numbers and recalls.
+        </p>
+        <fieldset className="max-h-56 space-y-2 overflow-y-auto">
+          <legend className="sr-only">Facilities</legend>
+          {facilities.map((facility) => (
+            <div key={facility.value} className="flex items-center gap-2">
+              <Checkbox
+                id={`facility-${facility.value}`}
+                checked={selected.has(facility.value)}
+                onCheckedChange={(checked) => {
+                  const next = new Set(selected);
+                  if (checked) next.add(facility.value);
+                  else next.delete(facility.value);
+                  setSelected(next);
+                }}
+              />
+              <Label htmlFor={`facility-${facility.value}`} className="font-normal">
+                {facility.label}
+              </Label>
+            </div>
+          ))}
+        </fieldset>
+        <Button onClick={save}>Save</Button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function EditRolesDialog({
   member,
   roles,
@@ -176,6 +227,7 @@ export default function UsersPage() {
   const { data: me } = useMe();
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Member | null>(null);
+  const [placing, setPlacing] = useState<Member | null>(null);
   const users = useQuery({
     queryKey: ["users"],
     queryFn: () => api.get<PageResponse<Member>>("/users?size=100"),
@@ -237,6 +289,9 @@ export default function UsersPage() {
                   <Button variant="ghost" size="sm" onClick={() => setEditing(member)}>
                     Edit roles
                   </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setPlacing(member)}>
+                    Facilities
+                  </Button>
                   {member.userId !== me?.user.id && (
                     <Button
                       variant="ghost"
@@ -253,6 +308,7 @@ export default function UsersPage() {
         </Table>
       </div>
       {adding && roles.data && <AddMemberDialog roles={roles.data} onClose={() => setAdding(false)} />}
+      {placing && <FacilitiesDialog member={placing} onClose={() => setPlacing(null)} />}
       {editing && roles.data && (
         <EditRolesDialog member={editing} roles={roles.data} onClose={() => setEditing(null)} />
       )}

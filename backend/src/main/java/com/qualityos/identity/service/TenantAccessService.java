@@ -107,6 +107,20 @@ public class TenantAccessService implements TenantAccessResolver {
     }
 
     /** Active members of the current tenant who hold a permission. Runs in the caller's transaction. */
+    public Set<UUID> activeMemberIds() {
+        return Set.copyOf(jdbc.queryForList(
+                "SELECT user_id FROM tenant_memberships WHERE tenant_id = ? AND status = 'ACTIVE'",
+                UUID.class, TenantContext.getCurrentTenantId()));
+    }
+
+    /** @return the name of someone who is, or was, a member here */
+    public Optional<String> memberName(UUID userId) {
+        return jdbc.queryForList("""
+                SELECT u.full_name FROM tenant_memberships m JOIN users u ON u.id = m.user_id
+                WHERE m.tenant_id = ? AND m.user_id = ?
+                """, String.class, TenantContext.getCurrentTenantId(), userId).stream().findFirst();
+    }
+
     public Set<UUID> holdersOf(String permission) {
         return Set.copyOf(jdbc.queryForList(HOLDERS, UUID.class, TenantContext.getCurrentTenantId(), permission));
     }

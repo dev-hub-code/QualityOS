@@ -18,13 +18,22 @@ public class Customer extends TenantOwnedEntity {
     private String code;
     private String name;
     private String gstin;
+    private String contactPerson;
+    private String email;
+    private String phone;
+    private String address;
 
     @Setter
     private Instant archivedAt;
 
-    public Customer(String code, String name, String gstin) {
+    public Customer(
+            String code, String name, String gstin, String contactPerson, String email, String phone, String address) {
         this.code = code;
         this.name = name;
         this.gstin = gstin;
+        this.contactPerson = contactPerson;
+        this.email = email;
+        this.phone = phone;
+        this.address = address;
     }
 }

@@ -7,9 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
+import { searchHitLink } from "@/lib/search";
 import type { SearchHit } from "@/lib/types";
 
-const KINDS: Record<string, string> = { LOT: "Received lot", PRODUCTION_BATCH: "Production batch" };
+const KINDS: Record<string, string> = {
+  LOT: "Received lot",
+  PRODUCTION_BATCH: "Production batch",
+  SERIAL: "Serial number",
+};
 
 export default function TraceabilityPage() {
   const [term, setTerm] = useState("");
@@ -26,7 +31,9 @@ export default function TraceabilityPage() {
   };
   return (
     <div className="max-w-3xl space-y-6">
-      <PageHeader title="Traceability" />
+      <PageHeader title="Traceability">
+        <RecordLink href="/traceability/serials">Serial number search</RecordLink>
+      </PageHeader>
       <form onSubmit={search} className="flex items-end gap-2">
         <div className="flex-1 space-y-1.5">
           <Label htmlFor="trace-search">Batch, serial, receipt, material or product</Label>
@@ -38,8 +45,8 @@ export default function TraceabilityPage() {
       {data?.length === 0 && <p className="text-sm text-muted-foreground">Nothing matches.</p>}
       <ul className="divide-y text-sm">
         {data?.map((hit) => (
-          <li key={hit.batchNumber} className="py-3">
-            <RecordLink href={`/traceability/${encodeURIComponent(hit.batchNumber)}`}>{hit.batchNumber}</RecordLink>{" "}
+          <li key={hit.serialNumber ?? hit.batchNumber} className="py-3">
+            <RecordLink href={searchHitLink(hit)}>{hit.serialNumber ?? hit.batchNumber}</RecordLink>{" "}
             <span className="text-muted-foreground">{KINDS[hit.kind]}</span>
             <p>{hit.description}</p>
             <p className="text-muted-foreground">{hit.matchedOn}</p>

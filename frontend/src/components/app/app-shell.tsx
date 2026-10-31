@@ -4,6 +4,7 @@ import { LogOut, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { GlobalSearch } from "@/components/app/global-search";
 import { NotificationBell } from "@/components/app/notification-bell";
 import { VerifyEmailBanner } from "@/components/app/verify-email-banner";
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         ) : (
           <p className="truncate text-sm text-muted-foreground">{me.organizations[0]?.name}</p>
         )}
+
+        {me.permissions.includes("TRACEABILITY_VIEW") && <GlobalSearch />}
 
         <nav aria-label="Main" className="flex flex-1 flex-col gap-1">
           {visibleNavItems(me.permissions).map(({ href, label, icon: Icon }) => {

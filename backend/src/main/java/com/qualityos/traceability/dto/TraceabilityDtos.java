@@ -6,6 +6,7 @@ import com.qualityos.quality.dto.QualityDtos.CapaHistory;
 import com.qualityos.quality.dto.QualityDtos.NcrHistory;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -25,10 +26,22 @@ public final class TraceabilityDtos {
     public record SaveCustomerRequest(
             @NotBlank @Size(max = 50) String code,
             @NotBlank @Size(max = 200) String name,
-            @Size(max = 15) String gstin) {
+            @Size(max = 15) String gstin,
+            @Size(max = 200) String contactPerson,
+            @Email @Size(max = 254) String email,
+            @Size(max = 30) String phone,
+            @Size(max = 500) String address) {
     }
 
-    public record CustomerResponse(UUID id, String code, String name, String gstin) {
+    public record CustomerResponse(
+            UUID id,
+            String code,
+            String name,
+            String gstin,
+            String contactPerson,
+            String email,
+            String phone,
+            String address) {
     }
 
     public record CreateBatchRequest(
@@ -242,6 +255,7 @@ public final class TraceabilityDtos {
     public record DispatchResponse(
             UUID id,
             String dispatchNumber,
+            UUID customerId,
             String customerName,
             LocalDate dispatchedOn,
             String reference,
@@ -254,7 +268,8 @@ public final class TraceabilityDtos {
     }
 
     /** @param matchedOn which field the term was found in */
-    public record SearchHit(String batchNumber, String kind, String description, String matchedOn) {
+    /** @param serialNumber set when the hit is one unit, not a batch or a lot */
+    public record SearchHit(String batchNumber, String serialNumber, String kind, String description, String matchedOn) {
     }
 
     /** A lot or a production batch in a trace. */
@@ -292,12 +307,25 @@ public final class TraceabilityDtos {
     public record RecallLine(
             UUID dispatchId,
             String dispatchNumber,
+            UUID customerId,
             String customerName,
             LocalDate dispatchedOn,
             LocalDate shippedOn,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal returnedQuantity,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal outstandingQuantity) {
+
+        public String quantityLabel() {
+            return quantity.stripTrailingZeros().toPlainString();
+        }
+
+        public String returnedLabel() {
+            return returnedQuantity.stripTrailingZeros().toPlainString();
+        }
+
+        public String outstandingLabel() {
+            return outstandingQuantity.stripTrailingZeros().toPlainString();
+        }
     }
 
     /** @param returned this unit came back from this dispatch */
@@ -310,7 +338,51 @@ public final class TraceabilityDtos {
             boolean returned) {
     }
 
-    public record SerialTrace(String serialNumber, String batchNumber, List<SerialDelivery> deliveries) {
+    public record SerialTrace(
+            String serialNumber,
+            String batchNumber,
+            String productCode,
+            String productName,
+            String batchStatus,
+            Instant manufacturedAt,
+            List<InspectionHistory> inspections,
+            List<SerialDelivery> deliveries) {
+    }
+
+    /** One unit in search results. The dispatch shown is where the unit is now, or where it last came back from. */
+    public record SerialSearchResult(
+            String serialNumber,
+            String productCode,
+            String productName,
+            String batchNumber,
+            String facilityName,
+            Instant manufacturedAt,
+            String inspectionStatus,
+            String qualityStatus,
+            String dispatchStatus,
+            String customerName,
+            String dispatchNumber,
+            LocalDate dispatchedOn) {
+    }
+
+    public record SerialFilter(
+            String query,
+            String field,
+            UUID facilityId,
+            LocalDate madeFrom,
+            LocalDate madeTo,
+            LocalDate dispatchedFrom,
+            LocalDate dispatchedTo) {
+    }
+
+    /** What a recall covers: the batches named, everything made from them, and where it all went. */
+    public record RecallScope(
+            List<ProductionBatchView> batches,
+            List<DispatchResponse> dispatches,
+            List<RecallLine> lines,
+            List<String> serialNumbers,
+            List<InspectionHistory> inspections,
+            List<NcrHistory> ncrs) {
     }
 
     public record TraceReport(

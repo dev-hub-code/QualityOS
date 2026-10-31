@@ -4,6 +4,7 @@ import com.qualityos.common.response.ApiResponse;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.identity.dto.UserRoleDtos.MemberResponse;
+import com.qualityos.identity.dto.UserRoleDtos.UpdateMemberFacilitiesRequest;
 import com.qualityos.identity.dto.UserRoleDtos.UpdateMemberRolesRequest;
 import com.qualityos.identity.service.UserManagementService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -48,6 +49,12 @@ public class UserController {
     public ApiResponse<MemberResponse> updateRoles(
             @PathVariable UUID membershipId, @Valid @RequestBody UpdateMemberRolesRequest request) {
         return ApiResponse.ok(users.updateRoles(membershipId, request.roleIds()));
+    }
+
+    @PutMapping("/{membershipId}/facilities")
+    public ApiResponse<MemberResponse> updateFacilities(
+            @PathVariable UUID membershipId, @Valid @RequestBody UpdateMemberFacilitiesRequest request) {
+        return ApiResponse.ok(users.updateFacilities(membershipId, request.facilityIds()));
     }
 
     @PostMapping("/{membershipId}/deactivate")

@@ -119,7 +119,8 @@ public class DispatchService {
         if (customers.existsByCode(code)) {
             throw new ConflictException("A customer with this code already exists.");
         }
-        Customer customer = customers.save(new Customer(code, request.name().trim(), request.gstin()));
+        Customer customer = customers.save(new Customer(code, request.name().trim(), request.gstin(),
+                request.contactPerson(), request.email(), request.phone(), request.address()));
         audit.record("CUSTOMER_CREATED", "Customer", customer.getId());
         return toResponse(customer);
     }
@@ -265,6 +266,7 @@ public class DispatchService {
         return records.stream().collect(Collectors.toMap(Function.identity(), record -> new DispatchResponse(
                 record.getId(),
                 record.getDispatchNumber(),
+                record.getCustomerId(),
                 named.get(record.getCustomerId()).getName(),
                 record.getDispatchedOn(),
                 record.getReference(),
@@ -282,7 +284,8 @@ public class DispatchService {
     }
 
     private static CustomerResponse toResponse(Customer customer) {
-        return new CustomerResponse(customer.getId(), customer.getCode(), customer.getName(), customer.getGstin());
+        return new CustomerResponse(customer.getId(), customer.getCode(), customer.getName(), customer.getGstin(),
+                customer.getContactPerson(), customer.getEmail(), customer.getPhone(), customer.getAddress());
     }
 
     private static Map<UUID, BigDecimal> quantities(List<DispatchReversalItem> items, boolean expected) {
@@ -290,6 +293,11 @@ public class DispatchService {
                 .filter(item -> (item.getStatus() == DispatchReversalItem.Status.EXPECTED) == expected)
                 .collect(Collectors.toMap(
                         DispatchReversalItem::getDispatchItemId, DispatchReversalItem::getQuantity, BigDecimal::add));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<UUID, CustomerResponse> customersById(Collection<UUID> ids) {
+        return customers.findAllById(ids).stream().collect(Collectors.toMap(Customer::getId, DispatchService::toResponse));
     }
 
     /** The dispatches behind these lines, however they ended. */

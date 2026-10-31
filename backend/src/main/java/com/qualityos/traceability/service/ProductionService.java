@@ -12,6 +12,7 @@ import com.qualityos.materialreceipt.service.MaterialReceiptService;
 import com.qualityos.organization.service.FacilityService;
 import com.qualityos.product.dto.ProductDtos.ProductReference;
 import com.qualityos.product.service.ProductService;
+import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.traceability.dto.TraceabilityDtos.AddSerialsRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.BatchDetail;
 import com.qualityos.traceability.dto.TraceabilityDtos.CompleteBatchRequest;
@@ -60,6 +61,7 @@ public class ProductionService {
     private final FacilityService facilities;
     private final DocumentNumberService numbers;
     private final AuditService audit;
+    private final FacilityScope scope;
 
     ProductionService(
             ProductionBatchRepository batches,
@@ -70,7 +72,8 @@ public class ProductionService {
             ProductService products,
             FacilityService facilities,
             DocumentNumberService numbers,
-            AuditService audit) {
+            AuditService audit,
+            FacilityScope scope) {
         this.batches = batches;
         this.relationships = relationships;
         this.finishedProducts = finishedProducts;
@@ -80,6 +83,7 @@ public class ProductionService {
         this.facilities = facilities;
         this.numbers = numbers;
         this.audit = audit;
+        this.scope = scope;
     }
 
     @Transactional(readOnly = true)
@@ -89,9 +93,18 @@ public class ProductionService {
                 .<ProductionBatch>where(Searches.contains(search, "batchNumber"))
                 .and(Searches.equalTo("status", status))
                 .and(Searches.equalTo("productId", productId));
+        Optional<Set<UUID>> restriction = scope.restriction();
+        if (restriction.isPresent()) {
+            filter = filter.and((root, query, builder) -> root.get("facilityId").in(restriction.get()));
+        }
         Page<ProductionBatch> page = batches.findAll(filter, pageable);
         Map<UUID, ProductReference> referenced = products.references(page.map(ProductionBatch::getProductId).toSet());
         return PageResponse.from(page, batch -> toView(batch, referenced.get(batch.getProductId())));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<ProductionBatchView> byNumber(String batchNumber) {
+        return batches.findByBatchNumber(batchNumber).map(this::view);
     }
 
     @Transactional(readOnly = true)
@@ -110,6 +123,7 @@ public class ProductionService {
     @Transactional(readOnly = true)
     public BatchDetail detail(UUID id) {
         ProductionBatch batch = load(id);
+        scope.require(Set.of(batch.getFacilityId()), "Batch", id.toString());
         return new BatchDetail(view(batch), consumptions(batch.getId()), serials(batch.getId()));
     }
 

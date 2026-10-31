@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { FlowChart } from "@/components/docs/flow-chart";
+import { DOC_FLOWS } from "@/lib/doc-flows";
 import { DOC_PAGES, docPage, type DocSection } from "@/lib/docs";
 
 interface Props {
@@ -70,6 +72,10 @@ export default async function DocsTopic({ params }: Props) {
           <dd className="font-medium">{page.plan}</dd>
         </div>
       </dl>
+
+      <div className="mt-8">
+        <FlowChart flow={DOC_FLOWS[page.slug]} />
+      </div>
 
       {page.sections.map((section) => (
         <Section key={section.title} section={section} />

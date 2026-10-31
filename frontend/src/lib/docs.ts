@@ -163,7 +163,7 @@ export const DOC_PAGES: DocPage[] = [
           ["Pending approval", "Waiting for a decision."],
           ["Approved", "Can be used on purchase orders."],
           ["Rejected", "Refused. It can be sent for approval again."],
-          ["Blocked", "No longer usable."],
+          ["Blocked", "Cannot be used until it is approved again."],
         ],
       },
       {
@@ -317,7 +317,7 @@ export const DOC_PAGES: DocPage[] = [
         title: "The steps",
         terms: [
           ["Pending", "Created from a lot or batch, and not started."],
-          ["In progress", "Results are being entered. You can save a partial entry and come back."],
+          ["In progress", "Results are being entered. You can save a partial entry and come back. A reviewer can also send it back here."],
           ["Submitted", "Results are locked, and waiting for a reviewer."],
           ["Approved", "The result is final, and waiting for a disposition."],
           ["Completed", "The disposition is recorded."],
@@ -384,14 +384,14 @@ export const DOC_PAGES: DocPage[] = [
       {
         title: "Status",
         terms: [
-          ["Open", "Newly raised."],
+          ["Open", "Newly raised. Assigning it moves it on."],
           ["Under investigation", "Someone is working out what happened."],
           ["Containment", "Action is being taken to stop it spreading."],
           ["Action required", "Corrective action is needed."],
-          ["Pending verification", "Ready for someone to check and close."],
+          ["Pending verification", "Ready for someone to check and close, or send back."],
           ["Closed", "Finished."],
           ["Rejected", "A reviewer found it was not a real non-conformance."],
-          ["Cancelled", "Withdrawn. One raised by an inspection can only be rejected."],
+          ["Cancelled", "Withdrawn while still Open. One raised by an inspection can only be rejected."],
         ],
       },
       {
@@ -430,7 +430,7 @@ export const DOC_PAGES: DocPage[] = [
           ["Root cause analysis", "The owner is finding the cause."],
           ["Action planning", "Corrective and preventive actions are being added."],
           ["Implementation", "The actions are being carried out."],
-          ["Effectiveness verification", "Someone checks that the fix worked."],
+          ["Effectiveness verification", "Someone checks that the fix worked. If it did not, the CAPA returns to Action planning."],
           ["Closed", "Finished."],
           ["Cancelled", "Withdrawn."],
         ],
@@ -454,7 +454,7 @@ export const DOC_PAGES: DocPage[] = [
         { who: "Dev, Quality Engineer", action: "Raises a CAPA on NCR-2026-00001, with Dev as owner, due in 30 days.", result: "The CAPA is Open." },
         { who: "Dev, Quality Engineer", action: "Records the cause: the supplier's rolling tolerance is too wide. Adds a corrective action to reject the lot, and a preventive one to agree a tighter tolerance.", result: "The plan is on the record, and the CAPA moves to Implementation." },
         { who: "Dev, Quality Engineer", action: "Completes both actions, and submits for verification.", result: "The CAPA waits at Effectiveness verification." },
-        { who: "Meera, Quality Manager", action: "Checks the next three lots, finds them in limits, and verifies.", result: "The CAPA closes, and the NCR can now close." },
+        { who: "Meera, Quality Manager", action: "Checks the next three lots, finds them in limits, records the fix as effective, and closes the CAPA.", result: "The CAPA is Closed, and the NCR can now close." },
       ],
     },
   },

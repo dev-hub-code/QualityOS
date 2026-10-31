@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { FlowChart } from "@/components/docs/flow-chart";
+import { OVERVIEW_FLOW } from "@/lib/doc-flows";
 import { DOC_GROUPS, DOC_PAGES } from "@/lib/docs";
 
 export default function DocsHome() {
@@ -9,6 +11,9 @@ export default function DocsHome() {
         How each part of QualityOS works, who uses it, and a worked example. The people, companies and figures in the
         examples are made up.
       </p>
+      <div className="mt-6 max-w-3xl">
+        <FlowChart flow={OVERVIEW_FLOW} />
+      </div>
       {DOC_GROUPS.map((group) => (
         <section key={group} className="mt-8">
           <h2 className="text-lg font-semibold">{group}</h2>

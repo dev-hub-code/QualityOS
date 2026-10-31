@@ -38,12 +38,13 @@ test("a visitor reaches the documentation and every topic has an example", async
     await page.goto(topic);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(page.getByText("Worked example")).toBeVisible();
+    await expect(page.getByRole("figure")).toBeVisible();
   }
 });
 
 test("the documentation fits a phone", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 800 });
-  for (const path of ["/docs", "/docs/inspections", "/docs/reports"]) {
+  for (const path of ["/docs", "/docs/inspections", "/docs/recalls", "/docs/reports"]) {
     await page.goto(path);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
   }

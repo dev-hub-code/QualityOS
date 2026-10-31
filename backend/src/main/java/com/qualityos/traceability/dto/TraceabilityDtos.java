@@ -164,7 +164,8 @@ public final class TraceabilityDtos {
             String productCode,
             String productName,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
-            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal returnedQuantity) {
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal returnedQuantity,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal expectedQuantity) {
     }
 
     public record ReturnLineRequest(
@@ -178,11 +179,20 @@ public final class TraceabilityDtos {
             @Size(max = 200) String carrierReference) {
     }
 
+    /** @param expected the goods are on their way, and {@code reversalDate} is when they should arrive */
     public record CreateReversalRequest(
             @NotBlank @Size(max = 100) String returnReference,
             @NotNull LocalDate reversalDate,
             @NotBlank @Size(max = 1000) String reason,
+            Boolean expected,
             @NotEmpty List<@Valid ReturnLineRequest> items) {
+
+        public boolean isExpected() {
+            return Boolean.TRUE.equals(expected);
+        }
+    }
+
+    public record ReceiveReturnRequest(@NotNull LocalDate receivedOn) {
     }
 
     /** A return line, as inspection needs to see it. */
@@ -223,6 +233,7 @@ public final class TraceabilityDtos {
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal dispatchedQuantity,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal reversedQuantity,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal remainingQuantity,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal expectedQuantity,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal pendingQuantity,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal acceptedQuantity,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal rejectedQuantity) {
@@ -273,6 +284,35 @@ public final class TraceabilityDtos {
      * What a person with this permission may see of a batch's history. Inspections, NCRs and CAPAs are left out
      * for anyone who could not open them directly.
      */
+    /**
+     * One dispatch that reached, or may have reached, a customer. A customer stays listed after returning everything.
+     *
+     * @param outstandingQuantity what the customer still holds, as far as anyone has recorded
+     */
+    public record RecallLine(
+            UUID dispatchId,
+            String dispatchNumber,
+            String customerName,
+            LocalDate dispatchedOn,
+            LocalDate shippedOn,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal returnedQuantity,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal outstandingQuantity) {
+    }
+
+    /** @param returned this unit came back from this dispatch */
+    public record SerialDelivery(
+            UUID dispatchId,
+            String dispatchNumber,
+            String customerName,
+            LocalDate dispatchedOn,
+            LocalDate shippedOn,
+            boolean returned) {
+    }
+
+    public record SerialTrace(String serialNumber, String batchNumber, List<SerialDelivery> deliveries) {
+    }
+
     public record TraceReport(
             TraceNode subject,
             List<TraceNode> backward,
@@ -281,6 +321,8 @@ public final class TraceabilityDtos {
             List<DispatchResponse> dispatches,
             List<ReversalView> returns,
             List<String> affectedCustomers,
+            List<String> unconfirmedCustomers,
+            List<RecallLine> recall,
             List<String> serialNumbers,
             List<InspectionHistory> inspections,
             List<NcrHistory> ncrs,

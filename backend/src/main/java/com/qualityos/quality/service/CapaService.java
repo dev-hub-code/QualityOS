@@ -52,6 +52,7 @@ public class CapaService implements AttachmentPolicy {
     private static final String ATTACHMENT_TYPE = "CAPA";
     private static final String NUMBER_PREFIX = "CAPA";
     private static final Duration OVERDUE_REMINDER_INTERVAL = Duration.ofDays(7);
+    private static final int DUE_SOON_DAYS = 3;
 
     private final CorrectiveActionRepository capas;
     private final CapaActionRepository actions;
@@ -230,7 +231,9 @@ public class CapaService implements AttachmentPolicy {
         if (capa.isEffectivenessRequired() && !verified) {
             throw new BusinessRuleException("This CAPA needs a successful effectiveness verification.");
         }
-        return apply(capa, note, closing -> closing.close(TenantContext.getCurrentUserId(), note, Instant.now()));
+        CapaDetail closed = apply(capa, note, closing -> closing.close(TenantContext.getCurrentUserId(), note, Instant.now()));
+        alerts.capaClosed(capa);
+        return closed;
     }
 
     @Transactional
@@ -248,6 +251,18 @@ public class CapaService implements AttachmentPolicy {
             capa.setOverdueNotifiedAt(now);
         });
         return overdue.size();
+    }
+
+    /** Reminds each owner once, shortly before the date. Runs under the current tenant. */
+    @Transactional
+    public int remindDueSoon() {
+        Instant now = Instant.now();
+        List<CorrectiveAction> due = capas.findDueSoon(today(), today().plusDays(DUE_SOON_DAYS));
+        due.forEach(capa -> {
+            alerts.capaDueSoon(capa);
+            capa.setDueRemindedAt(now);
+        });
+        return due.size();
     }
 
     @Override

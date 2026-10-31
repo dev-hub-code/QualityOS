@@ -9,6 +9,7 @@ import com.qualityos.notification.service.NotificationType;
 import com.qualityos.quality.entity.CapaAction;
 import com.qualityos.quality.entity.CorrectiveAction;
 import com.qualityos.quality.entity.NonConformance;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -57,6 +58,20 @@ class QualityAlerts {
     void capaAwaitingVerification(CorrectiveAction capa) {
         capa(access.holdersOf(Permissions.CAPA_APPROVE), NotificationType.CAPA_AWAITING_VERIFICATION, capa,
                 capa.getCapaNumber() + " needs effectiveness verification", capa.getTitle(), null);
+    }
+
+    void capaDueSoon(CorrectiveAction capa) {
+        capa(Set.of(capa.getOwnerId()), NotificationType.CAPA_DUE_SOON, capa,
+                capa.getCapaNumber() + " is due on " + capa.getTargetDate(), capa.getTitle(),
+                capaEmail(EmailTemplate.CAPA_DUE_REMINDER, capa));
+    }
+
+    void capaClosed(CorrectiveAction capa) {
+        Set<UUID> recipients = new HashSet<>();
+        recipients.add(capa.getOwnerId());
+        recipients.add(capa.getCreatedBy());
+        capa(recipients, NotificationType.CAPA_CLOSED, capa, capa.getCapaNumber() + " was closed", capa.getTitle(),
+                capaEmail(EmailTemplate.CAPA_CLOSURE, capa));
     }
 
     void capaOverdue(CorrectiveAction capa) {

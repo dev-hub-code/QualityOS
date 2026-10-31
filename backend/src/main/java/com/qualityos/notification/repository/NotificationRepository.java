@@ -1,6 +1,7 @@
 package com.qualityos.notification.repository;
 
 import com.qualityos.notification.entity.Notification;
+import com.qualityos.notification.service.NotificationType;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 import java.time.Instant;
@@ -16,6 +17,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.QueryHints;
 
 public interface NotificationRepository extends JpaRepository<Notification, UUID> {
+
+    boolean existsByTypeAndCreatedAtAfter(NotificationType type, Instant after);
 
     Page<Notification> findByUserId(UUID userId, Pageable pageable);
 

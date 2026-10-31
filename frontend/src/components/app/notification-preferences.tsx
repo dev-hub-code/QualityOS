@@ -21,7 +21,10 @@ const LABELS: Record<string, string> = {
   CAPA_ASSIGNED: "A CAPA is assigned to me or returned to planning",
   CAPA_ACTION_ASSIGNED: "A CAPA action is assigned to me",
   CAPA_AWAITING_VERIFICATION: "A CAPA needs effectiveness verification",
+  CAPA_DUE_SOON: "My CAPA is due soon",
   CAPA_OVERDUE: "My CAPA is overdue",
+  CAPA_CLOSED: "My CAPA is closed",
+  DISPATCH_SHIPMENT_UNCONFIRMED: "Dispatches are waiting for shipment confirmation",
 };
 const PATH = "/notifications/preferences";
 

@@ -102,7 +102,7 @@ export default function TraceReportPage() {
   const [correcting, setCorrecting] = useState(false);
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<TraceReport>(path) });
   if (!data) return <QueryState error={error} />;
-  const { subject, backward, forward, dispatches, returns, affectedCustomers, serialNumbers, timeline } = data;
+  const { subject, backward, forward, dispatches, returns, affectedCustomers, unconfirmedCustomers, serialNumbers, timeline } = data;
   return (
     <div className="space-y-6">
       <PageHeader title={subject.batchNumber} subtitle={`${subject.code} – ${subject.name}`}>
@@ -115,7 +115,14 @@ export default function TraceReportPage() {
       {correcting && <CorrectLotDialog lot={subject} onClose={() => setCorrecting(false)} />}
       {affectedCustomers.length > 0 && (
         <p className="rounded-lg border p-3 text-sm">
-          <span className="font-medium">Customers who received this:</span> {affectedCustomers.join(", ")}
+          <span className="font-medium">Customers who received this:</span> {affectedCustomers.join(", ")}.{" "}
+          <RecordLink href={`/traceability/${encodeURIComponent(subject.batchNumber)}/recall`}>Recall report</RecordLink>
+        </p>
+      )}
+      {unconfirmedCustomers.length > 0 && (
+        <p className="rounded-lg border p-3 text-sm">
+          <span className="font-medium">Shipment not confirmed for:</span> {unconfirmedCustomers.join(", ")}. These goods
+          may not have left yet.
         </p>
       )}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -150,7 +157,13 @@ export default function TraceReportPage() {
       )}
       {serialNumbers.length > 0 && (
         <Section title="Serial numbers">
-          <p className="text-sm break-words">{serialNumbers.join(", ")}</p>
+          <p className="flex flex-wrap gap-x-3 text-sm">
+            {serialNumbers.map((serial) => (
+              <RecordLink key={serial} href={`/traceability/serials/${encodeURIComponent(serial)}`}>
+                {serial}
+              </RecordLink>
+            ))}
+          </p>
         </Section>
       )}
       <Timeline events={timeline} />

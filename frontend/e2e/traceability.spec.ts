@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 import { apiCaller, PASSWORD, signUp, unique } from "./helpers";
 import { acceptInvitation, inviteUser } from "./mail";
 
@@ -183,8 +183,8 @@ test("a wrong lot on a completed batch is corrected with approval", async ({ pag
   await expect(page.getByText("Reversed: Weighed twice")).toBeVisible();
 });
 
-test("returned goods stay out of stock until an inspection accepts them", async ({ page, browser }) => {
-  test.setTimeout(90_000);
+/** A released batch of 10, dispatched in full but not yet confirmed as shipped. */
+async function dispatchedBatch(page: Page, browser: Browser) {
   await signUp(page);
   await prepare(page);
   const managerEmail = `manager-${unique()}@example.com`;
@@ -218,6 +218,13 @@ test("returned goods stay out of stock until an inspection accepts them", async 
     dispatchedOn: new Date().toISOString().slice(0, 10),
     items: [{ productionBatchId: batchId, quantity: "10" }],
   });
+
+  return { batchId, batchNumber: made.batch.batchNumber as string, manager };
+}
+
+test("returned goods stay out of stock until an inspection accepts them", async ({ page, browser }) => {
+  test.setTimeout(90_000);
+  const { batchId, manager } = await dispatchedBatch(page, browser);
 
   await page.goto("/dispatches");
   await expect(page.getByRole("button", { name: "Record return" })).toHaveCount(0);
@@ -258,4 +265,42 @@ test("returned goods stay out of stock until an inspection accepts them", async 
 
   await page.goto(`/production-batches/${batchId}`);
   await expect(page.getByText("Available").locator("..")).toContainText("4");
+});
+
+test("an expected return waits for the goods, and the recall report shows what is still out", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(90_000);
+  const { batchNumber } = await dispatchedBatch(page, browser);
+  const today = new Date().toISOString().slice(0, 10);
+  const report = `/traceability/${encodeURIComponent(batchNumber)}`;
+
+  await page.goto(report);
+  await expect(page.getByText("Shipment not confirmed for:")).toBeVisible();
+
+  await page.goto("/dispatches");
+  await expect(page.getByText("awaiting shipment", { exact: false }).first()).toBeVisible();
+  await step(page, "Confirm shipment", (dialog) => dialog.getByLabel("Shipped on").fill(today));
+  await step(page, "Record return", async (dialog) => {
+    await dialog.getByLabel("Line", { exact: true }).selectOption({ index: 1 });
+    await dialog.getByLabel("Returned quantity").fill("3");
+    await dialog.getByLabel("Return reference").fill("RMA-EXPECTED");
+    await dialog.getByLabel("Date received or expected").fill(today);
+    await dialog.getByLabel("Reason for return").fill("Wrong size");
+    await dialog.getByLabel("Not here yet: the goods are on their way").click();
+  });
+
+  await page.goto("/dispatch-reversals");
+  await page.getByRole("link", { name: /^RET-/ }).click();
+  await expect(page.getByRole("button", { name: "Inspect" })).toHaveCount(0);
+  await step(page, "Mark received", (dialog) => dialog.getByLabel("Date received").fill(today));
+  await expect(page.getByRole("button", { name: "Inspect" })).toBeVisible();
+
+  await page.goto(report);
+  await page.getByRole("link", { name: "Recall report" }).click();
+  await expect(page.getByRole("heading", { name: `Recall report: ${batchNumber}` })).toBeVisible();
+  const row = page.getByRole("row").nth(1);
+  await expect(row.getByRole("cell").nth(4)).toHaveText("3");
+  await expect(row.getByRole("cell").nth(5)).toHaveText("7");
 });

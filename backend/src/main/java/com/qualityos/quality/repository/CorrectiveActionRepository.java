@@ -33,4 +33,13 @@ public interface CorrectiveActionRepository
               and (c.overdueNotifiedAt is null or c.overdueNotifiedAt < :remindedBefore)
             """)
     List<CorrectiveAction> findOverdue(LocalDate today, Instant remindedBefore);
+
+    @Query("""
+            select c from CorrectiveAction c
+            where c.targetDate between :today and :until
+              and c.status not in (com.qualityos.quality.entity.CorrectiveAction.Status.CLOSED,
+                                   com.qualityos.quality.entity.CorrectiveAction.Status.CANCELLED)
+              and c.dueRemindedAt is null
+            """)
+    List<CorrectiveAction> findDueSoon(LocalDate today, LocalDate until);
 }

@@ -19,4 +19,11 @@ public interface DispatchReversalItemRepository extends JpaRepository<DispatchRe
     List<DispatchReversalItem> findByReversalIdIn(Collection<UUID> reversalIds);
 
     List<DispatchReversalItem> findByDispatchItemIdIn(Collection<UUID> dispatchItemIds);
+
+    /** Every return that named this serial number, which is how a unit's earlier customers stay known. */
+    @Query(value = """
+            select * from dispatch_reversal_items
+            where serial_numbers @> jsonb_build_array(cast(:serial as text)) and status <> 'CANCELLED'
+            """, nativeQuery = true)
+    List<DispatchReversalItem> findBySerial(String serial);
 }

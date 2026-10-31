@@ -17,8 +17,12 @@ import com.qualityos.traceability.dto.TraceabilityDtos.CorrectionImpact;
 import com.qualityos.traceability.dto.TraceabilityDtos.DispatchLine;
 import com.qualityos.traceability.dto.TraceabilityDtos.DispatchResponse;
 import com.qualityos.traceability.dto.TraceabilityDtos.ProductionBatchView;
+import com.qualityos.traceability.dto.TraceabilityDtos.RecallLine;
 import com.qualityos.traceability.dto.TraceabilityDtos.ReversalView;
 import com.qualityos.traceability.dto.TraceabilityDtos.SearchHit;
+import com.qualityos.traceability.dto.TraceabilityDtos.SerialDelivery;
+import com.qualityos.traceability.dto.TraceabilityDtos.SerialTrace;
+import com.qualityos.traceability.dto.TraceabilityDtos.DispatchLine;
 import com.qualityos.traceability.dto.TraceabilityDtos.TimelineEvent;
 import com.qualityos.traceability.dto.TraceabilityDtos.TraceEdge;
 import com.qualityos.traceability.dto.TraceabilityDtos.TraceNode;
@@ -31,6 +35,7 @@ import com.qualityos.traceability.repository.BatchRelationshipRepository;
 import com.qualityos.traceability.repository.FinishedProductRepository;
 import com.qualityos.traceability.repository.MaterialCorrectionRepository;
 import com.qualityos.traceability.repository.ProductionBatchRepository;
+import java.math.BigDecimal;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -235,6 +240,15 @@ public class TraceabilityService {
                 .filter(dispatch -> dispatch.reversalReason() == null)
                 .map(DispatchResponse::customerName)
                 .distinct().sorted().toList();
+        Set<String> tracedBatches = views.values().stream().map(ProductionBatchView::batchNumber).collect(Collectors.toSet());
+        List<RecallLine> recall = shipped.stream()
+                .filter(dispatch -> dispatch.reversalReason() == null)
+                .map(dispatch -> recallLine(dispatch, tracedBatches))
+                .toList();
+        List<String> unconfirmed = recall.stream()
+                .filter(line -> line.shippedOn() == null)
+                .map(RecallLine::customerName)
+                .distinct().sorted().toList();
         List<String> serials = finishedProducts.findByProductionBatchIdInOrderBySerialNumber(orNone(allBatches)).stream()
                 .map(FinishedProduct::getSerialNumber)
                 .toList();
@@ -264,6 +278,8 @@ public class TraceabilityService {
                 shipped,
                 returned,
                 customers,
+                unconfirmed,
+                recall,
                 serials,
                 visibleInspections,
                 visibleNcrs,
@@ -390,5 +406,35 @@ public class TraceabilityService {
         return new TraceNode(batch.id(), BATCH, batch.batchNumber(), batch.productCode(), batch.productName(),
                 batch.producedQuantity() != null ? batch.producedQuantity() : batch.plannedQuantity(),
                 batch.status(), null, null, null, null);
+    }
+
+    private static RecallLine recallLine(DispatchResponse dispatch, Set<String> batches) {
+        List<DispatchLine> lines = dispatch.lines().stream()
+                .filter(line -> batches.contains(line.batchNumber()))
+                .toList();
+        BigDecimal quantity = lines.stream().map(DispatchLine::quantity).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal returned = lines.stream().map(DispatchLine::returnedQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new RecallLine(dispatch.id(), dispatch.dispatchNumber(), dispatch.customerName(), dispatch.dispatchedOn(),
+                dispatch.shippedOn(), quantity, returned, quantity.subtract(returned));
+    }
+
+    /** Every customer a unit reached, oldest first. Traces follow batches, so this answers it for a single unit. */
+    @Transactional(readOnly = true)
+    public SerialTrace serial(String serial) {
+        FinishedProduct unit = finishedProducts.findBySerialNumberIn(List.of(serial)).stream().findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Serial number", serial));
+        Set<UUID> returnedLines = returns.returnedLines(serial);
+        Set<UUID> lines = new HashSet<>(returnedLines);
+        if (unit.getDispatchItemId() != null) {
+            lines.add(unit.getDispatchItemId());
+        }
+        List<SerialDelivery> deliveries = dispatches.forItems(lines).stream()
+                .sorted(Comparator.comparing(DispatchResponse::createdAt))
+                .map(dispatch -> new SerialDelivery(dispatch.id(), dispatch.dispatchNumber(), dispatch.customerName(),
+                        dispatch.dispatchedOn(), dispatch.shippedOn(), dispatch.lines().stream()
+                                .anyMatch(line -> returnedLines.contains(line.id()))))
+                .toList();
+        return new SerialTrace(serial, production.views(List.of(unit.getProductionBatchId())).getFirst().batchNumber(),
+                deliveries);
     }
 }

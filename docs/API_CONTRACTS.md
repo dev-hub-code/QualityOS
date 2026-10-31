@@ -123,3 +123,10 @@ unverified sign-in is off. Local Docker Compose enforces it too. Integration tes
 
 Dispatches, customers and return lines stay on the trace after a full return, so `affectedCustomers` includes everyone
 a shipment reached. Only a dispatch cancelled through `/reverse` drops out, because those goods never left.
+
+A return sent with `expected: true` starts as `EXPECTED`: its quantity is held against the dispatch, but it cannot be
+inspected. `POST /dispatch-reversals/{id}/receive` records arrival, and `POST /dispatch-reversals/{id}/cancel` releases the
+quantity if the goods never come.
+
+`GET /traceability/batches/{number}` also returns `recall` (dispatched, returned and outstanding per dispatch) and
+`unconfirmedCustomers`. `GET /traceability/serials/{serial}` lists every customer one unit reached.

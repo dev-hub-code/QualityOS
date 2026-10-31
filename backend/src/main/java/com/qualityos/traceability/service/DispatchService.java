@@ -7,6 +7,10 @@ import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.organization.service.OrganizationService;
+import com.qualityos.notification.service.NotificationService;
+import com.qualityos.identity.service.TenantAccessService;
+import com.qualityos.notification.service.NotificationType;
+import com.qualityos.common.security.Permissions;
 import com.qualityos.traceability.dto.TraceabilityDtos.ConfirmShipmentRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.CreateDispatchRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.CustomerResponse;
@@ -38,6 +42,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Collection;
 import java.util.Comparator;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -52,12 +57,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DispatchService {
 
+    private static final int UNCONFIRMED_AFTER_DAYS = 3;
+
     private final DispatchRecordRepository dispatches;
     private final DispatchItemRepository items;
     private final CustomerRepository customers;
     private final ProductionBatchRepository batches;
     private final FinishedProductRepository finishedProducts;
     private final TraceCorrectionRepository corrections;
+    private final NotificationService notifications;
+    private final TenantAccessService access;
     private final DispatchReversalRepository reversals;
     private final DispatchShipmentRepository shipments;
     private final DispatchReversalItemRepository reversalItems;
@@ -73,6 +82,8 @@ public class DispatchService {
             ProductionBatchRepository batches,
             FinishedProductRepository finishedProducts,
             TraceCorrectionRepository corrections,
+            NotificationService notifications,
+            TenantAccessService access,
             DispatchReversalRepository reversals,
             DispatchShipmentRepository shipments,
             DispatchReversalItemRepository reversalItems,
@@ -86,6 +97,8 @@ public class DispatchService {
         this.batches = batches;
         this.finishedProducts = finishedProducts;
         this.corrections = corrections;
+        this.notifications = notifications;
+        this.access = access;
         this.reversals = reversals;
         this.shipments = shipments;
         this.reversalItems = reversalItems;
@@ -243,10 +256,12 @@ public class DispatchService {
         Map<UUID, DispatchShipment> confirmed = shipments
                 .findByDispatchIdIn(records.stream().map(DispatchRecord::getId).toList()).stream()
                 .collect(Collectors.toMap(DispatchShipment::getDispatchId, Function.identity()));
-        Map<UUID, BigDecimal> returned = reversalItems
+        List<DispatchReversalItem> back = reversalItems
                 .findByDispatchItemIdIn(lines.stream().map(DispatchItem::getId).toList()).stream()
-                .collect(Collectors.toMap(
-                        DispatchReversalItem::getDispatchItemId, DispatchReversalItem::getQuantity, BigDecimal::add));
+                .filter(item -> !item.isCancelled())
+                .toList();
+        Map<UUID, BigDecimal> returned = quantities(back, false);
+        Map<UUID, BigDecimal> expected = quantities(back, true);
         return records.stream().collect(Collectors.toMap(Function.identity(), record -> new DispatchResponse(
                 record.getId(),
                 record.getDispatchNumber(),
@@ -256,7 +271,8 @@ public class DispatchService {
                 byDispatch.getOrDefault(record.getId(), List.of()).stream().map(line -> {
                     ProductionBatchView batch = shipped.get(line.getProductionBatchId());
                     return new DispatchLine(line.getId(), batch.batchNumber(), batch.productCode(), batch.productName(),
-                            line.getQuantity(), returned.getOrDefault(line.getId(), BigDecimal.ZERO));
+                            line.getQuantity(), returned.getOrDefault(line.getId(), BigDecimal.ZERO),
+                            expected.getOrDefault(line.getId(), BigDecimal.ZERO));
                 }).toList(),
                 record.getCreatedAt(),
                 voided.containsKey(record.getId()) ? voided.get(record.getId()).getReason() : null,
@@ -267,6 +283,38 @@ public class DispatchService {
 
     private static CustomerResponse toResponse(Customer customer) {
         return new CustomerResponse(customer.getId(), customer.getCode(), customer.getName(), customer.getGstin());
+    }
+
+    private static Map<UUID, BigDecimal> quantities(List<DispatchReversalItem> items, boolean expected) {
+        return items.stream()
+                .filter(item -> (item.getStatus() == DispatchReversalItem.Status.EXPECTED) == expected)
+                .collect(Collectors.toMap(
+                        DispatchReversalItem::getDispatchItemId, DispatchReversalItem::getQuantity, BigDecimal::add));
+    }
+
+    /** The dispatches behind these lines, however they ended. */
+    @Transactional(readOnly = true)
+    public List<DispatchResponse> forItems(Collection<UUID> itemIds) {
+        List<UUID> ids = items.findAllById(itemIds).stream().map(DispatchItem::getDispatchId).distinct().toList();
+        List<DispatchRecord> found = dispatches.findAllById(ids);
+        Map<DispatchRecord, DispatchResponse> answers = responses(found);
+        return found.stream().map(answers::get).toList();
+    }
+
+    /** Reminds daily about goods that may have left without anyone saying so. Runs under the current tenant. */
+    @Transactional
+    public int remindUnconfirmed() {
+        LocalDate today = LocalDate.now(ZoneId.of(organizations.getCurrent().timezone()));
+        long waiting = dispatches.countUnconfirmed(today.minusDays(UNCONFIRMED_AFTER_DAYS));
+        if (waiting == 0 || notifications.sentSince(
+                NotificationType.DISPATCH_SHIPMENT_UNCONFIRMED, Instant.now().minus(Duration.ofDays(1)))) {
+            return 0;
+        }
+        notifications.notify(access.holdersOf(Permissions.TRACEABILITY_MANAGE),
+                NotificationType.DISPATCH_SHIPMENT_UNCONFIRMED,
+                waiting + " dispatches have no confirmed shipment",
+                "Confirm each shipment, or cancel the dispatch if the goods never left.", "/dispatches");
+        return (int) waiting;
     }
 
     private DispatchRecord lock(UUID id) {

@@ -74,6 +74,12 @@ public class NotificationService {
                 .toList());
     }
 
+    /** Whether anyone in this tenant was told about this since then, for reminders that run often. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean sentSince(NotificationType type, Instant since) {
+        return notifications.existsByTypeAndCreatedAtAfter(type, since);
+    }
+
     @Transactional(readOnly = true)
     public PageResponse<NotificationResponse> inbox(boolean unreadOnly, Pageable pageable) {
         UUID userId = TenantContext.getCurrentUserId();

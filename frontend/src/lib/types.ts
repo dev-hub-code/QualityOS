@@ -331,7 +331,7 @@ export interface InspectionSummary {
   id: string;
   inspectionNumber: string;
   inspectionType: string;
-  supplierName: string;
+  supplierName: string | null;
   materialCode: string;
   materialName: string;
   batchNumber: string;
@@ -363,7 +363,7 @@ export interface Inspection {
   id: string;
   inspectionNumber: string;
   inspectionType: string;
-  supplierName: string;
+  supplierName: string | null;
   materialCode: string;
   materialName: string;
   batchNumber: string;
@@ -499,4 +499,85 @@ export interface Capa extends CapaSummary {
   actions: CapaAction[];
   verifications: { effective: boolean; method: string; note: string; verifiedBy: string; at: string }[];
   history: StatusChange[];
+}
+
+export interface Customer {
+  id: string;
+  code: string;
+  name: string;
+  gstin: string | null;
+}
+
+export interface ReleasedLot {
+  itemId: string;
+  materialCode: string;
+  materialName: string;
+  internalBatch: string;
+  remainingQuantity: string;
+}
+
+export interface ProductionBatch {
+  id: string;
+  batchNumber: string;
+  productId: string;
+  productCode: string;
+  productName: string;
+  status: string;
+  plannedQuantity: string;
+  producedQuantity: string | null;
+  availableQuantity: string;
+}
+
+export interface BatchDetail {
+  batch: ProductionBatch;
+  consumptions: { sourceBatch: string; description: string; quantity: string; at: string }[];
+  serialNumbers: string[];
+}
+
+export interface Dispatch {
+  id: string;
+  dispatchNumber: string;
+  customerName: string;
+  dispatchedOn: string;
+  reference: string | null;
+  lines: { batchNumber: string; productCode: string; productName: string; quantity: string }[];
+}
+
+export interface SearchHit {
+  batchNumber: string;
+  kind: string;
+  description: string;
+  matchedOn: string;
+}
+
+export interface TraceNode {
+  kind: "LOT" | "PRODUCTION_BATCH";
+  batchNumber: string;
+  code: string;
+  name: string;
+  quantity: string;
+  status: string;
+  supplierName: string | null;
+  supplierBatch: string | null;
+  receiptNumber: string | null;
+  purchaseOrderNumber: string | null;
+}
+
+export interface TimelineEvent {
+  at: string;
+  kind: string;
+  title: string;
+  batchNumber: string | null;
+  status: string | null;
+  link: string | null;
+}
+
+export interface TraceReport {
+  subject: TraceNode;
+  backward: TraceNode[];
+  forward: TraceNode[];
+  dispatches: Dispatch[];
+  affectedCustomers: string[];
+  serialNumbers: string[];
+  timeline: TimelineEvent[];
 }

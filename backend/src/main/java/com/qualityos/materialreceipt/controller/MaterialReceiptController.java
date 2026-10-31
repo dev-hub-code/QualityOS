@@ -6,6 +6,7 @@ import com.qualityos.common.response.Pages;
 import com.qualityos.common.security.Permissions.Require;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.CreateReceiptRequest;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceiptDetail;
+import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.LotView;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceivedBatch;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceiptSummary;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.VoidReceiptRequest;
@@ -13,6 +14,7 @@ import com.qualityos.materialreceipt.service.MaterialReceiptService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.Set;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -47,6 +49,12 @@ public class MaterialReceiptController {
             @RequestParam(required = false) String q,
             @RequestParam(required = false) UUID purchaseOrderId) {
         return ApiResponse.ok(receipts.list(q, purchaseOrderId, Pages.of(page, size, sort, SORTABLE, "grnNumber")));
+    }
+
+    @GetMapping("/released-lots")
+    @PreAuthorize(Require.TRACEABILITY_VIEW)
+    public ApiResponse<List<LotView>> releasedLots(@RequestParam(required = false) UUID materialId) {
+        return ApiResponse.ok(receipts.releasedLots(materialId));
     }
 
     @GetMapping("/awaiting-inspection")

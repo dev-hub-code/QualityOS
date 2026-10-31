@@ -205,6 +205,14 @@ public class MaterialService implements AttachmentPolicy {
                 .collect(Collectors.toMap(MaterialReference::id, Function.identity()));
     }
 
+    /** Ids of materials whose code or name contains the term. */
+    @Transactional(readOnly = true)
+    public List<UUID> idsMatching(String term) {
+        return materials.findAll(Searches.<Material>contains(term, "code", "name")).stream()
+                .map(Material::getId)
+                .toList();
+    }
+
     @Override
     public String entityType() {
         return "MATERIAL";

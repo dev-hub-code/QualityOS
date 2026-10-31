@@ -44,11 +44,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import com.qualityos.quality.dto.QualityDtos.InspectionFailure;
 import com.qualityos.quality.service.NcrService;
+import com.qualityos.traceability.dto.TraceabilityDtos.ProductionBatchView;
+import com.qualityos.traceability.service.ProductionService;
+import com.qualityos.inspection.dto.InspectionDtos.InspectionHistory;
+import java.math.BigDecimal;
+import java.util.Collection;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -75,6 +81,7 @@ public class InspectionService implements AttachmentPolicy {
     private final AuditService audit;
     private final InspectionAlerts inspectionAlerts;
     private final NcrService ncrs;
+    private final ProductionService production;
     private final JsonMapper json;
 
     /** Lazy because the attachment service collects every policy, and this class is one. */
@@ -91,6 +98,7 @@ public class InspectionService implements AttachmentPolicy {
             AuditService audit,
             InspectionAlerts inspectionAlerts,
             NcrService ncrs,
+            ProductionService production,
             JsonMapper json) {
         this.inspections = inspections;
         this.results = results;
@@ -104,6 +112,7 @@ public class InspectionService implements AttachmentPolicy {
         this.audit = audit;
         this.inspectionAlerts = inspectionAlerts;
         this.ncrs = ncrs;
+        this.production = production;
         this.json = json;
     }
 
@@ -115,17 +124,30 @@ public class InspectionService implements AttachmentPolicy {
                         .and(Searches.equalTo("status", status))
                         .and(Searches.equalTo("supplierId", supplierId));
         Page<Inspection> page = inspections.findAll(filter, pageable);
-        Map<UUID, SupplierReference> supplierNames = suppliers.references(page.map(Inspection::getSupplierId).toSet());
-        Map<UUID, MaterialReference> referenced = materials.references(page.map(Inspection::getMaterialId).toSet());
+        Map<UUID, SupplierReference> supplierNames = suppliers.references(page.stream()
+                .map(Inspection::getSupplierId).filter(Objects::nonNull).collect(Collectors.toSet()));
+        Map<UUID, MaterialReference> referenced = materials.references(page.stream()
+                .map(Inspection::getMaterialId).filter(Objects::nonNull).collect(Collectors.toSet()));
+        Map<UUID, ProductionBatchView> made = production.views(page.stream()
+                        .map(Inspection::getProductionBatchId).filter(Objects::nonNull).toList())
+                .stream().collect(Collectors.toMap(ProductionBatchView::id, Function.identity()));
         return PageResponse.from(page, inspection -> {
-            MaterialReference material = referenced.get(inspection.getMaterialId());
+            Subject subject;
+            if (inspection.getMaterialId() != null) {
+                MaterialReference material = referenced.get(inspection.getMaterialId());
+                subject = new Subject(
+                        supplierNames.get(inspection.getSupplierId()).name(), material.code(), material.name());
+            } else {
+                ProductionBatchView batch = made.get(inspection.getProductionBatchId());
+                subject = new Subject(null, batch.productCode(), batch.productName());
+            }
             return new InspectionSummary(
                     inspection.getId(),
                     inspection.getInspectionNumber(),
                     inspection.getInspectionType().name(),
-                    supplierNames.get(inspection.getSupplierId()).name(),
-                    material.code(),
-                    material.name(),
+                    subject.supplierName(),
+                    subject.code(),
+                    subject.name(),
                     inspection.getBatchNumber(),
                     inspection.getStatus().name(),
                     name(inspection.getEvaluatedResult()),
@@ -143,33 +165,98 @@ public class InspectionService implements AttachmentPolicy {
     /** Freezes the specification in force today. Later template changes never reach this inspection. */
     @Transactional
     public InspectionDetail create(CreateInspectionRequest request) {
+        if ((request.receiptItemId() == null) == (request.productionBatchId() == null)) {
+            throw new BusinessRuleException("Choose a received batch or a production batch to inspect.");
+        }
+        return toDetail(request.receiptItemId() != null ? inspectLot(request) : inspectProductionBatch(request));
+    }
+
+    private Inspection inspectLot(CreateInspectionRequest request) {
         ReceivedBatch batch = receipts.batch(request.receiptItemId());
         InspectionTemplate template = templates.requireUsableFor(request.templateId(), batch.materialId());
         TemplateVersion version = templates.versionInForce(template.getId());
         int samples = version.samplesFor(batch.quantity());
         receipts.startInspection(batch.itemId());
-        Inspection inspection = new Inspection(
+        return save(new Inspection(
                 numbers.next("INS"),
                 template.getInspectionType(),
                 version.getId(),
                 json.writeValueAsString(templates.snapshot(template.getId(), version)),
                 batch.itemId(),
+                null,
                 batch.supplierId(),
                 batch.facilityId(),
                 batch.materialId(),
                 batch.internalBatch(),
                 batch.quantity(),
-                samples);
+                samples));
+    }
+
+    private Inspection inspectProductionBatch(CreateInspectionRequest request) {
+        ProductionBatchView batch = production.batch(request.productionBatchId());
+        InspectionTemplate template = templates.requireUsableForProduct(request.templateId(), batch.productId());
+        production.requireInspectable(batch.id(), template.getInspectionType().name());
+        TemplateVersion version = templates.versionInForce(template.getId());
+        BigDecimal quantity = batch.producedQuantity() != null ? batch.producedQuantity() : batch.plannedQuantity();
+        return save(new Inspection(
+                numbers.next("INS"),
+                template.getInspectionType(),
+                version.getId(),
+                json.writeValueAsString(templates.snapshot(template.getId(), version)),
+                null,
+                batch.id(),
+                null,
+                batch.facilityId(),
+                null,
+                batch.batchNumber(),
+                quantity,
+                version.samplesFor(quantity)));
+    }
+
+    private Inspection save(Inspection inspection) {
         inspections.saveAndFlush(inspection);
         audit.record("INSPECTION_CREATED", ENTITY, inspection.getId());
-        return toDetail(inspection);
+        return inspection;
+    }
+
+    /** The trail of inspections for a set of lots and batches. Empty sets are fine. */
+    @Transactional(readOnly = true)
+    public List<InspectionHistory> history(Collection<UUID> lotIds, Collection<UUID> batchIds) {
+        return inspections
+                .findByReceiptItemIdInOrProductionBatchIdInOrderByCreatedAt(orNone(lotIds), orNone(batchIds))
+                .stream()
+                .map(inspection -> new InspectionHistory(
+                        inspection.getId(),
+                        inspection.getInspectionNumber(),
+                        inspection.getInspectionType().name(),
+                        inspection.getBatchNumber(),
+                        inspection.getStatus().name(),
+                        name(inspection.getFinalResult()),
+                        name(inspection.getDisposition()),
+                        inspection.getCreatedAt()))
+                .toList();
+    }
+
+    private static Collection<UUID> orNone(Collection<UUID> ids) {
+        return ids.isEmpty() ? List.of(new UUID(0, 0)) : ids;
+    }
+
+    private void recordOutcome(Inspection inspection, String disposition, boolean finalDecision) {
+        if (inspection.getReceiptItemId() != null) {
+            receipts.recordDisposition(inspection.getReceiptItemId(), disposition, finalDecision);
+        } else {
+            production.recordInspectionOutcome(
+                    inspection.getProductionBatchId(), inspection.getInspectionType().name(), disposition);
+        }
     }
 
     @Transactional
     public InspectionDetail cancel(UUID id) {
         Inspection inspection = lock(id);
         inspection.cancel();
-        receipts.releaseInspection(inspection.getReceiptItemId());
+        if (inspection.getReceiptItemId() != null) {
+            receipts.releaseInspection(inspection.getReceiptItemId());
+        }
         inspections.saveAndFlush(inspection);
         audit.record("INSPECTION_CANCELLED", ENTITY, id);
         return toDetail(inspection);
@@ -235,7 +322,7 @@ public class InspectionService implements AttachmentPolicy {
         decide(id, "SUBMITTED", outcome.evaluation().name());
         audit.record("INSPECTION_SUBMITTED", ENTITY, id, null, Map.of("evaluation", outcome.evaluation()));
         if (outcome.criticalFailure()) {
-            receipts.recordDisposition(inspection.getReceiptItemId(), Disposition.HOLD.name(), false);
+            recordOutcome(inspection, Disposition.HOLD.name(), false);
             decide(id, "HOLD", "Automatic hold: a critical parameter failed.");
             audit.record("MATERIAL_HELD", ENTITY, id);
         }
@@ -260,7 +347,7 @@ public class InspectionService implements AttachmentPolicy {
         UUID inspector = inspection.getSubmittedBy();
         inspection.sendBack(TenantContext.getCurrentUserId());
         inspections.saveAndFlush(inspection);
-        receipts.recordDisposition(inspection.getReceiptItemId(), null, false);
+        recordOutcome(inspection, null, false);
         decide(id, "SENT_BACK", note);
         audit.record("INSPECTION_SENT_BACK", ENTITY, id, null, Map.of("note", note));
         inspectionAlerts.sentBack(inspection, inspector, note);
@@ -278,7 +365,7 @@ public class InspectionService implements AttachmentPolicy {
         Disposition previous = inspection.getDisposition();
         inspection.dispose(decision);
         inspections.saveAndFlush(inspection);
-        receipts.recordDisposition(inspection.getReceiptItemId(), decision.name(), decision.isFinal());
+        recordOutcome(inspection, decision.name(), decision.isFinal());
         decide(id, decision.name(), request.note());
         audit.record("MATERIAL_DISPOSITION_RECORDED", ENTITY, id,
                 previous == null ? null : Map.of("disposition", previous), Map.of("disposition", decision));
@@ -339,7 +426,6 @@ public class InspectionService implements AttachmentPolicy {
         String description = failed.isEmpty()
                 ? "Material disposed of as " + decision + "."
                 : "Failed parameters: " + String.join(", ", failed) + ". Disposition: " + decision + ".";
-        ReceivedBatch batch = receipts.batch(inspection.getReceiptItemId());
         ncrs.raiseFromInspection(new InspectionFailure(
                 inspection.getId(),
                 inspection.getInspectionNumber(),
@@ -348,7 +434,7 @@ public class InspectionService implements AttachmentPolicy {
                 inspection.getBatchNumber(),
                 failed.stream().anyMatch(code -> criticality.getOrDefault(code, false)),
                 description,
-                rejected ? batch.quantity() : null));
+                rejected ? inspection.getQuantity() : null));
     }
 
     private SpecSnapshot specificationOf(Inspection inspection) {
@@ -393,16 +479,30 @@ public class InspectionService implements AttachmentPolicy {
         }
     }
 
+    private record Subject(String supplierName, String code, String name) {
+    }
+
+    /** What was inspected, in the same words whether it arrived from a supplier or was made here. */
+    private Subject subjectOf(Inspection inspection) {
+        if (inspection.getReceiptItemId() != null) {
+            ReceivedBatch batch = receipts.batch(inspection.getReceiptItemId());
+            return new Subject(batch.supplierName(), batch.materialCode(), batch.materialName());
+        }
+        ProductionBatchView batch = production.batch(inspection.getProductionBatchId());
+        return new Subject(null, batch.productCode(), batch.productName());
+    }
+
     private InspectionDetail toDetail(Inspection inspection) {
-        ReceivedBatch batch = receipts.batch(inspection.getReceiptItemId());
+        Subject subject = subjectOf(inspection);
         return new InspectionDetail(
                 inspection.getId(),
                 inspection.getInspectionNumber(),
                 inspection.getInspectionType().name(),
                 inspection.getReceiptItemId(),
-                batch.supplierName(),
-                batch.materialCode(),
-                batch.materialName(),
+                inspection.getProductionBatchId(),
+                subject.supplierName(),
+                subject.code(),
+                subject.name(),
                 inspection.getBatchNumber(),
                 inspection.getQuantity(),
                 inspection.getSampleSize(),

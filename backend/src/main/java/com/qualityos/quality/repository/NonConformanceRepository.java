@@ -2,6 +2,8 @@ package com.qualityos.quality.repository;
 
 import com.qualityos.quality.entity.NonConformance;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -17,4 +19,12 @@ public interface NonConformanceRepository
     Optional<NonConformance> findForUpdate(UUID id);
 
     Optional<NonConformance> findByInspectionId(UUID inspectionId);
+
+    /** NCRs an inspection raised, and those raised by hand against the batch. */
+    @Query("""
+            select n from NonConformance n
+            where n.inspectionId in :inspectionIds or n.batchNumber in :batchNumbers
+            order by n.createdAt
+            """)
+    List<NonConformance> findForTrace(Collection<UUID> inspectionIds, Collection<String> batchNumbers);
 }

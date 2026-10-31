@@ -1,8 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { apiCaller, PASSWORD, signUp, unique } from "./helpers";
 import { acceptInvitation, inviteUser } from "./mail";
-
-const PASSWORD = "correct-horse-battery";
-const unique = () => `${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
 async function dialogAdd(page: Page, button: string, fill: (page: Page) => Promise<void>) {
   await page.getByRole("button", { name: button }).click();
@@ -11,33 +9,9 @@ async function dialogAdd(page: Page, button: string, fill: (page: Page) => Promi
   await expect(page.getByRole("dialog")).toBeHidden();
 }
 
-async function signUp(page: Page) {
-  await page.goto("/register");
-  await page.getByLabel("Organisation name").fill(`Acme ${unique()}`);
-  await page.getByLabel("Your name").fill("Asha Rao");
-  await page.getByLabel("Work email").fill(`owner-${unique()}@example.com`);
-  await page.getByLabel("Password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Create organisation" }).click();
-  await expect(page).toHaveURL(/onboarding/);
-  await page.getByLabel("GSTIN").fill("27ABCDE1234F1Z5");
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page).toHaveURL(/dashboard/);
-}
-
 /** Facility, material, approved supplier, issued order and received batch, through the API proxy. */
 async function receiveMaterial(page: Page) {
-  const call = (method: string, path: string, data: unknown = {}) =>
-    page.evaluate(
-      async ([method, path, data]) => {
-        const init =
-          method === "GET"
-            ? {}
-            : { method, headers: { "content-type": "application/json" }, body: JSON.stringify(data) };
-        const response = await fetch(`/api/v1${path}`, init);
-        return (await response.json()).data;
-      },
-      [method, path, data] as const,
-    );
+  const call = apiCaller(page);
   const units: { id: string; code: string }[] = await call("GET", "/units");
   const facility = await call("POST", "/facilities", { code: "PUNE", name: "Pune Plant" });
   const material = await call("POST", "/materials", {

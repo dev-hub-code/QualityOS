@@ -202,4 +202,13 @@ public final class QualityDtos {
             List<VerificationResponse> verifications,
             List<StatusChange> history) {
     }
+
+    /** An NCR as a trace shows it. */
+    public record NcrHistory(
+            UUID id, String ncrNumber, String title, String status, String severity, String batchNumber, Instant createdAt) {
+    }
+
+    /** A CAPA as a trace shows it. */
+    public record CapaHistory(UUID id, String capaNumber, String title, String status, UUID ncrId, Instant createdAt) {
+    }
 }

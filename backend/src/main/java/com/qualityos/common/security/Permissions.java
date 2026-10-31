@@ -23,6 +23,8 @@ public final class Permissions {
     public static final String CAPA_VIEW = "CAPA_VIEW";
     public static final String CAPA_MANAGE = "CAPA_MANAGE";
     public static final String CAPA_APPROVE = "CAPA_APPROVE";
+    public static final String TRACEABILITY_VIEW = "TRACEABILITY_VIEW";
+    public static final String TRACEABILITY_MANAGE = "TRACEABILITY_MANAGE";
     public static final String INSPECTION_EXECUTE = "INSPECTION_EXECUTE";
 
     private Permissions() {
@@ -57,6 +59,8 @@ public final class Permissions {
         public static final String CAPA_VIEW = "hasAuthority('CAPA_VIEW')";
         public static final String CAPA_MANAGE = "hasAuthority('CAPA_MANAGE')";
         public static final String CAPA_APPROVE = "hasAuthority('CAPA_APPROVE')";
+        public static final String TRACEABILITY_VIEW = "hasAuthority('TRACEABILITY_VIEW')";
+        public static final String TRACEABILITY_MANAGE = "hasAuthority('TRACEABILITY_MANAGE')";
 
         private Require() {
         }

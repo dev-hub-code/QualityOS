@@ -11,8 +11,8 @@ account emails a real customer needs.
 | 4 Inspection engine | Template builder and versioning, evaluation engine, sampling, execution, approval, disposition, report | **IQC usable end to end on a phone** | **Done** |
 | 5 Notifications and account email | In-app and email notifications, invitations, email verification, password reset, IP rate limiting, scheduled jobs | Inspection events notify the right people, and a user can join and recover an account by email | **Done** |
 | 6 NCR and CAPA | Lifecycles, containment, root cause, verification, closure | Failed inspection flows through to closed CAPA | **Done** |
-| 7 Traceability | Batch graph, forward and backward trace, timeline, search | Raw material to dispatch traced | Next |
-| 8 Calibration and audit | Instruments, QR, calibration records, audits, findings | Overdue instruments notify and audit findings raise NCRs | |
+| 7 Traceability | Batch graph, forward and backward trace, timeline, search | Raw material to dispatch traced | **Done** |
+| 8 Calibration and audit | Instruments, QR, calibration records, audits, findings | Overdue instruments notify and audit findings raise NCRs | Next |
 | 9 Analytics | Dashboard, scorecards, Pareto, PDF and Excel exports | Reports honour tenant and facility scope | |
 | 10 Subscription | Plans, trials, limits, invoices | Limits enforced, prices editable by admin | |
 | 11 Production | Terraform, ECS, RDS, S3, Secrets Manager, CI/CD, monitoring, backups | Deployed and restore-tested | Deferred |
@@ -46,7 +46,12 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | NCRs are not yet linked to supplier scorecards | Phase 9 |
 | The inspection report is a printable page, not a generated PDF | Phase 9, with PDF exports |
 | A template can only be chosen by hand; none is picked automatically for a material | When a user needs it |
-| Inspections start from received material only. IPQC and FQC need production batches | Phase 7, with traceability |
+| Production batches take IPQC and FQC inspections only. OQC and the other template types have no production flow | When a user needs it |
+| A template cannot yet be limited to a product in the UI, and quantities consumed are not converted between units | When a user needs it |
+| A wrong dispatch or consumption cannot be corrected, because genealogy and dispatch are append-only. A correcting entry needs its own design | Before customer launch |
+| Naming serial numbers on a dispatch is optional, so a batch can ship without saying which units went. A trace then shows the customer by batch, not by unit | Review after real use |
+| The dispatch screen ships one batch per dispatch, though the API takes several. Dispatch dates are not checked against today | When a user needs it |
+| A trace finds who received a batch, but there is no recall workflow | When a user needs it |
 | `tenant_settings` and supplier scorecards are not built | Phase 9 |
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | Lists show only active records, with no way to restore an archived one | When a user needs it |

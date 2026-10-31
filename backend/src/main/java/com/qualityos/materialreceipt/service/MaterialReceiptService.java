@@ -16,6 +16,7 @@ import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceiptItemRequest;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceiptItemResponse;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceiptSummary;
 import com.qualityos.materialreceipt.entity.MaterialReceipt;
+import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.LotView;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceivedBatch;
 import com.qualityos.materialreceipt.entity.MaterialReceiptItem;
 import com.qualityos.materialreceipt.entity.MaterialReceiptItem.InspectionStatus;
@@ -27,12 +28,17 @@ import com.qualityos.purchaseorder.service.PurchaseOrderService;
 import com.qualityos.supplier.dto.SupplierDtos.SupplierReference;
 import com.qualityos.supplier.service.SupplierService;
 import java.math.BigDecimal;
+import java.util.Collection;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -124,6 +130,11 @@ public class MaterialReceiptService implements AttachmentPolicy {
     @Transactional
     public ReceiptDetail voidReceipt(UUID id, String reason) {
         MaterialReceipt receipt = load(id);
+        boolean used = receipt.getItems().stream()
+                .anyMatch(item -> item.getConsumedQuantity().signum() > 0);
+        if (used) {
+            throw new BusinessRuleException("This receipt cannot be voided: its material has gone into production.");
+        }
         receipt.voidReceipt(reason);
         purchaseOrders.reverseReceipt(receipt.getPurchaseOrderId(), receipt.getItems().stream().collect(Collectors.toMap(
                 MaterialReceiptItem::getPurchaseOrderItemId, MaterialReceiptItem::getQuantity, BigDecimal::add)));
@@ -155,6 +166,71 @@ public class MaterialReceiptService implements AttachmentPolicy {
 
     /** Claims a batch for inspection. The item's version stops this racing with a void. */
     @Transactional(propagation = Propagation.MANDATORY)
+    public LotView consume(UUID itemId, BigDecimal quantity) {
+        MaterialReceiptItem item = items.findForUpdate(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Batch", itemId));
+        if (item.getReceipt().getStatus() == MaterialReceipt.Status.VOIDED) {
+            throw new BusinessRuleException("This receipt was voided.");
+        }
+        item.consume(quantity);
+        items.flush();
+        return lots(List.of(item)).getFirst();
+    }
+
+    @Transactional(readOnly = true)
+    public List<LotView> releasedLots(UUID materialId) {
+        return lots(items.findLots(materialId).stream()
+                .filter(item -> item.isReleased() && item.remainingQuantity().signum() > 0)
+                .toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<LotView> lots(Collection<UUID> ids) {
+        return lots(items.findByIdIn(ids));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<LotView> lotByNumber(String internalBatch) {
+        return items.findByInternalBatch(internalBatch).map(item -> lots(List.of(item)).getFirst());
+    }
+
+    /** @param term a supplier batch, internal batch, receipt number, or material code or name */
+    @Transactional(readOnly = true)
+    public List<LotView> searchLots(String term, int limit) {
+        String pattern = "%" + term.trim().toLowerCase(Locale.ROOT).replace("\\", "\\\\")
+                .replace("%", "\\%").replace("_", "\\_") + "%";
+        List<UUID> matching = materials.idsMatching(term);
+        return lots(items.search(pattern, matching.isEmpty() ? List.of(new UUID(0, 0)) : matching,
+                PageRequest.of(0, limit)));
+    }
+
+    private List<LotView> lots(List<MaterialReceiptItem> found) {
+        Map<UUID, SupplierReference> supplierNames = suppliers.references(
+                found.stream().map(item -> item.getReceipt().getSupplierId()).collect(Collectors.toSet()));
+        Map<UUID, MaterialReference> referenced = materials.references(
+                found.stream().map(MaterialReceiptItem::getMaterialId).collect(Collectors.toSet()));
+        return found.stream().map(item -> {
+            MaterialReceipt receipt = item.getReceipt();
+            MaterialReference material = referenced.get(item.getMaterialId());
+            return new LotView(
+                    item.getId(),
+                    receipt.getGrnNumber(),
+                    receipt.getReceivedOn(),
+                    receipt.getPurchaseOrderId(),
+                    supplierNames.get(receipt.getSupplierId()).name(),
+                    material.id(),
+                    material.code(),
+                    material.name(),
+                    item.getSupplierBatch(),
+                    item.getInternalBatch(),
+                    item.getQuantity(),
+                    item.remainingQuantity(),
+                    item.getInspectionStatus().name(),
+                    item.getDisposition(),
+                    item.isReleased());
+        }).toList();
+    }
+
     public void startInspection(UUID itemId) {
         MaterialReceiptItem item = loadItem(itemId);
         if (item.getInspectionStatus() != InspectionStatus.PENDING) {

@@ -4,6 +4,7 @@ import com.qualityos.quality.entity.CorrectiveAction;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,6 +21,8 @@ public interface CorrectiveActionRepository
     Optional<CorrectiveAction> findForUpdate(UUID id);
 
     List<CorrectiveAction> findByNcrIdOrderByCapaNumber(UUID ncrId);
+
+    List<CorrectiveAction> findByNcrIdInOrderByCreatedAt(Collection<UUID> ncrIds);
 
     /** Skips anyone reminded since {@code remindedBefore}, so that a CAPA does not nag on every run. */
     @Query("""

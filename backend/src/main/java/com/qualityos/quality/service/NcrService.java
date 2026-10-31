@@ -13,6 +13,8 @@ import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.material.service.MaterialService;
 import com.qualityos.quality.dto.QualityDtos.Assignee;
+import com.qualityos.quality.dto.QualityDtos.CapaHistory;
+import com.qualityos.quality.dto.QualityDtos.NcrHistory;
 import com.qualityos.quality.dto.QualityDtos.CreateNcrRequest;
 import com.qualityos.quality.dto.QualityDtos.DefectCategoryResponse;
 import com.qualityos.quality.dto.QualityDtos.InspectionFailure;
@@ -32,6 +34,7 @@ import com.qualityos.quality.repository.NcrStatusChangeRepository;
 import com.qualityos.quality.repository.NonConformanceRepository;
 import com.qualityos.supplier.service.SupplierService;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -256,6 +259,27 @@ public class NcrService implements AttachmentPolicy {
     @Transactional
     public NcrDetail cancel(UUID id, String reason) {
         return transition(id, reason, ncr -> ncr.cancel(reason));
+    }
+
+    @Transactional(readOnly = true)
+    public List<NcrHistory> history(Collection<UUID> inspectionIds, Collection<String> batchNumbers) {
+        Collection<UUID> inspections = inspectionIds.isEmpty() ? List.of(new UUID(0, 0)) : inspectionIds;
+        Collection<String> batches = batchNumbers.isEmpty() ? List.of("") : batchNumbers;
+        return ncrs.findForTrace(inspections, batches).stream()
+                .map(ncr -> new NcrHistory(ncr.getId(), ncr.getNcrNumber(), ncr.getTitle(), ncr.getStatus().name(),
+                        ncr.getSeverity().name(), ncr.getBatchNumber(), ncr.getCreatedAt()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CapaHistory> capaHistory(Collection<UUID> ncrIds) {
+        if (ncrIds.isEmpty()) {
+            return List.of();
+        }
+        return capas.findByNcrIdInOrderByCreatedAt(ncrIds).stream()
+                .map(capa -> new CapaHistory(capa.getId(), capa.getCapaNumber(), capa.getTitle(),
+                        capa.getStatus().name(), capa.getNcrId(), capa.getCreatedAt()))
+                .toList();
     }
 
     @Override

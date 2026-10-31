@@ -65,8 +65,13 @@ email verification tokens, stored hashed like refresh tokens.
 - `tenants_with_overdue_capas()` returns tenant ids only, on the same pattern as `tenants_with_pending_email()`.
 
 ### Phase 7: traceability
-`batches`, `batch_relationships` (parent, child, quantity: a directed graph walked with recursive CTEs),
-`production_batches`, `finished_products`, `dispatch_records`, **`customers`** (dispatch needs a recipient).
+`production_batches`, `batch_relationships` (parent lot or batch, child batch and quantity: a directed graph walked
+with recursive CTEs), `finished_products`, `dispatch_records`, **`dispatch_items`**, **`customers`** (V7). Received lots
+stay in `material_receipt_items`, which gains `consumed_quantity`, so no separate `batches` table exists.
+
+- `batch_relationships`, `dispatch_records` and `dispatch_items` cannot be changed, enforced by triggers.
+- Check constraints stop a lot or batch giving out more than it holds, and stop anything leaving an unreleased batch.
+- `inspections` gains `production_batch_id`. Each inspection has exactly one subject, and a batch has one open inspection.
 
 ### Phase 8: calibration and audit
 `instruments`, `calibration_records`, `audits`, `audit_checklists`, `audit_findings`,

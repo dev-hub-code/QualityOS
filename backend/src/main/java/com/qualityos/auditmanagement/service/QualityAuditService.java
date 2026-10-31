@@ -329,7 +329,8 @@ public class QualityAuditService implements AttachmentPolicy {
                 row.getSupplierId(),
                 finding.getGrade() == AuditFinding.Grade.MAJOR_NONCONFORMITY,
                 finding.getStatement(),
-                finding.getStatement() + "\n\nEvidence: " + finding.getEvidence()));
+                finding.getStatement() + "\n\nEvidence: " + finding.getEvidence(),
+                row.getFacilityId()));
         finding.setNcrId(ncr);
     }
 

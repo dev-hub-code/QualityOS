@@ -9,6 +9,7 @@ import {
   RecordLink,
   StatusBadge,
   useApprovedSuppliers,
+  useFacilities,
   useDefectCategories,
   useMaterials,
   useRefresh,
@@ -40,6 +41,7 @@ export default function NcrsPage() {
   const suppliers = useApprovedSuppliers();
   const materials = useMaterials();
   const categories = useDefectCategories();
+  const facilities = useFacilities();
   const [adding, setAdding] = useState(false);
   const fields: FieldDef[] = [
     { name: "title", label: "Title", required: true },
@@ -55,6 +57,7 @@ export default function NcrsPage() {
         { value: "MINOR", label: "Minor" },
       ],
     },
+    { name: "facilityId", label: "Facility", type: "select", options: facilities },
     { name: "defectCategoryId", label: "Defect category", type: "select", options: categories },
     { name: "supplierId", label: "Supplier", type: "select", options: suppliers },
     { name: "materialId", label: "Material", type: "select", options: materials },

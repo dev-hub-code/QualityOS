@@ -45,6 +45,7 @@ layers, so that one mistake does not expose data.
 | Platform admins (Phase 10) | Separate `/api/v1/platform/**` endpoints, using a distinct role with an explicit policy, and every access audited. No silent impersonation |
 | Attachments | Stored under an opaque key. Downloads load the parent record first (so tenant and permission checks apply), then issue a short-lived presigned URL |
 | Reports and exports | Same services and RLS as the API, plus facility scoping |
+| Facility limits | `FacilityScope`, in the services: lists, reads, writes, attachments and alerts. A refused record answers 404. This narrows access inside an organisation, on top of the tenant layers. It is not enforced by RLS |
 | Logs and audit | `audit_logs` has RLS and the app role has only `INSERT` and `SELECT` on it |
 | Connection pooling | `app.tenant_id` is only set with local scope. If PgBouncer is added, it must run in transaction mode |
 

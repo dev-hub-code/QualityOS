@@ -6,6 +6,7 @@ import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.response.PageResponse;
+import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.organization.service.OrganizationService;
 import com.qualityos.traceability.dto.TraceabilityDtos.CreateReversalRequest;
@@ -74,6 +75,7 @@ public class DispatchReturnService {
     private final TenantAccessService access;
     private final DocumentNumberService numbers;
     private final AuditService audit;
+    private final FacilityScope scope;
 
     DispatchReturnService(
             DispatchReversalRepository reversals,
@@ -89,7 +91,9 @@ public class DispatchReturnService {
             OrganizationService organizations,
             TenantAccessService access,
             DocumentNumberService numbers,
-            AuditService audit) {
+            AuditService audit,
+            FacilityScope scope) {
+        this.scope = scope;
         this.reversals = reversals;
         this.reversalItems = reversalItems;
         this.dispatches = dispatches;
@@ -108,7 +112,9 @@ public class DispatchReturnService {
 
     @Transactional(readOnly = true)
     public PageResponse<ReversalView> list(Pageable pageable) {
-        Page<DispatchReversal> page = reversals.findAll(pageable);
+        Page<DispatchReversal> page = scope.restriction()
+                .map(allowed -> reversals.findWithin(allowed, pageable))
+                .orElseGet(() -> reversals.findAll(pageable));
         Map<UUID, ReversalView> views = views(page.getContent()).stream()
                 .collect(Collectors.toMap(ReversalView::id, Function.identity()));
         return PageResponse.from(page, reversal -> views.get(reversal.getId()));
@@ -135,6 +141,7 @@ public class DispatchReturnService {
     public ReversalView create(UUID dispatchId, CreateReversalRequest request) {
         DispatchRecord dispatch = dispatches.findForUpdate(dispatchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Dispatch", dispatchId));
+        scope.require(dispatchItems.facilitiesOf(dispatchId), "Dispatch", dispatchId.toString());
         if (corrections.existsByDispatchId(dispatchId)) {
             throw new BusinessRuleException("This dispatch was reversed as a mistake, so nothing can come back.");
         }
@@ -372,11 +379,17 @@ public class DispatchReturnService {
     }
 
     private DispatchRecord requireDispatch(UUID id) {
-        return dispatches.findById(id).orElseThrow(() -> new ResourceNotFoundException("Dispatch", id));
+        DispatchRecord dispatch =
+                dispatches.findById(id).orElseThrow(() -> new ResourceNotFoundException("Dispatch", id));
+        scope.require(dispatchItems.facilitiesOf(id), "Dispatch", id.toString());
+        return dispatch;
     }
 
     private DispatchReversal load(UUID id) {
-        return reversals.findById(id).orElseThrow(() -> new ResourceNotFoundException("Dispatch reversal", id));
+        DispatchReversal reversal = reversals.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Dispatch reversal", id));
+        scope.require(dispatchItems.facilitiesOf(reversal.getDispatchId()), "Dispatch reversal", id.toString());
+        return reversal;
     }
 
     private DispatchReversalItem lockItem(UUID id) {

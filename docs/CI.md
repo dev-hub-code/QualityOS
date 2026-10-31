@@ -1,5 +1,7 @@
 # Continuous integration
 
+> **Status:** this workflow has not run yet. GitHub answers "Actions has been disabled for this user", so every result so far comes from local runs. Require these checks only after a real run has passed.
+
 `.github/workflows/ci.yml` runs on pull requests into `dev` and `main`, on pushes to them, and on demand.
 
 | Job | Checks |

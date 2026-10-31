@@ -60,6 +60,9 @@ public class CorrectiveAction extends TenantOwnedEntity {
     private Instant closedAt;
     private UUID closedBy;
 
+    @Setter
+    private UUID facilityId;
+
     public CorrectiveAction(String capaNumber, UUID ncrId, String title, String problemStatement, UUID ownerId,
             LocalDate targetDate, boolean effectivenessRequired) {
         this.capaNumber = capaNumber;

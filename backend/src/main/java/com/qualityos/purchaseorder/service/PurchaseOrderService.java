@@ -6,6 +6,7 @@ import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
+import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.material.dto.MaterialDtos.MaterialReference;
 import com.qualityos.material.service.MaterialService;
 import com.qualityos.organization.service.FacilityService;
@@ -43,6 +44,8 @@ public class PurchaseOrderService {
 
     private static final String NUMBER_PREFIX = "PO";
 
+    private static final String ENTITY = "PurchaseOrder";
+
     private final PurchaseOrderRepository orders;
     private final SupplierService suppliers;
     private final FacilityService facilities;
@@ -50,6 +53,7 @@ public class PurchaseOrderService {
     private final DocumentNumberService numbers;
     private final AuditService audit;
     private final EntityManager entityManager;
+    private final FacilityScope scope;
 
     PurchaseOrderService(
             PurchaseOrderRepository orders,
@@ -58,7 +62,9 @@ public class PurchaseOrderService {
             MaterialService materials,
             DocumentNumberService numbers,
             AuditService audit,
-            EntityManager entityManager) {
+            EntityManager entityManager,
+            FacilityScope scope) {
+        this.scope = scope;
         this.orders = orders;
         this.suppliers = suppliers;
         this.facilities = facilities;
@@ -74,7 +80,7 @@ public class PurchaseOrderService {
         Specification<PurchaseOrder> filter = Specification.<PurchaseOrder>where(Searches.contains(search, "poNumber"))
                 .and(Searches.equalTo("status", status))
                 .and(Searches.equalTo("supplierId", supplierId));
-        Page<PurchaseOrder> page = orders.findAll(filter, pageable);
+        Page<PurchaseOrder> page = orders.findAll(scope.limit(filter, "facilityId"), pageable);
         Map<UUID, SupplierReference> supplierNames =
                 suppliers.references(page.map(PurchaseOrder::getSupplierId).toSet());
         return PageResponse.from(page, order -> new PurchaseOrderSummary(
@@ -158,6 +164,7 @@ public class PurchaseOrderService {
     @Transactional(propagation = Propagation.MANDATORY)
     public ReceiptTarget recordReceipt(UUID id, Map<UUID, BigDecimal> quantities) {
         PurchaseOrder order = orders.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Purchase order", id));
+        scope.requireAllowed(order.getFacilityId(), ENTITY, id.toString());
         suppliers.requireApproved(order.getSupplierId());
         Map<UUID, PurchaseOrderItem> items = itemsOf(order);
         quantities.forEach((itemId, quantity) -> {
@@ -179,6 +186,7 @@ public class PurchaseOrderService {
     @Transactional(propagation = Propagation.MANDATORY)
     public void reverseReceipt(UUID id, Map<UUID, BigDecimal> quantities) {
         PurchaseOrder order = orders.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Purchase order", id));
+        scope.requireAllowed(order.getFacilityId(), ENTITY, id.toString());
         Map<UUID, PurchaseOrderItem> items = itemsOf(order);
         quantities.forEach((itemId, quantity) -> order.reverseReceipt(items.get(itemId), quantity));
     }
@@ -188,12 +196,15 @@ public class PurchaseOrderService {
     }
 
     private PurchaseOrder loadWithItems(UUID id) {
-        return orders.findWithItems(id).orElseThrow(() -> new ResourceNotFoundException("Purchase order", id));
+        PurchaseOrder order = orders.findWithItems(id).orElseThrow(() -> new ResourceNotFoundException("Purchase order", id));
+        scope.requireAllowed(order.getFacilityId(), ENTITY, id.toString());
+        return order;
     }
 
     private void apply(PurchaseOrder order, SavePurchaseOrderRequest request) {
         suppliers.reference(request.supplierId());
         facilities.requireActive(request.facilityId());
+        scope.requireAllowed(request.facilityId(), ENTITY, request.facilityId().toString());
         if (request.expectedDate() != null && request.expectedDate().isBefore(request.orderDate())) {
             throw new BusinessRuleException("The delivery date cannot be before the order date.");
         }

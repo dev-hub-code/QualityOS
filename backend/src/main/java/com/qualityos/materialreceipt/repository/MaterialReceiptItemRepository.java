@@ -20,6 +20,10 @@ public interface MaterialReceiptItemRepository extends JpaRepository<MaterialRec
     Page<MaterialReceiptItem> findByInspectionStatus(InspectionStatus status, Pageable pageable);
 
     @EntityGraph(attributePaths = "receipt")
+    Page<MaterialReceiptItem> findByInspectionStatusAndReceiptFacilityIdIn(
+            InspectionStatus status, Collection<UUID> facilities, Pageable pageable);
+
+    @EntityGraph(attributePaths = "receipt")
     @Query("select i from MaterialReceiptItem i where i.id = :id")
     Optional<MaterialReceiptItem> findWithReceipt(UUID id);
 

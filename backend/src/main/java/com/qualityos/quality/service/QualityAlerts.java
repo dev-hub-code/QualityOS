@@ -3,6 +3,7 @@ package com.qualityos.quality.service;
 import com.qualityos.common.mail.EmailContent;
 import com.qualityos.common.mail.EmailTemplate;
 import com.qualityos.common.security.Permissions;
+import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.notification.service.NotificationService;
 import com.qualityos.notification.service.NotificationType;
@@ -21,8 +22,10 @@ class QualityAlerts {
 
     private final NotificationService notifications;
     private final TenantAccessService access;
+    private final FacilityScope scope;
 
-    QualityAlerts(NotificationService notifications, TenantAccessService access) {
+    QualityAlerts(NotificationService notifications, TenantAccessService access, FacilityScope scope) {
+        this.scope = scope;
         this.notifications = notifications;
         this.access = access;
     }
@@ -92,10 +95,10 @@ class QualityAlerts {
     }
 
     private void ncr(Set<UUID> to, NotificationType type, NonConformance ncr, String title, String body, EmailContent email) {
-        notifications.notify(to, type, title, body, "/ncrs/" + ncr.getId(), email);
+        notifications.notify(scope.allowedIn(ncr.getFacilityId(), to), type, title, body, "/ncrs/" + ncr.getId(), email);
     }
 
     private void capa(Set<UUID> to, NotificationType type, CorrectiveAction capa, String title, String body, EmailContent email) {
-        notifications.notify(to, type, title, body, "/capas/" + capa.getId(), email);
+        notifications.notify(scope.allowedIn(capa.getFacilityId(), to), type, title, body, "/capas/" + capa.getId(), email);
     }
 }

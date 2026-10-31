@@ -113,6 +113,7 @@ class SubscriptionIT extends AbstractIntegrationTest {
         assertThat(((Number) starter.get("monthlyPrice")).intValue()).isEqualTo(2999);
         Map<String, Object> edit = new HashMap<>(starter);
         edit.put("monthlyPrice", 3499);
+        edit.put("reason", "Price review");
         as(admin, put(PLATFORM + "/plans/" + starter.get("id")).contentType("application/json")
                         .content(json.writeValueAsString(edit)))
                 .andExpect(status().isOk());
@@ -359,11 +360,11 @@ class SubscriptionIT extends AbstractIntegrationTest {
     @Test
     void theConsoleListsOrganisationsWithoutMixingThem() throws Exception {
         request("GROWTH", "MONTHLY");
-        String list = body(as(admin, get(PLATFORM + "/organisations")).andExpect(status().isOk()));
-        List<List<?>> open = JsonPath.read(list, "$.data.items[?(@.tenantId == '" + owner.tenantId() + "')].openInvoices");
-        assertThat(open.getFirst()).hasSize(1);
-        List<List<?>> mine = JsonPath.read(list, "$.data.items[?(@.tenantId == '" + admin.tenantId() + "')].openInvoices");
-        assertThat(mine.getFirst()).isEmpty();
+        as(admin, get(PLATFORM + "/organisations").param("q", owner.email()))
+                .andExpect(jsonPath("$.data.items[0].tenantId").value(owner.tenantId().toString()))
+                .andExpect(jsonPath("$.data.items[0].openInvoices.length()").value(1));
+        as(admin, get(PLATFORM + "/organisations").param("q", admin.email()))
+                .andExpect(jsonPath("$.data.items[0].openInvoices.length()").value(0));
     }
 
     @Test
@@ -372,7 +373,10 @@ class SubscriptionIT extends AbstractIntegrationTest {
         asDatabaseSuperuser().update(
                 "UPDATE subscriptions SET current_period_ends_at = now() + INTERVAL '10 years' WHERE tenant_id = ?",
                 owner.tenantId());
-        List<String> listed = JsonPath.read(body(as(admin, get(PLATFORM + "/organisations"))), "$.data.items[*].tenantId");
+        String shared = java.util.UUID.randomUUID().toString();
+        asDatabaseSuperuser().update("UPDATE tenants SET name = ? WHERE id IN (?, ?)", shared, owner.tenantId(), admin.tenantId());
+        List<String> listed = JsonPath.read(
+                body(as(admin, get(PLATFORM + "/organisations").param("q", shared))), "$.data.items[*].tenantId");
         assertThat(listed.indexOf(owner.tenantId().toString())).isLessThan(listed.indexOf(admin.tenantId().toString()));
     }
 

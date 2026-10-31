@@ -52,18 +52,66 @@ test("a platform admin changes a price without a release", async ({ page }) => {
   await page.goto("/platform/plans");
   await page.getByRole("button", { name: "Edit Starter" }).click();
   await page.getByLabel("Monthly price (blank for custom)").fill("3111");
+  await page.getByLabel("Reason").fill("Price review");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByText("₹3,111.00")).toBeVisible();
+  await expect(page.getByRole("cell", { name: "₹3,111.00" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Edit Starter" }).click();
   await page.getByLabel("Monthly price (blank for custom)").fill("2999");
+  await page.getByLabel("Reason").fill("Back to the list price");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByText("₹2,999.00")).toBeVisible();
+  await expect(page.getByRole("cell", { name: "₹2,999.00" }).first()).toBeVisible();
 });
 
 test("the platform console is closed to everyone else", async ({ page }) => {
   await signUp(page);
-  await expect(page.getByRole("link", { name: "Plans" })).toHaveCount(0);
-  expect((await page.request.get("/api/v1/platform/plans")).status()).toBe(403);
+  await expect(page.getByRole("link", { name: "Control Center" })).toHaveCount(0);
+  for (const path of ["plans", "dashboard", "organisations", "organisations/export"]) {
+    expect((await page.request.get(`/api/v1/platform/${path}`)).status()).toBe(403);
+  }
+  await page.goto("/platform/dashboard");
+  await expect(page.getByText("You do not have access to the Control Center.")).toBeVisible();
+});
+
+test("a platform admin runs a plan and finds a customer from the Control Center", async ({ page, browser }) => {
+  test.setTimeout(60_000);
+  const email = `admin-${unique()}@example.com`;
+  await signUp(page, email);
+  makePlatformAdmin(email);
+  const context = await browser.newContext();
+  const customerPage = await context.newPage();
+  const customer = `customer-${unique()}@example.com`;
+  await signUp(customerPage, customer);
+  await context.close();
+
+  await page.goto("/dashboard");
+  await page.getByRole("link", { name: "Control Center" }).click();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  await expect(page.getByText("MRR", { exact: true })).toBeVisible();
+  await expect(page.getByText("Subscriptions by plan")).toBeVisible();
+  await page.getByLabel("Period").selectOption("LAST_7");
+  await expect(page.getByRole("navigation", { name: "Control Center" })).toBeVisible();
+
+  const code = `E2E_${unique().replaceAll("-", "_").toUpperCase()}`.slice(0, 28);
+  await page.getByRole("link", { name: "Plans" }).click();
+  await page.getByRole("button", { name: "New plan" }).click();
+  await page.getByLabel("Code, such as GROWTH_PLUS").fill(code);
+  await page.getByLabel("Name").fill(code);
+  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: `Activate ${code}` }).click();
+  await page.getByLabel("Reason").fill("Launch");
+  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: `Archive ${code}` }).click();
+  await page.getByLabel("Reason").fill("Launched by mistake");
+  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("link", { name: code }).click();
+  await expect(page.getByText("Launched by mistake")).toBeVisible();
+
+  await page.getByRole("link", { name: "Organisations" }).click();
+  await page.getByLabel("Search name, email or GSTIN").fill(customer);
+  await expect(page.getByRole("status")).toHaveText("1 organisation, page 1");
+  await page.getByRole("row").nth(1).getByRole("link").click();
+  await expect(page.getByText(customer)).toBeVisible();
+  await expect(page.getByText("Figures only.")).toBeVisible();
 });
 
 test("billing fits a phone", async ({ page }) => {

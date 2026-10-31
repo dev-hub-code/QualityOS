@@ -4,6 +4,8 @@ import com.qualityos.common.persistence.AuditedEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -38,6 +40,22 @@ public class SubscriptionPlan extends AuditedEntity {
     private int graceDays;
     private int displayOrder;
     private boolean active;
+    private String currency;
+    private boolean publicVisible;
+    private Instant archivedAt;
+
+    /** A new plan, or a copy of another, starts out of sale until someone chooses to offer it. */
+    public SubscriptionPlan(String code, String name) {
+        this.code = code;
+        this.name = name;
+        this.description = "";
+        this.taxPercent = new BigDecimal("18");
+        this.features = new ArrayList<>();
+        this.trialDays = 14;
+        this.graceDays = 7;
+        this.currency = "INR";
+        this.publicVisible = false;
+    }
 
     public BigDecimal priceFor(Subscription.Cycle cycle) {
         return cycle == Subscription.Cycle.ANNUAL ? annualPrice : monthlyPrice;

@@ -123,6 +123,7 @@ public class SubscriptionService {
     @Transactional(readOnly = true)
     public List<PublicPlan> publicPlans() {
         return plans.findByActiveTrueOrderByDisplayOrder().stream()
+                .filter(SubscriptionPlan::isPublicVisible)
                 .map(plan -> new PublicPlan(plan.getCode(), plan.getName(), plan.getDescription(),
                         plan.getMonthlyPrice(), plan.getAnnualPrice(), plan.getMaxUsers(), plan.getMaxFacilities(),
                         plan.getFeatures(), plan.getTrialDays()))
@@ -133,7 +134,8 @@ public class SubscriptionService {
         return new PlanResponse(plan.getId(), plan.getCode(), plan.getName(), plan.getDescription(),
                 plan.getMonthlyPrice(), plan.getAnnualPrice(), plan.getTaxPercent(), plan.getMaxUsers(),
                 plan.getMaxFacilities(), plan.getFeatures(), plan.getTrialDays(), plan.getGraceDays(), plan.isActive(),
-                plan.getVersion());
+                plan.getVersion(), plan.getCurrency(), plan.isPublicVisible(), plan.getArchivedAt(),
+                plan.getDisplayOrder());
     }
 
     /** Also how a subscription is renewed: choose the same plan. */

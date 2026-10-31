@@ -202,8 +202,16 @@ choice of organisation, and the work runs under that organisation's tenant conte
 
 | Method | Path | Result |
 |---|---|---|
-| GET, PUT | `/api/v1/platform/plans`, `/plans/{id}` | Prices, limits, features, trial and grace days |
-| GET | `/api/v1/platform/organisations` | Each organisation's subscription and open invoices, up to 500, unpaid first, with the `total` |
+| GET, PUT | `/api/v1/platform/plans`, `/plans/{id}` | Prices, limits, features, trial and grace days. A plan with subscribers needs `reason` |
+| POST | `/api/v1/platform/plans` | New plan from `code` and `name`, out of sale |
+| POST | `/api/v1/platform/plans/{id}/duplicate` | Copy of a plan's terms, out of sale |
+| POST | `/api/v1/platform/plans/{id}/active` | Offers or withdraws a plan. Needs `version` and `reason` |
+| POST | `/api/v1/platform/plans/{id}/archive` | Needs `version` and `reason`. Refused while anyone is on the plan |
+| GET | `/api/v1/platform/plans/{id}/impact`, `/versions` | Subscriber count, and the plan's saved history |
+| GET | `/api/v1/platform/dashboard` | `from`, `to`. Figures are defined in [PLATFORM_ADMIN.md](PLATFORM_ADMIN.md) |
+| GET | `/api/v1/platform/organisations` | `q` (name, email, GSTIN), `plan`, `state`, `unpaid`, `registeredFrom`, `registeredTo`, `sort` (`NAME`, `NEWEST`, `ENDING`), `page`, `size` up to 100. Unpaid first by default |
+| GET | `/api/v1/platform/organisations/export` | The same filters as CSV, up to 5,000 rows. Leaves an audit event |
+| GET | `/api/v1/platform/organisations/{id}` | Profile, subscription, usage counts, invoices, payments, recent event names |
 | POST | `/api/v1/platform/organisations/{id}/invoices` | Invoice at an agreed amount, for Enterprise |
 | POST | `/api/v1/platform/organisations/{id}/invoices/{invoiceId}/payments` | Records a payment. A repeated reference changes nothing |
 | POST | `/api/v1/platform/organisations/{id}/extend` | Adds days |

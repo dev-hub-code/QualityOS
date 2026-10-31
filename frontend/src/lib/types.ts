@@ -48,6 +48,7 @@ export interface Member {
   fullName: string;
   status: "ACTIVE" | "INACTIVE";
   roles: { id: string; code: string; name: string }[];
+  facilityIds: string[];
 }
 
 export interface Attachment {
@@ -506,6 +507,10 @@ export interface Customer {
   code: string;
   name: string;
   gstin: string | null;
+  contactPerson: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
 }
 
 export interface ReleasedLot {
@@ -563,6 +568,7 @@ export interface Dispatch {
 
 export interface SearchHit {
   batchNumber: string;
+  serialNumber: string | null;
   kind: string;
   description: string;
   matchedOn: string;
@@ -650,6 +656,7 @@ export interface DispatchReturn {
 export interface RecallLine {
   dispatchId: string;
   dispatchNumber: string;
+  customerId: string;
   customerName: string;
   dispatchedOn: string;
   shippedOn: string | null;
@@ -658,9 +665,36 @@ export interface RecallLine {
   outstandingQuantity: string;
 }
 
+export interface SerialSearchResult {
+  serialNumber: string;
+  productCode: string;
+  productName: string;
+  batchNumber: string;
+  facilityName: string;
+  manufacturedAt: string | null;
+  inspectionStatus: string | null;
+  qualityStatus: string;
+  dispatchStatus: string;
+  customerName: string | null;
+  dispatchNumber: string | null;
+  dispatchedOn: string | null;
+}
+
 export interface SerialTrace {
   serialNumber: string;
   batchNumber: string;
+  productCode: string;
+  productName: string;
+  batchStatus: string;
+  manufacturedAt: string | null;
+  inspections: {
+    id: string;
+    inspectionNumber: string;
+    inspectionType: string;
+    status: string;
+    finalResult: string | null;
+    disposition: string | null;
+  }[];
   deliveries: {
     dispatchId: string;
     dispatchNumber: string;
@@ -669,4 +703,133 @@ export interface SerialTrace {
     shippedOn: string | null;
     returned: boolean;
   }[];
+}
+
+export interface RecallSummary {
+  id: string;
+  recallNumber: string;
+  recallDate: string;
+  reason: string;
+  status: string;
+  batchNumbers: string[];
+}
+
+export interface ClosureReview {
+  customers: number;
+  contacted: number;
+  acknowledged: number;
+  exceptions: number;
+  unresolvedCustomers: string[];
+  dispatchedQuantity: string;
+  returnedQuantity: string;
+  outstandingQuantity: string;
+  capaStatus: string | null;
+  blockers: string[];
+}
+
+export interface RecallDetail {
+  id: string;
+  recallNumber: string;
+  recallDate: string;
+  reason: string;
+  instructions: string;
+  capaId: string | null;
+  status: "OPEN" | "PENDING_CLOSURE" | "CLOSED";
+  batchNumbers: string[];
+  closureNote: string | null;
+  closureRequestedBy: string | null;
+  closureRequestedAt: string | null;
+  closedBy: string | null;
+  closedAt: string | null;
+  review: ClosureReview;
+}
+
+export interface RecallDashboard {
+  totalCustomers: number;
+  pending: number;
+  contactAttempts: number;
+  contacted: number;
+  acknowledged: number;
+  unreachable: number;
+  returnsInProgress: number;
+  resolved: number;
+  outstandingFollowUps: number;
+  dispatchedQuantity: string;
+  returnedQuantity: string;
+  outstandingQuantity: string;
+}
+
+export interface RecallContact {
+  id: string;
+  customerId: string;
+  customerCode: string;
+  customerName: string;
+  status: string;
+  contactPerson: string | null;
+  contactDetails: string | null;
+  assignedTo: string | null;
+  assignedName: string | null;
+  followUpOn: string | null;
+  notes: string | null;
+  exceptionReason: string | null;
+  attempts: number;
+  lastAttemptAt: string | null;
+  acknowledgedOn: string | null;
+  quantity: string;
+  returnedQuantity: string;
+  outstandingQuantity: string;
+}
+
+export interface RecallHistoryEntry {
+  id: string;
+  kind: "ATTEMPT" | "ACKNOWLEDGEMENT";
+  customerName: string;
+  method: string | null;
+  contactPerson: string | null;
+  at: string;
+  on: string;
+  outcome: string | null;
+  customerResponse: string | null;
+  notes: string | null;
+  recordedBy: string | null;
+  kindLabel: string;
+  outcomeLabel: string;
+}
+
+export interface RecallReport {
+  organizationName: string;
+  organizationLegalName: string | null;
+  organizationAddress: string | null;
+  organizationGstin: string | null;
+  generatedLabel: string;
+  recall: RecallDetail;
+  products: { code: string; name: string; batchNumber: string; status: string }[];
+  customers: {
+    code: string;
+    name: string;
+    contactPerson: string | null;
+    email: string | null;
+    phone: string | null;
+    address: string | null;
+    status: string;
+    attempts: number;
+    acknowledgedOn: string | null;
+    exceptionReason: string | null;
+    quantity: string;
+    returnedQuantity: string;
+    outstandingQuantity: string;
+  }[];
+  dispatches: RecallLine[];
+  serialNumbers: string[];
+  inspections: {
+    id: string;
+    inspectionNumber: string;
+    inspectionType: string;
+    batchNumber: string;
+    status: string;
+    finalResult: string | null;
+    disposition: string | null;
+  }[];
+  ncrs: { id: string; ncrNumber: string; title: string; severity: string; status: string }[];
+  history: RecallHistoryEntry[];
 }

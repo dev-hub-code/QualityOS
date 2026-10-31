@@ -30,7 +30,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 |---|---|
 | Someone can still deliberately lock out a known email (10 failures, 15 minutes), though the IP limit slows it down. A reset link unlocks the account | Review after real use |
 | The IP rate limit is held per backend instance, so several instances multiply it. Shared limits need Redis or the load balancer | With production work |
-| An unconfirmed sign-up that never returns keeps its account and organisation. The address stays reserved, and a repeat sign-up just sends a new link | With a cleanup job |
+| An expired sign-up is emptied after 30 days, not deleted, because its audit rows cannot be removed. Its suspended organisation row stays. With unverified login allowed, nothing is expired | By design |
 | Account-level audit events (verification, password reset) have no tenant, so no organisation can read them in-app | Phase 10, with the admin panel |
 | A material receipt does not notify inspectors; they see it in the inspection queue | When a user needs it |
 | Notifications are polled once a minute, with no live push. Only email and in-app channels exist | When a user needs it |
@@ -55,12 +55,17 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A template cannot yet be limited to a product in the UI, and quantities consumed are not converted between units | When a user needs it |
 | A customer who returned everything still shows as having received the batch. This is deliberate: a recall should reach them | By design |
 | The return screen takes one line at a time, though the API takes several. Credit notes and refunds are separate and not built | When a user needs it |
+| Search covers lots, batches, products and serial numbers, not NCRs, CAPAs or suppliers. Serial search reports where a unit is now; earlier customers are on its detail page | When a user needs it |
 | A lot's internal batch number cannot be corrected, because other records refer to it by number. It is generated, so it cannot be mistyped | By design |
 | A corrected lot keeps its original purchase order line, and a finished NCR keeps its original supplier and material | By design: history is preserved |
 | A correction of an inspected lot does not trigger reinspection. It needs two approvers, who decide whether to act | Review after real use |
 | Naming serial numbers on a dispatch is optional, so a batch can ship without saying which units went. A trace then shows the customer by batch, not by unit | Review after real use |
 | A dispatch only counts as shipped once someone confirms it. Traces flag it until then, and managers get a daily reminder after three days | Review after real use |
-| The recall report lists who to contact. There is no recall workflow to track that contact, and no export beyond printing | When a user needs it |
+| Facility limits cover production batches, traces, serial numbers and recalls. Lots, receipts, inspections, NCRs, CAPAs and dispatch lists are not limited yet | Next, before a customer relies on it |
+| The recall PDF does not shape Devanagari: names stay readable, but conjuncts do not form correctly | Before Hindi or Marathi customer names matter |
+| A dispatch after a recall starts is not blocked. Its customer joins the recall when closure is requested or approved | Review after real use |
+| Recalls start from one batch in the UI, though the API takes several. Linking a CAPA is API only | When a user needs it |
+| Scheduled job history has no screen. A silent job shows as `STALE` in health and as a log warning | Phase 9, with the admin panel |
 | `tenant_settings` and supplier scorecards are not built | Phase 9 |
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | Lists show only active records, with no way to restore an archived one | When a user needs it |

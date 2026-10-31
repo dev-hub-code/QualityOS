@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.qualityos.common.job.JobContext;
 import com.qualityos.common.mail.EmailContent;
 import com.qualityos.common.mail.EmailRequest;
 import com.qualityos.common.mail.EmailService;
@@ -79,7 +80,7 @@ class EmailDeliveryIT extends AbstractIntegrationTest {
         as(member, get("/api/v1/auth/me")).andExpect(jsonPath("$.data.user.language").value("hi"));
 
         capaAssigned(owner, member);
-        delivery.deliverPending();
+        delivery.deliverPending(new JobContext());
 
         MailMessage email = lastTo(member);
         assertThat(email.subject()).contains("CAPA-1", "सौंपा");
@@ -94,7 +95,7 @@ class EmailDeliveryIT extends AbstractIntegrationTest {
         setOrganizationLocale(owner, "mr-IN");
 
         capaAssigned(owner, member);
-        delivery.deliverPending();
+        delivery.deliverPending(new JobContext());
         assertThat(lastTo(member).subject()).contains("सोपवला");
     }
 
@@ -105,7 +106,7 @@ class EmailDeliveryIT extends AbstractIntegrationTest {
         setOrganizationLocale(owner, "fr-FR");
 
         capaAssigned(owner, member);
-        delivery.deliverPending();
+        delivery.deliverPending(new JobContext());
         assertThat(lastTo(member).subject()).isEqualTo("CAPA CAPA-1 was assigned to you");
     }
 
@@ -192,7 +193,7 @@ class EmailDeliveryIT extends AbstractIntegrationTest {
         Session member = addMember(owner, "VIEWER");
         Session stranger = register();
         capaAssigned(owner, member);
-        delivery.deliverPending();
+        delivery.deliverPending(new JobContext());
 
         String count = "SELECT count(*) FROM email_delivery_logs";
         assertThat(inTransactionAs(owner.tenantId(), null, () -> jdbc.queryForObject(count, Integer.class))).isPositive();

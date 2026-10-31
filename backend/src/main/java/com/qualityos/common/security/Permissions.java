@@ -25,6 +25,9 @@ public final class Permissions {
     public static final String CAPA_APPROVE = "CAPA_APPROVE";
     public static final String TRACEABILITY_VIEW = "TRACEABILITY_VIEW";
     public static final String TRACEABILITY_MANAGE = "TRACEABILITY_MANAGE";
+    public static final String RECALL_VIEW = "RECALL_VIEW";
+    public static final String RECALL_MANAGE = "RECALL_MANAGE";
+    public static final String RECALL_CLOSE = "RECALL_CLOSE";
     public static final String MATERIAL_CORRECTION_REQUEST = "MATERIAL_CORRECTION_REQUEST";
     public static final String MATERIAL_CORRECTION_APPROVE = "MATERIAL_CORRECTION_APPROVE";
     public static final String INSPECTION_EXECUTE = "INSPECTION_EXECUTE";
@@ -63,6 +66,9 @@ public final class Permissions {
         public static final String CAPA_APPROVE = "hasAuthority('CAPA_APPROVE')";
         public static final String TRACEABILITY_VIEW = "hasAuthority('TRACEABILITY_VIEW')";
         public static final String TRACEABILITY_MANAGE = "hasAuthority('TRACEABILITY_MANAGE')";
+        public static final String RECALL_VIEW = "hasAuthority('RECALL_VIEW')";
+        public static final String RECALL_MANAGE = "hasAuthority('RECALL_MANAGE')";
+        public static final String RECALL_CLOSE = "hasAuthority('RECALL_CLOSE')";
         public static final String MATERIAL_CORRECTION_REQUEST = "hasAuthority('MATERIAL_CORRECTION_REQUEST')";
         public static final String MATERIAL_CORRECTION_APPROVE = "hasAuthority('MATERIAL_CORRECTION_APPROVE')";
 

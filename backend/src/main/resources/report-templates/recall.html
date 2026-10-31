@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Recall report {{report.recall.recallNumber}}</title>
+<meta name="author" content="{{report.organizationName}}"/>
+<meta name="subject" content="Product recall report"/>
+<style>
+@page {
+  size: A4 landscape;
+  margin: 18mm 12mm 16mm 12mm;
+  @top-left { content: "{{report.recall.recallNumber}}"; font: 8pt "Report Sans"; color: #555; }
+  @top-right { content: "Generated {{report.generatedLabel}}"; font: 8pt "Report Sans"; color: #555; }
+  @bottom-left { content: "{{report.organizationName}}"; font: 8pt "Report Sans"; color: #555; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt "Report Sans"; color: #555; }
+}
+body { font-family: "Report Sans", "Report Devanagari", sans-serif; font-size: 9pt; color: #111; line-height: 1.35; }
+h1 { font-size: 17pt; margin: 0 0 2pt 0; }
+h2 { font-size: 11pt; margin: 14pt 0 5pt 0; border-bottom: 0.75pt solid #333; padding-bottom: 2pt; page-break-after: avoid;
+     -fs-page-break-min-height: 32mm; }
+p { margin: 0 0 5pt 0; }
+.muted { color: #555; }
+.pre { white-space: pre-wrap; }
+table { width: 100%; border-collapse: collapse; -fs-table-paginate: paginate; table-layout: fixed; }
+thead { display: table-header-group; }
+tr { page-break-inside: avoid; }
+th { background: #e8e8e8; text-align: left; font-weight: 700; font-size: 7.5pt; }
+th, td { border: 0.5pt solid #888; padding: 2.5pt 4pt; vertical-align: top; }
+td { font-size: 8.5pt; overflow-wrap: break-word; word-wrap: break-word; }
+.num { text-align: right; }
+.meta td { border: none; padding: 1pt 8pt 1pt 0; }
+.meta .label { width: 28mm; color: #555; }
+.totals td { text-align: center; font-size: 13pt; font-weight: 700; border: 0.5pt solid #888; padding: 5pt; }
+.totals span { display: block; font-size: 8pt; font-weight: 400; color: #555; }
+.serials { font-size: 8pt; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<h1>Product recall report</h1>
+<p class="muted">{{report.organizationName}}{{#report.organizationLegalName}} ({{.}}){{/report.organizationLegalName}}{{#report.organizationAddress}}, {{.}}{{/report.organizationAddress}}{{#report.organizationGstin}}, GSTIN {{.}}{{/report.organizationGstin}}</p>
+
+<table class="meta">
+<tr><td class="label">Recall reference</td><td>{{report.recall.recallNumber}}</td><td class="label">Status</td><td>{{report.recall.status}}</td></tr>
+<tr><td class="label">Recall date</td><td>{{report.recall.recallDate}}</td><td class="label">Generated</td><td>{{report.generatedLabel}}</td></tr>
+</table>
+
+<h2>Reason for recall</h2>
+<p class="pre">{{report.recall.reason}}</p>
+<h2>Action required</h2>
+<p class="pre">{{report.recall.instructions}}</p>
+
+<h2>Quantities</h2>
+<table class="totals"><tr>
+<td>{{report.recall.review.customers}}<span>Customers affected</span></td>
+<td>{{dispatched}}<span>Dispatched</span></td>
+<td>{{returned}}<span>Returned</span></td>
+<td>{{outstanding}}<span>Outstanding</span></td>
+</tr></table>
+
+<h2>Affected products and batches</h2>
+<table>
+<thead><tr><th style="width:18%">Product code</th><th>Product</th><th style="width:24%">Batch</th><th style="width:14%">Batch status</th></tr></thead>
+<tbody>{{#report.products}}<tr><td>{{code}}</td><td>{{name}}</td><td>{{batchNumber}}</td><td>{{status}}</td></tr>{{/report.products}}</tbody>
+</table>
+
+<h2>Customers</h2>
+<table>
+<thead><tr><th style="width:20%">Customer</th><th style="width:26%">Contact</th><th style="width:12%">Status</th><th style="width:7%">Attempts</th><th style="width:11%">Acknowledged</th><th class="num" style="width:8%">Dispatched</th><th class="num" style="width:7%">Returned</th><th class="num" style="width:9%">Outstanding</th></tr></thead>
+<tbody>{{#report.customers}}<tr>
+<td>{{name}} <span class="muted">({{code}})</span>{{#exceptionReason}}<br/><span class="muted">Exception: {{.}}</span>{{/exceptionReason}}</td>
+<td>{{contactPerson}}{{#phone}}, {{.}}{{/phone}}{{#email}}<br/>{{.}}{{/email}}{{#address}}<br/>{{.}}{{/address}}</td>
+<td>{{statusLabel}}{{#assignedName}}<br/><span class="muted">{{.}}</span>{{/assignedName}}</td>
+<td>{{attempts}}</td><td>{{acknowledgedOn}}</td>
+<td class="num">{{quantityLabel}}</td><td class="num">{{returnedLabel}}</td><td class="num">{{outstandingLabel}}</td>
+</tr>{{/report.customers}}</tbody>
+</table>
+
+<h2>Dispatch references</h2>
+<table>
+<thead><tr><th style="width:20%">Dispatch</th><th>Customer</th><th style="width:12%">Dispatched on</th><th style="width:12%">Shipped on</th><th class="num" style="width:10%">Quantity</th><th class="num" style="width:10%">Returned</th><th class="num" style="width:10%">Outstanding</th></tr></thead>
+<tbody>{{#report.dispatches}}<tr><td>{{dispatchNumber}}</td><td>{{customerName}}</td><td>{{dispatchedOn}}</td><td>{{shippedOn}}</td><td class="num">{{quantityLabel}}</td><td class="num">{{returnedLabel}}</td><td class="num">{{outstandingLabel}}</td></tr>{{/report.dispatches}}</tbody>
+</table>
+
+{{#hasSerials}}<h2>Affected serial numbers ({{serialCount}})</h2>
+<p class="serials">{{serials}}</p>{{/hasSerials}}
+
+{{#hasInspections}}<h2>Inspection history</h2>
+<table>
+<thead><tr><th style="width:22%">Inspection</th><th style="width:10%">Type</th><th>Batch</th><th style="width:16%">Status</th><th style="width:12%">Result</th><th style="width:14%">Disposition</th></tr></thead>
+<tbody>{{#report.inspections}}<tr><td>{{inspectionNumber}}</td><td>{{inspectionType}}</td><td>{{batchNumber}}</td><td>{{status}}</td><td>{{finalResult}}</td><td>{{disposition}}</td></tr>{{/report.inspections}}</tbody>
+</table>{{/hasInspections}}
+
+{{#hasNcrs}}<h2>Defect history</h2>
+<table>
+<thead><tr><th style="width:22%">NCR</th><th>Title</th><th style="width:16%">Severity</th><th style="width:18%">Status</th></tr></thead>
+<tbody>{{#report.ncrs}}<tr><td>{{ncrNumber}}</td><td>{{title}}</td><td>{{severity}}</td><td>{{status}}</td></tr>{{/report.ncrs}}</tbody>
+</table>{{/hasNcrs}}
+
+{{#hasHistory}}<h2>Contact history</h2>
+<table>
+<thead><tr><th style="width:15%">When</th><th style="width:20%">Customer</th><th style="width:12%">Kind</th><th style="width:15%">Outcome</th><th>Response</th><th style="width:13%">Recorded by</th></tr></thead>
+<tbody>{{#report.history}}<tr><td>{{on}}</td><td>{{customerName}}</td><td>{{kindLabel}}</td><td>{{outcomeLabel}}</td><td>{{customerResponse}}{{#notes}} {{.}}{{/notes}}</td><td>{{recordedBy}}</td></tr>{{/report.history}}</tbody>
+</table>{{/hasHistory}}
+</body>
+</html>

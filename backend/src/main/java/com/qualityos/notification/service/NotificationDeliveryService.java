@@ -1,5 +1,7 @@
 package com.qualityos.notification.service;
 
+import com.qualityos.common.job.JobContext;
+import com.qualityos.common.job.JobRunner;
 import com.qualityos.common.mail.EmailRequest;
 import com.qualityos.common.mail.EmailService;
 import com.qualityos.common.mail.EmailTemplate;
@@ -43,6 +45,7 @@ public class NotificationDeliveryService {
     private final TenantAccessService access;
     private final EmailService emails;
     private final OrganizationService organizations;
+    private final JobRunner jobs;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
     private final String appUrl;
@@ -52,6 +55,7 @@ public class NotificationDeliveryService {
             TenantAccessService access,
             EmailService emails,
             OrganizationService organizations,
+            JobRunner jobs,
             JdbcTemplate jdbc,
             PlatformTransactionManager transactionManager,
             @Value("${qualityos.app-url}") String appUrl) {
@@ -59,28 +63,24 @@ public class NotificationDeliveryService {
         this.access = access;
         this.emails = emails;
         this.organizations = organizations;
+        this.jobs = jobs;
         this.jdbc = jdbc;
         this.tx = new TransactionTemplate(transactionManager);
         this.appUrl = appUrl;
     }
 
-    public void deliverPending() {
+    public void deliverPending(JobContext context) {
         List<UUID> tenants = tx.execute(status ->
                 jdbc.queryForList("SELECT tenants_with_pending_email()", UUID.class));
-        for (UUID tenantId : tenants) {
-            try {
-                TenantContext.runAs(tenantId, null, this::deliverForCurrentTenant);
-            } catch (RuntimeException ex) {
-                // One tenant's problem must not hold up everyone else's mail.
-                log.error("Notification delivery failed for tenant {}", tenantId, ex);
-            }
-        }
+        // One tenant's problem must not hold up everyone else's mail.
+        jobs.forEachTenant(context, tenants, tenant -> deliverForCurrentTenant(context));
     }
 
-    private void deliverForCurrentTenant() {
+    private void deliverForCurrentTenant(JobContext context) {
         List<UUID> due = tx.execute(status ->
                 notifications.findDueForEmail(Instant.now(), PageRequest.of(0, BATCH_SIZE)));
         due.forEach(id -> tx.executeWithoutResult(status -> notifications.claimForEmail(id).ifPresent(this::deliver)));
+        context.processed(due.size());
     }
 
     private void deliver(Notification notification) {

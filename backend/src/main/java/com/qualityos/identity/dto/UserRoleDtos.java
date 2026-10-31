@@ -40,7 +40,12 @@ public final class UserRoleDtos {
             String email,
             String fullName,
             String status,
-            List<RoleSummary> roles) {
+            List<RoleSummary> roles,
+            Set<UUID> facilityIds) {
+    }
+
+    /** @param facilityIds empty means every facility */
+    public record UpdateMemberFacilitiesRequest(@NotNull Set<UUID> facilityIds) {
     }
 
     public record SaveRoleRequest(

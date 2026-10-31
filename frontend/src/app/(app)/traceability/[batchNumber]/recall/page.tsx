@@ -2,8 +2,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
+import { useState } from "react";
+import { StartRecallDialog } from "@/components/recalls/start-recall-dialog";
 import { PageHeader, QueryState, RecordLink, StatusBadge } from "@/components/records/parts";
 import { Button } from "@/components/ui/button";
+import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { formatQuantity } from "@/lib/record-form";
 import type { TraceReport } from "@/lib/types";
@@ -11,6 +14,8 @@ import type { TraceReport } from "@/lib/types";
 export default function RecallReportPage() {
   const { batchNumber } = useParams<{ batchNumber: string }>();
   const path = `/traceability/batches/${batchNumber}`;
+  const canStart = usePermission("RECALL_MANAGE");
+  const [starting, setStarting] = useState(false);
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<TraceReport>(path) });
   if (!data) return <QueryState error={error} />;
   return (
@@ -19,6 +24,11 @@ export default function RecallReportPage() {
         title={`Recall report: ${data.subject.batchNumber}`}
         subtitle="Everyone this batch reached, including customers who have returned it."
       >
+        {canStart && (
+          <Button className="print:hidden" onClick={() => setStarting(true)}>
+            Start a recall
+          </Button>
+        )}
         <Button variant="outline" className="print:hidden" onClick={() => window.print()}>
           Print
         </Button>
@@ -54,6 +64,9 @@ export default function RecallReportPage() {
         </table>
       </div>
       {data.recall.length === 0 && <p className="text-sm text-muted-foreground">This batch has not been dispatched.</p>}
+      {starting && (
+        <StartRecallDialog batchNumber={data.subject.batchNumber} onClose={() => setStarting(false)} />
+      )}
     </div>
   );
 }

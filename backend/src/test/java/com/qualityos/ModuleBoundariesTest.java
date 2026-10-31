@@ -15,7 +15,7 @@ class ModuleBoundariesTest {
 
     static final List<String> MODULES = List.of(
             "identity", "organization", "supplier", "material", "product", "purchaseorder", "materialreceipt",
-            "inspection", "notification", "quality", "traceability");
+            "inspection", "notification", "quality", "traceability", "recall");
 
     private static final JavaClasses CLASSES = new ClassFileImporter()
             .withImportOption(new ImportOption.DoNotIncludeTests())

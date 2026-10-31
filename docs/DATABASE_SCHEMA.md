@@ -135,3 +135,7 @@ row-level security. `account_tokens` holds one-time password reset and email ver
   backfilled as shipped unless already cancelled.
 - **V14** adds `EXPECTED` and `CANCELLED` to return statuses, `corrective_actions.due_reminded_at`, and the tenant-id-only
   job functions `tenants_with_capas_due()` and `tenants_with_unconfirmed_dispatches()`.
+- **V15** adds trigram and JSONB search indexes, contact columns on `customers`, `membership_facilities`, the `RECALL_*`
+  permissions, `recalls`, `recall_batches`, `recall_contact_records`, the append-only `recall_contact_attempts` and
+  `recall_acknowledgements`, the platform tables `scheduled_job_locks` and `scheduled_job_executions`, and
+  `expire_unverified_accounts()`.

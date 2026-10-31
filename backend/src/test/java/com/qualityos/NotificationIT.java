@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.qualityos.common.job.JobContext;
 import com.qualityos.common.mail.MailMessage;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.notification.service.NotificationDeliveryService;
@@ -52,8 +53,8 @@ class NotificationIT extends AbstractIntegrationTest {
         Session user = register();
         notify(user, user);
 
-        delivery.deliverPending();
-        delivery.deliverPending();
+        delivery.deliverPending(new JobContext());
+        delivery.deliverPending(new JobContext());
 
         assertThat(mail.to(user.email()).stream().filter(m -> m.subject().equals("Title")).toList())
                 .singleElement()
@@ -67,15 +68,15 @@ class NotificationIT extends AbstractIntegrationTest {
         notify(user, user);
         mail.setFailing(true);
         try {
-            delivery.deliverPending();
+            delivery.deliverPending(new JobContext());
             assertThat(emailStatus(user)).isEqualTo("PENDING");
-            delivery.deliverPending();
+            delivery.deliverPending(new JobContext());
             asAppRole(user.tenantId(), sql -> assertThat(sql.queryForObject(
                     "SELECT email_attempts FROM notifications", Integer.class)).isEqualTo(1));
 
             for (int attempt = 0; attempt < 5; attempt++) {
                 makeDue(user);
-                delivery.deliverPending();
+                delivery.deliverPending(new JobContext());
             }
             assertThat(emailStatus(user)).isEqualTo("FAILED");
         } finally {
@@ -90,12 +91,12 @@ class NotificationIT extends AbstractIntegrationTest {
         notify(user, user);
         mail.setFailing(true);
         try {
-            delivery.deliverPending();
+            delivery.deliverPending(new JobContext());
         } finally {
             mail.setFailing(false);
         }
         makeDue(user);
-        delivery.deliverPending();
+        delivery.deliverPending(new JobContext());
         assertThat(emailStatus(user)).isEqualTo("SENT");
     }
 
@@ -107,7 +108,7 @@ class NotificationIT extends AbstractIntegrationTest {
         as(owner, postJson("/api/v1/users/" + membershipId(owner, member.userId()) + "/deactivate", Map.of()))
                 .andExpect(status().isNoContent());
 
-        delivery.deliverPending();
+        delivery.deliverPending(new JobContext());
 
         assertThat(emailStatus(owner)).isEqualTo("SKIPPED");
         assertThat(mail.to(member.email()).stream().filter(m -> m.subject().equals("Title"))).isEmpty();
@@ -124,7 +125,7 @@ class NotificationIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.data[?(@.type == 'INSPECTION_CRITICAL_FAILURE')].emailEnabled").value(true));
 
         notify(user, user);
-        delivery.deliverPending();
+        delivery.deliverPending(new JobContext());
 
         assertThat(emailStatus(user)).isEqualTo("NONE");
         as(user, get("/api/v1/notifications/unread-count")).andExpect(jsonPath("$.data.count").value(1));

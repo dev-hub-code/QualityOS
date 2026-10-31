@@ -130,3 +130,20 @@ quantity if the goods never come.
 
 `GET /traceability/batches/{number}` also returns `recall` (dispatched, returned and outstanding per dispatch) and
 `unconfirmedCustomers`. `GET /traceability/serials/{serial}` lists every customer one unit reached.
+
+`GET /traceability/serials` searches units. `q` is matched in any case, in the column named by `field` (`SERIAL`, `PRODUCT`,
+`BATCH`, `CUSTOMER`, `DISPATCH`), or all of them. It also takes `facilityId`, `madeFrom`, `madeTo`, `dispatchedFrom`,
+`dispatchedTo`, `page`, `size` and `sort`, and refuses a search with no filter at all.
+
+`PUT /users/{membershipId}/facilities` limits a member to some facilities. An empty list means all of them. Records outside
+a member's facilities answer 404.
+
+| Recalls | Permission |
+|---|---|
+| `GET /recalls`, `GET /recalls/{id}`, `/customers`, `/contact-history`, `/dashboard`, `/report`, `/report.pdf` | `RECALL_VIEW` |
+| `POST /recalls`, `PUT /recalls/{id}/customers/{customerId}`, `POST .../contact-attempts`, `POST .../status`, `POST /recalls/{id}/acknowledgements`, `POST /recalls/{id}/request-closure` | `RECALL_MANAGE` |
+| `POST /recalls/{id}/customers/{customerId}/exception`, `POST /recalls/{id}/send-back`, `POST /recalls/{id}/close` | `RECALL_CLOSE` |
+
+A sent email is an attempt with the outcome `NO_REPLY`. Only `REACHED` moves a customer to `CONTACTED`, and only an
+acknowledgement allows `RESOLVED`. Closing needs every customer resolved or covered by an exception, any linked CAPA closed,
+and a second person.

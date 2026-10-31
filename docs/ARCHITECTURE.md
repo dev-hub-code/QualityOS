@@ -113,3 +113,10 @@ To add a language, add it to `qualityos.mail.languages` and add a folder. Any fi
 Account emails retry three times in the background. Notification emails keep the existing retry schedule of about an
 hour. Notifications store their template and variables, not finished text, so the language is chosen when they are sent.
 
+## Scheduled jobs
+
+Every job runs through `JobRunner`. It takes a row in `scheduled_job_locks` with a lease, so one instance runs a job at a
+time and a dead instance's lock lapses. A finished run holds the lock for 90% of its interval, so a second instance on the
+same schedule does not repeat it. A failed run releases it at once. Tenant work runs per tenant, so one failure does not stop
+the others, and each run writes a row to `scheduled_job_executions`, kept for 30 days. `JobMonitor` warns when a job misses
+three runs, and reports `STALE` in health.

@@ -15,6 +15,10 @@ const FIELDS: FieldDef[] = [
   { name: "code", label: "Code", required: true },
   { name: "name", label: "Name", required: true },
   { name: "gstin", label: "GSTIN" },
+  { name: "contactPerson", label: "Contact person" },
+  { name: "email", label: "Email", type: "email" },
+  { name: "phone", label: "Phone" },
+  { name: "address", label: "Address", type: "textarea" },
 ];
 const PATH = "/customers";
 

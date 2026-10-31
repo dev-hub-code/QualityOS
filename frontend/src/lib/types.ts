@@ -1050,6 +1050,10 @@ export interface Plan {
   publicVisible: boolean;
   archivedAt: string | null;
   displayOrder: number;
+  maxStorageMb: number | null;
+  maxMonthlyInspections: number | null;
+  maxAttachments: number | null;
+  featureValues: Record<string, unknown>;
 }
 
 export interface PlanVersion {
@@ -1121,6 +1125,12 @@ export interface Subscription {
   facilities: number;
   maxFacilities: number | null;
   features: string[];
+  storageBytes: number;
+  maxStorageMb: number | null;
+  inspectionsThisMonth: number;
+  maxMonthlyInspections: number | null;
+  attachments: number;
+  maxAttachments: number | null;
 }
 
 export interface Invoice {
@@ -1232,4 +1242,79 @@ export interface TrialSummary {
   endingIn7Days: number;
   convertedThisMonth: number;
   conversionRate: number | null;
+}
+
+export interface Feature {
+  code: string;
+  name: string;
+  description: string;
+  valueType: "BOOLEAN" | "NUMBER" | "TEXT" | "STRUCTURED";
+  active: boolean;
+  defaultEnabled: boolean;
+  enforced: boolean;
+  organisations: number;
+  version: number;
+}
+
+export interface FeatureOrganisationList {
+  total: number;
+  items: { tenantId: string; name: string; planName: string }[];
+}
+
+export interface UsageRow {
+  tenantId: string;
+  name: string;
+  planName: string;
+  features: string[];
+  users: number;
+  maxUsers: number | null;
+  facilities: number;
+  maxFacilities: number | null;
+  storageBytes: number;
+  maxStorageMb: number | null;
+  inspections: number;
+  maxMonthlyInspections: number | null;
+  attachments: number;
+  maxAttachments: number | null;
+  level: "OK" | "NEAR" | "REACHED";
+  upgradeTo: string | null;
+}
+
+export interface UsageList {
+  total: number;
+  items: UsageRow[];
+}
+
+export interface UsageHistory {
+  takenOn: string;
+  users: number;
+  facilities: number;
+  storageBytes: number;
+  inspections: number;
+  attachments: number;
+}
+
+export interface PlatformAnalytics {
+  from: string;
+  to: string;
+  mrr: number;
+  arr: number;
+  openingMrr: number;
+  openingCustomers: number;
+  closingCustomers: number;
+  newCustomers: number;
+  registered: number;
+  converted: number;
+  trialConversion: number | null;
+  lostCustomers: number;
+  customerChurn: number | null;
+  revenueLost: number;
+  revenueChurn: number | null;
+  averageRevenue: number | null;
+  revenueByPlan: { name: string; mrr: number }[];
+  plans: { name: string; count: number }[];
+  outstanding: number;
+  collected: number;
+  collectionRate: number | null;
+  months: PlatformMonth[];
 }

@@ -37,15 +37,18 @@ public class AttachmentService {
     private final FileStorage storage;
     private final AuditService audit;
     private final Map<String, AttachmentPolicy> policies;
+    private final AttachmentQuota quota;
 
     AttachmentService(
             AttachmentRepository attachments,
             FileStorage storage,
             AuditService audit,
-            List<AttachmentPolicy> policies) {
+            List<AttachmentPolicy> policies,
+            AttachmentQuota quota) {
         this.attachments = attachments;
         this.storage = storage;
         this.audit = audit;
+        this.quota = quota;
         this.policies = policies.stream().collect(Collectors.toMap(AttachmentPolicy::entityType, Function.identity()));
     }
 
@@ -78,6 +81,7 @@ public class AttachmentService {
         if (file.isEmpty()) {
             throw new BusinessRuleException("The file is empty.");
         }
+        quota.requireAttachmentPlace(file.getSize());
         String contentType = detectType(file);
         String storageKey = TenantContext.getCurrentTenantId() + "/" + UUID.randomUUID();
         Attachment attachment = new Attachment(

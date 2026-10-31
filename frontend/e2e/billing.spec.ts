@@ -177,3 +177,45 @@ test("a platform admin suspends a customer, brings them back, and reconciles a p
   await expect(admin.getByRole("row", { name: organization })).toContainText(adminEmail);
   await context.close();
 });
+
+test("a platform admin defines a feature, puts it on a plan, and reads usage and analytics", async ({ page }) => {
+  test.setTimeout(60_000);
+  const email = `admin-${unique()}@example.com`;
+  await signUp(page, email);
+  makePlatformAdmin(email);
+  const code = `E2E_${Date.now()}`;
+
+  await page.goto("/platform/features");
+  await expect(page.getByRole("row", { name: /Dashboards and reports/ }).first()).toContainText("Enforced");
+  await page.getByRole("button", { name: "New feature" }).click();
+  await page.getByLabel("Code, such as PRIORITY_SUPPORT").fill(code);
+  await page.getByLabel("Name").fill(`Support ${code}`);
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("row", { name: code }).first()).toContainText("Listed only, not enforced");
+
+  await page.getByRole("button", { name: `Support ${code} on Starter: not included` }).click();
+  await page.getByLabel(/Reason/).fill("Testing the catalogue");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("button", { name: `Support ${code} on Starter: included` })).toBeVisible();
+
+  await page.getByRole("button", { name: `Support ${code} on Starter: included` }).click();
+  await page.getByLabel(/Reason/).fill("Finished testing");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("button", { name: `Support ${code} on Starter: not included` })).toBeVisible();
+  await page.getByRole("row", { name: code }).first().getByRole("button", { name: "Deactivate" }).click();
+  await page.getByLabel("Reason").fill("Finished testing");
+  await page.getByRole("button", { name: "Save" }).click();
+
+  await page.goto("/platform/usage");
+  await expect(page.getByRole("status")).toContainText("page 1");
+  await page.getByRole("button", { name: "History" }).first().click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.goto("/platform/analytics");
+  await expect(page.getByText("Revenue churn")).toBeVisible();
+  const csv = page.waitForEvent("download");
+  await page.getByRole("link", { name: "Export CSV" }).click();
+  expect((await readFile(await (await csv).path())).toString()).toContain("MRR (INR)");
+});
+

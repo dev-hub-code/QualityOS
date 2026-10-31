@@ -11,15 +11,10 @@ export interface PublicPlan {
   maxFacilities: number | null;
   features: string[];
   trialDays: number;
+  featureNames: string[];
 }
 
 const BASE = "Inspections, suppliers, purchasing and receipts";
-const FEATURES: Record<string, string> = {
-  NCR_CAPA: "NCR and CAPA",
-  REPORTS: "Dashboards and reports",
-  ADVANCED: "Traceability, recalls, calibration and audits",
-};
-
 const rupees = (value: number) => `₹${value.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 
 const count = (value: number | null, noun: string) =>
@@ -45,8 +40,8 @@ function Plan({ plan }: { plan: PublicPlan }) {
         <li>{count(plan.maxUsers, "user")}</li>
         <li>{count(plan.maxFacilities, "facility").replace("facilitys", "facilities")}</li>
         <li>{BASE}</li>
-        {plan.features.map((feature) => (
-          <li key={feature}>{FEATURES[feature] ?? feature}</li>
+        {plan.featureNames.map((feature) => (
+          <li key={feature}>{feature}</li>
         ))}
       </ul>
     </li>

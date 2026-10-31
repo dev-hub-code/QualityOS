@@ -16,6 +16,7 @@ import com.qualityos.subscription.dto.SubscriptionDtos.OrganisationList;
 import com.qualityos.subscription.dto.SubscriptionDtos.OrganisationRow;
 import com.qualityos.subscription.dto.SubscriptionDtos.OrganisationUsage;
 import com.qualityos.subscription.dto.SubscriptionDtos.PaymentList;
+import com.qualityos.subscription.dto.SubscriptionDtos.PlatformAnalytics;
 import com.qualityos.subscription.dto.SubscriptionDtos.PlatformDashboard;
 import com.qualityos.subscription.dto.SubscriptionDtos.PlatformInvoice;
 import com.qualityos.subscription.dto.SubscriptionDtos.PlatformPayment;
@@ -113,6 +114,27 @@ public class PlatformInsights {
         merged.put("from", start.toString());
         merged.put("to", end.toString());
         return json.convertValue(merged, PlatformDashboard.class);
+    }
+
+    public PlatformAnalytics analytics(LocalDate from, LocalDate to) {
+        LocalDate end = to == null ? LocalDate.now(ZONE) : to;
+        LocalDate start = from == null ? end.minusDays(DEFAULT_DAYS - 1) : from;
+        requirePeriod(start, end);
+        String figures = tx.execute(status -> jdbc.queryForObject(
+                "SELECT platform_analytics(?, ?, ?)::text", String.class, opening(start), opening(end.plusDays(1)),
+                ZONE.getId()));
+        Map<String, Object> merged = json.readValue(figures, new tools.jackson.core.type.TypeReference<>() { });
+        merged.put("from", start.toString());
+        merged.put("to", end.toString());
+        return json.convertValue(merged, PlatformAnalytics.class);
+    }
+
+    /** Leaves a trace, because the file carries the business's own figures. */
+    public PlatformAnalytics exportAnalytics(LocalDate from, LocalDate to) {
+        PlatformAnalytics figures = analytics(from, to);
+        tx.executeWithoutResult(status -> audit.record("ANALYTICS_EXPORTED", "PlatformAnalytics", null, null,
+                Map.of("from", figures.from().toString(), "to", figures.to().toString())));
+        return figures;
     }
 
     private static void requirePeriod(LocalDate start, LocalDate end) {

@@ -5,6 +5,7 @@ import {
   Building,
   Building2,
   ChartColumn,
+  ChartNoAxesCombined,
   ClipboardCheck,
   ClipboardList,
   ClipboardX,
@@ -31,6 +32,7 @@ import {
   ShieldEllipsis,
   Siren,
   Tags,
+  ToggleRight,
   Truck,
   Undo2,
   Users,
@@ -82,12 +84,19 @@ export const NAV_ITEMS: NavItem[] = [
 
 /** Kept apart from the workspace. A page joins this list only once it works. */
 export const CONTROL_CENTER_NAV: { heading: string; items: NavItem[] }[] = [
-  { heading: "Overview", items: [{ label: "Dashboard", href: "/platform/dashboard", icon: LayoutDashboard }] },
-  { heading: "Customers", items: [{ label: "Organisations", href: "/platform/organisations", icon: Building }] },
+  { heading: "Overview", items: [
+      { label: "Dashboard", href: "/platform/dashboard", icon: LayoutDashboard },
+      { label: "Analytics", href: "/platform/analytics", icon: ChartNoAxesCombined },
+    ] },
+  { heading: "Customers", items: [
+      { label: "Organisations", href: "/platform/organisations", icon: Building },
+      { label: "Usage", href: "/platform/usage", icon: Gauge },
+    ] },
   { heading: "Billing", items: [
       { label: "Subscriptions", href: "/platform/subscriptions", icon: Repeat },
       { label: "Trials", href: "/platform/trials", icon: Hourglass },
       { label: "Plans", href: "/platform/plans", icon: Tags },
+      { label: "Features", href: "/platform/features", icon: ToggleRight },
       { label: "Invoices", href: "/platform/invoices", icon: ReceiptText },
       { label: "Payments", href: "/platform/payments", icon: Banknote },
     ] },

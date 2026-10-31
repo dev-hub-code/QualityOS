@@ -5,24 +5,21 @@ import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.tenant.TenantContext;
-import com.qualityos.organization.service.OrganizationService;
 import com.qualityos.subscription.dto.SubscriptionDtos.CustomInvoiceRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.InvoiceResponse;
-import com.qualityos.subscription.dto.SubscriptionDtos.OrganisationList;
 import com.qualityos.subscription.dto.SubscriptionDtos.PaymentResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.PlanResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.RecordPaymentRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.SavePlanRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.SubscriptionResponse;
-import com.qualityos.subscription.dto.SubscriptionDtos.TenantSubscription;
 import com.qualityos.subscription.entity.SubscriptionPlan;
 import com.qualityos.subscription.repository.SubscriptionPlanRepository;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -34,28 +31,24 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class PlatformService {
 
-    private static final int MAX_ORGANISATIONS = 500;
     private static final String PROVIDER_MANUAL = "MANUAL";
 
     private final SubscriptionPlanRepository plans;
+    private final PlanCatalogue catalogue;
     private final SubscriptionService subscriptions;
-    private final OrganizationService organizations;
     private final AuditService audit;
-    private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
 
     PlatformService(
             SubscriptionPlanRepository plans,
+            PlanCatalogue catalogue,
             SubscriptionService subscriptions,
-            OrganizationService organizations,
             AuditService audit,
-            JdbcTemplate jdbc,
             PlatformTransactionManager transactionManager) {
         this.plans = plans;
+        this.catalogue = catalogue;
         this.subscriptions = subscriptions;
-        this.organizations = organizations;
         this.audit = audit;
-        this.jdbc = jdbc;
         this.tx = new TransactionTemplate(transactionManager);
     }
 
@@ -70,9 +63,8 @@ public class PlatformService {
         return tx.execute(status -> {
             SubscriptionPlan plan = plans.findById(id)
                     .orElseThrow(() -> new ResourceNotFoundException("Plan", id.toString()));
-            if (plan.getVersion() != request.version()) {
-                throw new ConflictException("Someone else has changed this plan. Reload and try again.");
-            }
+            catalogue.requireCurrent(plan, request.version());
+            catalogue.requireReasonWhenInUse(plan, request.reason());
             if (!PlanAccess.FEATURES.keySet().containsAll(request.features())) {
                 throw new BusinessRuleException("A plan can only include known features.");
             }
@@ -88,10 +80,23 @@ public class PlatformService {
             plan.setTrialDays(request.trialDays());
             plan.setGraceDays(request.graceDays());
             plan.setActive(request.active());
+            if (request.publicVisible() != null) {
+                plan.setPublicVisible(request.publicVisible());
+            }
+            if (request.displayOrder() != null) {
+                plan.setDisplayOrder(request.displayOrder());
+            }
             plans.saveAndFlush(plan);
-            audit.record("PLAN_UPDATED", "SubscriptionPlan", plan.getId(), before, figures(plan));
+            catalogue.remember(plan, request.reason());
+            audit.record("PLAN_UPDATED", "SubscriptionPlan", plan.getId(), before, figures(plan, request.reason()));
             return SubscriptionService.toResponse(plan);
         });
+    }
+
+    private static Map<String, Object> figures(SubscriptionPlan plan, String reason) {
+        Map<String, Object> figures = new HashMap<>(figures(plan));
+        figures.put("reason", reason == null ? "" : reason);
+        return figures;
     }
 
     private static Map<String, Object> figures(SubscriptionPlan plan) {
@@ -103,16 +108,6 @@ public class PlatformService {
                 "maxFacilities", String.valueOf(plan.getMaxFacilities()),
                 "features", String.join(",", plan.getFeatures()),
                 "active", plan.isActive());
-    }
-
-    public OrganisationList organisations() {
-        List<UUID> tenants = tx.execute(status -> jdbc.queryForList("SELECT platform_tenant_ids()", UUID.class));
-        return new OrganisationList(tenants.size(), tenants.stream()
-                .limit(MAX_ORGANISATIONS)
-                .map(tenant -> inside(tenant, () -> new TenantSubscription(tenant, organizations.getCurrent().name(),
-                        subscriptions.current(),
-                        subscriptions.invoices().stream().filter(invoice -> invoice.status().equals("ISSUED")).toList())))
-                .toList());
     }
 
     public InvoiceResponse raiseInvoice(UUID tenant, CustomInvoiceRequest request) {

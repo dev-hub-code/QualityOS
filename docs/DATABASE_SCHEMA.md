@@ -155,3 +155,8 @@ inspections, and on NCRs and CAPAs by creation and closure.
 `platform_admins` but not write it. `subscriptions` (one per tenant), `subscription_invoices` and `payment_transactions`
 are tenant-owned with row-level security. An invoice copies its plan name, prices and buyer details, so that it never
 changes afterwards. At most one invoice per tenant can be open, and a payment reference is unique per tenant and provider.
+
+V21 adds `currency`, `public_visible` and `archived_at` to `subscription_plans`, and `subscription_plan_versions`, which
+keeps each saved state of a plan. The application role can only add to that table. The `platform_*` functions that read
+across organisations run as the schema owner and raise an error unless the current user is in `platform_admins`.
+`platform_contracts_at` has no grant to the application role.

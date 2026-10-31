@@ -142,3 +142,9 @@ and call it from a verified callback under the invoice's tenant. A repeated refe
 
 The platform console never bypasses row-level security. `platform_tenant_ids()` returns ids only, and each organisation
 is then read and changed under its own tenant context.
+
+## Reading across organisations
+
+The Control Center needs search and totals across every organisation, which row-level security rightly refuses. Those
+reads are `SECURITY DEFINER` functions that check `platform_admins` themselves. Details of one organisation are still
+read under its own tenant context.

@@ -974,15 +974,16 @@ export const DOC_PAGES: DocPage[] = [
     group: "Account",
     title: "Platform administration",
     summary: "For the people who run QualityOS itself, not for customer organisations.",
-    menu: "Plans, Organisations",
+    menu: "Control Center",
     roles: "Platform administrators",
     plan: "Not part of a plan",
     sections: [
       {
         title: "What an administrator can do",
         terms: [
-          ["Plans", "Change prices, limits, features, trial length and grace period, without a code change."],
-          ["Organisations", "See each organisation's plan, state and unpaid invoices, with unpaid first."],
+          ["Dashboard", "See organisations, recurring revenue, money collected, churn and trends for a chosen period."],
+          ["Plans", "Create, copy, change, compare and archive plans, with a saved history of every change."],
+          ["Organisations", "Search by name, email or GSTIN, filter, export, and open one organisation's details."],
           ["Raise an invoice", "Issue an invoice on an organisation's behalf."],
           ["Record a payment", "Mark an invoice as paid, which starts the plan it was raised for."],
           ["Extend", "Give an organisation more time."],
@@ -991,8 +992,8 @@ export const DOC_PAGES: DocPage[] = [
       {
         title: "Good to know",
         list: [
-          "These menu items only appear for platform administrators.",
-          "The list shows up to 500 organisations and says when more exist.",
+          "The Control Center link only appears for platform administrators.",
+          "Changing a plan that has subscribers needs a reason, and shows how many organisations it reaches.",
         ],
       },
     ],

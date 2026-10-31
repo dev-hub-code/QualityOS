@@ -19,7 +19,7 @@ and known gaps.
 | Traceability | Production batches, serial numbers, dispatch, returns, material corrections, forward and backward traces, recalls |
 | Calibration and audits | Instruments, calibration records, audit checklists, findings that raise NCRs |
 | Analytics | Dashboard, supplier scorecards, Pareto, PDF and Excel reports |
-| Subscription | Plans, limits, trials, invoices, platform console. Payments are recorded by hand, and invoices are not yet GST tax invoices |
+| Subscription | Plans, limits, trials, invoices, and the Control Center at `/platform`. Payments are recorded by hand, and invoices are not yet GST tax invoices |
 
 ## Prerequisites
 
@@ -75,3 +75,4 @@ These commands are the current evidence. CI has not run them on GitHub yet.
 - [Analytics definitions](docs/ANALYTICS.md)
 - [Continuous integration](docs/CI.md)
 - [Security review](docs/SECURITY_REVIEW.md)
+- [Platform administration](docs/PLATFORM_ADMIN.md)

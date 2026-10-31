@@ -1,9 +1,11 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { useState } from "react";
 import { formatMoney } from "@/components/billing/subscription-banner";
-import { PageHeader, QueryState, useRefresh } from "@/components/records/parts";
+import { PageHeader, QueryState, Section, useRefresh } from "@/components/records/parts";
+import { PLAN_FEATURES, PlanComparison } from "@/components/platform/plan-comparison";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -11,11 +13,6 @@ import { api } from "@/lib/api";
 import type { FieldDef } from "@/lib/record-form";
 import type { Plan } from "@/lib/types";
 
-const FEATURES = [
-  ["NCR_CAPA", "NCR and CAPA"],
-  ["REPORTS", "Dashboards and reports"],
-  ["ADVANCED", "Traceability, recalls, calibration and audits"],
-];
 
 const FIELDS: FieldDef[] = [
   { name: "name", label: "Name", required: true },
@@ -27,9 +24,17 @@ const FIELDS: FieldDef[] = [
   { name: "maxFacilities", label: "Facility limit (blank for none)", type: "decimal" },
   { name: "trialDays", label: "Trial days", type: "decimal", required: true },
   { name: "graceDays", label: "Grace days", type: "decimal", required: true },
-  ...FEATURES.map(([name, label]): FieldDef => ({ name, label, type: "checkbox" })),
+  ...PLAN_FEATURES.map(([name, label]): FieldDef => ({ name, label, type: "checkbox" })),
   { name: "active", label: "Offered to customers", type: "checkbox" },
+  { name: "publicVisible", label: "Shown on the website", type: "checkbox" },
+  { name: "displayOrder", label: "Display order", type: "decimal", required: true },
 ];
+
+const NEW_PLAN: FieldDef[] = [
+  { name: "code", label: "Code, such as GROWTH_PLUS", required: true },
+  { name: "name", label: "Name", required: true },
+];
+const REASON: FieldDef[] = [{ name: "reason", label: "Reason", type: "textarea", required: true }];
 
 const NUMBERS = [
   "monthlyPrice",
@@ -39,6 +44,7 @@ const NUMBERS = [
   "maxFacilities",
   "trialDays",
   "graceDays",
+  "displayOrder",
 ] as const;
 
 const money = (value: number | null) => (value === null ? "Custom" : formatMoney(value));
@@ -46,12 +52,24 @@ const money = (value: number | null) => (value === null ? "Custom" : formatMoney
 export default function PlatformPlansPage() {
   const refresh = useRefresh();
   const [editing, setEditing] = useState<Plan | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [copying, setCopying] = useState<Plan | null>(null);
+  const [acting, setActing] = useState<{ plan: Plan; action: "activate" | "deactivate" | "archive" } | null>(null);
   const path = "/platform/plans";
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<Plan[]>(path) });
+  const impact = useQuery({
+    queryKey: [path, editing?.id, "impact"],
+    queryFn: () => api.get<{ subscribers: number }>(`${path}/${editing?.id}/impact`),
+    enabled: editing !== null,
+  });
+  const subscribers = impact.data?.subscribers ?? 0;
   if (!data) return <QueryState error={error} />;
+  const listed = [...data].sort((a, b) => Number(a.archivedAt !== null) - Number(b.archivedAt !== null));
   return (
     <div className="space-y-6">
-      <PageHeader title="Plans" subtitle="Changes apply to new invoices. Issued invoices keep their figures." />
+      <PageHeader title="Plans" subtitle="Changes apply to new invoices. Issued invoices keep their figures.">
+        <Button onClick={() => setAdding(true)}>New plan</Button>
+      </PageHeader>
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -65,19 +83,38 @@ export default function PlatformPlansPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.map((plan) => (
+            {listed.map((plan) => (
               <TableRow key={plan.id}>
                 <TableCell>
-                  {plan.name}
-                  {!plan.active && " (not offered)"}
+                  <Link className="underline" href={`/platform/plans/${plan.id}`}>
+                    {plan.name}
+                  </Link>
+                  {plan.archivedAt ? " (archived)" : !plan.active && " (not offered)"}
                 </TableCell>
                 <TableCell className="text-right">{money(plan.monthlyPrice)}</TableCell>
                 <TableCell className="text-right">{money(plan.annualPrice)}</TableCell>
                 <TableCell className="text-right">{plan.maxUsers ?? "No limit"}</TableCell>
                 <TableCell className="text-right">{plan.maxFacilities ?? "No limit"}</TableCell>
-                <TableCell>
-                  <Button size="sm" variant="outline" onClick={() => setEditing(plan)}>
-                    Edit {plan.name}
+                <TableCell className="space-x-2 whitespace-nowrap">
+                  {!plan.archivedAt && (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => setEditing(plan)}>
+                        Edit {plan.name}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setActing({ plan, action: plan.active ? "deactivate" : "activate" })}
+                      >
+                        {plan.active ? "Deactivate" : "Activate"} {plan.name}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setActing({ plan, action: "archive" })}>
+                        Archive {plan.name}
+                      </Button>
+                    </>
+                  )}
+                  <Button size="sm" variant="outline" onClick={() => setCopying(plan)}>
+                    Copy {plan.name}
                   </Button>
                 </TableCell>
               </TableRow>
@@ -85,20 +122,68 @@ export default function PlatformPlansPage() {
           </TableBody>
         </Table>
       </div>
-      {editing && (
+      <Section title="Compare plans">
+        <PlanComparison plans={data.filter((plan) => !plan.archivedAt)} />
+      </Section>
+      {adding && (
+        <RecordDialog
+          title="New plan"
+          fields={NEW_PLAN}
+          onClose={() => setAdding(false)}
+          onSubmit={async (values) => {
+            await api.post(path, values);
+            await refresh();
+          }}
+        />
+      )}
+      {copying && (
+        <RecordDialog
+          title={`Copy ${copying.name}`}
+          fields={NEW_PLAN}
+          onClose={() => setCopying(null)}
+          onSubmit={async (values) => {
+            await api.post(`${path}/${copying.id}/duplicate`, values);
+            await refresh();
+          }}
+        />
+      )}
+      {acting && (
+        <RecordDialog
+          title={`${acting.action[0].toUpperCase()}${acting.action.slice(1)} ${acting.plan.name}`}
+          fields={REASON}
+          onClose={() => setActing(null)}
+          onSubmit={async ({ reason }) => {
+            const { plan, action } = acting;
+            const body = { version: plan.version, reason };
+            await (action === "archive"
+              ? api.post(`${path}/${plan.id}/archive`, body)
+              : api.post(`${path}/${plan.id}/active`, { ...body, active: action === "activate" }));
+            await refresh();
+          }}
+        />
+      )}
+      {editing && impact.data && (
         <RecordDialog
           title={`Edit ${editing.name}`}
-          fields={FIELDS}
+          fields={[...FIELDS, { name: "reason", label: "Reason", type: "textarea", required: subscribers > 0 }]}
+          extra={
+            subscribers > 0 && (
+              <p role="status" className="text-sm">
+                {subscribers} {subscribers === 1 ? "organisation is" : "organisations are"} on this plan. Limits and
+                features change for them at once. A new price applies from their next invoice.
+              </p>
+            )
+          }
           record={{
             ...editing,
             ...Object.fromEntries(
               NUMBERS.map((name) => [name, editing[name] === null ? "" : String(editing[name])]),
             ),
-            ...Object.fromEntries(FEATURES.map(([code]) => [code, editing.features.includes(code)])),
+            ...Object.fromEntries(PLAN_FEATURES.map(([code]) => [code, editing.features.includes(code)])),
           }}
           onClose={() => setEditing(null)}
           onSubmit={async (values) => {
-            const features = FEATURES.map(([code]) => code).filter((code) => values[code]);
+            const features = PLAN_FEATURES.map(([code]) => code).filter((code) => values[code]);
             await api.put(`${path}/${editing.id}`, { ...values, features, version: editing.version });
             setEditing(null);
             await refresh();

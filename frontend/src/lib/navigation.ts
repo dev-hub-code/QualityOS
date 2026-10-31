@@ -10,6 +10,7 @@ import {
   Gauge,
   ListTodo,
   ScanSearch,
+  ShieldEllipsis,
   SearchCheck,
   Siren,
   ClipboardX,
@@ -72,8 +73,14 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Billing", href: "/settings/billing", icon: CreditCard, anyPermission: ["SUBSCRIPTION_MANAGE"] },
   { label: "Settings", href: "/settings", icon: Settings },
   { label: "Documentation", href: "/docs", icon: BookOpen },
-  { label: "Plans", href: "/platform/plans", icon: Tags, anyPermission: ["PLATFORM_ADMIN"] },
-  { label: "Organisations", href: "/platform/organisations", icon: Building, anyPermission: ["PLATFORM_ADMIN"] },
+  { label: "Control Center", href: "/platform/dashboard", icon: ShieldEllipsis, anyPermission: ["PLATFORM_ADMIN"] },
+];
+
+/** Kept apart from the workspace. A page joins this list only once it works. */
+export const CONTROL_CENTER_NAV: { heading: string; items: NavItem[] }[] = [
+  { heading: "Overview", items: [{ label: "Dashboard", href: "/platform/dashboard", icon: LayoutDashboard }] },
+  { heading: "Customers", items: [{ label: "Organisations", href: "/platform/organisations", icon: Building }] },
+  { heading: "Billing", items: [{ label: "Plans", href: "/platform/plans", icon: Tags }] },
 ];
 
 export function visibleNavItems(permissions: readonly string[], items = NAV_ITEMS): NavItem[] {

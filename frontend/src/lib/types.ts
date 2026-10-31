@@ -1046,6 +1046,64 @@ export interface Plan {
   graceDays: number;
   active: boolean;
   version: number;
+  currency: string;
+  publicVisible: boolean;
+  archivedAt: string | null;
+  displayOrder: number;
+}
+
+export interface PlanVersion {
+  version: number;
+  snapshot: Record<string, unknown>;
+  reason: string | null;
+  changedBy: string | null;
+  changedAt: string;
+}
+
+export interface PlatformMonth {
+  month: string;
+  mrr: number;
+  paying: number;
+  registered: number;
+  converted: number;
+  collected: number;
+  cancelled: number;
+}
+
+export interface PlatformDashboard {
+  from: string;
+  to: string;
+  organisations: number;
+  active: number;
+  trials: number;
+  grace: number;
+  readOnly: number;
+  expired: number;
+  mrr: number;
+  arr: number;
+  outstanding: number;
+  outstandingInvoices: number;
+  collected: number;
+  collectionRate: number | null;
+  churnRate: number | null;
+  plans: { name: string; count: number }[];
+  months: PlatformMonth[];
+}
+
+export interface OrganisationDetail {
+  tenantId: string;
+  name: string;
+  legalName: string | null;
+  gstin: string | null;
+  contactEmail: string | null;
+  countryCode: string;
+  timezone: string;
+  registeredAt: string;
+  subscription: Subscription;
+  usage: { inspections: number; ncrs: number; capas: number; attachments: number; attachmentBytes: number };
+  invoices: Invoice[];
+  payments: Payment[];
+  activity: { action: string; entityType: string; occurredAt: string }[];
 }
 
 export interface Subscription {
@@ -1094,6 +1152,9 @@ export interface TenantSubscription {
   organizationName: string;
   subscription: Subscription;
   openInvoices: Invoice[];
+  gstin: string | null;
+  contactEmail: string | null;
+  registeredAt: string;
 }
 
 export interface OrganisationList {

@@ -53,6 +53,7 @@ public class Inspection extends TenantOwnedEntity {
 
     private UUID receiptItemId;
     private UUID productionBatchId;
+    private UUID returnItemId;
     private UUID supplierId;
     private UUID facilityId;
     private UUID materialId;
@@ -102,6 +103,10 @@ public class Inspection extends TenantOwnedEntity {
         this.batchNumber = batchNumber;
         this.quantity = quantity;
         this.sampleSize = sampleSize;
+    }
+
+    public void forReturnedGoods(UUID returnItemId) {
+        this.returnItemId = returnItemId;
     }
 
     /** Corrections only: the results stand, and only the record of what was inspected changes. */

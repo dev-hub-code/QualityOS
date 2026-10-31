@@ -48,9 +48,12 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import com.qualityos.quality.dto.QualityDtos.InspectionFailure;
 import com.qualityos.quality.service.NcrService;
 import com.qualityos.traceability.dto.TraceabilityDtos.ProductionBatchView;
+import com.qualityos.traceability.dto.TraceabilityDtos.ReturnedGoods;
+import com.qualityos.traceability.service.DispatchReturnService;
 import com.qualityos.traceability.service.ProductionService;
 import com.qualityos.inspection.dto.InspectionDtos.InspectionHistory;
 import java.math.BigDecimal;
@@ -82,6 +85,7 @@ public class InspectionService implements AttachmentPolicy {
     private final InspectionAlerts inspectionAlerts;
     private final NcrService ncrs;
     private final ProductionService production;
+    private final DispatchReturnService returns;
     private final JsonMapper json;
 
     /** Lazy because the attachment service collects every policy, and this class is one. */
@@ -99,6 +103,7 @@ public class InspectionService implements AttachmentPolicy {
             InspectionAlerts inspectionAlerts,
             NcrService ncrs,
             ProductionService production,
+            DispatchReturnService returns,
             JsonMapper json) {
         this.inspections = inspections;
         this.results = results;
@@ -113,6 +118,7 @@ public class InspectionService implements AttachmentPolicy {
         this.inspectionAlerts = inspectionAlerts;
         this.ncrs = ncrs;
         this.production = production;
+        this.returns = returns;
         this.json = json;
     }
 
@@ -165,10 +171,42 @@ public class InspectionService implements AttachmentPolicy {
     /** Freezes the specification in force today. Later template changes never reach this inspection. */
     @Transactional
     public InspectionDetail create(CreateInspectionRequest request) {
-        if ((request.receiptItemId() == null) == (request.productionBatchId() == null)) {
-            throw new BusinessRuleException("Choose a received batch or a production batch to inspect.");
+        long subjects = Stream.of(request.receiptItemId(), request.productionBatchId(), request.returnItemId())
+                .filter(Objects::nonNull)
+                .count();
+        if (subjects != 1) {
+            throw new BusinessRuleException("Choose one received batch, production batch or return to inspect.");
         }
-        return toDetail(request.receiptItemId() != null ? inspectLot(request) : inspectProductionBatch(request));
+        if (request.receiptItemId() != null) {
+            return toDetail(inspectLot(request));
+        }
+        return toDetail(request.returnItemId() != null ? inspectReturn(request) : inspectProductionBatch(request));
+    }
+
+    private Inspection inspectReturn(CreateInspectionRequest request) {
+        ReturnedGoods goods = returns.startInspection(request.returnItemId());
+        ProductionBatchView batch = production.batch(goods.productionBatchId());
+        InspectionTemplate template = templates.requireUsableForProduct(request.templateId(), batch.productId());
+        if (template.getInspectionType() != InspectionTemplate.Type.FQC
+                && template.getInspectionType() != InspectionTemplate.Type.OQC) {
+            throw new BusinessRuleException("Returned goods take a final or outgoing inspection template.");
+        }
+        TemplateVersion version = templates.versionInForce(template.getId());
+        Inspection inspection = new Inspection(
+                numbers.next("INS"),
+                template.getInspectionType(),
+                version.getId(),
+                json.writeValueAsString(templates.snapshot(template.getId(), version)),
+                null,
+                batch.id(),
+                null,
+                batch.facilityId(),
+                null,
+                batch.batchNumber(),
+                goods.quantity(),
+                version.samplesFor(goods.quantity()));
+        inspection.forReturnedGoods(goods.id());
+        return save(inspection);
     }
 
     private Inspection inspectLot(CreateInspectionRequest request) {
@@ -256,7 +294,9 @@ public class InspectionService implements AttachmentPolicy {
     }
 
     private void recordOutcome(Inspection inspection, String disposition, boolean finalDecision) {
-        if (inspection.getReceiptItemId() != null) {
+        if (inspection.getReturnItemId() != null) {
+            returns.recordInspectionOutcome(inspection.getReturnItemId(), disposition, finalDecision);
+        } else if (inspection.getReceiptItemId() != null) {
             receipts.recordDisposition(inspection.getReceiptItemId(), disposition, finalDecision);
         } else {
             production.recordInspectionOutcome(
@@ -268,7 +308,9 @@ public class InspectionService implements AttachmentPolicy {
     public InspectionDetail cancel(UUID id) {
         Inspection inspection = lock(id);
         inspection.cancel();
-        if (inspection.getReceiptItemId() != null) {
+        if (inspection.getReturnItemId() != null) {
+            returns.inspectionCancelled(inspection.getReturnItemId());
+        } else if (inspection.getReceiptItemId() != null) {
             receipts.releaseInspection(inspection.getReceiptItemId());
         }
         inspections.saveAndFlush(inspection);

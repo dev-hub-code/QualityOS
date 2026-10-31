@@ -21,8 +21,9 @@ public final class InspectionDtos {
     private InspectionDtos() {
     }
 
-    /** Names one subject: a received lot or a production batch. */
-    public record CreateInspectionRequest(UUID receiptItemId, UUID productionBatchId, @NotNull UUID templateId) {
+    /** Names one subject: a received lot, a production batch, or goods a customer returned. */
+    public record CreateInspectionRequest(
+            UUID receiptItemId, UUID productionBatchId, UUID returnItemId, @NotNull UUID templateId) {
     }
 
     public record ExecuteRequest(@NotEmpty List<@Valid ResultRequest> results) {

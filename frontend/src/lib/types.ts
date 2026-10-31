@@ -547,7 +547,14 @@ export interface Dispatch {
   customerName: string;
   dispatchedOn: string;
   reference: string | null;
-  lines: { batchNumber: string; productCode: string; productName: string; quantity: string }[];
+  lines: {
+    id: string;
+    batchNumber: string;
+    productCode: string;
+    productName: string;
+    quantity: string;
+    returnedQuantity: string;
+  }[];
   reversalReason: string | null;
 }
 
@@ -586,6 +593,7 @@ export interface TraceReport {
   backward: TraceNode[];
   forward: TraceNode[];
   dispatches: Dispatch[];
+  returns: DispatchReturn[];
   affectedCustomers: string[];
   serialNumbers: string[];
   timeline: TimelineEvent[];
@@ -611,4 +619,25 @@ export interface CorrectionDetail extends CorrectionSummary {
   impact: { inspected: boolean; batches: string[]; customers: string[] } | null;
   decisionNote: string | null;
   appliedAt: string | null;
+}
+
+export interface DispatchReturn {
+  id: string;
+  reversalNumber: string;
+  dispatchNumber: string;
+  customerName: string;
+  returnReference: string;
+  reversalDate: string;
+  reason: string;
+  status: string;
+  recordedByName: string | null;
+  items: {
+    id: string;
+    batchNumber: string;
+    productCode: string;
+    quantity: string;
+    serialNumbers: string[];
+    status: string;
+    disposition: string | null;
+  }[];
 }

@@ -11,7 +11,7 @@ import { formatQuantity, type FieldDef, type FieldOption } from "@/lib/record-fo
 import type { Assignee, DefectCategory, Category, Facility, Material, Product, Specification, Supplier, Unit } from "@/lib/types";
 
 const NEGATIVE = new Set(["REJECTED", "REJECT", "BLOCKED", "CANCELLED", "VOIDED", "FAIL", "HOLD", "CRITICAL", "OVERDUE", "ON_HOLD", "REVERSED"]);
-const POSITIVE = new Set(["APPROVED", "RECEIVED", "CLOSED", "NOT_REQUIRED", "PASS", "ACCEPT", "PUBLISHED", "COMPLETED", "MINOR", "RELEASED", "APPLIED"]);
+const POSITIVE = new Set(["APPROVED", "RECEIVED", "CLOSED", "NOT_REQUIRED", "PASS", "ACCEPT", "PUBLISHED", "COMPLETED", "MINOR", "RELEASED", "APPLIED", "ACCEPTED"]);
 
 export function StatusBadge({ status }: { status: string }) {
   const variant = NEGATIVE.has(status) ? "destructive" : POSITIVE.has(status) ? "default" : "secondary";

@@ -159,10 +159,68 @@ public final class TraceabilityDtos {
     }
 
     public record DispatchLine(
+            UUID id,
             String batchNumber,
             String productCode,
             String productName,
-            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity) {
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal returnedQuantity) {
+    }
+
+    public record ReturnLineRequest(
+            @NotNull UUID dispatchItemId,
+            @NotNull @Positive @Digits(integer = 12, fraction = 6) BigDecimal quantity,
+            @Size(max = 1000) List<@NotBlank @Size(max = 100) String> serialNumbers) {
+    }
+
+    public record CreateReversalRequest(
+            @NotBlank @Size(max = 100) String returnReference,
+            @NotNull LocalDate reversalDate,
+            @NotBlank @Size(max = 1000) String reason,
+            @NotEmpty List<@Valid ReturnLineRequest> items) {
+    }
+
+    /** A return line, as inspection needs to see it. */
+    public record ReturnedGoods(UUID id, UUID productionBatchId, BigDecimal quantity) {
+    }
+
+    public record ReversalItemView(
+            UUID id,
+            UUID dispatchItemId,
+            String batchNumber,
+            String productCode,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
+            List<String> serialNumbers,
+            String status,
+            String disposition) {
+    }
+
+    public record ReversalView(
+            UUID id,
+            String reversalNumber,
+            UUID dispatchId,
+            String dispatchNumber,
+            String customerName,
+            String returnReference,
+            LocalDate reversalDate,
+            String reason,
+            String status,
+            String recordedByName,
+            Instant createdAt,
+            Instant closedAt,
+            List<ReversalItemView> items) {
+    }
+
+    /** @param status NOT_REVERSED, PARTIALLY_REVERSED or FULLY_REVERSED */
+    public record ReversalSummary(
+            UUID dispatchId,
+            String status,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal dispatchedQuantity,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal reversedQuantity,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal remainingQuantity,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal pendingQuantity,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal acceptedQuantity,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal rejectedQuantity) {
     }
 
     public record DispatchResponse(
@@ -214,6 +272,7 @@ public final class TraceabilityDtos {
             List<TraceNode> forward,
             List<TraceEdge> edges,
             List<DispatchResponse> dispatches,
+            List<ReversalView> returns,
             List<String> affectedCustomers,
             List<String> serialNumbers,
             List<InspectionHistory> inspections,

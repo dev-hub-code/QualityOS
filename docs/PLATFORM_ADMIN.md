@@ -13,6 +13,18 @@ The Control Center is where the people who run QualityOS manage plans and custom
 
 A page joins the navigation only once it works.
 
+## Online payment
+
+Cashfree checkout appears on a customer's billing page once `CASHFREE_APP_ID` and `CASHFREE_SECRET_KEY` are set. Without
+them customers see no pay button, and invoices are recorded by hand as before. Set `CASHFREE_ENVIRONMENT=production` only
+with live keys, and point the Cashfree webhook at `<APP_URL>/api/webhooks/cashfree`.
+
+The amount comes from the invoice, and a payment counts only after QualityOS has asked Cashfree about it. Neither the
+customer's return nor a webhook's contents settle anything alone. Payments appear under Payments with provider `CASHFREE`.
+
+Search the audit log for `PAYMENT_NEEDS_REVIEW`. It means money was taken but could not be applied, usually because the
+invoice was replaced or already paid. Refund it in Cashfree, or record it by hand against the right invoice.
+
 ## Signing in
 
 Every sign-in goes through `/start`. An operator lands on the Control Center and anyone else on their organisation's

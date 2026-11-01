@@ -309,6 +309,29 @@ public final class SubscriptionDtos {
             @Size(max = 500) String notes) {
     }
 
+    public record PaymentGateway(boolean available, String mode) {
+    }
+
+    /** The phone is sent to the gateway, which requires one, and is not stored here. */
+    public record CheckoutRequest(@NotBlank @Pattern(regexp = "[6-9]\\d{9}", message = "Enter a 10-digit mobile number") String phone) {
+
+        @Override
+        public String toString() {
+            return "CheckoutRequest[]";
+        }
+    }
+
+    public record CheckoutResponse(String orderId, String paymentSessionId, String mode) {
+
+        @Override
+        public String toString() {
+            return "CheckoutResponse[" + orderId + "]";
+        }
+    }
+
+    public record OrderConfirmation(String status) {
+    }
+
     /** Every operator action on an organisation says why. */
     public record ReasonRequest(@NotBlank @Size(max = 500) String reason) {
     }

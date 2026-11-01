@@ -36,6 +36,8 @@ class EndpointAuthorizationIT extends AbstractIntegrationTest {
             // Open to everyone, and hold no organisation data.
             "GET /api/v1/public/plans",
             "GET /api/v1/system/info",
+            // Cashfree holds no session. Each request is checked by its signature instead.
+            "POST /api/v1/public/webhooks/cashfree",
             // The caller's own notifications.
             "GET /api/v1/notifications",
             "GET /api/v1/notifications/preferences",

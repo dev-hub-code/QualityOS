@@ -34,6 +34,7 @@ describe("leavesWorkspace", () => {
   it("moves an operator of a platform organisation off workspace pages", () => {
     expect(leavesWorkspace("/dashboard", ["PLATFORM_ADMIN"], false)).toBe(true);
     expect(leavesWorkspace("/ncrs/1", ["PLATFORM_ADMIN"], false)).toBe(true);
+    expect(leavesWorkspace("/settings/billing", ["PLATFORM_ADMIN"], false)).toBe(true);
   });
 
   it("leaves their account pages and the Control Center alone", () => {

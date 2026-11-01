@@ -124,12 +124,14 @@ export const CONTROL_CENTER_NAV: { heading: string; items: NavItem[] }[] = [
     ] },
 ];
 
-const ACCOUNT_PAGES = ["/settings", "/docs", "/platform"];
+/** Settings alone, because the billing page beneath it belongs to a customer. */
+const isAccountPage = (pathname: string) =>
+  pathname === "/settings" || ["/docs", "/platform"].some((page) => pathname === page || pathname.startsWith(`${page}/`));
 
 /** A platform organisation has no records of its own, so its members only get what belongs to their account. */
 export function workspaceNavItems(permissions: readonly string[], hasSubscription: boolean): NavItem[] {
   const visible = visibleNavItems(permissions);
-  return hasSubscription ? visible : visible.filter(({ href }) => ACCOUNT_PAGES.includes(href));
+  return hasSubscription ? visible : visible.filter(({ href }) => isAccountPage(href));
 }
 
 /** An operator of a platform organisation has no workspace, however they reached the page. */
@@ -137,7 +139,7 @@ export function leavesWorkspace(pathname: string, permissions: readonly string[]
   return (
     !hasSubscription &&
     permissions.includes("PLATFORM_ADMIN") &&
-    !ACCOUNT_PAGES.some((page) => pathname === page || pathname.startsWith(`${page}/`))
+    !isAccountPage(pathname)
   );
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { landingPage, visibleNavItems, workspaceNavItems } from "./navigation";
+import { landingPage, leavesWorkspace, visibleNavItems, workspaceNavItems } from "./navigation";
 
 const labels = (permissions: string[]) => visibleNavItems(permissions).map((item) => item.label);
 
@@ -27,6 +27,24 @@ describe("workspaceNavItems", () => {
       "Documentation",
       "Control Center",
     ]);
+  });
+});
+
+describe("leavesWorkspace", () => {
+  it("moves an operator of a platform organisation off workspace pages", () => {
+    expect(leavesWorkspace("/dashboard", ["PLATFORM_ADMIN"], false)).toBe(true);
+    expect(leavesWorkspace("/ncrs/1", ["PLATFORM_ADMIN"], false)).toBe(true);
+  });
+
+  it("leaves their account pages and the Control Center alone", () => {
+    for (const page of ["/settings", "/docs", "/platform/dashboard"]) {
+      expect(leavesWorkspace(page, ["PLATFORM_ADMIN"], false)).toBe(false);
+    }
+  });
+
+  it("leaves customers and operators with a workspace alone", () => {
+    expect(leavesWorkspace("/dashboard", ["PLATFORM_ADMIN"], true)).toBe(false);
+    expect(leavesWorkspace("/dashboard", [], false)).toBe(false);
   });
 });
 

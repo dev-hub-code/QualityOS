@@ -124,12 +124,21 @@ export const CONTROL_CENTER_NAV: { heading: string; items: NavItem[] }[] = [
     ] },
 ];
 
+const ACCOUNT_PAGES = ["/settings", "/docs", "/platform"];
+
 /** A platform organisation has no records of its own, so its members only get what belongs to their account. */
 export function workspaceNavItems(permissions: readonly string[], hasSubscription: boolean): NavItem[] {
   const visible = visibleNavItems(permissions);
-  return hasSubscription
-    ? visible
-    : visible.filter(({ href }) => ["/settings", "/docs", "/platform/dashboard"].includes(href));
+  return hasSubscription ? visible : visible.filter(({ href }) => ACCOUNT_PAGES.includes(href));
+}
+
+/** An operator of a platform organisation has no workspace, however they reached the page. */
+export function leavesWorkspace(pathname: string, permissions: readonly string[], hasSubscription: boolean): boolean {
+  return (
+    !hasSubscription &&
+    permissions.includes("PLATFORM_ADMIN") &&
+    !ACCOUNT_PAGES.some((page) => pathname === page || pathname.startsWith(`${page}/`))
+  );
 }
 
 export function landingPage(permissions: readonly string[]): string {

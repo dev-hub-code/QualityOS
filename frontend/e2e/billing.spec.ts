@@ -107,6 +107,7 @@ test("an open invoice offers online payment only when a gateway is set up", asyn
   await page.getByLabel("Mobile number").fill("12345");
   await page.getByRole("button", { name: /online/ }).click();
   await expect(page.getByRole("alert").filter({ hasText: "10-digit" })).toBeVisible();
+});
 
 test("an operator of a platform organisation has no workspace to land in", async ({ page }) => {
   const email = `admin-${unique()}@example.com`;

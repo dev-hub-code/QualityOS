@@ -60,6 +60,13 @@ app:
 qualityos:
   # The address users reach the web application on, used for links in emails.
   app-url: ${APP_URL:http://localhost:3000}
+  # Online payment. Left empty, customers see no pay button and invoices are recorded by hand.
+  payments:
+    cashfree:
+      client-id: ${CASHFREE_APP_ID:}
+      client-secret: ${CASHFREE_SECRET_KEY:}
+      environment: ${CASHFREE_ENVIRONMENT:sandbox}
+      base-url: ${CASHFREE_BASE_URL:}
   # The seller printed on invoices. Set these for the legal entity that bills before sending one to a customer.
   billing:
     seller-name: ${BILLING_SELLER_NAME:QualityOS}

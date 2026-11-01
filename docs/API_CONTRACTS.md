@@ -70,6 +70,10 @@ fields are allow-listed per endpoint. `data` is a `PageResponse`:
 | `POST /auth/logout` | Revokes the token family |
 | `POST /auth/switch-tenant` | New token for another verified membership. An addition to the brief |
 | `POST /auth/change-password` | Requires the current password and revokes all sessions. An addition to the brief |
+| `GET /subscription/payment-gateway` | Whether online payment is available, and in which mode |
+| `POST /subscription/invoices/{id}/checkout` | Takes `phone`. Opens or continues a Cashfree order for the invoice's own total |
+| `POST /subscription/gateway-orders/{orderId}/confirm` | Asks Cashfree what happened and applies it. Returns `ACTIVE`, `PAID` or `NEEDS_REVIEW` |
+| `POST /public/webhooks/cashfree` | Cashfree only, checked by signature. Reach it through the web app at `/api/webhooks/cashfree` |
 | `GET /auth/me` | User, current organisation, whether it has a subscription, permissions and memberships. An addition to the brief |
 
 Access token: RS256, 15 minutes, with claims `sub` and `tid` (tenant). Membership and permissions are

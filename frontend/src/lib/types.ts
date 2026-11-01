@@ -3,6 +3,21 @@ export interface OrganizationSummary {
   name: string;
 }
 
+export interface PaymentGateway {
+  available: boolean;
+  mode: "sandbox" | "production" | null;
+}
+
+export interface Checkout {
+  orderId: string;
+  paymentSessionId: string;
+  mode: "sandbox" | "production";
+}
+
+export interface OrderConfirmation {
+  status: "ACTIVE" | "PAID" | "NEEDS_REVIEW";
+}
+
 export interface Me {
   user: { id: string; email: string; fullName: string; emailVerified: boolean; language: string | null };
   tenantId: string;

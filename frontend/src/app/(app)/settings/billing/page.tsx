@@ -1,20 +1,27 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { PayOnline } from "@/components/billing/pay-online";
 import { formatDate, formatMoney } from "@/components/billing/subscription-banner";
 import { PageHeader, QueryState, Section, StatusBadge, useAction } from "@/components/records/parts";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import { storageText, usageText } from "@/lib/usage";
-import type { BillingCycle, Invoice, Payment, Plan, Subscription } from "@/lib/types";
+import type { BillingCycle, Invoice, OrderConfirmation, Payment, PaymentGateway, Plan, Subscription } from "@/lib/types";
 
 const STATE: Record<Subscription["state"], string> = {
   TRIAL: "Trial",
   ACTIVE: "Active",
   GRACE: "Ended, grace period",
   READ_ONLY: "Read-only",
+};
+
+const RETURNED: Record<OrderConfirmation["status"], string> = {
+  PAID: "Payment received. Thank you.",
+  ACTIVE: "This payment has not reached us yet. If money left your account, it will show here shortly. Please do not pay again.",
+  NEEDS_REVIEW: "We received a payment that could not be applied to this invoice. Please contact support. You do not need to pay again.",
 };
 
 function limit(used: number, max: number | null) {
@@ -69,6 +76,22 @@ export default function BillingPage() {
   const plans = useQuery(get<Plan[]>("/subscription/plans"));
   const invoices = useQuery(get<Invoice[]>("/subscription/invoices"));
   const payments = useQuery(get<Payment[]>("/subscription/payments"));
+  const gateway = useQuery(get<PaymentGateway>("/subscription/payment-gateway"));
+  const queryClient = useQueryClient();
+  const [returned, setReturned] = useState("");
+
+  // Back from Cashfree. The address only says which order to ask about; the backend finds out what happened.
+  useEffect(() => {
+    const orderId = new URLSearchParams(window.location.search).get("order_id");
+    if (!orderId) return;
+    window.history.replaceState(null, "", window.location.pathname);
+    api
+      .post<OrderConfirmation>(`/subscription/gateway-orders/${encodeURIComponent(orderId)}/confirm`)
+      .then(({ status }) => setReturned(RETURNED[status]))
+      .catch((error: Error) => setReturned(error.message))
+      .finally(() => queryClient.invalidateQueries());
+  }, [queryClient]);
+
   const current = subscription.data;
   if (!current) return <QueryState error={subscription.error} />;
   const number = (invoiceId: string) => invoices.data?.find((invoice) => invoice.id === invoiceId)?.invoiceNumber;
@@ -77,6 +100,11 @@ export default function BillingPage() {
     <div className="space-y-6">
       <PageHeader title="Billing" subtitle={`${current.planName} plan`} />
       {message && <p className="text-sm text-destructive">{message}</p>}
+      {returned && (
+        <p role="status" className="rounded-md border bg-muted px-3 py-2 text-sm">
+          {returned}
+        </p>
+      )}
       <Section title="Subscription">
         <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div>
@@ -124,10 +152,13 @@ export default function BillingPage() {
         </div>
       </Section>
       {open && (
-        <p role="status" className="rounded-md border bg-muted px-3 py-2 text-sm">
-          Invoice {open.invoiceNumber} for {formatMoney(open.total)} is due by {open.dueOn}. The {open.planName} plan starts
-          once it is paid. Choosing another plan replaces this invoice.
-        </p>
+        <div className="rounded-md border bg-muted px-3 py-2 text-sm">
+          <p role="status">
+            Invoice {open.invoiceNumber} for {formatMoney(open.total)} is due by {open.dueOn}. The {open.planName} plan starts
+            once it is paid. Choosing another plan replaces this invoice.
+          </p>
+          {gateway.data?.available && <PayOnline invoice={open} testMode={gateway.data.mode === "sandbox"} />}
+        </div>
       )}
       <Section title="Plans">
         <fieldset className="mb-4 flex gap-4 text-sm">

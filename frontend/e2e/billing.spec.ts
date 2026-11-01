@@ -92,6 +92,23 @@ test("signing in opens the Control Center for an operator and the organisation f
   await context.close();
 });
 
+test("an open invoice offers online payment only when a gateway is set up", async ({ page }) => {
+  await signUp(page);
+  await page.goto("/settings/billing");
+  await page.getByRole("button", { name: "Choose Growth" }).click();
+  await expect(page.getByText(/The Growth plan starts\s+once it is paid/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /online/ })).toHaveCount(0);
+
+  await page.route("**/api/v1/subscription/payment-gateway", (route) =>
+    route.fulfill({ json: { success: true, data: { available: true, mode: "sandbox" } } }),
+  );
+  await page.reload();
+  await expect(page.getByText("Test mode: no real money moves.")).toBeVisible();
+  await page.getByLabel("Mobile number").fill("12345");
+  await page.getByRole("button", { name: /online/ }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "10-digit" })).toBeVisible();
+});
+
 test("an operator of a platform organisation has no workspace to land in", async ({ page }) => {
   const email = `admin-${unique()}@example.com`;
   await signUp(page, email);

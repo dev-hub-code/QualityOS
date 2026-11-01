@@ -3,11 +3,16 @@ package com.qualityos.subscription.controller;
 import com.qualityos.common.response.ApiResponse;
 import com.qualityos.common.security.Permissions.Require;
 import com.qualityos.subscription.dto.SubscriptionDtos.ChangePlanRequest;
+import com.qualityos.subscription.dto.SubscriptionDtos.CheckoutRequest;
+import com.qualityos.subscription.dto.SubscriptionDtos.CheckoutResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.InvoiceResponse;
+import com.qualityos.subscription.dto.SubscriptionDtos.OrderConfirmation;
+import com.qualityos.subscription.dto.SubscriptionDtos.PaymentGateway;
 import com.qualityos.subscription.dto.SubscriptionDtos.PaymentResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.PlanResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.SubscriptionResponse;
 import com.qualityos.subscription.entity.SubscriptionInvoice;
+import com.qualityos.subscription.service.CashfreePayments;
 import com.qualityos.subscription.service.InvoicePdfRenderer;
 import com.qualityos.subscription.service.SubscriptionService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,10 +41,12 @@ public class SubscriptionController {
 
     private final SubscriptionService subscriptions;
     private final InvoicePdfRenderer invoices;
+    private final CashfreePayments gateway;
 
-    SubscriptionController(SubscriptionService subscriptions, InvoicePdfRenderer invoices) {
+    SubscriptionController(SubscriptionService subscriptions, InvoicePdfRenderer invoices, CashfreePayments gateway) {
         this.subscriptions = subscriptions;
         this.invoices = invoices;
+        this.gateway = gateway;
     }
 
     /** Any member may see where the organisation stands, so that the app can warn before it turns read-only. */
@@ -78,6 +85,22 @@ public class SubscriptionController {
     @GetMapping("/payments")
     public ApiResponse<List<PaymentResponse>> payments() {
         return ApiResponse.ok(subscriptions.payments());
+    }
+
+    @GetMapping("/payment-gateway")
+    public ApiResponse<PaymentGateway> paymentGateway() {
+        return ApiResponse.ok(gateway.gateway());
+    }
+
+    @PostMapping("/invoices/{id}/checkout")
+    public ApiResponse<CheckoutResponse> checkout(@PathVariable UUID id, @Valid @RequestBody CheckoutRequest request) {
+        return ApiResponse.ok(gateway.checkout(id, request));
+    }
+
+    /** Asks the gateway what happened. Nothing the browser says about the payment is taken into account. */
+    @PostMapping("/gateway-orders/{orderId}/confirm")
+    public ApiResponse<OrderConfirmation> confirm(@PathVariable String orderId) {
+        return ApiResponse.ok(new OrderConfirmation(gateway.confirm(orderId).name()));
     }
 
     @GetMapping("/invoices/{id}/pdf")

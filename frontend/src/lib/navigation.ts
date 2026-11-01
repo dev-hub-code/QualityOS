@@ -124,6 +124,14 @@ export const CONTROL_CENTER_NAV: { heading: string; items: NavItem[] }[] = [
     ] },
 ];
 
+/** A platform organisation has no records of its own, so its members only get what belongs to their account. */
+export function workspaceNavItems(permissions: readonly string[], hasSubscription: boolean): NavItem[] {
+  const visible = visibleNavItems(permissions);
+  return hasSubscription
+    ? visible
+    : visible.filter(({ href }) => ["/settings", "/docs", "/platform/dashboard"].includes(href));
+}
+
 export function landingPage(permissions: readonly string[]): string {
   return permissions.includes("PLATFORM_ADMIN") ? "/platform/dashboard" : "/dashboard";
 }

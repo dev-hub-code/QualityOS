@@ -17,7 +17,7 @@ A page joins the navigation only once it works.
 
 Every sign-in goes through `/start`. An operator lands on the Control Center and anyone else on their organisation's
 dashboard. This only picks the page; the backend refuses platform requests on its own. **Back to workspace** still takes
-an operator into their organisation.
+an operator of a customer organisation into it.
 
 ## Bootstrap
 
@@ -26,6 +26,16 @@ database superuser. Later operators are added under Operators by a Super Admin.
 
 ```sql
 INSERT INTO platform_admins (user_id, role) SELECT id, 'SUPER_ADMIN' FROM users WHERE email = 'someone@example.com';
+```
+
+An account must belong to an organisation to sign in, so a dedicated operator registers one too. Delete that
+organisation's subscription so that it stops being a customer: it then has no plan or state, and no Control Center list
+or count includes it except the audit, email and notification logs. Its members see only their account settings and
+documentation, and its records are read-only.
+
+```sql
+DELETE FROM subscriptions WHERE tenant_id = (
+    SELECT m.tenant_id FROM tenant_memberships m JOIN users u ON u.id = m.user_id WHERE u.email = 'someone@example.com');
 ```
 
 The same statement is the recovery process if no Super Admin can sign in. The application refuses to remove or demote

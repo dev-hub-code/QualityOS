@@ -98,7 +98,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | Lists show only active records, with no way to restore an archived one | When a user needs it |
 | Facility, supplier, material and product pickers load the first 100 records | Add search when a tenant exceeds this |
-| Facility sub-records (departments, lines, shifts), supplier contacts, material-to-product mappings, and new categories and units are not audited individually | Review after real use |
+| Facility sub-records (departments, lines, shifts), supplier contacts, material-to-product mappings, and new units are not audited individually | Review after real use |
 
 ## Definition of done for each phase
 

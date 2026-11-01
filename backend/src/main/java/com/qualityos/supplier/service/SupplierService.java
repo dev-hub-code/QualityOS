@@ -33,6 +33,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -143,7 +144,37 @@ public class SupplierService implements AttachmentPolicy {
         if (categories.existsByName(trimmed)) {
             throw new ConflictException("This category already exists.");
         }
-        return mapper.toResponse(categories.save(new SupplierCategory(trimmed)));
+        SupplierCategory category = categories.save(new SupplierCategory(trimmed));
+        audit.record("SUPPLIER_CATEGORY_CREATED", "SupplierCategory", category.getId());
+        return mapper.toResponse(category);
+    }
+
+    @Transactional
+    public CategoryResponse renameCategory(UUID id, String name) {
+        SupplierCategory category = requireCategory(id);
+        String trimmed = name.trim();
+        if (!trimmed.equals(category.getName()) && categories.existsByName(trimmed)) {
+            throw new ConflictException("This category already exists.");
+        }
+        category.setName(trimmed);
+        audit.record("SUPPLIER_CATEGORY_RENAMED", "SupplierCategory", id);
+        return mapper.toResponse(category);
+    }
+
+    /** The database refuses while a supplier holds the category, including an archived one. */
+    @Transactional
+    public void deleteCategory(UUID id) {
+        categories.delete(requireCategory(id));
+        try {
+            categories.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new ConflictException("This category is in use, so it cannot be deleted.");
+        }
+        audit.record("SUPPLIER_CATEGORY_DELETED", "SupplierCategory", id);
+    }
+
+    private SupplierCategory requireCategory(UUID id) {
+        return categories.findById(id).orElseThrow(() -> new ResourceNotFoundException("Category", id.toString()));
     }
 
     /** Orders may only be placed with an approved, active supplier. */

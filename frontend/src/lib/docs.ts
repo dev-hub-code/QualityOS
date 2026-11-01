@@ -369,7 +369,7 @@ export const DOC_PAGES: DocPage[] = [
     group: "Quality",
     title: "Non-conformances (NCRs)",
     summary: "Record what went wrong, contain it, find the cause, and close it properly.",
-    menu: "NCRs, Defect categories",
+    menu: "NCRs, Categories",
     roles: "Quality Manager, Quality Engineer, Plant Manager",
     plan: GROWTH,
     sections: [

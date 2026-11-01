@@ -121,4 +121,17 @@ public class MaterialController {
     public ApiResponse<CategoryResponse> addCategory(@Valid @RequestBody SaveCategoryRequest request) {
         return ApiResponse.ok(materials.addCategory(request.name()));
     }
+
+    @PutMapping("/product-categories/{id}")
+    @PreAuthorize(Require.PRODUCT_MANAGE)
+    public ApiResponse<CategoryResponse> renameCategory(@PathVariable UUID id, @Valid @RequestBody SaveCategoryRequest request) {
+        return ApiResponse.ok(materials.renameCategory(id, request.name()));
+    }
+
+    @DeleteMapping("/product-categories/{id}")
+    @PreAuthorize(Require.PRODUCT_MANAGE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteCategory(@PathVariable UUID id) {
+        materials.deleteCategory(id);
+    }
 }

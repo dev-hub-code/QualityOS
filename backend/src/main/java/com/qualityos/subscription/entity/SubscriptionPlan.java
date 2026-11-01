@@ -45,7 +45,6 @@ public class SubscriptionPlan extends AuditedEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> featureValues = new HashMap<>();
 
-    private int trialDays;
     private int graceDays;
     private int displayOrder;
     private boolean active;
@@ -60,7 +59,6 @@ public class SubscriptionPlan extends AuditedEntity {
         this.description = "";
         this.taxPercent = new BigDecimal("18");
         this.features = new ArrayList<>();
-        this.trialDays = 14;
         this.graceDays = 7;
         this.currency = "INR";
         this.publicVisible = false;

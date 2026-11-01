@@ -26,7 +26,7 @@ describe("Pricing", () => {
     expect(screen.getByText("Traceability, recalls, calibration and audits")).toBeInTheDocument();
   });
 
-  it("takes the trial length from the plans", () => {
+  it("shows the trial length it is given", () => {
     render(<Pricing plans={[{ ...STARTER, trialDays: 30 }]} />);
     expect(screen.getByRole("link", { name: "Start a 30-day trial" })).toHaveAttribute("href", "/register");
   });

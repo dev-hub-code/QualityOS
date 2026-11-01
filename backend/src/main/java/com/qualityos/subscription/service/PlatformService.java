@@ -106,7 +106,6 @@ public class PlatformService {
             Map<String, Object> values = new HashMap<>(plan.getFeatureValues());
             values.keySet().retainAll(request.features());
             plan.setFeatureValues(values);
-            plan.setTrialDays(request.trialDays());
             plan.setGraceDays(request.graceDays());
             plan.setActive(request.active());
             if (request.publicVisible() != null) {

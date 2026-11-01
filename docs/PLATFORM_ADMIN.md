@@ -244,7 +244,8 @@ cannot. Secrets stay in the environment.
 
 | Setting | Effect |
 |---|---|
-| Default trial and grace days | Used for plans created afterwards. Existing plans keep their own |
+| Trial days | The trial every new organisation gets. A running trial keeps its end date; use Extend to change one |
+| Default grace days | Used for plans created afterwards. Existing plans keep their own |
 | New sign-ups | When closed, registration is refused. Existing accounts and invitations still work |
 | Support email | Shown to customers during maintenance |
 | Maintenance mode | Customers keep read access, but lose change permissions, as they do when read-only. Operators keep platform access. Takes effect on the next request |

@@ -103,7 +103,11 @@ public class SubscriptionService {
     public void startTrial() {
         SubscriptionPlan plan = plans.findByCode(SubscriptionPlan.TRIAL_CODE).orElseThrow(() ->
                 new IllegalStateException("The trial plan is not seeded"));
-        subscriptions.save(new Subscription(plan.getId(), Instant.now().plus(Duration.ofDays(plan.getTrialDays()))));
+        subscriptions.save(new Subscription(plan.getId(), Instant.now().plus(Duration.ofDays(trialDays()))));
+    }
+
+    private int trialDays() {
+        return jdbc.queryForObject("SELECT default_trial_days FROM platform_settings", Integer.class);
     }
 
     @Transactional(readOnly = true)
@@ -141,11 +145,12 @@ public class SubscriptionService {
         Map<String, String> names = features.findAllByOrderByName().stream()
                 .filter(FeatureDefinition::isActive)
                 .collect(Collectors.toMap(FeatureDefinition::getCode, FeatureDefinition::getName));
+        int trialDays = trialDays();
         return plans.findByActiveTrueOrderByDisplayOrder().stream()
                 .filter(SubscriptionPlan::isPublicVisible)
                 .map(plan -> new PublicPlan(plan.getCode(), plan.getName(), plan.getDescription(),
                         plan.getMonthlyPrice(), plan.getAnnualPrice(), plan.getMaxUsers(), plan.getMaxFacilities(),
-                        plan.getFeatures(), plan.getTrialDays(),
+                        plan.getFeatures(), trialDays,
                         plan.getFeatures().stream().filter(names::containsKey).map(names::get).toList()))
                 .toList();
     }
@@ -153,7 +158,7 @@ public class SubscriptionService {
     static PlanResponse toResponse(SubscriptionPlan plan) {
         return new PlanResponse(plan.getId(), plan.getCode(), plan.getName(), plan.getDescription(),
                 plan.getMonthlyPrice(), plan.getAnnualPrice(), plan.getTaxPercent(), plan.getMaxUsers(),
-                plan.getMaxFacilities(), plan.getFeatures(), plan.getTrialDays(), plan.getGraceDays(), plan.isActive(),
+                plan.getMaxFacilities(), plan.getFeatures(), plan.getGraceDays(), plan.isActive(),
                 plan.getVersion(), plan.getCurrency(), plan.isPublicVisible(), plan.getArchivedAt(),
                 plan.getDisplayOrder(), plan.getMaxStorageMb(), plan.getMaxMonthlyInspections(), plan.getMaxAttachments(),
                 plan.getFeatureValues());

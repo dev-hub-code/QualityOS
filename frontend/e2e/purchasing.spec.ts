@@ -2,6 +2,32 @@ import { expect, test } from "@playwright/test";
 import { signUp } from "./helpers";
 
 
+test("a category can be added from the form when the list is empty", async ({ page }) => {
+  await signUp(page);
+  await page.getByRole("link", { name: "Suppliers" }).click();
+  await page.getByRole("button", { name: "Add supplier" }).click();
+  const category = page.getByLabel("Category", { exact: true });
+  await expect(category.locator("option")).toHaveCount(1);
+
+  await page.getByRole("button", { name: "Add category" }).click();
+  await page.getByRole("textbox", { name: "New category name" }).fill("Raw material");
+  await page.getByRole("textbox", { name: "New category name" }).press("Enter");
+
+  await expect(category).toHaveValue(/.+/);
+  await expect(category.locator("option:checked")).toHaveText("Raw material");
+  await page.getByLabel("Code", { exact: true }).fill("SUP-CAT");
+  await page.getByLabel("Name", { exact: true }).fill("Category Supplier");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+
+  await page.getByRole("link", { name: "Products" }).click();
+  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add category" }).click();
+  await page.getByRole("textbox", { name: "New category name" }).fill("Forgings");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByLabel("Category", { exact: true }).locator("option:checked")).toHaveText("Forgings");
+});
+
 test("a supplier is approved, ordered from, and delivers in two batches", async ({ page }) => {
   await signUp(page);
 

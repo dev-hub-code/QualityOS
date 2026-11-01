@@ -15,7 +15,7 @@ export const supplierFields = (categories: FieldOption[]): FieldDef[] => [
   { name: "name", label: "Name", required: true },
   { name: "legalName", label: "Legal name" },
   { name: "gstin", label: "GSTIN" },
-  { name: "categoryId", label: "Category", type: "select", options: categories },
+  { name: "categoryId", label: "Category", type: "select", options: categories, addPath: "/suppliers/categories" },
   { name: "email", label: "Email", type: "email" },
   { name: "phone", label: "Phone" },
   { name: "address", label: "Address" },
@@ -30,7 +30,7 @@ export const materialFields = (units: FieldOption[], categories: FieldOption[]):
   { name: "grade", label: "Grade" },
   { name: "description", label: "Description" },
   { name: "uomId", label: "Unit", type: "select", required: true, options: units },
-  { name: "categoryId", label: "Category", type: "select", options: categories },
+  { name: "categoryId", label: "Category", type: "select", options: categories, addPath: "/product-categories" },
   { name: "inspectionRequired", label: "Inspect on receipt", type: "checkbox" },
 ];
 
@@ -49,7 +49,7 @@ export const productFields = (units: FieldOption[], categories: FieldOption[]): 
     ],
   },
   { name: "uomId", label: "Unit", type: "select", required: true, options: units },
-  { name: "categoryId", label: "Category", type: "select", options: categories },
+  { name: "categoryId", label: "Category", type: "select", options: categories, addPath: "/product-categories" },
 ];
 
 export const INSPECTION_TYPES: FieldOption[] = [

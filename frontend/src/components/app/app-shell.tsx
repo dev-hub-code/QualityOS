@@ -25,11 +25,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const controlCenter = pathname === "/platform" || pathname.startsWith("/platform/");
+
   useEffect(() => {
-    if (me && !me.onboarded && me.permissions.includes("TENANT_MANAGE")) {
+    if (me && !me.onboarded && !controlCenter && me.permissions.includes("TENANT_MANAGE")) {
       router.replace("/onboarding");
     }
-  }, [me, router]);
+  }, [me, controlCenter, router]);
 
   async function switchOrganization(tenantId: string) {
     await session.post("switch-organization", { tenantId });
@@ -41,7 +43,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     hardNavigate("/login");
   }
 
-  const controlCenter = pathname === "/platform" || pathname.startsWith("/platform/");
   const link = (href: string, active: boolean) =>
     `flex items-center gap-2 rounded-md px-2 py-2 text-sm ${LINK[controlCenter ? "center" : "workspace"][active ? "on" : "off"]}`;
 

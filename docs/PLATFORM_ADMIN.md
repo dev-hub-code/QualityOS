@@ -13,6 +13,12 @@ The Control Center is where the people who run QualityOS manage plans and custom
 
 A page joins the navigation only once it works.
 
+## Signing in
+
+Every sign-in goes through `/start`. An operator lands on the Control Center and anyone else on their organisation's
+dashboard. This only picks the page; the backend refuses platform requests on its own. **Back to workspace** still takes
+an operator into their organisation.
+
 ## Bootstrap
 
 The first operator cannot be created by the application, on purpose. Register the account normally, then run this as a

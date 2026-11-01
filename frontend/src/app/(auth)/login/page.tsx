@@ -28,7 +28,7 @@ export default function LoginPage() {
       if (result?.verificationRequired) {
         setPendingEmail(values.email);
       } else {
-        hardNavigate("/dashboard");
+        hardNavigate("/start");
       }
     } catch (error) {
       setFormError(applyServerErrors(error, setError));

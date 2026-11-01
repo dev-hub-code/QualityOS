@@ -124,6 +124,10 @@ export const CONTROL_CENTER_NAV: { heading: string; items: NavItem[] }[] = [
     ] },
 ];
 
+export function landingPage(permissions: readonly string[]): string {
+  return permissions.includes("PLATFORM_ADMIN") ? "/platform/dashboard" : "/dashboard";
+}
+
 export function visibleNavItems(permissions: readonly string[], items = NAV_ITEMS): NavItem[] {
   return items.filter(
     (item) => !item.anyPermission || item.anyPermission.some((p) => permissions.includes(p)),

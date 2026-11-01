@@ -1,5 +1,8 @@
 # Database Schema
 
+> The migrations were consolidated into V1 to V11, one file per module, before the first deployment. The schema did not
+> change. V numbers later in this document mean the original files, which remain in git history before that change.
+
 `V1__foundation.sql` adds extensions, application role privileges and shared functions.
 `V2__identity_and_tenancy.sql` adds the Phase 2 tables. Later phases below are the target design, and each
 table is created by the phase that uses it.

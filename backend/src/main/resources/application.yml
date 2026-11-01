@@ -33,6 +33,10 @@ spring:
     username: ${SMTP_USERNAME:}
     password: ${SMTP_PASSWORD:}
     properties:
+      # Off for Mailpit. A real server, such as Gmail or Amazon SES, needs both, and the mail must not fall back to plain text.
+      mail.smtp.auth: ${SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS:false}
+      mail.smtp.starttls.required: ${SMTP_STARTTLS:false}
       mail.smtp.connectiontimeout: 5000
       mail.smtp.timeout: 10000
       mail.smtp.writetimeout: 10000

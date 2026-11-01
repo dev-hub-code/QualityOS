@@ -12,7 +12,7 @@ import { VerifyEmailBanner } from "@/components/app/verify-email-banner";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/hooks/use-me";
 import { hardNavigate, session } from "@/lib/api";
-import { CONTROL_CENTER_NAV, visibleNavItems, workspaceNavItems } from "@/lib/navigation";
+import { CONTROL_CENTER_NAV, leavesWorkspace, visibleNavItems, workspaceNavItems } from "@/lib/navigation";
 
 const LINK = {
   workspace: { on: "bg-primary text-primary-foreground", off: "hover:bg-muted" },
@@ -28,10 +28,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const controlCenter = pathname === "/platform" || pathname.startsWith("/platform/");
 
   useEffect(() => {
-    if (me && !me.onboarded && !controlCenter && me.permissions.includes("TENANT_MANAGE")) {
+    if (me && leavesWorkspace(pathname, me.permissions, me.hasSubscription)) {
+      router.replace("/platform/dashboard");
+    } else if (me && !me.onboarded && !controlCenter && me.permissions.includes("TENANT_MANAGE")) {
       router.replace("/onboarding");
     }
-  }, [me, controlCenter, router]);
+  }, [me, pathname, controlCenter, router]);
 
   async function switchOrganization(tenantId: string) {
     await session.post("switch-organization", { tenantId });

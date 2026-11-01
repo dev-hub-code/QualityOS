@@ -124,12 +124,23 @@ export const CONTROL_CENTER_NAV: { heading: string; items: NavItem[] }[] = [
     ] },
 ];
 
+/** Settings alone, because the billing page beneath it belongs to a customer. */
+const isAccountPage = (pathname: string) =>
+  pathname === "/settings" || ["/docs", "/platform"].some((page) => pathname === page || pathname.startsWith(`${page}/`));
+
 /** A platform organisation has no records of its own, so its members only get what belongs to their account. */
 export function workspaceNavItems(permissions: readonly string[], hasSubscription: boolean): NavItem[] {
   const visible = visibleNavItems(permissions);
-  return hasSubscription
-    ? visible
-    : visible.filter(({ href }) => ["/settings", "/docs", "/platform/dashboard"].includes(href));
+  return hasSubscription ? visible : visible.filter(({ href }) => isAccountPage(href));
+}
+
+/** An operator of a platform organisation has no workspace, however they reached the page. */
+export function leavesWorkspace(pathname: string, permissions: readonly string[], hasSubscription: boolean): boolean {
+  return (
+    !hasSubscription &&
+    permissions.includes("PLATFORM_ADMIN") &&
+    !isAccountPage(pathname)
+  );
 }
 
 export function landingPage(permissions: readonly string[]): string {

@@ -1058,7 +1058,6 @@ export interface Plan {
   maxUsers: number | null;
   maxFacilities: number | null;
   features: string[];
-  trialDays: number;
   graceDays: number;
   active: boolean;
   version: number;

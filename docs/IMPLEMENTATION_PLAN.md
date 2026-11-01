@@ -82,7 +82,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A renewal is paid by hand each period. There are no saved cards or automatic debits | When a user needs it |
 | CGST, SGST, IGST, place of supply and SAC are worked out from GSTINs, but no accountant has reviewed this. It does not cover exemptions, SEZ supplies, exports or an unregistered buyer. The seller's GSTIN and SAC must be set before an invoice goes to a customer | Before the first paid customer |
 | A plan change has no proration. A different plan starts on payment and the unused time on the old one is lost | Review after real use |
-| The starting user and facility limits, trial length, grace period and annual prices are placeholders, editable under Plans | Owner to confirm before launch |
+| The starting user and facility limits, grace period and annual prices are placeholders, editable under Plans. The trial length is under Settings | Owner to confirm before launch |
 | Which features each plan includes is an interpretation of the brief's table. Starter has no dashboards or reports | Owner to confirm before launch |
 | Account emails, such as reset links, cannot be retried, because a resent link would have expired. Failed ones show in the email log | By design |
 | Announcements are in-app banners for signed-in members. No email is sent, and people who are signed out do not see them | When a user needs it |
@@ -98,7 +98,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | Lists show only active records, with no way to restore an archived one | When a user needs it |
 | Facility, supplier, material and product pickers load the first 100 records | Add search when a tenant exceeds this |
-| Facility sub-records (departments, lines, shifts), supplier contacts, material-to-product mappings, and new categories and units are not audited individually | Review after real use |
+| Facility sub-records (departments, lines, shifts), supplier contacts, material-to-product mappings, and new units are not audited individually | Review after real use |
 
 ## Definition of done for each phase
 

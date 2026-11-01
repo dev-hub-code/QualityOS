@@ -124,8 +124,33 @@ class PlatformConsoleIT extends MasterDataFixture {
         putJson(root, PLATFORM + "/settings", settings(false, true)).andExpect(status().isOk());
         String code = "P" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
         as(root, postJson(PLATFORM + "/plans", Map.of("code", code, "name", "Pilot"))).andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.trialDays").value(21))
                 .andExpect(jsonPath("$.data.graceDays").value(5));
+    }
+
+    @Test
+    void theTrialLengthInSettingsIsWhatANewOrganisationGets() throws Exception {
+        putJson(root, PLATFORM + "/settings", settings(false, true)).andExpect(status().isOk());
+
+        Session customer = register();
+
+        double days = asDatabaseSuperuser().queryForObject(
+                "SELECT extract(epoch FROM current_period_ends_at - now()) / 86400 FROM subscriptions WHERE tenant_id = ?",
+                Double.class, customer.tenantId());
+        assertThat(days).isCloseTo(21.0, org.assertj.core.data.Offset.offset(0.01));
+        mvc.perform(get("/api/v1/public/plans")).andExpect(jsonPath("$.data[0].trialDays").value(21));
+    }
+
+    @Test
+    void aChangedTrialLengthLeavesRunningTrialsAlone() throws Exception {
+        Session running = register();
+        String before = asDatabaseSuperuser().queryForObject(
+                "SELECT current_period_ends_at::text FROM subscriptions WHERE tenant_id = ?", String.class, running.tenantId());
+
+        putJson(root, PLATFORM + "/settings", settings(false, true)).andExpect(status().isOk());
+
+        assertThat(asDatabaseSuperuser().queryForObject(
+                "SELECT current_period_ends_at::text FROM subscriptions WHERE tenant_id = ?", String.class, running.tenantId()))
+                .isEqualTo(before);
     }
 
     @Test

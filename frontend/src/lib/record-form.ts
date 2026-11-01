@@ -11,6 +11,8 @@ export interface FieldDef {
   type?: "text" | "textarea" | "email" | "date" | "time" | "decimal" | "select" | "checkbox";
   required?: boolean;
   options?: FieldOption[];
+  /** Where a new option can be added from the form. The list must be cached under this same path. */
+  addPath?: string;
 }
 
 /** Matches NUMERIC(18,6), so that the database never has to round a value. */

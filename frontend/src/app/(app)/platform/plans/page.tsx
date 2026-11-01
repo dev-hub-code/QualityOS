@@ -26,7 +26,6 @@ const FIELDS: FieldDef[] = [
   { name: "maxStorageMb", label: "Storage limit in MB (blank for none)", type: "decimal" },
   { name: "maxMonthlyInspections", label: "Inspections a month (blank for none)", type: "decimal" },
   { name: "maxAttachments", label: "Attachment limit (blank for none)", type: "decimal" },
-  { name: "trialDays", label: "Trial days", type: "decimal", required: true },
   { name: "graceDays", label: "Grace days", type: "decimal", required: true },
   { name: "active", label: "Offered to customers", type: "checkbox" },
   { name: "publicVisible", label: "Shown on the website", type: "checkbox" },
@@ -48,7 +47,6 @@ const NUMBERS = [
   "maxStorageMb",
   "maxMonthlyInspections",
   "maxAttachments",
-  "trialDays",
   "graceDays",
   "displayOrder",
 ] as const;

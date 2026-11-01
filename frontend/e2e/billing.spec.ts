@@ -75,8 +75,8 @@ test("signing in opens the Control Center for an operator and the organisation f
   await expect(page).toHaveURL(/\/platform\/dashboard/);
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 
-  // Already signed in: the sign-in page moves them on rather than showing the form.
-  await page.goto("/login");
+  // Already signed in: the sign-in page moves them on rather than showing the form. The app redirects mid-load.
+  await page.goto("/login", { waitUntil: "commit" });
   await expect(page).toHaveURL(/\/platform\/dashboard/);
 
   const context = await browser.newContext();

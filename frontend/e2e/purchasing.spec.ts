@@ -2,6 +2,64 @@ import { expect, test } from "@playwright/test";
 import { signUp } from "./helpers";
 
 
+test("a category can be added from the form when the list is empty", async ({ page }) => {
+  await signUp(page);
+  await page.getByRole("link", { name: "Suppliers" }).click();
+  await page.getByRole("button", { name: "Add supplier" }).click();
+  const category = page.getByLabel("Category", { exact: true });
+  await expect(category.locator("option")).toHaveCount(1);
+
+  await page.getByRole("button", { name: "Add category" }).click();
+  await page.getByRole("textbox", { name: "New category name" }).fill("Raw material");
+  await page.getByRole("textbox", { name: "New category name" }).press("Enter");
+
+  await expect(category).toHaveValue(/.+/);
+  await expect(category.locator("option:checked")).toHaveText("Raw material");
+  await page.getByLabel("Code", { exact: true }).fill("SUP-CAT");
+  await page.getByLabel("Name", { exact: true }).fill("Category Supplier");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+
+  await page.getByRole("link", { name: "Products" }).click();
+  await page.getByRole("button", { name: "Add product" }).click();
+  await page.getByRole("button", { name: "Add category" }).click();
+  await page.getByRole("textbox", { name: "New category name" }).fill("Forgings");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(page.getByLabel("Category", { exact: true }).locator("option:checked")).toHaveText("Forgings");
+});
+
+test("categories are managed in one place, and one in use cannot be deleted", async ({ page }) => {
+  await signUp(page);
+  await page.getByRole("link", { name: "Categories" }).click();
+  await expect(page).toHaveURL(/\/categories$/);
+  const suppliers = page.getByRole("region", { name: "Supplier categories" });
+  await expect(page.getByRole("region", { name: "Product categories" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Defect categories" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Add supplier category" }).click();
+  await page.getByRole("dialog").getByLabel("Name").fill("Forgings");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(suppliers.getByText("Forgings")).toBeVisible();
+
+  await suppliers.getByRole("button", { name: "Rename" }).click();
+  await page.getByRole("dialog").getByLabel("Name").fill("Castings");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(suppliers.getByText("Castings")).toBeVisible();
+
+  await page.getByRole("link", { name: "Suppliers" }).click();
+  await page.getByRole("button", { name: "Add supplier" }).click();
+  await page.getByLabel("Code", { exact: true }).fill("SUP-USE");
+  await page.getByLabel("Name", { exact: true }).fill("Used Category Supplier");
+  await page.getByLabel("Category", { exact: true }).selectOption({ label: "Castings" });
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+
+  await page.getByRole("link", { name: "Categories" }).click();
+  await suppliers.getByRole("button", { name: "Delete" }).click();
+  await expect(page.getByText("This category is in use, so it cannot be deleted.")).toBeVisible();
+  await expect(suppliers.getByText("Castings")).toBeVisible();
+});
+
 test("a supplier is approved, ordered from, and delivers in two batches", async ({ page }) => {
   await signUp(page);
 

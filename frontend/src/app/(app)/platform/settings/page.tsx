@@ -13,7 +13,7 @@ import type { PlatformSettings } from "@/lib/types";
 
 const PATH = "/platform/settings";
 const FIELDS: FieldDef[] = [
-  { name: "defaultTrialDays", label: "Default trial days for new plans", type: "decimal", required: true },
+  { name: "defaultTrialDays", label: "Trial days for new organisations", type: "decimal", required: true },
   { name: "defaultGraceDays", label: "Default grace days for new plans", type: "decimal", required: true },
   { name: "supportEmail", label: "Support email shown to customers", type: "email" },
   { name: "registrationOpen", label: "Allow new sign-ups", type: "checkbox" },
@@ -37,7 +37,7 @@ export default function PlatformSettingsPage() {
         <Section title="Current settings">
           <Details
             items={[
-              ["Default trial days", data.defaultTrialDays],
+              ["Trial days for new organisations", data.defaultTrialDays],
               ["Default grace days", data.defaultGraceDays],
               ["Support email", data.supportEmail ?? "Not set"],
               ["New sign-ups", data.registrationOpen ? "Open" : "Closed"],

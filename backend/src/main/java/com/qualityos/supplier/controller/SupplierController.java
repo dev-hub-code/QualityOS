@@ -69,6 +69,19 @@ public class SupplierController {
         return ApiResponse.ok(suppliers.addCategory(request.name()));
     }
 
+    @PutMapping("/categories/{id}")
+    @PreAuthorize(Require.SUPPLIER_UPDATE)
+    public ApiResponse<CategoryResponse> renameCategory(@PathVariable UUID id, @Valid @RequestBody SaveCategoryRequest request) {
+        return ApiResponse.ok(suppliers.renameCategory(id, request.name()));
+    }
+
+    @DeleteMapping("/categories/{id}")
+    @PreAuthorize(Require.SUPPLIER_UPDATE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteCategory(@PathVariable UUID id) {
+        suppliers.deleteCategory(id);
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize(Require.SUPPLIER_VIEW)
     public ApiResponse<SupplierDetail> get(@PathVariable UUID id) {

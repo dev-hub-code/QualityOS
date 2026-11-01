@@ -119,7 +119,8 @@ test("a template is published, and a failed critical measurement never releases 
   };
 
   await manager.goto("/defect-categories");
-  await step(manager, "Add category", async (dialog) => {
+  await expect(manager).toHaveURL(/\/categories$/);
+  await step(manager, "Add defect category", async (dialog) => {
     await dialog.getByLabel("Code").fill("DIM");
     await dialog.getByLabel("Name").fill("Dimensional");
   });

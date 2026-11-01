@@ -107,6 +107,22 @@ test("an open invoice offers online payment only when a gateway is set up", asyn
   await page.getByLabel("Mobile number").fill("12345");
   await page.getByRole("button", { name: /online/ }).click();
   await expect(page.getByRole("alert").filter({ hasText: "10-digit" })).toBeVisible();
+
+test("an operator of a platform organisation has no workspace to land in", async ({ page }) => {
+  const email = `admin-${unique()}@example.com`;
+  await signUp(page, email);
+  makePlatformAdmin(email);
+  execFileSync("docker", [
+    "compose", "exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "qualityos", "-c",
+    `DELETE FROM subscriptions WHERE tenant_id = (SELECT m.tenant_id FROM tenant_memberships m JOIN users u ON u.id = m.user_id WHERE u.email = '${email}')`,
+  ]);
+
+  await page.goto("/dashboard");
+  await expect(page).toHaveURL(/\/platform\/dashboard/);
+
+  await page.getByRole("link", { name: "Account settings" }).click();
+  await expect(page).toHaveURL(/\/settings$/);
+  await expect(page.getByRole("heading", { name: "Your password" })).toBeVisible();
 });
 
 test("the platform console is closed to everyone else", async ({ page }) => {

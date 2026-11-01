@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { visibleNavItems } from "./navigation";
+import { landingPage, visibleNavItems } from "./navigation";
 
 const labels = (permissions: string[]) => visibleNavItems(permissions).map((item) => item.label);
+
+describe("landingPage", () => {
+  it("sends platform operators to the Control Center", () => {
+    expect(landingPage(["PLATFORM_ADMIN", "TENANT_MANAGE"])).toBe("/platform/dashboard");
+  });
+
+  it("sends everyone else to their organisation", () => {
+    expect(landingPage(["TENANT_MANAGE", "USER_MANAGE"])).toBe("/dashboard");
+    expect(landingPage([])).toBe("/dashboard");
+  });
+});
 
 describe("visibleNavItems", () => {
   it("hides administration from users without permissions", () => {

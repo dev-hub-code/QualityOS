@@ -62,6 +62,36 @@ test("a platform admin changes a price without a release", async ({ page }) => {
   await expect(page.getByRole("cell", { name: "₹2,999.00" }).first()).toBeVisible();
 });
 
+test("signing in opens the Control Center for an operator and the organisation for everyone else", async ({ page, browser }) => {
+  const email = `admin-${unique()}@example.com`;
+  await signUp(page, email);
+  makePlatformAdmin(email);
+
+  await page.context().clearCookies();
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/platform\/dashboard/);
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+
+  // Already signed in: the sign-in page moves them on rather than showing the form.
+  await page.goto("/login");
+  await expect(page).toHaveURL(/\/platform\/dashboard/);
+
+  const context = await browser.newContext();
+  const owner = await context.newPage();
+  const ownerEmail = `owner-${unique()}@example.com`;
+  await signUp(owner, ownerEmail);
+  await context.clearCookies();
+  await owner.goto("/login");
+  await owner.getByLabel("Email").fill(ownerEmail);
+  await owner.getByLabel("Password").fill(PASSWORD);
+  await owner.getByRole("button", { name: "Sign in" }).click();
+  await expect(owner).toHaveURL(/\/dashboard$/);
+  await context.close();
+});
+
 test("the platform console is closed to everyone else", async ({ page }) => {
   await signUp(page);
   await expect(page.getByRole("link", { name: "Control Center" })).toHaveCount(0);

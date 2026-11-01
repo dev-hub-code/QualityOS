@@ -428,7 +428,6 @@ class PlatformEntitlementsIT extends MasterDataFixture {
         save.put("maxMonthlyInspections", 100);
         save.put("maxAttachments", 500);
         save.put("features", List.of());
-        save.put("trialDays", 14);
         save.put("graceDays", 7);
         save.put("active", false);
         save.put("version", planVersion(plan));

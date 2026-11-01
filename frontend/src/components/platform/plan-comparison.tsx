@@ -14,7 +14,6 @@ export function PlanComparison({ plans, features }: { plans: Plan[]; features: F
     ["Storage (MB)", (plan) => limit(plan.maxStorageMb)],
     ["Inspections a month", (plan) => limit(plan.maxMonthlyInspections)],
     ["Attachments", (plan) => limit(plan.maxAttachments)],
-    ["Trial days", (plan) => plan.trialDays],
     ["Grace days", (plan) => plan.graceDays],
     ...features.map(({ code, name }): [string, (plan: Plan) => string] => [
       name,

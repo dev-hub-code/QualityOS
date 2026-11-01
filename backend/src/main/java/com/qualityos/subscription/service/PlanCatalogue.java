@@ -68,8 +68,7 @@ public class PlanCatalogue {
     }
 
     private SubscriptionPlan withDefaults(SubscriptionPlan plan) {
-        jdbc.query("SELECT default_trial_days, default_grace_days FROM platform_settings", rows -> {
-            plan.setTrialDays(rows.getInt("default_trial_days"));
+        jdbc.query("SELECT default_grace_days FROM platform_settings", rows -> {
             plan.setGraceDays(rows.getInt("default_grace_days"));
         });
         plan.setFeatures(new ArrayList<>(features.findAllByOrderByName().stream()
@@ -94,7 +93,6 @@ public class PlanCatalogue {
             copy.setMaxAttachments(source.getMaxAttachments());
             copy.setFeatures(new ArrayList<>(source.getFeatures()));
             copy.setFeatureValues(new HashMap<>(source.getFeatureValues()));
-            copy.setTrialDays(source.getTrialDays());
             copy.setGraceDays(source.getGraceDays());
             return add(copy, "PLAN_DUPLICATED");
         });
@@ -201,7 +199,6 @@ public class PlanCatalogue {
         snapshot.put("maxAttachments", plan.getMaxAttachments());
         snapshot.put("features", plan.getFeatures());
         snapshot.put("featureValues", plan.getFeatureValues());
-        snapshot.put("trialDays", plan.getTrialDays());
         snapshot.put("graceDays", plan.getGraceDays());
         snapshot.put("active", plan.isActive());
         snapshot.put("publicVisible", plan.isPublicVisible());

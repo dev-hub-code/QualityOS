@@ -70,7 +70,7 @@ fields are allow-listed per endpoint. `data` is a `PageResponse`:
 | `POST /auth/logout` | Revokes the token family |
 | `POST /auth/switch-tenant` | New token for another verified membership. An addition to the brief |
 | `POST /auth/change-password` | Requires the current password and revokes all sessions. An addition to the brief |
-| `GET /auth/me` | User, current organisation, permissions and memberships. An addition to the brief |
+| `GET /auth/me` | User, current organisation, whether it has a subscription, permissions and memberships. An addition to the brief |
 
 Access token: RS256, 15 minutes, with claims `sub` and `tid` (tenant). Membership and permissions are
 loaded on the server for every request, so changes apply at once rather than when the token expires.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { landingPage, visibleNavItems } from "./navigation";
+import { landingPage, visibleNavItems, workspaceNavItems } from "./navigation";
 
 const labels = (permissions: string[]) => visibleNavItems(permissions).map((item) => item.label);
 
@@ -11,6 +11,22 @@ describe("landingPage", () => {
   it("sends everyone else to their organisation", () => {
     expect(landingPage(["TENANT_MANAGE", "USER_MANAGE"])).toBe("/dashboard");
     expect(landingPage([])).toBe("/dashboard");
+  });
+});
+
+describe("workspaceNavItems", () => {
+  const permissions = ["PLATFORM_ADMIN", "SUBSCRIPTION_MANAGE", "PURCHASE_VIEW"];
+
+  it("keeps the whole workspace for a subscribed organisation", () => {
+    expect(workspaceNavItems(permissions, true)).toEqual(visibleNavItems(permissions));
+  });
+
+  it("leaves a platform organisation only its account pages", () => {
+    expect(workspaceNavItems(permissions, false).map((item) => item.label)).toEqual([
+      "Settings",
+      "Documentation",
+      "Control Center",
+    ]);
   });
 });
 

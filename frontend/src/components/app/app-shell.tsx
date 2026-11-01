@@ -12,7 +12,7 @@ import { VerifyEmailBanner } from "@/components/app/verify-email-banner";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/hooks/use-me";
 import { hardNavigate, session } from "@/lib/api";
-import { CONTROL_CENTER_NAV, visibleNavItems } from "@/lib/navigation";
+import { CONTROL_CENTER_NAV, visibleNavItems, workspaceNavItems } from "@/lib/navigation";
 
 const LINK = {
   workspace: { on: "bg-primary text-primary-foreground", off: "hover:bg-muted" },
@@ -117,14 +117,17 @@ export function AppShell({ children }: { children: ReactNode }) {
                 ))}
               </div>
             ))}
-            <Link href="/dashboard" className={link("/dashboard", false)}>
+            <Link
+              href={me.hasSubscription ? "/dashboard" : "/settings"}
+              className={link("/dashboard", false)}
+            >
               <ArrowLeft aria-hidden className="size-4" />
-              Back to workspace
+              {me.hasSubscription ? "Back to workspace" : "Account settings"}
             </Link>
           </nav>
         ) : (
           <nav aria-label="Main" className="flex flex-1 flex-col gap-1">
-            {visibleNavItems(me.permissions).map(({ href, label, icon: Icon }) => {
+            {workspaceNavItems(me.permissions, me.hasSubscription).map(({ href, label, icon: Icon }) => {
               const active = pathname === href || pathname.startsWith(`${href}/`);
               return (
                 <Link
@@ -154,7 +157,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="min-w-0 flex-1 p-4 md:p-8">
         {!me.user.emailVerified && <VerifyEmailBanner email={me.user.email} />}
         {!controlCenter && <PlatformNotices />}
-        <SubscriptionBanner />
+        {me.hasSubscription && <SubscriptionBanner />}
         {children}
       </main>
     </div>

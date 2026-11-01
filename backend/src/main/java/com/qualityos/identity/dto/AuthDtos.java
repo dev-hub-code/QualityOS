@@ -88,6 +88,7 @@ public final class AuthDtos {
             UserSummary user,
             UUID tenantId,
             boolean onboarded,
+            boolean hasSubscription,
             Set<String> permissions,
             List<OrganizationSummary> organizations) {
     }

@@ -7,6 +7,7 @@ export interface Me {
   user: { id: string; email: string; fullName: string; emailVerified: boolean; language: string | null };
   tenantId: string;
   onboarded: boolean;
+  hasSubscription: boolean;
   permissions: string[];
   organizations: OrganizationSummary[];
 }

@@ -319,11 +319,14 @@ public class AuthService {
         UUID tenantId = TenantContext.getCurrentTenantId();
         User user = tx.execute(status -> users.findById(userId).orElseThrow());
         List<OrganizationSummary> memberOf = access.organizationsOf(userId);
+        boolean hasSubscription = Boolean.TRUE.equals(tx.execute(status -> jdbc.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM subscriptions WHERE tenant_id = ?)", Boolean.class, tenantId)));
         return new MeResponse(
                 new UserSummary(user.getId(), user.getEmail(), user.getFullName(), user.getEmailVerifiedAt() != null,
                         user.getPreferredLanguage()),
                 tenantId,
                 organizations.getCurrent().onboarded(),
+                hasSubscription,
                 permissions,
                 memberOf);
     }

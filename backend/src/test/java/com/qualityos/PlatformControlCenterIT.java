@@ -87,6 +87,26 @@ class PlatformControlCenterIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void anOrganisationWithoutASubscriptionIsNotACustomer() throws Exception {
+        String months = "$.data.months[-1].registered";
+        as(owner, get("/api/v1/auth/me")).andExpect(jsonPath("$.data.hasSubscription").value(true));
+        double registered = dashboardFigure(months);
+
+        asDatabaseSuperuser().update("DELETE FROM subscriptions WHERE tenant_id = ?", admin.tenantId());
+
+        assertThat(dashboardFigure(months)).isEqualTo(registered - 1);
+        as(admin, get(PLATFORM + "/organisations/" + admin.tenantId())).andExpect(status().isNotFound());
+        assertThat(body(as(admin, get(PLATFORM + "/organisations?size=100")).andExpect(status().isOk())))
+                .doesNotContain(admin.tenantId().toString());
+
+        // Its operator keeps the Control Center, including what changes things, though nothing is left to bill.
+        as(admin, get("/api/v1/auth/me"))
+                .andExpect(jsonPath("$.data.hasSubscription").value(false))
+                .andExpect(jsonPath("$.data.permissions[?(@ == 'PLATFORM_OPERATOR_MANAGE')]").exists());
+        assertThat(newPlan()).containsKey("id");
+    }
+
+    @Test
     void aTenantAdministratorIsRefusedEveryNewPath() throws Exception {
         String plan = planIdOf(owner);
         for (String path : List.of("/dashboard", "/organisations/" + owner.tenantId(), "/organisations/export",

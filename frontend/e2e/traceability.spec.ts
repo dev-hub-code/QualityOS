@@ -149,7 +149,7 @@ test("returned goods stay out of stock until an inspection accepts them", async 
   await expect(page.getByRole("button", { name: "Reverse", exact: true })).toHaveCount(0);
 
   await page.goto(`/production-batches/${batchId}`);
-  await expect(page.getByText("Available").locator("..")).toContainText("0");
+  await expect(page.getByText("Available", { exact: true }).locator("..")).toContainText("0");
 
   await page.goto("/dispatch-reversals");
   await page.getByRole("link", { name: /^RET-/ }).click();
@@ -170,7 +170,7 @@ test("returned goods stay out of stock until an inspection accepts them", async 
   );
 
   await page.goto(`/production-batches/${batchId}`);
-  await expect(page.getByText("Available").locator("..")).toContainText("4");
+  await expect(page.getByText("Available", { exact: true }).locator("..")).toContainText("4");
 });
 
 test("an expected return waits for the goods, and the recall report shows what is still out", async ({

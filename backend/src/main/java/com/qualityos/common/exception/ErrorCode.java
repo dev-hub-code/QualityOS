@@ -20,6 +20,8 @@ public enum ErrorCode {
     CONFLICT(HttpStatus.CONFLICT),
     CONCURRENT_MODIFICATION(HttpStatus.CONFLICT),
     BUSINESS_RULE_VIOLATION(HttpStatus.UNPROCESSABLE_CONTENT),
+    /** Goods under an open recall. Someone who can manage recalls may still dispatch them, with a reason. */
+    RECALL_HOLD(HttpStatus.UNPROCESSABLE_CONTENT),
     TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS),
     REQUEST_FAILED(HttpStatus.BAD_REQUEST),
     PAYMENT_GATEWAY_UNAVAILABLE(HttpStatus.BAD_GATEWAY),

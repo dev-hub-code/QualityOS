@@ -8,7 +8,7 @@ import { PageHeader, StatusBadge, useRefresh } from "@/components/records/parts"
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
-import { api, type PageResponse } from "@/lib/api";
+import { api, ApiError, type PageResponse } from "@/lib/api";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import { parseSerials, toDispatchItems } from "@/lib/traceability";
 import type { Customer, Dispatch, ProductionBatch } from "@/lib/types";
@@ -136,6 +136,9 @@ function DispatchDialog({ onClose }: { onClose: () => void }) {
     queryFn: () => api.get<PageResponse<ProductionBatch>>(RELEASED),
   });
   const [lines, setLines] = useState(1);
+  const canOverrideRecall = usePermission("RECALL_MANAGE");
+  // Set once the server refuses goods under an open recall, so that someone allowed to may give a reason.
+  const [heldByRecall, setHeldByRecall] = useState(false);
   const options = (batches?.items ?? [])
     .filter((batch) => Number(batch.availableQuantity) > 0)
     .map((batch) => ({
@@ -160,6 +163,9 @@ function DispatchDialog({ onClose }: { onClose: () => void }) {
         { name: `serials${line}`, label: `Serial numbers ${line}, if tracked (one per line)`, type: "textarea" },
       ];
     }).flat(),
+    ...(heldByRecall && canOverrideRecall
+      ? [{ name: "recallOverrideReason", label: "Reason to dispatch despite the recall", type: "textarea", required: true } as FieldDef]
+      : []),
   ];
   return (
     <RecordDialog
@@ -178,8 +184,13 @@ function DispatchDialog({ onClose }: { onClose: () => void }) {
             dispatchedOn: values.dispatchedOn,
             reference: values.reference,
             items: toDispatchItems(values, lines),
+            recallOverrideReason: values.recallOverrideReason || null,
           })
           .then(refresh)
+          .catch((error: unknown) => {
+            if (error instanceof ApiError && error.code === "RECALL_HOLD") setHeldByRecall(true);
+            throw error;
+          })
       }
     />
   );

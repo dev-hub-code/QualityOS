@@ -39,6 +39,7 @@ Every response uses this shape. Implemented in `ApiResponse`.
 | 405, 415 | `METHOD_NOT_ALLOWED`, `UNSUPPORTED_MEDIA_TYPE` | |
 | 409 | `CONFLICT`, `CONCURRENT_MODIFICATION` | Duplicate data; stale `version` |
 | 422 | `BUSINESS_RULE_VIOLATION` | Valid request refused by a rule, such as an illegal state transition |
+| 422 | `RECALL_HOLD` | A dispatch includes goods under an open recall. Send `recallOverrideReason` (needs `RECALL_MANAGE`) to dispatch them anyway |
 | 500 | `INTERNAL_ERROR` | Details only in logs, found with the correlation ID |
 
 Codes are stable. Clients should branch on `code`, not on `message`.
@@ -275,3 +276,13 @@ may be sent again after `POST /reauthenticate`.
 | `PUT /api/v1/platform/support/tickets/{id}/status` | `PLATFORM_CUSTOMER_MANAGE` | Change status, with `version` |
 | `GET`, `POST /api/v1/platform/support/tickets/{id}/notes` | `POST` needs `PLATFORM_CUSTOMER_MANAGE` | Read or add notes |
 | `GET /api/v1/platform/support/organisations/{tenantId}/errors` | | Failed emails in the last 30 days |
+
+## Recall hold on dispatch
+
+A batch is held while a recall that is not closed (`OPEN` or `PENDING_CLOSURE`) started from it, or from any batch it
+was made from. `POST /dispatches` with a held batch returns `422 RECALL_HOLD`, naming the batches and recalls.
+
+`recallOverrideReason` on the same request lets the goods out. The caller needs `RECALL_MANAGE`, or the answer is
+`403`. The dispatch is audited as `RECALL_HOLD_OVERRIDDEN` with the recalls and the reason, and its customer is added to
+each recall's contact list in the same transaction. Closing the recall releases the hold.
+

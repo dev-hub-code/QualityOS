@@ -164,11 +164,16 @@ public final class TraceabilityDtos {
             @Size(max = 1000) List<@NotBlank @Size(max = 100) String> serialNumbers) {
     }
 
+    /**
+     * @param recallOverrideReason why goods under an open recall must still go out. Only someone who can manage recalls
+     *     may give one, and it is ignored when nothing in the dispatch is under recall
+     */
     public record CreateDispatchRequest(
             @NotNull UUID customerId,
             @NotNull LocalDate dispatchedOn,
             @Size(max = 200) String reference,
-            @NotEmpty List<@Valid DispatchItemRequest> items) {
+            @NotEmpty List<@Valid DispatchItemRequest> items,
+            @Size(max = 1000) String recallOverrideReason) {
     }
 
     public record DispatchLine(

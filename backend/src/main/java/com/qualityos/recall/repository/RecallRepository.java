@@ -3,6 +3,7 @@ package com.qualityos.recall.repository;
 import com.qualityos.recall.entity.Recall;
 import jakarta.persistence.LockModeType;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -16,6 +17,8 @@ public interface RecallRepository extends JpaRepository<Recall, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Recall r where r.id = :id")
     Optional<Recall> findForUpdate(UUID id);
+
+    List<Recall> findByRecallNumberIn(Collection<String> recallNumbers);
 
     /** Recalls lying wholly inside these facilities. A member cannot act on a recall they can only partly see. */
     @Query("""

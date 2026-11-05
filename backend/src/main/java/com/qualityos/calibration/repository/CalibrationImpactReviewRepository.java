@@ -10,5 +10,7 @@ public interface CalibrationImpactReviewRepository extends JpaRepository<Calibra
 
     List<CalibrationImpactReview> findByInstrumentIdOrderByCreatedAtDescInspectionNumber(UUID instrumentId);
 
+    long countByCalibrationRecordIdAndDecisionIsNull(UUID calibrationRecordId);
+
     List<CalibrationImpactReview> findByInspectionIdAndInstrumentIdIn(UUID inspectionId, Collection<UUID> instrumentIds);
 }

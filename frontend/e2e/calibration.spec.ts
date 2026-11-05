@@ -49,7 +49,7 @@ test("an instrument is registered, calibrated and failed, and a failure shows in
   await expect(page.getByText("out of service").first()).toBeVisible();
 });
 
-test("a failed calibration raises an NCR and each inspection in doubt gets a decision", async ({ page }) => {
+test("a failed calibration raises an NCR, and a decision to reinspect holds the goods", async ({ page }) => {
   test.setTimeout(60_000);
   await signUp(page);
   await prepare(page);
@@ -83,6 +83,18 @@ test("a failed calibration raises an NCR and each inspection in doubt gets a dec
     templateId: templates.items[0].id,
   });
   await call("POST", `/inspections/${inspection.id}/instruments`, { instrumentIds: [instrument.id] });
+  await call("PUT", "/organizations/current/settings", {
+    singlePersonReview: true,
+    capaRequiredFrom: "MAJOR",
+    effectivenessRequiredFrom: "MAJOR",
+    version: null,
+  });
+  await call("POST", `/inspections/${inspection.id}/execute`, {
+    results: [{ parameterCode: "DIA", sampleNumber: 1, valueNumeric: "20.0" }],
+  });
+  await call("POST", `/inspections/${inspection.id}/submit`);
+  await call("POST", `/inspections/${inspection.id}/approve`, { note: "Only member" });
+  await call("POST", `/inspections/${inspection.id}/disposition`, { disposition: "ACCEPT", note: "Only member" });
 
   await page.goto(`/calibration/${instrument.id}`);
   await expect(page.getByText("No failed calibration has put an inspection in doubt.")).toBeVisible();
@@ -103,4 +115,7 @@ test("a failed calibration raises an NCR and each inspection in doubt gets a dec
   await page.getByRole("link", { name: inspection.inspectionNumber, exact: true }).first().click();
   await expect(page.getByRole("heading", { name: inspection.inspectionNumber })).toBeVisible();
   await expect(page.getByText("reinspect", { exact: true })).toBeVisible();
+
+  await page.goto(`/production-batches/${made.batch.id}`);
+  await expect(page.getByText("on hold", { exact: true }).first()).toBeVisible();
 });

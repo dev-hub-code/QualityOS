@@ -301,6 +301,18 @@ public class MaterialReceiptService implements AttachmentPolicy {
         loadItem(itemId).updateInspection(InspectionStatus.PENDING, null);
     }
 
+    /** Not limited to the caller's plants: the hold follows a calibration decision, wherever the lot is. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void holdForReinspection(UUID itemId, String reason) {
+        MaterialReceiptItem item =
+                items.findWithReceipt(itemId).orElseThrow(() -> new ResourceNotFoundException("Received batch", itemId));
+        if (item.holdForReinspection()) {
+            items.flush();
+            audit.record("LOT_HELD_FOR_REINSPECTION", "MaterialReceipt", item.getReceipt().getId(), null,
+                    Map.of("batch", item.getInternalBatch(), "reason", reason));
+        }
+    }
+
     @Transactional(propagation = Propagation.MANDATORY)
     public void recordDisposition(UUID itemId, String disposition, boolean finalDecision) {
         loadItem(itemId).updateInspection(

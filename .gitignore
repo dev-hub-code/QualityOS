@@ -5,3 +5,7 @@ node_modules/
 .idea/
 .vscode/
 *.iml
+
+# Local reference files, not part of the project
+/audit/
+/docs/QualityOS-Documentation.pdf

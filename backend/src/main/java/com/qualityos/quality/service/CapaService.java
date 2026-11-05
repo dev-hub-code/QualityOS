@@ -72,6 +72,7 @@ public class CapaService implements AttachmentPolicy {
     private final FacilityScope scope;
     private final FacilityService facilities;
     private final ReviewPolicy reviewPolicy;
+    private final QualityRules rules;
 
     CapaService(
             CorrectiveActionRepository capas,
@@ -87,7 +88,9 @@ public class CapaService implements AttachmentPolicy {
             JsonMapper json,
             FacilityScope scope,
             FacilityService facilities,
-            ReviewPolicy reviewPolicy) {
+            ReviewPolicy reviewPolicy,
+            QualityRules rules) {
+        this.rules = rules;
         this.reviewPolicy = reviewPolicy;
         this.facilities = facilities;
         this.scope = scope;
@@ -136,7 +139,7 @@ public class CapaService implements AttachmentPolicy {
         UUID facilityId = request.facilityId();
         if (request.ncrId() != null) {
             NonConformance ncr = ncrs.requireOpen(request.ncrId());
-            effectiveness |= ncr.getSeverity() != NonConformance.Severity.MINOR;
+            effectiveness |= rules.effectivenessRequired(ncr.getSeverity());
             facilityId = ncr.getFacilityId();
         } else {
             scope.requirePlaced(facilityId);

@@ -38,12 +38,21 @@ public class OrganizationSettingsController {
     @PutMapping
     @PreAuthorize("hasAuthority('" + Permissions.TENANT_MANAGE + "')")
     public ApiResponse<OrganizationSettings> update(@Valid @RequestBody UpdateOrganizationSettingsRequest request) {
-        return ApiResponse.ok(view(settings.update(request.singlePersonReview(), request.version())));
+        return ApiResponse.ok(view(settings.update(new TenantSettingsService.Settings(
+                request.singlePersonReview(),
+                request.capaRequiredFrom(),
+                request.effectivenessRequiredFrom(),
+                request.version()))));
     }
 
     private OrganizationSettings view(TenantSettingsService.Settings saved) {
         long members = reviewPolicy.activeMembers();
         return new OrganizationSettings(
-                saved.singlePersonReview(), saved.singlePersonReview() && members == 1, members, saved.version());
+                saved.singlePersonReview(),
+                saved.singlePersonReview() && members == 1,
+                members,
+                saved.capaRequiredFrom(),
+                saved.effectivenessRequiredFrom(),
+                saved.version());
     }
 }

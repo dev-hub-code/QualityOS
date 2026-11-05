@@ -398,7 +398,7 @@ export const DOC_PAGES: DocPage[] = [
         title: "Closing rules",
         list: [
           "The person who closes an NCR must differ from the person who requested verification.",
-          "A critical or major NCR needs a closed CAPA.",
+          "By default, a critical or major NCR needs a closed CAPA. An administrator can change which NCRs need one under Settings.",
           "Every linked CAPA must be closed or cancelled first.",
           "A reviewer can send an NCR back if the work is not good enough.",
         ],
@@ -441,7 +441,7 @@ export const DOC_PAGES: DocPage[] = [
           "Record the root cause before moving on, and add at least one action.",
           "Every action must be complete before verification.",
           "Someone other than the CAPA owner must verify it. An organisation with one member can allow self-review under Settings, with a reason each time.",
-          "A CAPA on a critical or major NCR always needs an effectiveness check.",
+          "By default, a CAPA on a critical or major NCR needs an effectiveness check. An administrator can change this under Settings.",
           "Reminders go out 3 days before the target date, and again once it is overdue.",
           "Completing an action needs the CAPA manage permission.",
           "Evidence is attached to the CAPA, not to each action.",

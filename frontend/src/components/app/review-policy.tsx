@@ -1,23 +1,16 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { FormError } from "@/components/forms/field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { ORGANIZATION_SETTINGS_PATH, useOrganizationSettings } from "@/hooks/use-organization-settings";
+import { useOrganizationSettings, useSaveOrganizationSettings } from "@/hooks/use-organization-settings";
 import { usePermission } from "@/hooks/use-me";
-import { api } from "@/lib/api";
 
 /** The settings section for reviewing one's own work in a one-person organisation. */
 export function ReviewPolicySettings() {
-  const queryClient = useQueryClient();
   const canManage = usePermission("TENANT_MANAGE");
   const { data } = useOrganizationSettings();
-  const update = useMutation({
-    mutationFn: (singlePersonReview: boolean) =>
-      api.put(ORGANIZATION_SETTINGS_PATH, { singlePersonReview, version: data?.version ?? null }),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: [ORGANIZATION_SETTINGS_PATH] }),
-  });
+  const update = useSaveOrganizationSettings();
   if (!data) return null;
   return (
     <section className="space-y-3">
@@ -32,7 +25,7 @@ export function ReviewPolicySettings() {
           id="single-person-review"
           checked={data.singlePersonReview}
           disabled={!canManage || update.isPending}
-          onCheckedChange={(checked) => update.mutate(checked === true)}
+          onCheckedChange={(checked) => update.mutate({ singlePersonReview: checked === true })}
         />
         <Label htmlFor="single-person-review" className="font-normal">
           Let me review my own work while I am the only member

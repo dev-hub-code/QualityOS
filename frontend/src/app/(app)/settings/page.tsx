@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { EmailLanguage } from "@/components/app/email-language";
 import { NotificationPreferences } from "@/components/app/notification-preferences";
 import { OrganizationForm } from "@/components/app/organization-form";
+import { QualityRulesSettings } from "@/components/app/quality-rules";
 import { ReviewPolicySettings } from "@/components/app/review-policy";
 import { applyServerErrors } from "@/components/forms/apply-server-errors";
 import { Field, FormError } from "@/components/forms/field";
@@ -86,6 +87,7 @@ export default function SettingsPage() {
         )}
       </section>
       <ReviewPolicySettings />
+      <QualityRulesSettings />
       <section className="space-y-4">
         <h2 className="font-medium">Your password</h2>
         <ChangePasswordForm />

@@ -16,6 +16,8 @@ class OrganizationSettingsIT extends AbstractIntegrationTest {
     private ResultActions save(Session session, boolean singlePersonReview, Long version) throws Exception {
         Map<String, Object> body = new HashMap<>();
         body.put("singlePersonReview", singlePersonReview);
+        body.put("capaRequiredFrom", "MAJOR");
+        body.put("effectivenessRequiredFrom", "MAJOR");
         body.put("version", version);
         return as(session, put("/api/v1/organizations/current/settings")
                 .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(body)));
@@ -28,12 +30,26 @@ class OrganizationSettingsIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.data.singlePersonReview").value(false))
                 .andExpect(jsonPath("$.data.selfReviewInEffect").value(false))
                 .andExpect(jsonPath("$.data.activeMembers").value(1))
+                .andExpect(jsonPath("$.data.capaRequiredFrom").value("MAJOR"))
+                .andExpect(jsonPath("$.data.effectivenessRequiredFrom").value("MAJOR"))
                 .andExpect(jsonPath("$.data.version").doesNotExist());
 
         save(owner, true, null)
                 .andExpect(jsonPath("$.data.singlePersonReview").value(true))
                 .andExpect(jsonPath("$.data.selfReviewInEffect").value(true))
                 .andExpect(jsonPath("$.data.version").value(0));
+    }
+
+    @Test
+    void everyRuleMustBeSentAndKnown() throws Exception {
+        Session owner = register();
+        as(owner, put("/api/v1/organizations/current/settings").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"singlePersonReview\":false,\"capaRequiredFrom\":\"SOMETIMES\","
+                                + "\"effectivenessRequiredFrom\":\"MAJOR\"}"))
+                .andExpect(status().isBadRequest());
+        as(owner, put("/api/v1/organizations/current/settings").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"singlePersonReview\":false}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

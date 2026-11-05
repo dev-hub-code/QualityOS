@@ -44,7 +44,8 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Sampling is fixed, percentage or every unit; AQL tables (such as ISO 2859-1) are not built | When a customer needs them |
 | A one-person organisation can review its own inspections, NCR closures and CAPA verifications once an administrator turns this on under Settings. It applies only while there is one active member, and each use needs a reason, recorded as `SELF_REVIEW`. An administrator could deactivate everyone else to use it, but both steps are in the audit log | Review after real use |
 | Recalls, audits and material corrections still need a second person, even in a one-person organisation | When a user needs it |
-| NCR and CAPA workflows are fixed: a critical or major NCR always needs a closed CAPA and a verified fix. There are no per-tenant settings for them | Next on `tenant_settings` |
+| Each organisation chooses which NCR severities need a closed CAPA and which need a verified fix (default: critical and major). The NCR statuses and their order are fixed | When a user needs it |
+| A change to the CAPA rule applies to open NCRs at once. A CAPA keeps the verification rule it was raised under | By design |
 | An NCR raised on a held lot has no rejected quantity, and a later reject does not fill it in | Review after real use |
 | Completing a CAPA action needs `CAPA_MANAGE`, so an action owner without it must ask someone who has it | Review after real use |
 | Overdue reminders cover the CAPA as a whole, not each action | When a user needs it |
@@ -72,7 +73,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A failed calibration flags the inspections in doubt and notifies people, but does not raise an NCR or reopen them | Review after real use |
 | Audits are planned one at a time, with no recurring schedule or reminder before the date. A missed audit shows as overdue in the list | When a user needs it |
 | A recorded audit finding cannot be edited. A wrong one is handled by cancelling its NCR, and it stays on the report | Review after real use |
-| `tenant_settings` holds only the review rule so far | Grows as rules are added |
+| `tenant_settings` holds the review rule and the two NCR and CAPA rules so far | Grows as rules are added |
 | Dashboard figures are kept for 60 seconds per organisation, period and facility scope. Anything written to the audit log clears them at once on the same instance. Other changes, and changes on another instance, show within 60 seconds | With production work: use a shared cache if the figures must agree across instances |
 | A report stops at 5,000 rows and says so, so a larger period must be split | When a user needs it |
 | Key figures and charts show to anyone with `REPORT_VIEW`, as totals, even without the view permission for each kind of record. Lists and reports need that permission too | Review after real use |

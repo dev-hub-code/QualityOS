@@ -161,13 +161,23 @@ public abstract class AbstractIntegrationTest {
         return ids.getFirst();
     }
 
-    /** Lets a sole member review their own work. Assumes the settings were never saved before. */
+    /** Lets a sole member review their own work. */
     protected void allowSinglePersonReview(Session admin) throws Exception {
-        java.util.Map<String, Object> body = new java.util.HashMap<>();
-        body.put("singlePersonReview", true);
-        body.put("version", null);
-        as(admin, org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .put("/api/v1/organizations/current/settings")
+        updateSettings(admin, Map.of("singlePersonReview", true));
+    }
+
+    /** Saves the organisation's settings with {@code changes}, keeping every other rule as it is. */
+    protected void updateSettings(Session admin, Map<String, Object> changes) throws Exception {
+        String path = "/api/v1/organizations/current/settings";
+        Map<String, Object> current = JsonPath.read(as(admin, org.springframework.test.web.servlet.request
+                        .MockMvcRequestBuilders.get(path)).andReturn().getResponse().getContentAsString(), "$.data");
+        Map<String, Object> body = new java.util.HashMap<>();
+        for (String key : java.util.List.of(
+                "singlePersonReview", "capaRequiredFrom", "effectivenessRequiredFrom", "version")) {
+            body.put(key, current.get(key));
+        }
+        body.putAll(changes);
+        as(admin, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path)
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(body)))
                 .andExpect(status().isOk());

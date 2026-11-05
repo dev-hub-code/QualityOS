@@ -75,6 +75,7 @@ public class NcrService implements AttachmentPolicy {
     private final FacilityScope scope;
     private final FacilityService facilities;
     private final ReviewPolicy reviewPolicy;
+    private final QualityRules rules;
 
     NcrService(
             NonConformanceRepository ncrs,
@@ -89,7 +90,9 @@ public class NcrService implements AttachmentPolicy {
             QualityAlerts alerts,
             FacilityScope scope,
             FacilityService facilities,
-            ReviewPolicy reviewPolicy) {
+            ReviewPolicy reviewPolicy,
+            QualityRules rules) {
+        this.rules = rules;
         this.reviewPolicy = reviewPolicy;
         this.facilities = facilities;
         this.scope = scope;
@@ -269,7 +272,7 @@ public class NcrService implements AttachmentPolicy {
         return transition(id, null, ncr -> ncr.recordInvestigation(cause, request.defectCategoryId()));
     }
 
-    /** A critical or major NCR needs a closed CAPA behind it, and no NCR may leave a CAPA unfinished. */
+    /** The organisation's rule decides which NCRs need a closed CAPA behind them. None may leave a CAPA unfinished. */
     @Transactional
     public NcrDetail requestVerification(UUID id, String note) {
         NonConformance ncr = lock(id);
@@ -279,8 +282,9 @@ public class NcrService implements AttachmentPolicy {
             throw new BusinessRuleException("Every linked CAPA must be closed or cancelled first.");
         }
         boolean closedCapa = linked.stream().anyMatch(capa -> capa.getStatus() == CorrectiveAction.Status.CLOSED);
-        if (ncr.getSeverity() != NonConformance.Severity.MINOR && !closedCapa) {
-            throw new BusinessRuleException("A critical or major NCR needs a closed CAPA.");
+        if (rules.capaRequired(ncr.getSeverity()) && !closedCapa) {
+            throw new BusinessRuleException(
+                    "A " + ncr.getSeverity().name().toLowerCase(java.util.Locale.ROOT) + " NCR needs a closed CAPA.");
         }
         NonConformance.Status previous = ncr.getStatus();
         ncr.requestVerification(TenantContext.getCurrentUserId());
@@ -479,6 +483,8 @@ public class NcrService implements AttachmentPolicy {
                 ncr.getVerificationRequestedBy(),
                 ncr.getCreatedAt(),
                 ncr.getClosedAt(),
+                rules.capaRequired(ncr.getSeverity()),
+                rules.effectivenessRequired(ncr.getSeverity()),
                 linked,
                 changes);
     }

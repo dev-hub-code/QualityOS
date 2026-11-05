@@ -18,7 +18,9 @@ import {
 import { RecordDialog } from "@/components/records/record-dialog";
 import { StatusHistory } from "@/components/records/status-history";
 import { Button } from "@/components/ui/button";
+import { SelfReviewNotice } from "@/components/app/review-policy";
 import { useMe, usePermission } from "@/hooks/use-me";
+import { useSelfReviewInEffect } from "@/hooks/use-organization-settings";
 import { api } from "@/lib/api";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { Capa, Ncr } from "@/lib/types";
@@ -38,6 +40,7 @@ export default function NcrPage() {
   const router = useRouter();
   const refresh = useRefresh();
   const { data: me } = useMe();
+  const selfReviewInEffect = useSelfReviewInEffect();
   const canCreate = usePermission("NCR_CREATE");
   const canAssign = usePermission("NCR_ASSIGN");
   const canClose = usePermission("NCR_CLOSE");
@@ -80,7 +83,8 @@ export default function NcrPage() {
     steps.push({ label: "Request verification", action: "request-verification", fields: [note("Note", false)] });
   }
   const independent = me?.user.id !== ncr.verificationRequestedBy;
-  if (canClose && status === "PENDING_VERIFICATION" && independent) {
+  const selfReview = !independent && selfReviewInEffect;
+  if (canClose && status === "PENDING_VERIFICATION" && (independent || selfReview)) {
     steps.push({ label: "Close NCR", action: "close", fields: [note("Closure note")] });
     steps.push({ label: "Send back", action: "send-back", fields: [note("What is missing")], outline: true });
   }
@@ -121,9 +125,10 @@ export default function NcrPage() {
           </Button>
         ))}
       </PageHeader>
-      {status === "PENDING_VERIFICATION" && canClose && !independent && (
+      {status === "PENDING_VERIFICATION" && canClose && !independent && !selfReview && (
         <p className="text-sm text-muted-foreground">Someone other than you must close this NCR.</p>
       )}
+      {status === "PENDING_VERIFICATION" && canClose && selfReview && <SelfReviewNotice />}
       <Section title="Details">
         <Details
           items={[

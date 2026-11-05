@@ -191,6 +191,29 @@ class QualityIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void aSolePersonCanTakeAnNcrToClosureUnderThePolicy() throws Exception {
+        String ncr = ncrAwaitingAction("MAJOR");
+        String capa = capa(ncr, owner);
+        analyse(capa);
+        implement(capa, addAction(capa, "CORRECTIVE"));
+        allowSinglePersonReview(owner);
+        as(owner, postJson("/api/v1/users/" + membershipId(owner, manager.userId()) + "/deactivate", Map.of()))
+                .andExpect(status().is2xxSuccessful());
+
+        verify(owner, capa, true).andExpect(status().isOk());
+        act(owner, "/capas/" + capa + "/close", Map.of("note", "Effective, checked alone"))
+                .andExpect(jsonPath("$.data.status").value("CLOSED"));
+        act(owner, "/ncrs/" + ncr + "/request-verification", Map.of("note", "Fixed"))
+                .andExpect(jsonPath("$.data.status").value("PENDING_VERIFICATION"));
+        act(owner, "/ncrs/" + ncr + "/close", Map.of("note", "Verified on the floor"))
+                .andExpect(jsonPath("$.data.status").value("CLOSED"));
+
+        assertThat(selfReviews(owner.tenantId(), "CAPA_VERIFY")).isEqualTo(1);
+        assertThat(selfReviews(owner.tenantId(), "CAPA_CLOSE")).isEqualTo(1);
+        assertThat(selfReviews(owner.tenantId(), "NCR_CLOSE")).isEqualTo(1);
+    }
+
+    @Test
     void aFixMustBeVerifiedByAnotherPersonBeforeClosing() throws Exception {
         String capa = capa(ncrAwaitingAction("MAJOR"), owner);
         analyse(capa);

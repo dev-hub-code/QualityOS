@@ -10,6 +10,9 @@ public interface MembershipRepository extends JpaRepository<Membership, UUID> {
 
     Optional<Membership> findByUserId(UUID userId);
 
+    /** Within the current organisation, through the tenant filter. */
+    long countByStatus(Membership.Status status);
+
     @Query("""
             select count(m) from Membership m
             where m.status = com.qualityos.identity.entity.Membership.Status.ACTIVE

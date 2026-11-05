@@ -134,9 +134,10 @@ public class NonConformance extends TenantOwnedEntity {
         status = Status.ACTION_REQUIRED;
     }
 
-    public void close(UUID actor, String note, Instant now) {
+    /** @param selfReviewAllowed the organisation's review policy lets the requester close it themselves */
+    public void close(UUID actor, String note, Instant now, boolean selfReviewAllowed) {
         require(Set.of(Status.PENDING_VERIFICATION), "closed");
-        if (actor.equals(verificationRequestedBy)) {
+        if (actor.equals(verificationRequestedBy) && !selfReviewAllowed) {
             throw new BusinessRuleException("Someone other than the person who requested verification must close this.");
         }
         closedBy = actor;

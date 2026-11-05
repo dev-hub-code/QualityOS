@@ -113,9 +113,10 @@ public class CorrectiveAction extends TenantOwnedEntity {
     }
 
     /** The people who did the work cannot be the ones to say that it worked. */
-    public void requireVerifiableBy(UUID actor) {
+    /** @param selfReviewAllowed the organisation's review policy lets the owner verify their own CAPA */
+    public void requireVerifiableBy(UUID actor, boolean selfReviewAllowed) {
         require(Status.EFFECTIVENESS_VERIFICATION, "be verified");
-        if (actor.equals(ownerId)) {
+        if (actor.equals(ownerId) && !selfReviewAllowed) {
             throw new BusinessRuleException("Someone other than the CAPA owner must verify this.");
         }
     }
@@ -126,8 +127,8 @@ public class CorrectiveAction extends TenantOwnedEntity {
         status = Status.ACTION_PLANNING;
     }
 
-    public void close(UUID actor, String note, Instant now) {
-        requireVerifiableBy(actor);
+    public void close(UUID actor, String note, Instant now, boolean selfReviewAllowed) {
+        requireVerifiableBy(actor, selfReviewAllowed);
         closedBy = actor;
         closedAt = now;
         outcomeNote = note;

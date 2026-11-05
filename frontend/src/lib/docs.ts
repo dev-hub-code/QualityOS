@@ -347,7 +347,7 @@ export const DOC_PAGES: DocPage[] = [
       {
         title: "Good to know",
         list: [
-          "The reviewer must be someone other than the inspector.",
+          "The reviewer must be someone other than the inspector. An organisation with one member can allow self-review under Settings, with a reason each time.",
           "A changed result leaves an audit event.",
           "Failed material always gets an NCR, however it is disposed of.",
           "An instrument that is overdue or out of service cannot be recorded on an inspection.",
@@ -440,7 +440,7 @@ export const DOC_PAGES: DocPage[] = [
         list: [
           "Record the root cause before moving on, and add at least one action.",
           "Every action must be complete before verification.",
-          "Someone other than the CAPA owner must verify it.",
+          "Someone other than the CAPA owner must verify it. An organisation with one member can allow self-review under Settings, with a reason each time.",
           "A CAPA on a critical or major NCR always needs an effectiveness check.",
           "Reminders go out 3 days before the target date, and again once it is overdue.",
           "Completing an action needs the CAPA manage permission.",

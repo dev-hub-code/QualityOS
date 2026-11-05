@@ -168,6 +168,12 @@ keeps each saved state of a plan. The application role can only add to that tabl
 across organisations run as the schema owner and raise an error unless the current user is in `platform_admins`.
 `platform_contracts_at` has no grant to the application role.
 
+## Organisation settings (V15)
+
+**`tenant_settings`**: one row per organisation, written on its first save, with `single_person_review`. Until then
+every rule has its default. Row-level security is enabled and forced like any tenant-owned table. It is a separate
+table, rather than columns on `tenants`, so saving a rule does not change the organisation profile's version.
+
 ## Control Center operators (V24)
 
 `platform_admins` gains `role`, `deactivated_at`, `added_by` and `reauthenticated_until`. Existing rows become

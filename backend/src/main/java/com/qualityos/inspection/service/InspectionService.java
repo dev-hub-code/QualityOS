@@ -11,6 +11,7 @@ import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.FacilityScope;
+import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.inspection.dto.InspectionDtos.ApproveRequest;
 import com.qualityos.inspection.dto.InspectionDtos.CreateInspectionRequest;
 import com.qualityos.inspection.dto.InspectionDtos.DecisionResponse;
@@ -94,6 +95,7 @@ public class InspectionService implements AttachmentPolicy {
     private final DispatchReturnService returns;
     private final JsonMapper json;
     private final FacilityScope scope;
+    private final ReviewPolicy reviewPolicy;
 
     /** Lazy because the attachment service collects every policy, and this class is one. */
     InspectionService(
@@ -114,8 +116,10 @@ public class InspectionService implements AttachmentPolicy {
             ProductionService production,
             DispatchReturnService returns,
             JsonMapper json,
-            FacilityScope scope) {
+            FacilityScope scope,
+            ReviewPolicy reviewPolicy) {
         this.limits = limits;
+        this.reviewPolicy = reviewPolicy;
         this.scope = scope;
         this.instruments = instruments;
         this.inspections = inspections;
@@ -417,7 +421,10 @@ public class InspectionService implements AttachmentPolicy {
     @Transactional
     public InspectionDetail approve(UUID id, ApproveRequest request) {
         Inspection inspection = lock(id);
-        inspection.approve(request.result(), TenantContext.getCurrentUserId());
+        UUID actor = TenantContext.getCurrentUserId();
+        boolean selfReview = reviewPolicy.permits(
+                actor, inspection.getSubmittedBy(), ENTITY, id, "INSPECTION_APPROVE", request.note());
+        inspection.approve(request.result(), actor, selfReview);
         inspections.saveAndFlush(inspection);
         decide(id, "APPROVED", request.note());
         audit.record("INSPECTION_APPROVED", ENTITY, id, null, Map.of("result", inspection.getFinalResult()));
@@ -429,7 +436,8 @@ public class InspectionService implements AttachmentPolicy {
     public InspectionDetail sendBack(UUID id, String note) {
         Inspection inspection = lock(id);
         UUID inspector = inspection.getSubmittedBy();
-        inspection.sendBack(TenantContext.getCurrentUserId());
+        UUID actor = TenantContext.getCurrentUserId();
+        inspection.sendBack(actor, reviewPolicy.permits(actor, inspector, ENTITY, id, "INSPECTION_SEND_BACK", note));
         inspections.saveAndFlush(inspection);
         recordOutcome(inspection, null, false);
         decide(id, "SENT_BACK", note);

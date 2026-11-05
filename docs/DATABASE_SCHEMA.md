@@ -175,6 +175,14 @@ every rule has its default. V16 adds `capa_required_from` and `effectiveness_req
 `MINOR` or `NEVER`, default `MAJOR`). Row-level security is enabled and forced like any tenant-owned table. It is a separate
 table, rather than columns on `tenants`, so saving a rule does not change the organisation profile's version.
 
+## Failed calibration review (V17)
+
+`non_conformances` gains `calibration_record_id` and `instrument_id`, set together exactly when the source is
+`CALIBRATION`, with at most one NCR per failed calibration. **`calibration_impact_reviews`** holds one row per inspection
+in doubt after a failed calibration, with a copy of the inspection number and the date of use. `decision`, `note`,
+`decided_by` and `decided_at` are set together, once: a trigger refuses any later change and any deletion. Row-level
+security is enabled and forced.
+
 ## Control Center operators (V24)
 
 `platform_admins` gains `role`, `deactivated_at`, `added_by` and `reauthenticated_until`. Existing rows become

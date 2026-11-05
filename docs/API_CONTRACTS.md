@@ -176,9 +176,16 @@ and a second person.
 
 | Calibration | Permission |
 |---|---|
-| `GET /instruments`, `GET /instruments/{id}`, `/calibrations`, `/usage`, `/qr.svg` | `CALIBRATION_VIEW` |
-| `POST /instruments`, `PUT /instruments/{id}`, `POST /instruments/{id}/status`, `POST /instruments/{id}/calibrations` | `CALIBRATION_MANAGE` |
+| `GET /instruments`, `GET /instruments/{id}`, `/calibrations`, `/usage`, `/impact-reviews`, `/qr.svg` | `CALIBRATION_VIEW` |
+| `POST /instruments`, `PUT /instruments/{id}`, `POST /instruments/{id}/status`, `POST /instruments/{id}/calibrations`, `POST /instruments/{id}/impact-reviews/{reviewId}/decision` | `CALIBRATION_MANAGE` |
 | `GET /instruments/usable`, `POST /inspections/{id}/instruments` | `INSPECTION_EXECUTE` |
+
+A failed calibration lists each inspection that used the instrument since its last good calibration, and raises one MAJOR
+NCR (source `CALIBRATION`) for them. With nothing in doubt, no NCR is raised. `GET /instruments/{id}/impact-reviews` groups
+the reviews by failed calibration, newest first, with the NCR and the number still pending. A decision takes `decision`
+(`RESULT_STANDS` or `REINSPECT`) and a `note`, is made once (`422` after that), and is audited as
+`CALIBRATION_IMPACT_DECIDED`. An NCR raised by a calibration cannot be cancelled, only rejected. Each instrument on an
+inspection carries `impactReview`: `PENDING`, `RESULT_STANDS`, `REINSPECT` or null.
 
 | Audits | Permission |
 |---|---|

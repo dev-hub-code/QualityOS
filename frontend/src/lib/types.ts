@@ -484,6 +484,8 @@ export interface Ncr extends NcrSummary {
   description: string;
   inspectionId: string | null;
   auditId: string | null;
+  /** Set when a failed calibration raised the NCR. */
+  instrumentId: string | null;
   defectCategoryId: string | null;
   defectCategoryName: string | null;
   rejectedQuantity: string | null;
@@ -875,6 +877,30 @@ export interface UsedInstrument {
   instrumentCode: string;
   name: string;
   nextDueOn: string;
+  /** Where the inspection stands if the instrument later failed calibration. Null when it was never in doubt. */
+  impactReview: "PENDING" | "RESULT_STANDS" | "REINSPECT" | null;
+}
+
+export interface ImpactReview {
+  id: string;
+  inspectionId: string;
+  inspectionNumber: string;
+  usedOn: string;
+  decision: "RESULT_STANDS" | "REINSPECT" | null;
+  note: string | null;
+  decidedByName: string | null;
+  decidedAt: string | null;
+}
+
+/** The inspections in doubt after one failed calibration, and the NCR it raised. */
+export interface ImpactReviewGroup {
+  calibrationId: string;
+  calibratedOn: string;
+  ncrId: string | null;
+  ncrNumber: string | null;
+  ncrStatus: string | null;
+  pending: number;
+  reviews: ImpactReview[];
 }
 
 export interface Instrument {

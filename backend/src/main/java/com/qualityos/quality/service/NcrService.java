@@ -17,6 +17,7 @@ import com.qualityos.material.service.MaterialService;
 import com.qualityos.organization.service.FacilityService;
 import com.qualityos.quality.dto.QualityDtos.Assignee;
 import com.qualityos.quality.dto.QualityDtos.AuditFailure;
+import com.qualityos.quality.dto.QualityDtos.CalibrationFailure;
 import com.qualityos.quality.dto.QualityDtos.CapaHistory;
 import com.qualityos.quality.dto.QualityDtos.NcrHistory;
 import com.qualityos.quality.dto.QualityDtos.NcrOutcome;
@@ -230,6 +231,36 @@ public class NcrService implements AttachmentPolicy {
                         title(failure),
                         failure.description())))
                 .getId();
+    }
+
+    /**
+     * Joins the calibration's transaction, so a failure cannot be recorded without its NCR. Repeats return the same
+     * NCR. The goods themselves are decided inspection by inspection in the calibration's impact review.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public NcrOutcome raiseFromCalibration(CalibrationFailure failure) {
+        NonConformance ncr = ncrs.findByCalibrationRecordId(failure.calibrationRecordId())
+                .orElseGet(() -> raise(failure.facilityId(), NonConformance.fromCalibration(
+                        numbers.next(NUMBER_PREFIX),
+                        failure.calibrationRecordId(),
+                        failure.instrumentId(),
+                        failure.instrumentCode() + " " + failure.instrumentName() + " failed calibration",
+                        "Failed calibration on %s. Measurements since its last good calibration are in doubt: %s."
+                                .formatted(failure.calibratedOn(), String.join(", ", failure.inspectionNumbers())))));
+        return new NcrOutcome(ncr.getId(), ncr.getNcrNumber(), ncr.getStatus().name(), ncr.getStatus().isFinished(),
+                List.of());
+    }
+
+    /** The NCR each failed calibration raised, by calibration. Like {@link #outcomes}, for a caller who sees the instrument. */
+    @Transactional(readOnly = true)
+    public Map<UUID, NcrOutcome> forCalibrations(Collection<UUID> calibrationRecordIds) {
+        if (calibrationRecordIds.isEmpty()) {
+            return Map.of();
+        }
+        return ncrs.findByCalibrationRecordIdIn(calibrationRecordIds).stream().collect(Collectors.toMap(
+                NonConformance::getCalibrationRecordId,
+                ncr -> new NcrOutcome(ncr.getId(), ncr.getNcrNumber(), ncr.getStatus().name(),
+                        ncr.getStatus().isFinished(), List.of())));
     }
 
     /** Runs without a permission check of its own: the caller may see the audit, and this is how it stands. */
@@ -466,6 +497,7 @@ public class NcrService implements AttachmentPolicy {
                 ncr.getSource().name(),
                 ncr.getInspectionId(),
                 ncr.getAuditId(),
+                ncr.getInstrumentId(),
                 ncr.getSupplierId(),
                 ncr.getSupplierId() == null ? null : supplierNames(Set.of(ncr.getSupplierId())).get(ncr.getSupplierId()),
                 ncr.getMaterialId(),

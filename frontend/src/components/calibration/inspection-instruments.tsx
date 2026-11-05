@@ -3,11 +3,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
-import { Section, useAction } from "@/components/records/parts";
+import { Section, StatusBadge, useAction } from "@/components/records/parts";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api, type PageResponse } from "@/lib/api";
-import type { Inspection, Instrument } from "@/lib/types";
+import type { Inspection, Instrument, UsedInstrument } from "@/lib/types";
+
+/** Shown beside an instrument that failed calibration after this inspection used it. */
+const IMPACT_LABELS: Record<NonNullable<UsedInstrument["impactReview"]>, string> = {
+  PENDING: "CALIBRATION_REVIEW_PENDING",
+  RESULT_STANDS: "RESULT_STANDS",
+  REINSPECT: "REINSPECT",
+};
 
 /** The list offers only instruments in date, and the server refuses any other. */
 export function InspectionInstruments({ inspection, editable }: { inspection: Inspection; editable: boolean }) {
@@ -29,6 +36,11 @@ export function InspectionInstruments({ inspection, editable }: { inspection: In
         {inspection.instruments.map((instrument) => (
           <li key={instrument.id}>
             {instrument.instrumentCode} – {instrument.name}, calibration due {instrument.nextDueOn}
+            {instrument.impactReview && (
+              <span className="ml-2">
+                <StatusBadge status={IMPACT_LABELS[instrument.impactReview]} />
+              </span>
+            )}
           </li>
         ))}
       </ul>

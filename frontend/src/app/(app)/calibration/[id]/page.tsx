@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { CalibrationHistory, InstrumentUsage } from "@/components/calibration/calibration-history";
+import { ImpactReviews } from "@/components/calibration/impact-reviews";
 import { instrumentFields } from "@/components/calibration/instrument-fields";
 import {
   Details,
@@ -126,6 +127,9 @@ export default function InstrumentPage() {
         </Section>
         <Section title="Calibration history">
           <CalibrationHistory records={records} canManage={canManage && !retired} />
+        </Section>
+        <Section title="Inspections in doubt">
+          <ImpactReviews path={path} canManage={canManage} />
         </Section>
         <Section title="Usage history">
           <InstrumentUsage uses={uses} />

@@ -2,6 +2,9 @@ package com.qualityos.calibration.controller;
 
 import com.qualityos.calibration.dto.CalibrationDtos.CalibrationResponse;
 import com.qualityos.calibration.dto.CalibrationDtos.ChangeStatusRequest;
+import com.qualityos.calibration.dto.CalibrationDtos.DecideImpactRequest;
+import com.qualityos.calibration.dto.CalibrationDtos.ImpactReviewGroup;
+import com.qualityos.calibration.dto.CalibrationDtos.ImpactReviewResponse;
 import com.qualityos.calibration.dto.CalibrationDtos.InstrumentResponse;
 import com.qualityos.calibration.dto.CalibrationDtos.RecordCalibrationRequest;
 import com.qualityos.calibration.dto.CalibrationDtos.SaveInstrumentRequest;
@@ -114,6 +117,18 @@ public class InstrumentController {
     }
 
     /** Holds only a link, which still asks whoever scans it to sign in. */
+    @GetMapping("/{id}/impact-reviews")
+    public ApiResponse<List<ImpactReviewGroup>> impactReviews(@PathVariable UUID id) {
+        return ApiResponse.ok(instruments.impactReviews(id));
+    }
+
+    @PostMapping("/{id}/impact-reviews/{reviewId}/decision")
+    @PreAuthorize(Require.CALIBRATION_MANAGE)
+    public ApiResponse<ImpactReviewResponse> decideImpact(
+            @PathVariable UUID id, @PathVariable UUID reviewId, @Valid @RequestBody DecideImpactRequest request) {
+        return ApiResponse.ok(instruments.decideImpact(id, reviewId, request));
+    }
+
     @GetMapping(value = "/{id}/qr.svg", produces = "image/svg+xml")
     public ResponseEntity<String> qr(@PathVariable UUID id) {
         instruments.get(id);

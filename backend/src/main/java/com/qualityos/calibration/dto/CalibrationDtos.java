@@ -1,5 +1,6 @@
 package com.qualityos.calibration.dto;
 
+import com.qualityos.calibration.entity.CalibrationImpactReview;
 import com.qualityos.calibration.entity.CalibrationRecord;
 import com.qualityos.calibration.entity.Instrument;
 import jakarta.validation.constraints.NotBlank;
@@ -9,6 +10,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 public final class CalibrationDtos {
@@ -78,6 +80,38 @@ public final class CalibrationDtos {
     public record UsageResponse(UUID inspectionId, String inspectionNumber, LocalDate usedOn, boolean suspect) {
     }
 
-    public record UsedInstrument(UUID id, String instrumentCode, String name, LocalDate nextDueOn) {
+    /**
+     * @param impactReview where this inspection stands after the instrument failed calibration: {@code PENDING},
+     *     {@code RESULT_STANDS} or {@code REINSPECT}. Null when it was never in doubt
+     */
+    public record UsedInstrument(UUID id, String instrumentCode, String name, LocalDate nextDueOn, String impactReview) {
+    }
+
+    /** @param decision null while the inspection waits for a decision */
+    public record ImpactReviewResponse(
+            UUID id,
+            UUID inspectionId,
+            String inspectionNumber,
+            LocalDate usedOn,
+            String decision,
+            String note,
+            String decidedByName,
+            Instant decidedAt) {
+    }
+
+    /** The inspections in doubt after one failed calibration, and the NCR it raised. */
+    public record ImpactReviewGroup(
+            UUID calibrationId,
+            LocalDate calibratedOn,
+            UUID ncrId,
+            String ncrNumber,
+            String ncrStatus,
+            long pending,
+            List<ImpactReviewResponse> reviews) {
+    }
+
+    public record DecideImpactRequest(
+            @NotNull CalibrationImpactReview.Decision decision,
+            @NotBlank @Size(max = 2000) String note) {
     }
 }

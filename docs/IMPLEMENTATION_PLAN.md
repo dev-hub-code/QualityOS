@@ -70,7 +70,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A dispatch after a recall starts is not blocked. Its customer joins the recall when closure is requested or approved | Review after real use |
 | Recalls start from one batch in the UI, though the API takes several. Linking a CAPA is API only | When a user needs it |
 | Recording an instrument on an inspection is optional, and applies to the whole inspection, not each measurement | Review after real use |
-| A failed calibration flags the inspections in doubt and notifies people, but does not raise an NCR or reopen them | Review after real use |
+| A failed calibration raises an NCR and asks for a decision on each inspection in doubt. A decision to reinspect does not hold the goods or start an inspection, and the NCR can close while decisions are pending | Review after real use |
 | Audits are planned one at a time, with no recurring schedule or reminder before the date. A missed audit shows as overdue in the list | When a user needs it |
 | A recorded audit finding cannot be edited. A wrong one is handled by cancelling its NCR, and it stays on the report | Review after real use |
 | `tenant_settings` holds the review rule and the two NCR and CAPA rules so far | Grows as rules are added |

@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jayway.jsonpath.JsonPath;
 import com.qualityos.calibration.service.QrCodes;
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -108,6 +109,78 @@ class CalibrationIT extends TraceabilityFixture {
         calibrate(id, days(0), "ADJUSTED").andExpect(status().isCreated());
         as(owner, get(INSTRUMENTS + "/" + id)).andExpect(jsonPath("$.data.status").value("ACTIVE"));
         as(owner, get(INSTRUMENTS + "/" + id + "/usage")).andExpect(jsonPath("$.data[0].suspect").value(false));
+    }
+
+    @Test
+    void aFailureRaisesAnNcrAndAsksForADecisionOnEachInspectionInDoubt() throws Exception {
+        String id = instrument(days(30));
+        calibrate(id, days(-10), "PASS").andExpect(status().isCreated());
+        String inspection = inspection();
+        use(inspection, id).andExpect(status().isOk());
+
+        String failed = idOf(body(calibrate(id, days(0), "FAIL").andExpect(status().isCreated())));
+
+        String path = INSTRUMENTS + "/" + id + "/impact-reviews";
+        String groups = body(as(owner, get(path))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].calibrationId").value(failed))
+                .andExpect(jsonPath("$.data[0].pending").value(1))
+                .andExpect(jsonPath("$.data[0].ncrStatus").value("OPEN"))
+                .andExpect(jsonPath("$.data[0].reviews[0].inspectionId").value(inspection))
+                .andExpect(jsonPath("$.data[0].reviews[0].decision").doesNotExist()));
+        String ncr = JsonPath.read(groups, "$.data[0].ncrId");
+        String review = JsonPath.read(groups, "$.data[0].reviews[0].id");
+        as(owner, get("/api/v1/ncrs/" + ncr))
+                .andExpect(jsonPath("$.data.source").value("CALIBRATION"))
+                .andExpect(jsonPath("$.data.instrumentId").value(id))
+                .andExpect(jsonPath("$.data.severity").value("MAJOR"));
+        as(owner, postJson("/api/v1/ncrs/" + ncr + "/cancel", Map.of("note", "Not needed")))
+                .andExpect(status().isUnprocessableEntity());
+        as(owner, get("/api/v1/inspections/" + inspection))
+                .andExpect(jsonPath("$.data.instruments[0].impactReview").value("PENDING"));
+
+        calibrate(id, days(0), "ADJUSTED").andExpect(status().isCreated());
+        as(owner, get(path)).andExpect(jsonPath("$.data[0].pending").value(1));
+
+        Session viewer = addMember(owner, "VIEWER");
+        as(viewer, postJson(path + "/" + review + "/decision", Map.of("decision", "REINSPECT", "note", "Re-measure")))
+                .andExpect(status().isForbidden());
+        as(owner, postJson(path + "/" + review + "/decision", Map.of("decision", "REINSPECT")))
+                .andExpect(status().isBadRequest());
+        as(owner, postJson(path + "/" + review + "/decision",
+                        Map.of("decision", "REINSPECT", "note", "Drift exceeds the DIA tolerance")))
+                .andExpect(jsonPath("$.data.decision").value("REINSPECT"))
+                .andExpect(jsonPath("$.data.decidedByName").isNotEmpty());
+        as(owner, postJson(path + "/" + review + "/decision", Map.of("decision", "RESULT_STANDS", "note", "Changed mind")))
+                .andExpect(status().isUnprocessableEntity());
+        as(owner, get(path)).andExpect(jsonPath("$.data[0].pending").value(0));
+        as(owner, get("/api/v1/inspections/" + inspection))
+                .andExpect(jsonPath("$.data.instruments[0].impactReview").value("REINSPECT"));
+        assertThatThrownBy(() -> asAppRole(owner.tenantId(), sql -> sql.update(
+                "UPDATE calibration_impact_reviews SET decision = 'RESULT_STANDS' WHERE id = ?", UUID.fromString(review))))
+                .isInstanceOf(DataAccessException.class);
+    }
+
+    @Test
+    void aFailureWithNothingInDoubtRaisesNoNcr() throws Exception {
+        String id = instrument(days(30));
+        calibrate(id, days(0), "FAIL").andExpect(status().isCreated());
+        as(owner, get(INSTRUMENTS + "/" + id + "/impact-reviews")).andExpect(jsonPath("$.data.length()").value(0));
+        as(owner, get("/api/v1/ncrs?size=100")).andExpect(jsonPath("$.data.totalItems").value(0));
+    }
+
+    @Test
+    void anotherOrganisationCannotDecideAReview() throws Exception {
+        String id = instrument(days(30));
+        calibrate(id, days(-10), "PASS").andExpect(status().isCreated());
+        use(inspection(), id).andExpect(status().isOk());
+        calibrate(id, days(0), "FAIL").andExpect(status().isCreated());
+        String review = JsonPath.read(body(as(owner, get(INSTRUMENTS + "/" + id + "/impact-reviews"))),
+                "$.data[0].reviews[0].id");
+        Session stranger = register();
+        as(stranger, postJson(INSTRUMENTS + "/" + id + "/impact-reviews/" + review + "/decision",
+                        Map.of("decision", "RESULT_STANDS", "note", "x")))
+                .andExpect(status().isNotFound());
     }
 
     @Test

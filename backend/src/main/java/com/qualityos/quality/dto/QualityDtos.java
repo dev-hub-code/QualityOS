@@ -48,6 +48,17 @@ public final class QualityDtos {
     }
 
     /** What an audit hands over when a finding raises an NCR. */
+    /** A failed calibration whose instrument measured these inspections since its last good calibration. */
+    public record CalibrationFailure(
+            UUID calibrationRecordId,
+            UUID instrumentId,
+            String instrumentCode,
+            String instrumentName,
+            java.time.LocalDate calibratedOn,
+            List<String> inspectionNumbers,
+            UUID facilityId) {
+    }
+
     public record AuditFailure(
             UUID auditId,
             UUID findingId,
@@ -125,6 +136,7 @@ public final class QualityDtos {
             String source,
             UUID inspectionId,
             UUID auditId,
+            UUID instrumentId,
             UUID supplierId,
             String supplierName,
             UUID materialId,

@@ -12,7 +12,9 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SelfReviewNotice } from "@/components/app/review-policy";
 import { useMe, usePermission } from "@/hooks/use-me";
+import { useSelfReviewInEffect } from "@/hooks/use-organization-settings";
 import { api, type PageResponse } from "@/lib/api";
 import { requirement, sampleKey, samplesOf, toEntries, toFormValues } from "@/lib/inspection";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
@@ -177,10 +179,13 @@ function Review({ inspection }: { inspection: Inspection }) {
   const canApprove = usePermission("INSPECTION_APPROVE");
   const canDispose = usePermission("DISPOSITION_RECORD");
   const refresh = useRefresh();
+  const selfReviewInEffect = useSelfReviewInEffect();
   const [dialog, setDialog] = useState<Dialog>(null);
   const { status, finalResult, evaluatedResult } = inspection;
   const inspector = inspection.decisions.findLast((decision) => decision.decision === "SUBMITTED")?.decidedBy;
   const independent = me?.user.id !== inspector;
+  const selfReview = !independent && selfReviewInEffect;
+  const mayReview = independent || selfReview;
 
   const dispositions =
     finalResult === "PASS"
@@ -211,15 +216,16 @@ function Review({ inspection }: { inspection: Inspection }) {
           },
         ]
       : []),
-    NOTE_FIELD,
+    selfReview ? { ...NOTE_FIELD, required: true } : NOTE_FIELD,
   ];
 
   return (
     <>
-      {status === "SUBMITTED" && canApprove && !independent && (
+      {status === "SUBMITTED" && canApprove && !mayReview && (
         <p className="text-sm text-muted-foreground">Someone other than the inspector must review this inspection.</p>
       )}
-      {status === "SUBMITTED" && canApprove && independent && (
+      {status === "SUBMITTED" && canApprove && selfReview && <SelfReviewNotice />}
+      {status === "SUBMITTED" && canApprove && mayReview && (
         <div className="flex flex-wrap gap-3">
           <Button onClick={() => setDialog("approve")}>Approve</Button>
           <Button variant="outline" onClick={() => setDialog("send-back")}>

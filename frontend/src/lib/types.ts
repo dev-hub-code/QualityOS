@@ -42,6 +42,15 @@ export interface Organization {
   version: number;
 }
 
+/** The organisation's working rules. `version` is null until they are first saved. */
+export interface OrganizationSettings {
+  singlePersonReview: boolean;
+  /** On, and the organisation has one active member, so it applies now. */
+  selfReviewInEffect: boolean;
+  activeMembers: number;
+  version: number | null;
+}
+
 export interface Role {
   id: string;
   code: string;

@@ -20,7 +20,9 @@ import {
 import { RecordDialog } from "@/components/records/record-dialog";
 import { StatusHistory } from "@/components/records/status-history";
 import { Button } from "@/components/ui/button";
+import { SelfReviewNotice } from "@/components/app/review-policy";
 import { useMe, usePermission } from "@/hooks/use-me";
+import { useSelfReviewInEffect } from "@/hooks/use-organization-settings";
 import { api } from "@/lib/api";
 import { FISHBONE_BRANCHES, isReadyForVerification } from "@/lib/capa";
 import type { FieldDef } from "@/lib/record-form";
@@ -40,6 +42,7 @@ export default function CapaPage() {
   const path = `/capas/${id}`;
   const refresh = useRefresh();
   const { data: me } = useMe();
+  const selfReviewInEffect = useSelfReviewInEffect();
   const canManage = usePermission("CAPA_MANAGE");
   const canApprove = usePermission("CAPA_APPROVE");
   const assignees = useAssignees();
@@ -51,6 +54,7 @@ export default function CapaPage() {
   const { status } = capa;
   const finished = status === "CLOSED" || status === "CANCELLED";
   const independent = me?.user.id !== capa.ownerId;
+  const selfReview = !independent && selfReviewInEffect;
   const latest = capa.verifications.at(-1);
   const verified = !capa.effectivenessRequired || latest?.effective === true;
   const post = (action: string) => run(() => api.post(`${path}/${action}`));
@@ -131,7 +135,7 @@ export default function CapaPage() {
             Submit for verification
           </Button>
         )}
-        {canApprove && status === "EFFECTIVENESS_VERIFICATION" && independent && (
+        {canApprove && status === "EFFECTIVENESS_VERIFICATION" && (independent || selfReview) && (
           <>
             <Button variant={verified ? "outline" : "default"} onClick={() => setStep(verify)}>
               Verify effectiveness
@@ -155,9 +159,10 @@ export default function CapaPage() {
         )}
       </PageHeader>
       <FormError message={message} />
-      {status === "EFFECTIVENESS_VERIFICATION" && canApprove && !independent && (
+      {status === "EFFECTIVENESS_VERIFICATION" && canApprove && !independent && !selfReview && (
         <p className="text-sm text-muted-foreground">Someone other than the CAPA owner must verify this.</p>
       )}
+      {status === "EFFECTIVENESS_VERIFICATION" && canApprove && selfReview && <SelfReviewNotice />}
       <Section title="Details">
         <Details
           items={[

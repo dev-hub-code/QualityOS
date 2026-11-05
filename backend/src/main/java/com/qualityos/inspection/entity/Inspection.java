@@ -154,9 +154,10 @@ public class Inspection extends TenantOwnedEntity {
     /**
      * @param reviewedResult the reviewer's conclusion, needed only when the engine could not decide. It cannot
      *     overturn a failed evaluation: failed material is released through a conditional acceptance, on record.
+     * @param selfReviewAllowed the organisation's review policy lets the inspector review their own inspection
      */
-    public void approve(Result reviewedResult, UUID actor) {
-        requireIndependentReview(actor);
+    public void approve(Result reviewedResult, UUID actor, boolean selfReviewAllowed) {
+        requireIndependentReview(actor, selfReviewAllowed);
         Result decided = switch (evaluatedResult) {
             case PASS -> Result.PASS;
             case FAIL -> Result.FAIL;
@@ -173,8 +174,8 @@ public class Inspection extends TenantOwnedEntity {
         approvedAt = Instant.now();
     }
 
-    public void sendBack(UUID actor) {
-        requireIndependentReview(actor);
+    public void sendBack(UUID actor, boolean selfReviewAllowed) {
+        requireIndependentReview(actor, selfReviewAllowed);
         status = Status.IN_PROGRESS;
         evaluatedResult = null;
         disposition = null;
@@ -196,11 +197,11 @@ public class Inspection extends TenantOwnedEntity {
         }
     }
 
-    private void requireIndependentReview(UUID actor) {
+    private void requireIndependentReview(UUID actor, boolean selfReviewAllowed) {
         if (status != Status.SUBMITTED) {
             throw new BusinessRuleException("Only a submitted inspection can be reviewed.");
         }
-        if (actor.equals(submittedBy)) {
+        if (actor.equals(submittedBy) && !selfReviewAllowed) {
             throw new BusinessRuleException("An inspection must be reviewed by someone other than its inspector.");
         }
     }

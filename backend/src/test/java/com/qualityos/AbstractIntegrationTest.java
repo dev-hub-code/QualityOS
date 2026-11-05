@@ -161,6 +161,25 @@ public abstract class AbstractIntegrationTest {
         return ids.getFirst();
     }
 
+    /** Lets a sole member review their own work. Assumes the settings were never saved before. */
+    protected void allowSinglePersonReview(Session admin) throws Exception {
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("singlePersonReview", true);
+        body.put("version", null);
+        as(admin, org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/v1/organizations/current/settings")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(body)))
+                .andExpect(status().isOk());
+    }
+
+    protected int selfReviews(UUID tenantId, String step) {
+        return asDatabaseSuperuser().queryForObject("""
+                SELECT count(*) FROM audit_logs
+                WHERE tenant_id = ? AND action = 'SELF_REVIEW' AND new_state ->> 'step' = ?
+                """, Integer.class, tenantId, step);
+    }
+
     /** Direct SQL under one tenant's row-level security, or none when {@code tenantId} is null. */
     protected void asAppRole(UUID tenantId, java.util.function.Consumer<JdbcTemplate> work) {
         inTransactionAs(tenantId, null, () -> {

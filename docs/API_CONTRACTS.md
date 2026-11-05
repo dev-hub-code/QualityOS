@@ -119,6 +119,19 @@ unverified sign-in is off. Local Docker Compose enforces it too. Integration tes
 
 `PUT /auth/me/email-language` takes `language` (`en`, `hi`, `mr`, or null for the organisation default) and returns `204`.
 
+## Organisation settings
+
+| Endpoint | Access | Result |
+|---|---|---|
+| `GET /organizations/current/settings` | Any member | `singlePersonReview`, `selfReviewInEffect`, `activeMembers`, `version` (null until first saved) |
+| `PUT /organizations/current/settings` | `TENANT_MANAGE` | Takes `singlePersonReview` and the `version` last read. A stale version is `409`. Audited as `TENANT_SETTINGS_UPDATED` |
+
+`selfReviewInEffect` is true while `singlePersonReview` is on and the organisation has one active member. Then that
+person may approve or send back their own inspection, close an NCR whose verification they requested, and verify or
+close a CAPA they own. Each of those needs a note, and is recorded in the audit log as `SELF_REVIEW` with the step
+(`INSPECTION_APPROVE`, `INSPECTION_SEND_BACK`, `NCR_CLOSE`, `CAPA_VERIFY`, `CAPA_CLOSE`) and the reason. Once a second
+member is active, the usual rule returns without anyone changing the setting.
+
 ## Dispatch cancellation and customer returns
 
 | Action | Endpoint | Rule |

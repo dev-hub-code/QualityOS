@@ -11,6 +11,7 @@ import com.qualityos.common.security.Permissions;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.FacilityScope;
+import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.material.service.MaterialService;
 import com.qualityos.organization.service.FacilityService;
@@ -73,6 +74,7 @@ public class NcrService implements AttachmentPolicy {
     private final QualityAlerts alerts;
     private final FacilityScope scope;
     private final FacilityService facilities;
+    private final ReviewPolicy reviewPolicy;
 
     NcrService(
             NonConformanceRepository ncrs,
@@ -86,7 +88,9 @@ public class NcrService implements AttachmentPolicy {
             AuditService audit,
             QualityAlerts alerts,
             FacilityScope scope,
-            FacilityService facilities) {
+            FacilityService facilities,
+            ReviewPolicy reviewPolicy) {
+        this.reviewPolicy = reviewPolicy;
         this.facilities = facilities;
         this.scope = scope;
         this.ncrs = ncrs;
@@ -292,7 +296,9 @@ public class NcrService implements AttachmentPolicy {
 
     @Transactional
     public NcrDetail close(UUID id, String note) {
-        return transition(id, note, ncr -> ncr.close(TenantContext.getCurrentUserId(), note, Instant.now()));
+        UUID actor = TenantContext.getCurrentUserId();
+        return transition(id, note, ncr -> ncr.close(actor, note, Instant.now(), reviewPolicy.permits(
+                actor, ncr.getVerificationRequestedBy(), ENTITY, id, "NCR_CLOSE", note)));
     }
 
     @Transactional

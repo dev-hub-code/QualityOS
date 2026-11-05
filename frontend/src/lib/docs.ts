@@ -611,7 +611,7 @@ export const DOC_PAGES: DocPage[] = [
           "Goods left with customers must be confirmed and explained in the notes.",
           "A linked CAPA must be closed.",
           "Someone other than the requester must approve the closure.",
-          "A dispatch made after a recall starts is not blocked, but its customer joins the recall at closure.",
+          "While a recall is open, its batches, and anything made from them, cannot be dispatched. Someone who manages recalls can override this with a reason, and the customer joins the recall at once.",
         ],
       },
       {

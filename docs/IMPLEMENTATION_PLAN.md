@@ -67,7 +67,8 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A lot from another plant cannot be consumed by a member limited elsewhere. An unlimited member must record a transfer like that | Review after real use |
 | A batch trace can still show inspections and NCRs of a lot from another plant, because lineage must stay whole | By design |
 | The recall PDF does not shape Devanagari: names stay readable, but conjuncts do not form correctly | Before Hindi or Marathi customer names matter |
-| A dispatch after a recall starts is not blocked. Its customer joins the recall when closure is requested or approved | Review after real use |
+| A dispatch of a batch under an open recall, or of anything made from it, is refused. Someone with `RECALL_MANAGE` can override with a reason, which is audited, and the customer joins the recall at once. Every built-in role that can dispatch can also manage recalls, so in practice the override is a reason, not a second person | Review after real use |
+| A dispatch recorded before a recall started can still have its shipment confirmed. The recall already covers its customer | Review after real use |
 | Recalls start from one batch in the UI, though the API takes several. Linking a CAPA is API only | When a user needs it |
 | Recording an instrument on an inspection is optional, and applies to the whole inspection, not each measurement | Review after real use |
 | A failed calibration flags the inspections in doubt and notifies people, but does not raise an NCR or reopen them | Review after real use |

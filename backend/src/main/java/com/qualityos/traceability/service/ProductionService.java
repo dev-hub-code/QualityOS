@@ -5,6 +5,7 @@ import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.persistence.DocumentNumberService;
+import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.LotView;
@@ -32,6 +33,7 @@ import com.qualityos.traceability.repository.TraceCorrectionRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +45,7 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +54,19 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductionService {
 
     private static final String ENTITY = "ProductionBatch";
+
+    /** Each batch with itself and every batch it was made from, ignoring links that were corrected away. */
+    private static final String MADE_FROM = """
+            WITH RECURSIVE up(origin, batch_id) AS (
+                SELECT b.id, b.id FROM production_batches b WHERE b.tenant_id = :tenant AND b.id IN (:batches)
+                UNION
+                SELECT u.origin, r.parent_batch_id FROM batch_relationships r
+                JOIN up u ON r.child_batch_id = u.batch_id
+                WHERE r.tenant_id = :tenant AND r.parent_batch_id IS NOT NULL AND NOT EXISTS (
+                    SELECT 1 FROM trace_corrections c WHERE c.batch_relationship_id = r.id)
+            )
+            SELECT origin, batch_id FROM up
+            """;
 
     private final ProductionBatchRepository batches;
     private final BatchRelationshipRepository relationships;
@@ -62,6 +78,7 @@ public class ProductionService {
     private final DocumentNumberService numbers;
     private final AuditService audit;
     private final FacilityScope scope;
+    private final NamedParameterJdbcTemplate jdbc;
 
     ProductionService(
             ProductionBatchRepository batches,
@@ -73,7 +90,9 @@ public class ProductionService {
             FacilityService facilities,
             DocumentNumberService numbers,
             AuditService audit,
-            FacilityScope scope) {
+            FacilityScope scope,
+            NamedParameterJdbcTemplate jdbc) {
+        this.jdbc = jdbc;
         this.batches = batches;
         this.relationships = relationships;
         this.finishedProducts = finishedProducts;
@@ -326,5 +345,19 @@ public class ProductionService {
 
     private ProductionBatch lock(UUID id) {
         return batches.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Production batch", id));
+    }
+
+    /** Each batch, mapped to itself and every batch it was made from. Unknown batches are left out. */
+    @Transactional(readOnly = true)
+    public Map<UUID, Set<UUID>> madeFrom(Collection<UUID> batchIds) {
+        Map<UUID, Set<UUID>> sources = new HashMap<>();
+        if (batchIds.isEmpty()) {
+            return sources;
+        }
+        jdbc.query(MADE_FROM, Map.of("tenant", TenantContext.getCurrentTenantId(), "batches", batchIds), row -> {
+            sources.computeIfAbsent(row.getObject("origin", UUID.class), id -> new HashSet<>())
+                    .add(row.getObject("batch_id", UUID.class));
+        });
+        return sources;
     }
 }

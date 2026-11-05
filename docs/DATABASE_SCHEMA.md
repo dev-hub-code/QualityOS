@@ -171,7 +171,8 @@ across organisations run as the schema owner and raise an error unless the curre
 ## Organisation settings (V15)
 
 **`tenant_settings`**: one row per organisation, written on its first save, with `single_person_review`. Until then
-every rule has its default. Row-level security is enabled and forced like any tenant-owned table. It is a separate
+every rule has its default. V16 adds `capa_required_from` and `effectiveness_required_from` (`CRITICAL`, `MAJOR`,
+`MINOR` or `NEVER`, default `MAJOR`). Row-level security is enabled and forced like any tenant-owned table. It is a separate
 table, rather than columns on `tenants`, so saving a rule does not change the organisation profile's version.
 
 ## Control Center operators (V24)

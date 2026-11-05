@@ -42,12 +42,17 @@ export interface Organization {
   version: number;
 }
 
+/** The least severe NCR a rule covers: MINOR covers every NCR, NEVER none. */
+export type SeverityThreshold = "CRITICAL" | "MAJOR" | "MINOR" | "NEVER";
+
 /** The organisation's working rules. `version` is null until they are first saved. */
 export interface OrganizationSettings {
   singlePersonReview: boolean;
   /** On, and the organisation has one active member, so it applies now. */
   selfReviewInEffect: boolean;
   activeMembers: number;
+  capaRequiredFrom: SeverityThreshold;
+  effectivenessRequiredFrom: SeverityThreshold;
   version: number | null;
 }
 
@@ -489,6 +494,10 @@ export interface Ncr extends NcrSummary {
   raisedByName: string;
   verificationRequestedBy: string | null;
   closedAt: string | null;
+  /** The organisation's rule needs a closed CAPA before verification. */
+  capaRequired: boolean;
+  /** A CAPA raised on this NCR must have its fix verified. */
+  effectivenessRequired: boolean;
   capas: { id: string; capaNumber: string; title: string; status: string }[];
   history: StatusChange[];
 }

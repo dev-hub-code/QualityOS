@@ -123,14 +123,20 @@ unverified sign-in is off. Local Docker Compose enforces it too. Integration tes
 
 | Endpoint | Access | Result |
 |---|---|---|
-| `GET /organizations/current/settings` | Any member | `singlePersonReview`, `selfReviewInEffect`, `activeMembers`, `version` (null until first saved) |
-| `PUT /organizations/current/settings` | `TENANT_MANAGE` | Takes `singlePersonReview` and the `version` last read. A stale version is `409`. Audited as `TENANT_SETTINGS_UPDATED` |
+| `GET /organizations/current/settings` | Any member | `singlePersonReview`, `selfReviewInEffect`, `activeMembers`, `capaRequiredFrom`, `effectivenessRequiredFrom`, `version` (null until first saved) |
+| `PUT /organizations/current/settings` | `TENANT_MANAGE` | Takes every rule (`singlePersonReview`, `capaRequiredFrom`, `effectivenessRequiredFrom`) and the `version` last read. A missing rule is `400`, a stale version `409`. Audited as `TENANT_SETTINGS_UPDATED` with before and after |
 
 `selfReviewInEffect` is true while `singlePersonReview` is on and the organisation has one active member. Then that
 person may approve or send back their own inspection, close an NCR whose verification they requested, and verify or
 close a CAPA they own. Each of those needs a note, and is recorded in the audit log as `SELF_REVIEW` with the step
 (`INSPECTION_APPROVE`, `INSPECTION_SEND_BACK`, `NCR_CLOSE`, `CAPA_VERIFY`, `CAPA_CLOSE`) and the reason. Once a second
 member is active, the usual rule returns without anyone changing the setting.
+
+`capaRequiredFrom` and `effectivenessRequiredFrom` each name the least severe NCR a rule covers: `MINOR` (every NCR),
+`MAJOR` (critical and major, the default), `CRITICAL`, or `NEVER`. The first decides which NCRs need a closed CAPA
+before `request-verification`, checked at that moment. The second forces `effectivenessRequired` on when a CAPA is
+raised on an NCR it covers, and the CAPA keeps that flag. `GET /ncrs/{id}` returns `capaRequired` and
+`effectivenessRequired`, worked out for that NCR under the current rules.
 
 ## Dispatch cancellation and customer returns
 

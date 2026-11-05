@@ -111,6 +111,10 @@ public final class QualityDtos {
     public record LinkedCapa(UUID id, String capaNumber, String title, String status) {
     }
 
+    /**
+     * @param capaRequired the organisation's rule needs a closed CAPA before verification can be requested
+     * @param effectivenessRequired a CAPA raised on this NCR must have its fix verified, under the current rule
+     */
     public record NcrDetail(
             UUID id,
             String ncrNumber,
@@ -138,11 +142,13 @@ public final class QualityDtos {
             UUID verificationRequestedBy,
             Instant createdAt,
             Instant closedAt,
+            boolean capaRequired,
+            boolean effectivenessRequired,
             List<LinkedCapa> capas,
             List<StatusChange> history) {
     }
 
-    /** @param effectivenessRequired ignored for a critical or major NCR, whose fix must always be verified */
+    /** @param effectivenessRequired forced on when the organisation's rule requires it for the NCR's severity */
     public record CreateCapaRequest(
             UUID ncrId,
             @NotBlank @Size(max = 200) String title,

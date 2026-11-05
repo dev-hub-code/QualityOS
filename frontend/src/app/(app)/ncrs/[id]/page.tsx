@@ -154,7 +154,7 @@ export default function NcrPage() {
       <Section title="Corrective actions">
         {ncr.capas.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            None yet.{ncr.severity !== "MINOR" && " This severity needs a closed CAPA before verification."}
+            None yet.{ncr.capaRequired && " This NCR needs a closed CAPA before verification."}
           </p>
         )}
         <ul className="divide-y text-sm">
@@ -181,11 +181,24 @@ export default function NcrPage() {
       {raisingCapa && (
         <RecordDialog
           title="Raise CAPA"
-          fields={capaFields}
-          record={{ title: ncr.title, problemStatement: ncr.description, ownerId: ncr.assignedTo ?? undefined }}
+          fields={
+            ncr.effectivenessRequired
+              ? capaFields
+              : [...capaFields, { name: "effectivenessRequired", label: "Requires effectiveness verification", type: "checkbox" }]
+          }
+          record={{
+            title: ncr.title,
+            problemStatement: ncr.description,
+            ownerId: ncr.assignedTo ?? undefined,
+            effectivenessRequired: true,
+          }}
           onClose={() => setRaisingCapa(false)}
           onSubmit={async (values) => {
-            const created = await api.post<Capa>("/capas", { ...values, ncrId: id, effectivenessRequired: true });
+            const created = await api.post<Capa>("/capas", {
+              ...values,
+              ncrId: id,
+              effectivenessRequired: ncr.effectivenessRequired || values.effectivenessRequired === true,
+            });
             await refresh();
             router.push(`/capas/${created.id}`);
           }}

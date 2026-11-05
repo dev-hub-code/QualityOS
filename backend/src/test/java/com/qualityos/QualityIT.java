@@ -154,6 +154,40 @@ class QualityIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void theOrganisationDecidesWhichNcrsNeedACapa() throws Exception {
+        updateSettings(owner, Map.of("capaRequiredFrom", "CRITICAL"));
+        String major = ncrAwaitingAction("MAJOR");
+        as(owner, get("/api/v1/ncrs/" + major)).andExpect(jsonPath("$.data.capaRequired").value(false));
+        act(owner, "/ncrs/" + major + "/request-verification", Map.of())
+                .andExpect(jsonPath("$.data.status").value("PENDING_VERIFICATION"));
+        String critical = ncrAwaitingAction("CRITICAL");
+        act(owner, "/ncrs/" + critical + "/request-verification", Map.of())
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value("A critical NCR needs a closed CAPA."));
+
+        updateSettings(owner, Map.of("capaRequiredFrom", "MINOR"));
+        String minor = ncrAwaitingAction("MINOR");
+        as(owner, get("/api/v1/ncrs/" + minor)).andExpect(jsonPath("$.data.capaRequired").value(true));
+        act(owner, "/ncrs/" + minor + "/request-verification", Map.of()).andExpect(status().isUnprocessableContent());
+
+        updateSettings(owner, Map.of("capaRequiredFrom", "NEVER"));
+        act(owner, "/ncrs/" + critical + "/request-verification", Map.of()).andExpect(status().isOk());
+    }
+
+    @Test
+    void theOrganisationDecidesWhichFixesMustBeVerified() throws Exception {
+        updateSettings(owner, Map.of("effectivenessRequiredFrom", "NEVER"));
+        String major = ncrAwaitingAction("MAJOR");
+        as(owner, get("/api/v1/ncrs/" + major)).andExpect(jsonPath("$.data.effectivenessRequired").value(false));
+        act(owner, "/capas", capaRequest(major, owner, FUTURE))
+                .andExpect(jsonPath("$.data.effectivenessRequired").value(false));
+
+        updateSettings(owner, Map.of("effectivenessRequiredFrom", "MINOR"));
+        act(owner, "/capas", capaRequest(ncrAwaitingAction("MINOR"), owner, FUTURE))
+                .andExpect(jsonPath("$.data.effectivenessRequired").value(true));
+    }
+
+    @Test
     void aMinorNcrCanCloseWithoutACapaButNotPastAnOpenOne() throws Exception {
         String ncr = ncrAwaitingAction("MINOR");
         String capa = capa(ncr, owner);

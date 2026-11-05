@@ -50,6 +50,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -76,6 +77,7 @@ public class InstrumentService implements AttachmentPolicy {
     private final AuditService audit;
     private final CalibrationImpactReviewRepository reviews;
     private final NcrService ncrs;
+    private final ApplicationEventPublisher events;
 
     InstrumentService(
             InstrumentRepository instruments,
@@ -88,7 +90,9 @@ public class InstrumentService implements AttachmentPolicy {
             NotificationService notifications,
             AuditService audit,
             CalibrationImpactReviewRepository reviews,
-            NcrService ncrs) {
+            NcrService ncrs,
+            ApplicationEventPublisher events) {
+        this.events = events;
         this.reviews = reviews;
         this.ncrs = ncrs;
         this.instruments = instruments;
@@ -248,7 +252,7 @@ public class InstrumentService implements AttachmentPolicy {
 
     @Transactional
     public ImpactReviewResponse decideImpact(UUID id, UUID reviewId, DecideImpactRequest request) {
-        load(id);
+        Instrument instrument = load(id);
         CalibrationImpactReview review = reviews.findById(reviewId)
                 .filter(found -> found.getInstrumentId().equals(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Impact review", reviewId.toString()));
@@ -257,6 +261,9 @@ public class InstrumentService implements AttachmentPolicy {
         audit.record("CALIBRATION_IMPACT_DECIDED", ENTITY, id, null, Map.of(
                 "inspection", review.getInspectionNumber(), "decision", request.decision().name(),
                 "note", review.getNote()));
+        if (review.getDecision() == CalibrationImpactReview.Decision.REINSPECT) {
+            events.publishEvent(new ReinspectionRequired(review.getInspectionId(), instrument.getInstrumentCode()));
+        }
         return toResponse(review, access.activeMembers());
     }
 

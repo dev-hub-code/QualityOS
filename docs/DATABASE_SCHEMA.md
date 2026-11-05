@@ -183,6 +183,10 @@ in doubt after a failed calibration, with a copy of the inspection number and th
 `decided_by` and `decided_at` are set together, once: a trigger refuses any later change and any deletion. Row-level
 security is enabled and forced.
 
+**V18** lets a lot have a new inspection after a completed one, since a decision to reinspect sends it back. Only one
+inspection per lot can be open at a time. `ck_production_batches_release` now only says that a batch still in progress
+has given out nothing, so that a released batch can go on hold after some of it has left.
+
 ## Control Center operators (V24)
 
 `platform_admins` gains `role`, `deactivated_at`, `added_by` and `reauthenticated_until`. Existing rows become

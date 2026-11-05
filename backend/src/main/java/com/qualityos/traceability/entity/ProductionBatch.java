@@ -93,6 +93,20 @@ public class ProductionBatch extends TenantOwnedEntity {
         }
     }
 
+    /**
+     * A measurement behind it is in doubt. It waits for a new inspection: in-process while it is still being made,
+     * final once it is. What already left stays out. A rejected or held batch has nothing more to hold.
+     *
+     * @return whether the batch was put on hold
+     */
+    public boolean holdForReinspection() {
+        if (status == Status.REJECTED || status == Status.ON_HOLD) {
+            return false;
+        }
+        status = Status.ON_HOLD;
+        return true;
+    }
+
     private void resume() {
         if (status == Status.ON_HOLD) {
             status = producedQuantity == null ? Status.IN_PROGRESS : Status.COMPLETED;

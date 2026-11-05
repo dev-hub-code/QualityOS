@@ -77,6 +77,7 @@ public class NcrService implements AttachmentPolicy {
     private final FacilityService facilities;
     private final ReviewPolicy reviewPolicy;
     private final QualityRules rules;
+    private final CalibrationDecisions calibrationDecisions;
 
     NcrService(
             NonConformanceRepository ncrs,
@@ -92,8 +93,10 @@ public class NcrService implements AttachmentPolicy {
             FacilityScope scope,
             FacilityService facilities,
             ReviewPolicy reviewPolicy,
-            QualityRules rules) {
+            QualityRules rules,
+            CalibrationDecisions calibrationDecisions) {
         this.rules = rules;
+        this.calibrationDecisions = calibrationDecisions;
         this.reviewPolicy = reviewPolicy;
         this.facilities = facilities;
         this.scope = scope;
@@ -332,8 +335,23 @@ public class NcrService implements AttachmentPolicy {
     @Transactional
     public NcrDetail close(UUID id, String note) {
         UUID actor = TenantContext.getCurrentUserId();
-        return transition(id, note, ncr -> ncr.close(actor, note, Instant.now(), reviewPolicy.permits(
-                actor, ncr.getVerificationRequestedBy(), ENTITY, id, "NCR_CLOSE", note)));
+        return transition(id, note, ncr -> {
+            requireCalibrationDecided(ncr);
+            ncr.close(actor, note, Instant.now(), reviewPolicy.permits(
+                    actor, ncr.getVerificationRequestedBy(), ENTITY, id, "NCR_CLOSE", note));
+        });
+    }
+
+    /** A failed calibration's NCR stays open until every inspection it put in doubt has a decision. */
+    private void requireCalibrationDecided(NonConformance ncr) {
+        if (ncr.getCalibrationRecordId() == null) {
+            return;
+        }
+        long pending = calibrationDecisions.pending(ncr.getCalibrationRecordId());
+        if (pending > 0) {
+            throw new BusinessRuleException("Decide each inspection in doubt on the instrument's page first: "
+                    + pending + " still waiting.");
+        }
     }
 
     @Transactional

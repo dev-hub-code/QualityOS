@@ -17,7 +17,7 @@ const DECISION_FIELDS: FieldDef[] = [
     required: true,
     options: [
       { value: "RESULT_STANDS", label: "Result stands: the measurement is still trusted" },
-      { value: "REINSPECT", label: "Reinspect: the goods must be inspected again" },
+      { value: "REINSPECT", label: "Reinspect: hold the goods until a new inspection releases them" },
     ],
   },
   { name: "note", label: "Why", type: "textarea", required: true },

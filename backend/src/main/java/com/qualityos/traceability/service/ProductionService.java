@@ -261,6 +261,17 @@ public class ProductionService {
                 Map.of("status", previous), Map.of("status", batch.getStatus()));
     }
 
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void holdForReinspection(UUID id, String reason) {
+        ProductionBatch batch = lock(id);
+        ProductionBatch.Status previous = batch.getStatus();
+        if (batch.holdForReinspection()) {
+            batches.saveAndFlush(batch);
+            audit.record("PRODUCTION_BATCH_STATUS_CHANGED", ENTITY, id,
+                    Map.of("status", previous), Map.of("status", batch.getStatus(), "reason", reason));
+        }
+    }
+
     /** @return the consumption, as long as it still stands */
     @Transactional(readOnly = true)
     public Optional<ConsumptionRef> activeConsumption(UUID relationshipId) {

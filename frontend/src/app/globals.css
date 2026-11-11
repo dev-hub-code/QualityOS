@@ -51,24 +51,25 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.3 0.09 260);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  /* Navy on frosted silver-blue, after docs/reference.jpeg. */
+  --background: #f3f5f9;
+  --foreground: #1b2a55;
+  --card: rgb(255 255 255 / 0.68);
+  --card-foreground: #1b2a55;
+  --popover: #fbfcfe;
+  --popover-foreground: #1b2a55;
+  --primary: #1f2f6b;
+  --primary-foreground: #f8fafc;
+  --secondary: #e6ebf3;
+  --secondary-foreground: #1b2a55;
+  --muted: #e9edf4;
+  --muted-foreground: #5b6785;
+  --accent: #e6ebf3;
+  --accent-foreground: #1b2a55;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.55 0.17 255);
+  --border: #d5dce8;
+  --input: #cdd5e2;
+  --ring: #3b56b0;
   --success: oklch(0.52 0.14 150);
   --warning: oklch(0.62 0.16 60);
   --chart-1: oklch(0.87 0 0);
@@ -76,15 +77,19 @@
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.75rem;
+  --sidebar: rgb(255 255 255 / 0.6);
+  --sidebar-foreground: #1b2a55;
+  --sidebar-primary: #1f2f6b;
+  --sidebar-primary-foreground: #f8fafc;
+  --sidebar-accent: rgb(255 255 255 / 0.75);
+  --sidebar-accent-foreground: #1b2a55;
+  --sidebar-border: rgb(255 255 255 / 0.7);
+  --sidebar-ring: #3b56b0;
+  --page-gradient: radial-gradient(60rem 40rem at 0% 0%, rgb(255 255 255 / 0.9), transparent 60%),
+    radial-gradient(50rem 40rem at 100% 100%, rgb(150 168 200 / 0.45), transparent 60%),
+    linear-gradient(135deg, #eef2f7 0%, #e1e7ef 50%, #ccd5e2 100%);
+  --glass-shadow: 0 8px 30px -12px rgb(30 41 82 / 0.25);
 }
 
 .dark {
@@ -129,6 +134,8 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-image: var(--page-gradient);
+    background-attachment: fixed;
   }
   html {
     @apply font-sans;
@@ -144,4 +151,40 @@
 .dark .viz-root {
   --viz-1: #3987e5;
   --viz-2: #d95926;
+}
+
+/* Frosted panel: cards, tables and dialogs share it. */
+@utility glass {
+  background-color: var(--card);
+  box-shadow: var(--glass-shadow), inset 0 0 0 1px rgb(255 255 255 / 0.7);
+  backdrop-filter: blur(12px);
+}
+
+/* A table standing on its own gets a glass card; one already inside a card or glass panel does not. */
+@layer components {
+  [data-slot="table-container"]:not([data-slot="card"] *, .glass *) {
+    border-radius: calc(var(--radius) * 1.8);
+    background-color: var(--card);
+    box-shadow: var(--glass-shadow), inset 0 0 0 1px rgb(255 255 255 / 0.7);
+    backdrop-filter: blur(12px);
+  }
+}
+
+/* Native selects across the app follow the inputs. */
+@layer base {
+  select {
+    background-color: rgb(255 255 255 / 0.7);
+    border-radius: var(--radius-lg);
+  }
+}
+
+@media print {
+  body {
+    background-image: none;
+  }
+  .glass,
+  [data-slot="table-container"] {
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
 }

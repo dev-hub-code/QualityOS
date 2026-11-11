@@ -117,11 +117,11 @@ export default function RolesPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Roles</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-[#1b2a55] sm:text-3xl">Roles</h1>
         {canManage && <Button onClick={() => setDialog({ role: null })}>New role</Button>}
       </div>
       <FormError message={remove.error?.message} />
-      <div className="overflow-x-auto rounded-lg border">
+      <div className="overflow-x-auto glass rounded-2xl">
         <Table>
           <TableHeader>
             <TableRow>
@@ -146,7 +146,7 @@ export default function RolesPage() {
                   </Badge>
                 </TableCell>
                 <TableCell>{role.permissions.length}</TableCell>
-                <TableCell className="text-right whitespace-nowrap">
+                <TableCell className="text-right min-w-36 whitespace-normal [&>*]:m-0.5">
                   {canManage && !role.system && (
                     <>
                       <Button variant="ghost" size="sm" onClick={() => setDialog({ role })}>

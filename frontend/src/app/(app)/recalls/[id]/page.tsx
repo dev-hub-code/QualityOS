@@ -20,7 +20,7 @@ const CLOSURE_FIELDS: FieldDef[] = [
   { name: "acceptOutstanding", label: "I accept that goods remain with customers, as explained above", type: "checkbox" },
 ];
 const SEND_BACK_FIELDS: FieldDef[] = [{ name: "reason", label: "What still needs doing", type: "textarea", required: true }];
-const SELECT = "h-9 rounded-md border bg-background px-2 text-sm";
+const SELECT = "h-9 rounded-xl border bg-white/70 px-2 text-sm";
 
 function Closure({ recall, path }: { recall: RecallDetail; path: string }) {
   const canRequest = usePermission("RECALL_MANAGE");

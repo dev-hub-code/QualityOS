@@ -14,7 +14,7 @@ export function ReviewPolicySettings() {
   if (!data) return null;
   return (
     <section className="space-y-3">
-      <h2 className="font-medium">Reviews</h2>
+      <h2 className="text-base font-semibold text-[#1b2a55]">Reviews</h2>
       <p className="text-sm text-muted-foreground">
         Normally a second person approves an inspection, closes an NCR and verifies a CAPA. If you work alone, you can
         do these yourself. You must give a reason each time, and it is saved in the audit log.

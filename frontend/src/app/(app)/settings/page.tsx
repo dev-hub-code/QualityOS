@@ -73,10 +73,10 @@ export default function SettingsPage() {
   });
 
   return (
-    <div className="max-w-lg space-y-10">
-      <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+    <div className="max-w-2xl space-y-6 [&>section]:glass [&>section]:rounded-2xl [&>section]:p-5 sm:[&>section]:p-6">
+      <h1 className="text-2xl font-bold tracking-tight text-[#1b2a55] sm:text-3xl">Settings</h1>
       <section className="space-y-4">
-        <h2 className="font-medium">Organisation</h2>
+        <h2 className="text-base font-semibold text-[#1b2a55]">Organisation</h2>
         {organization && (
           <OrganizationForm
             key={organization.version}
@@ -89,7 +89,7 @@ export default function SettingsPage() {
       <ReviewPolicySettings />
       <QualityRulesSettings />
       <section className="space-y-4">
-        <h2 className="font-medium">Your password</h2>
+        <h2 className="text-base font-semibold text-[#1b2a55]">Your password</h2>
         <ChangePasswordForm />
       </section>
       <EmailLanguage />

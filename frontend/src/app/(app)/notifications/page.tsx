@@ -44,7 +44,7 @@ export default function NotificationsPage() {
       </PageHeader>
       <FormError message={open.error?.message ?? markAllRead.error?.message} />
       {data && items.length === 0 && <p className="text-sm text-muted-foreground">Nothing to show.</p>}
-      <ul className="divide-y rounded-lg border">
+      <ul className="divide-y glass rounded-2xl">
         {items.map((notification) => (
           <li key={notification.id}>
             <button

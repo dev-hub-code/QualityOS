@@ -1,14 +1,35 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import {
+  Building2,
+  CalendarX,
+  CircleAlert,
+  CircleCheck,
+  FileText,
+  Hourglass,
+  LifeBuoy,
+  Lock,
+  Percent,
+  ReceiptIndianRupee,
+  TrendingDown,
+  Wallet,
+} from "lucide-react";
 import { MonthBars, RankBars } from "@/components/analytics/charts";
 import { rate } from "@/components/analytics/kpi-tiles";
+import { DashboardFrame, FloatCard, HeroCard, HeroHeading, Panel, Pending, Tile, type QuickAction } from "@/components/app/showcase";
 import { formatMoney } from "@/components/billing/subscription-banner";
 import { usePeriod } from "@/components/platform/period-select";
-import { PageHeader, QueryState, Section } from "@/components/records/parts";
-import { Card, CardContent } from "@/components/ui/card";
+import { QueryState } from "@/components/records/parts";
 import { api } from "@/lib/api";
 import type { PlatformDashboard } from "@/lib/types";
+
+const ACTIONS: QuickAction[] = [
+  { label: "Customers", href: "/platform/organisations", icon: Building2 },
+  { label: "Invoices", href: "/platform/invoices", icon: FileText },
+  { label: "Payments", href: "/platform/payments", icon: Wallet },
+  { label: "Support", href: "/platform/support", icon: LifeBuoy },
+];
 
 export default function PlatformDashboardPage() {
   const { query, controls } = usePeriod();
@@ -18,26 +39,75 @@ export default function PlatformDashboardPage() {
     placeholderData: keepPreviousData,
   });
   return (
-    <div className="space-y-6">
-      <PageHeader title="Dashboard" subtitle="Recurring revenue is what is under contract. Collected is money received." />
-      {controls}
+    <DashboardFrame>
+      <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1fr)_31rem]">
+        <HeroHeading badge="Control Center" lead="Platform" accent="dashboard">
+          <p className="max-w-lg text-base text-slate-600 sm:text-lg">
+            Recurring revenue is what is under contract. Collected is money received.
+          </p>
+          {controls}
+          {data && (
+            <div className="grid gap-3 pt-2 sm:grid-cols-3">
+              <Pending icon={Hourglass} label="On trial" value={data.trials} href="/platform/trials" />
+              <Pending icon={CircleAlert} label="In grace period" value={data.grace} href="/platform/subscriptions" />
+              <Pending icon={FileText} label="Unpaid invoices" value={data.outstandingInvoices} href="/platform/invoices" />
+            </div>
+          )}
+        </HeroHeading>
+        {data && (
+          <HeroCard
+            brand="Control Center"
+            badge={`${data.active} paying`}
+            label={<span title="Monthly recurring revenue">MRR</span>}
+            value={formatMoney(data.mrr)}
+            note={`ARR ${formatMoney(data.arr)}`}
+            actions={ACTIONS}
+            floats={
+              <>
+                <FloatCard
+                  icon={ReceiptIndianRupee}
+                  label="Collected"
+                  value={formatMoney(data.collected)}
+                  note="in this period"
+                  href="/platform/payments"
+                />
+                <FloatCard
+                  icon={Percent}
+                  label="Collection rate"
+                  value={rate(data.collectionRate)}
+                  note={`${formatMoney(data.outstanding)} outstanding`}
+                  href="/platform/invoices"
+                  alert={data.outstandingInvoices > 0}
+                />
+              </>
+            }
+          />
+        )}
+      </div>
+
       {!data ? (
-        <QueryState error={error} />
+        <div className="mt-6">
+          <QueryState error={error} />
+        </div>
       ) : (
         <>
           {error && <QueryState error={error} />}
-          <dl className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-            {tiles(data).map(([label, value]) => (
-              <Card key={label}>
-                <CardContent>
-                  <dt className="text-sm text-muted-foreground">{label}</dt>
-                  <dd className="text-2xl font-semibold tabular-nums">{value}</dd>
-                </CardContent>
-              </Card>
-            ))}
+          <dl className="mt-10 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Tile icon={Building2} label="Organisations" value={data.organisations} />
+            <Tile icon={CircleCheck} label="Active subscriptions" value={data.active} />
+            <Tile icon={Hourglass} label="Trials" value={data.trials} />
+            <Tile icon={TrendingDown} label="Churn rate" value={rate(data.churnRate)} />
+            <Tile icon={CircleAlert} label="In grace period" value={data.grace} />
+            <Tile icon={Lock} label="Read-only" value={data.readOnly} />
+            <Tile icon={CalendarX} label="Expired" value={data.expired} />
+            <Tile
+              icon={FileText}
+              label="Outstanding invoices"
+              value={`${formatMoney(data.outstanding)} (${data.outstandingInvoices})`}
+            />
           </dl>
-          <div className="grid gap-4 xl:grid-cols-2">
-            <Section title="Recurring revenue and collections, by month">
+          <div className="mt-6 grid gap-6 xl:grid-cols-2">
+            <Panel title="Recurring revenue and collections, by month">
               <MonthBars
                 grouped
                 data={data.months}
@@ -46,8 +116,8 @@ export default function PlatformDashboardPage() {
                   { key: "collected", label: "Collected" },
                 ]}
               />
-            </Section>
-            <Section title="Registrations and trial conversion, by month">
+            </Panel>
+            <Panel title="Registrations and trial conversion, by month">
               <MonthBars
                 grouped
                 data={data.months}
@@ -56,8 +126,8 @@ export default function PlatformDashboardPage() {
                   { key: "converted", label: "Became paying" },
                 ]}
               />
-            </Section>
-            <Section title="Paying subscriptions and cancellations, by month">
+            </Panel>
+            <Panel title="Paying subscriptions and cancellations, by month">
               <MonthBars
                 grouped
                 data={data.months}
@@ -66,33 +136,16 @@ export default function PlatformDashboardPage() {
                   { key: "cancelled", label: "Cancelled" },
                 ]}
               />
-            </Section>
-            <Section title="Subscriptions by plan">
+            </Panel>
+            <Panel title="Subscriptions by plan">
               <RankBars
                 headings={["Plan", "Organisations"]}
                 rows={data.plans.map((plan) => ({ label: plan.name, value: plan.count, display: String(plan.count) }))}
               />
-            </Section>
+            </Panel>
           </div>
         </>
       )}
-    </div>
+    </DashboardFrame>
   );
-}
-
-function tiles(data: PlatformDashboard): [string, string | number][] {
-  return [
-    ["Organisations", data.organisations],
-    ["Active subscriptions", data.active],
-    ["Trials", data.trials],
-    ["Expired", data.expired],
-    ["In grace period", data.grace],
-    ["Read-only", data.readOnly],
-    ["MRR", formatMoney(data.mrr)],
-    ["ARR", formatMoney(data.arr)],
-    ["Outstanding invoices", `${formatMoney(data.outstanding)} (${data.outstandingInvoices})`],
-    ["Collected in period", formatMoney(data.collected)],
-    ["Collection rate", rate(data.collectionRate)],
-    ["Churn rate", rate(data.churnRate)],
-  ];
 }

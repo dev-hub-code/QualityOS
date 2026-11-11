@@ -73,18 +73,20 @@ export default function PlatformOperatorsPage() {
                 <TableRow key={operator.userId}>
                   <TableCell>
                     <div className="font-medium">{operator.fullName}</div>
-                    <div className="text-sm text-muted-foreground">{operator.email}</div>
+                    <div className="text-sm [overflow-wrap:anywhere] text-muted-foreground">{operator.email}</div>
                   </TableCell>
                   <TableCell>{ROLE_NAME[operator.role] ?? operator.role}</TableCell>
                   <TableCell>
                     <StatusBadge status={operator.deactivatedAt ? "DEACTIVATED" : "ACTIVE"} />
                   </TableCell>
                   <TableCell>
-                    {formatDate(operator.addedAt)}
-                    {operator.addedBy ? ` by ${operator.addedBy}` : ""}
+                    <div className="whitespace-nowrap">{formatDate(operator.addedAt)}</div>
+                    {operator.addedBy && (
+                      <div className="text-sm [overflow-wrap:anywhere] text-muted-foreground">by {operator.addedBy}</div>
+                    )}
                   </TableCell>
-                  <TableCell>{operator.lastActivity ? formatDate(operator.lastActivity) : "None"}</TableCell>
-                  <TableCell className="space-x-2 text-right whitespace-nowrap">
+                  <TableCell className="whitespace-nowrap">{operator.lastActivity ? formatDate(operator.lastActivity) : "None"}</TableCell>
+                  <TableCell className="text-right min-w-36 whitespace-normal [&>*]:m-0.5">
                     <RecordLink href={`/platform/audit-logs?q=${encodeURIComponent(operator.email)}`}>Activity</RecordLink>
                     {manage && (
                       <>

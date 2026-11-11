@@ -10,7 +10,7 @@ import { api } from "@/lib/api";
 import { FISHBONE_BRANCHES, WHY_COUNT, toFishbone, toFiveWhys } from "@/lib/capa";
 import type { Capa } from "@/lib/types";
 
-const TEXTAREA_CLASS = "w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-sm";
+const TEXTAREA_CLASS = "w-full rounded-xl border border-input bg-white/70 px-2 py-1.5 text-sm";
 
 /** The 5 Why and fishbone tools are optional aids. Only the root cause itself is required. */
 export function CapaAnalysisForm({ capa }: { capa: Capa }) {

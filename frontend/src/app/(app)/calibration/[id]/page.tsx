@@ -98,7 +98,7 @@ export default function InstrumentPage() {
           </Button>
         </PageHeader>
       </div>
-      <div className="flex w-fit items-center gap-4 rounded-lg border p-3">
+      <div className="flex w-fit items-center gap-4 glass rounded-2xl p-3">
         {/* eslint-disable-next-line @next/next/no-img-element -- an SVG from this app's own API, behind sign-in */}
         <img src={`/api/v1${path}/qr.svg`} alt={`QR code for ${instrument.instrumentCode}`} className="size-28" />
         <div className="text-sm">

@@ -198,9 +198,9 @@ function PendingInvitations() {
   if (!invitations.data?.length) return null;
   return (
     <section className="space-y-2">
-      <h2 className="font-medium">Pending invitations</h2>
+      <h2 className="text-base font-semibold text-[#1b2a55]">Pending invitations</h2>
       <FormError message={act.error?.message} />
-      <ul className="divide-y rounded-lg border text-sm">
+      <ul className="divide-y glass rounded-2xl text-sm">
         {invitations.data.map((invitation) => (
           <li key={invitation.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
             <span>
@@ -246,14 +246,14 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-[#1b2a55] sm:text-3xl">Users</h1>
         <Button onClick={() => setAdding(true)} disabled={!roles.data}>
           Invite user
         </Button>
       </div>
       <FormError message={setActive.error?.message} />
       <PendingInvitations />
-      <div className="overflow-x-auto rounded-lg border">
+      <div className="overflow-x-auto glass rounded-2xl">
         <Table>
           <TableHeader>
             <TableRow>
@@ -285,7 +285,7 @@ export default function UsersPage() {
                     {member.status === "ACTIVE" ? "Active" : "Inactive"}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right whitespace-nowrap">
+                <TableCell className="text-right min-w-36 whitespace-normal [&>*]:m-0.5">
                   <Button variant="ghost" size="sm" onClick={() => setEditing(member)}>
                     Edit roles
                   </Button>

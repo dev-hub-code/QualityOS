@@ -43,7 +43,7 @@ export default function SuppliersPage() {
       </PageHeader>
       <select
         aria-label="Filter by status"
-        className="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+        className="h-9 rounded-xl border border-input bg-white/70 px-2 text-sm"
         value={status}
         onChange={(event) => setStatus(event.target.value)}
       >

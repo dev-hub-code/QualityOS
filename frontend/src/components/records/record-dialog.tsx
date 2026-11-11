@@ -23,8 +23,8 @@ interface RecordDialogProps {
   extra?: ReactNode;
 }
 
-const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm";
-const TEXTAREA_CLASS = "w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-sm";
+const SELECT_CLASS = "h-9 w-full rounded-xl border border-input bg-white/70 px-2 text-sm";
+const TEXTAREA_CLASS = "w-full rounded-xl border border-input bg-white/70 px-2 py-1.5 text-sm";
 
 /** Adds to a list that may be empty, without leaving the form that needs it. */
 function AddOption({ field, onAdded }: { field: FieldDef; onAdded: (id: string) => void }) {

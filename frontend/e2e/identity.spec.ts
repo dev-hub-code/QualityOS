@@ -15,7 +15,7 @@ test("register, onboard, sign out and sign back in", async ({ page }) => {
   const email = `owner-${unique()}@example.com`;
   await registerOwner(page, email);
   await finishOnboarding(page);
-  await expect(page.getByRole("heading", { name: "Welcome, Asha Rao" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome back, Asha" })).toBeVisible();
 
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/login/);

@@ -55,7 +55,7 @@ function CategorySection({ title, noun, path, fields, canView, canManage, archiv
       {data.length === 0 ? (
         <p className="text-sm text-muted-foreground">No categories yet.</p>
       ) : (
-        <ul className="divide-y rounded-lg border text-sm">
+        <ul className="divide-y glass rounded-2xl text-sm">
           {data.map((category) => (
             <li key={category.id} className="flex items-center justify-between gap-3 p-3">
               <span>{category.code ? `${category.code} – ${category.name}` : category.name}</span>

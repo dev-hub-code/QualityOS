@@ -105,8 +105,9 @@ export default function PlatformPlansPage() {
                 <TableCell className="text-right">{money(plan.annualPrice)}</TableCell>
                 <TableCell className="text-right">{plan.maxUsers ?? "No limit"}</TableCell>
                 <TableCell className="text-right">{plan.maxFacilities ?? "No limit"}</TableCell>
-                <TableCell className="space-x-2 whitespace-nowrap">
-                  {billing && !plan.archivedAt && (
+                <TableCell className="min-w-80 whitespace-normal">
+                  <div className="flex flex-wrap justify-end gap-1.5">
+                    {billing && !plan.archivedAt && (
                     <>
                       <Button size="sm" variant="outline" onClick={() => setEditing(plan)}>
                         Edit {plan.name}
@@ -128,6 +129,7 @@ export default function PlatformPlansPage() {
                       Copy {plan.name}
                     </Button>
                   )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

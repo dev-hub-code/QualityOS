@@ -22,7 +22,7 @@ import type { Attachment, Inspection, NcrSummary, ParameterSpec } from "@/lib/ty
 
 const NOTE_FIELD: FieldDef = { name: "note", label: "Note" };
 const SEND_BACK_FIELDS: FieldDef[] = [{ ...NOTE_FIELD, label: "What needs correcting", required: true }];
-const SELECT_CLASS = "h-11 w-full rounded-md border border-input bg-transparent px-2 text-base";
+const SELECT_CLASS = "h-11 w-full rounded-xl border border-input bg-white/70 px-2 text-base";
 
 function SampleInput({
   parameter,

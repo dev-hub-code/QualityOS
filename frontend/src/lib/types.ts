@@ -1311,6 +1311,8 @@ export interface Feature {
   active: boolean;
   defaultEnabled: boolean;
   enforced: boolean;
+  /** APP: the product takes it away from a plan without it. TEAM: people deliver it, and the product cannot. */
+  delivery: "APP" | "TEAM";
   organisations: number;
   version: number;
 }

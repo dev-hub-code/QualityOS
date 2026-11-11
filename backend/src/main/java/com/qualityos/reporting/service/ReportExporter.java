@@ -55,7 +55,7 @@ public class ReportExporter {
     /** Text goes in as text, so that a value beginning with an equals sign is never run as a formula. */
     public byte[] excel(ReportTable report) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            Workbook workbook = new Workbook(out, "QualityOS", "1.0");
+            Workbook workbook = new Workbook(out, "ProductionOS", "1.0");
             Worksheet sheet = workbook.newWorksheet("Report");
             sheet.value(0, 0, report.title());
             sheet.style(0, 0).bold().fontSize(14).set();

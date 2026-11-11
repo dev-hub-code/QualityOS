@@ -52,7 +52,7 @@ function PassRateCard({ data }: { data: Overview }) {
   const { kpis } = data;
   return (
     <HeroCard
-      brand="QualityOS"
+      brand="ProductionOS"
       badge="90 days"
       label="Inspection pass rate"
       value={rate(kpis.inspectionPassRate)}

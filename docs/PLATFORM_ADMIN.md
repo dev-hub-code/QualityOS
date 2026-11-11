@@ -1,6 +1,6 @@
 # Platform administration
 
-The Control Center is where the people who run QualityOS manage plans and customers. It lives in the main app at
+The Control Center is where the people who run ProductionOS manage plans and customers. It lives in the main app at
 `/platform`, with its own navigation. It is built in phases, and this page describes what works today.
 
 | Phase | Scope | Status |
@@ -19,7 +19,7 @@ Cashfree checkout appears on a customer's billing page once `CASHFREE_APP_ID` an
 them customers see no pay button, and invoices are recorded by hand as before. Set `CASHFREE_ENVIRONMENT=production` only
 with live keys, and point the Cashfree webhook at `<APP_URL>/api/webhooks/cashfree`.
 
-The amount comes from the invoice, and a payment counts only after QualityOS has asked Cashfree about it. Neither the
+The amount comes from the invoice, and a payment counts only after ProductionOS has asked Cashfree about it. Neither the
 customer's return nor a webhook's contents settle anything alone. Payments appear under Payments with provider `CASHFREE`.
 
 Search the audit log for `PAYMENT_NEEDS_REVIEW`. It means money was taken but could not be applied, usually because the
@@ -178,7 +178,7 @@ There is no gateway. `SubscriptionService.settle` already takes a provider name 
 
 ### GST on invoices
 
-**This is not reviewed by an accountant, and QualityOS does not claim GST compliance.**
+**This is not reviewed by an accountant, and ProductionOS does not claim GST compliance.**
 
 From this release, an invoice stores its tax treatment when issued, by comparing the state codes opening the seller's and buyer's GSTINs:
 

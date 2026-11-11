@@ -11,7 +11,7 @@ public class OpenApiConfig {
     @Bean
     OpenAPI qualityOsOpenApi() {
         return new OpenAPI().info(new Info()
-                .title("QualityOS API")
+                .title("ProductionOS API")
                 .version("v1")
                 .description("Manufacturing quality management and product traceability platform."));
     }

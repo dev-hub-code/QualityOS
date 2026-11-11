@@ -11,7 +11,7 @@ export interface Flow {
 }
 
 export const OVERVIEW_FLOW: Flow = {
-  title: "How material moves through QualityOS",
+  title: "How material moves through ProductionOS",
   steps: [
     { label: "Purchase order", note: "Raised on an approved supplier." },
     { label: "Receipt", note: "Each line creates a lot with its own number." },

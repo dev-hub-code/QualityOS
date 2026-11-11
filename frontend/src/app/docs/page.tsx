@@ -8,7 +8,7 @@ export default function DocsHome() {
     <>
       <h1 className="text-3xl font-semibold tracking-tight">Documentation</h1>
       <p className="mt-3 max-w-2xl text-muted-foreground">
-        How each part of QualityOS works, who uses it, and a worked example. The people, companies and figures in the
+        How each part of ProductionOS works, who uses it, and a worked example. The people, companies and figures in the
         examples are made up.
       </p>
       <div className="mt-6 max-w-3xl">

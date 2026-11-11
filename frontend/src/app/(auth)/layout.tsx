@@ -8,7 +8,7 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
           <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-[#2a3f86] to-[#16224f] text-white shadow">
             <ShieldCheck aria-hidden className="size-5" />
           </span>
-          QualityOS
+          ProductionOS
         </p>
         <p className="text-sm text-muted-foreground">
           Digital Quality. Traceable Products. <span className="text-slate-400">Confident Manufacturing.</span>

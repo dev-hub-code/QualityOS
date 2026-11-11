@@ -24,7 +24,7 @@ public class InvoicePdfRenderer {
 
     /** For writing a sample without a running application. */
     public static InvoicePdfRenderer forSample(HtmlPdf pdf) {
-        return new InvoicePdfRenderer(pdf, "QualityOS", "", "");
+        return new InvoicePdfRenderer(pdf, "ProductionOS", "", "");
     }
 
     InvoicePdfRenderer(

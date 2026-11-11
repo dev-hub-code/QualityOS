@@ -43,7 +43,7 @@ export const DOC_PAGES: DocPage[] = [
     plan: EVERY_PLAN,
     sections: [
       {
-        title: "How QualityOS fits together",
+        title: "How ProductionOS fits together",
         text: "Every record links to the one before it. A purchase order leads to a receipt, a receipt creates lots, and each lot is inspected before it can be used. Failures raise NCRs, and NCRs lead to CAPAs. Released lots go into production batches, and batches go out on dispatches. That chain is what makes a trace possible.",
       },
       {
@@ -961,7 +961,7 @@ export const DOC_PAGES: DocPage[] = [
       },
       {
         title: "Certification",
-        text: "QualityOS helps you run a quality system and keep its records. It does not certify your organisation or confer regulatory approval. Whether your use of it meets a particular standard is for you and your certifier to decide.",
+        text: "ProductionOS helps you run a quality system and keep its records. It does not certify your organisation or confer regulatory approval. Whether your use of it meets a particular standard is for you and your certifier to decide.",
       },
     ],
     example: {
@@ -976,7 +976,7 @@ export const DOC_PAGES: DocPage[] = [
     slug: "platform",
     group: "Account",
     title: "Platform administration",
-    summary: "For the people who run QualityOS itself, not for customer organisations.",
+    summary: "For the people who run ProductionOS itself, not for customer organisations.",
     menu: "Control Center",
     roles: "Platform administrators",
     plan: "Not part of a plan",

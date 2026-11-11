@@ -14,7 +14,7 @@
     <groupId>com.qualityos</groupId>
     <artifactId>qualityos-backend</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <name>QualityOS Backend</name>
+    <name>ProductionOS Backend</name>
     <description>Manufacturing quality management and traceability platform</description>
 
     <properties>

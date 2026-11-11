@@ -1,4 +1,4 @@
-Subject: Your QualityOS subscription ends on {{dueDate}}
+Subject: Your ProductionOS subscription ends on {{dueDate}}
 
 Your subscription is ending
 

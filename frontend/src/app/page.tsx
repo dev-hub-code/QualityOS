@@ -32,7 +32,7 @@ import { backendUrl } from "@/lib/bff";
 
 export const metadata: Metadata = {
   description:
-    "Purchasing, goods-in, production batches, inspection, NCR and CAPA, dispatch and traceability, in one connected record.",
+    "Inspection, NCR and CAPA, and batch traceability for manufacturers, built on your purchasing, production and dispatch records.",
 };
 
 const WORKFLOW: [LucideIcon, string, string][] = [
@@ -52,21 +52,20 @@ const CONTROLS: [LucideIcon, string, string][] = [
 ];
 
 const MODULES: [LucideIcon, string, string][] = [
-  [ClipboardList, "Purchasing and goods-in", "Suppliers, purchase orders, part deliveries, and a batch number for every lot received."],
-  [Factory, "Production batches", "Planned and produced quantities, the lots each batch used, and serial numbers where you need them."],
-  [Send, "Dispatch and returns", "Ship released batches to customers, record what comes back, and keep quantities straight."],
   [ClipboardCheck, "Inspection at every stage", "Incoming, in-process and final inspection from versioned templates, with sampling and evidence."],
   [TriangleAlert, "NCR and CAPA", "Severity, containment, root cause, actions, due dates and effectiveness checks."],
   [Network, "Batch traceability", "Forward and backward traces, serial search, and recalls run from what you find."],
   [Gauge, "Calibration", "Instrument register, QR labels, due reminders and inspections flagged after a failed calibration."],
   [ListChecks, "Quality audits", "Checklists, findings that raise NCRs, and a generated audit report."],
   [ChartColumn, "Analytics and reports", "Pass rate, first pass yield, supplier scorecards, Pareto, and PDF or Excel exports."],
+  [ClipboardList, "Purchasing and goods-in", "Suppliers, purchase orders, part deliveries, and a batch number for every lot received."],
+  [Factory, "Production batches", "Planned and produced quantities, the lots each batch used, and serial numbers where you need them."],
+  [Send, "Dispatch and returns", "Ship released batches to customers, record what comes back, and keep quantities straight."],
 ];
 
 const HIGHLIGHTS: [LucideIcon, string][] = [
-  [ClipboardList, "Purchasing"],
-  [Factory, "Production"],
-  [ClipboardCheck, "Quality"],
+  [ClipboardCheck, "Inspection"],
+  [TriangleAlert, "NCR and CAPA"],
   [Network, "Traceability"],
 ];
 
@@ -154,15 +153,15 @@ export default function Home() {
                   <span className="absolute inline-flex size-full rounded-full bg-[#3b56b0] opacity-60 motion-safe:animate-ping" />
                   <span className="relative inline-flex size-2 rounded-full bg-[#1e2d5a]" />
                 </span>
-                Production, quality and traceability for Indian manufacturers
+                Quality and traceability for Indian manufacturers
               </p>
               <h1 className="mt-6 text-4xl leading-[1.08] font-bold tracking-tight text-balance text-[#1b2a55] sm:text-5xl lg:text-[3.5rem]">
-                From purchase order to dispatch,{" "}
-                <span className="bg-gradient-to-r from-[#5b6785] to-[#97a3bd] bg-clip-text text-transparent">every lot accounted for.</span>
+                Know what passed, what failed,{" "}
+                <span className="bg-gradient-to-r from-[#5b6785] to-[#97a3bd] bg-clip-text text-transparent">and where every lot went.</span>
               </h1>
               <p className="mt-6 max-w-xl text-lg text-pretty text-muted-foreground">
-                ProductionOS replaces the registers and spreadsheets behind purchasing, goods-in, production, inspection and
-                dispatch with one connected record. Know what you made, what passed, and where every lot went.
+                ProductionOS replaces inspection registers and spreadsheets with one connected record, from the purchase order and
+                the goods-in bay to the customer who received the batch.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link href="/register" className={buttonVariants({ size: "lg", className: "h-11 px-5" })}>
@@ -235,8 +234,9 @@ export default function Home() {
         </section>
 
         <section id="product" className="mx-auto max-w-6xl scroll-mt-20 px-4 sm:px-6">
-          <Heading eyebrow="Product" title="Production and quality, in one place" center>
-            Every module works from the same lots and batches, and more production features are on the way.
+          <Heading eyebrow="Product" title="Quality management, from goods-in to dispatch" center>
+            Inspection, NCR and CAPA, and traceability, built on the purchasing, production and dispatch records they
+            depend on.
           </Heading>
           <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {MODULES.map(([Icon, title, text]) => (

@@ -41,6 +41,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -54,6 +55,8 @@ public class SubscriptionService {
     private static final int PAYMENT_TERMS_DAYS = 7;
     private static final long MEGABYTE = 1_048_576L;
     private static final List<Integer> NOTICE_DAYS = List.of(7, 3, 1, 0);
+    /** The database index that keeps a payment reference to one invoice across the platform. */
+    private static final String REFERENCE_INDEX = "uq_payments_reference";
 
     private final SubscriptionPlanRepository plans;
     private final SubscriptionRepository subscriptions;
@@ -318,18 +321,20 @@ public class SubscriptionService {
 
     /**
      * The one way money reaches an invoice. A gateway's callback would call this too, under the tenant the invoice
-     * belongs to. A repeated reference changes nothing, so a callback can safely arrive twice.
+     * belongs to. A repeated reference changes nothing, so a callback can safely arrive twice, even at the same moment:
+     * the subscription lock makes the second wait and then find the first. Another organisation's payments are hidden
+     * from this lookup, so a reference used there is caught by the database's unique index when the payment is saved.
      */
     @Transactional
     public PaymentResponse settle(UUID invoiceId, String provider, RecordPaymentRequest request) {
-        var repeat = payments.findByProviderAndProviderReference(provider, request.reference());
+        Subscription subscription = subscriptions.lockCurrent().orElseThrow(SubscriptionService::missing);
+        var repeat = payments.findByProviderReferenceIgnoreCase(request.reference());
         if (repeat.isPresent()) {
             if (!repeat.get().getInvoiceId().equals(invoiceId)) {
-                throw new ConflictException("This reference is already used on another invoice.");
+                throw referenceUsed();
             }
             return payments().stream().filter(p -> p.id().equals(repeat.get().getId())).findFirst().orElseThrow();
         }
-        Subscription subscription = subscriptions.lockCurrent().orElseThrow(SubscriptionService::missing);
         SubscriptionInvoice invoice = invoice(invoiceId);
         if (invoice.getStatus() != SubscriptionInvoice.Status.ISSUED) {
             throw new ConflictException("This invoice is not open for payment.");
@@ -353,11 +358,22 @@ public class SubscriptionService {
         payment.setMethod(request.method().name());
         payment.setPaidOn(request.paidOn());
         payment.setNotes(request.notes());
-        payments.saveAndFlush(payment);
+        try {
+            payments.saveAndFlush(payment);
+        } catch (DataIntegrityViolationException e) {
+            if (String.valueOf(e.getMostSpecificCause().getMessage()).contains(REFERENCE_INDEX)) {
+                throw referenceUsed();
+            }
+            throw e;
+        }
         audit.record(request.failed() ? "PAYMENT_FAILED" : "PAYMENT_RECORDED", "PaymentTransaction", payment.getId(),
                 null, Map.of("invoice", invoice.getInvoiceNumber(), "provider", provider,
                         "amount", request.amount().toPlainString()));
         return payments().stream().filter(p -> p.id().equals(payment.getId())).findFirst().orElseThrow();
+    }
+
+    private static ConflictException referenceUsed() {
+        return new ConflictException("This reference is already used on another invoice.");
     }
 
     private void markPaid(Subscription subscription, SubscriptionInvoice invoice) {

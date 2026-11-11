@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ProductionOS: production, quality and traceability for manufacturers",
+  title: "ProductionOS: manufacturing quality and traceability",
   description: "Digital Quality. Traceable Products. Confident Manufacturing.",
 };
 

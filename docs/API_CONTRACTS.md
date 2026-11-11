@@ -184,7 +184,10 @@ A failed calibration lists each inspection that used the instrument since its la
 NCR (source `CALIBRATION`) for them. With nothing in doubt, no NCR is raised. `GET /instruments/{id}/impact-reviews` groups
 the reviews by failed calibration, newest first, with the NCR and the number still pending. A decision takes `decision`
 (`RESULT_STANDS` or `REINSPECT`) and a `note`, is made once (`422` after that), and is audited as
-`CALIBRATION_IMPACT_DECIDED`. An NCR raised by a calibration cannot be cancelled, only rejected. Each instrument on an
+`CALIBRATION_IMPACT_DECIDED`. `REINSPECT` holds whatever the inspection released: a lot goes back to awaiting
+inspection, and a batch (also for an accepted return) goes `ON_HOLD`, until a new inspection releases it. Stock already
+used or dispatched stays where it is. It is `422` on an inspection that is not completed. An NCR raised by a calibration
+cannot be cancelled, only rejected, and cannot close while any of its inspections has no decision. Each instrument on an
 inspection carries `impactReview`: `PENDING`, `RESULT_STANDS`, `REINSPECT` or null.
 
 | Audits | Permission |

@@ -62,12 +62,15 @@ import com.qualityos.traceability.service.ProductionService;
 import com.qualityos.inspection.dto.InspectionDtos.InspectionHistory;
 import java.math.BigDecimal;
 import java.util.Collection;
+import com.qualityos.calibration.service.ReinspectionRequired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import com.qualityos.subscription.service.PlanLimits;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -312,6 +315,34 @@ public class InspectionService implements AttachmentPolicy {
 
     private static Collection<UUID> orNone(Collection<UUID> ids) {
         return ids.isEmpty() ? List.of(new UUID(0, 0)) : ids;
+    }
+
+    /**
+     * Holds the goods an inspection released, once a failed calibration puts its measurements in doubt. A new
+     * inspection is the only way to release them again. Goods it did not release have nothing to hold.
+     */
+    @EventListener
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void holdForReinspection(ReinspectionRequired event) {
+        Inspection inspection = inspections.findForUpdate(event.inspectionId())
+                .orElseThrow(() -> new ResourceNotFoundException(ENTITY, event.inspectionId()));
+        String number = inspection.getInspectionNumber();
+        if (inspection.getStatus() == Inspection.Status.CANCELLED) {
+            throw new BusinessRuleException(number + " was cancelled and released nothing. Decide that its result stands.");
+        }
+        if (inspection.getStatus() != Inspection.Status.COMPLETED) {
+            throw new BusinessRuleException(number + " is not finished yet. Decide once it is.");
+        }
+        Disposition disposition = inspection.getDisposition();
+        if (disposition != Disposition.ACCEPT && disposition != Disposition.CONDITIONAL_ACCEPTANCE) {
+            return;
+        }
+        String reason = event.instrumentCode() + " failed calibration, so " + number + " is in doubt.";
+        if (inspection.getReceiptItemId() != null) {
+            receipts.holdForReinspection(inspection.getReceiptItemId(), reason);
+        } else {
+            production.holdForReinspection(inspection.getProductionBatchId(), reason);
+        }
     }
 
     private void recordOutcome(Inspection inspection, String disposition, boolean finalDecision) {

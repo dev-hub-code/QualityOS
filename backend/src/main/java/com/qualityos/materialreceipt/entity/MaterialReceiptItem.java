@@ -111,6 +111,21 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
         }
     }
 
+    /**
+     * A measurement behind its release is in doubt, so the lot waits for a new inspection. Stock already used stays
+     * used. A lot that was never released has nothing to hold.
+     *
+     * @return whether the lot was released before
+     */
+    public boolean holdForReinspection() {
+        if (inspectionStatus != InspectionStatus.COMPLETED || !isReleased()) {
+            return false;
+        }
+        inspectionStatus = InspectionStatus.PENDING;
+        disposition = null;
+        return true;
+    }
+
     public void updateInspection(InspectionStatus status, String disposition) {
         this.inspectionStatus = status;
         this.disposition = disposition;

@@ -26,7 +26,7 @@ export function AuditChecklist({ auditId, items, editable }: { auditId: string; 
             {editable ? (
               <select
                 aria-label={`Answer to question ${item.position}`}
-                className="h-8 rounded-md border bg-background px-2 text-sm"
+                className="h-8 rounded-xl border bg-white/70 px-2 text-sm"
                 value={item.result ?? ""}
                 onChange={(event) => {
                   const result = event.target.value;

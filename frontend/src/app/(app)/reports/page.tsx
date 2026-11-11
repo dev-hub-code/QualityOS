@@ -44,7 +44,7 @@ export default function ReportsPage() {
         <Label htmlFor="report-type">Report</Label>
         <select
           id="report-type"
-          className="h-9 max-w-full rounded-md border bg-background px-2 text-sm"
+          className="h-9 max-w-full rounded-xl border bg-white/70 px-2 text-sm"
           value={slug ?? ""}
           onChange={(event) => setChosen(event.target.value)}
         >

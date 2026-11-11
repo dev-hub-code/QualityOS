@@ -142,7 +142,7 @@ export default function PlatformOrganisationPage() {
                   <TableCell>{invoice.status.toLowerCase()}</TableCell>
                   <TableCell>{formatDate(invoice.dueOn)}</TableCell>
                   <TableCell className="text-right">{formatMoney(invoice.total)}</TableCell>
-                  <TableCell className="space-x-2 whitespace-nowrap text-right">
+                  <TableCell className="text-right min-w-36 whitespace-normal [&>*]:m-0.5">
                     {billing && invoice.status === "ISSUED" && (
                       <Button size="sm" variant="outline" onClick={() => setPaying(invoice)}>
                         Record payment

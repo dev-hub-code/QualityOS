@@ -35,7 +35,7 @@ export default function CustomersPage() {
       </PageHeader>
       <FormError message={message} />
       {data.length === 0 && <p className="text-sm text-muted-foreground">No customers yet.</p>}
-      <ul className="divide-y rounded-lg border text-sm">
+      <ul className="divide-y glass rounded-2xl text-sm">
         {data.map((customer) => (
           <li key={customer.id} className="flex items-center justify-between gap-3 p-3">
             <span>

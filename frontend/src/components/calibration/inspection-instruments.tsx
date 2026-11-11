@@ -48,7 +48,7 @@ export function InspectionInstruments({ inspection, editable }: { inspection: In
         <div className="mt-2 flex flex-wrap gap-2">
           <select
             aria-label="Instrument"
-            className="h-9 rounded-md border bg-background px-2 text-sm"
+            className="h-9 rounded-xl border bg-white/70 px-2 text-sm"
             value={chosen}
             onChange={(event) => setChosen(event.target.value)}
           >

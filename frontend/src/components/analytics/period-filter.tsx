@@ -32,7 +32,7 @@ export function PeriodFilter({ value, onChange }: { value: Period; onChange: (ne
         <Label htmlFor="period-facility">Facility</Label>
         <select
           id="period-facility"
-          className="h-9 rounded-md border bg-background px-2 text-sm"
+          className="h-9 rounded-xl border bg-white/70 px-2 text-sm"
           value={value.facilityId}
           onChange={(event) => onChange({ ...value, facilityId: event.target.value })}
         >

@@ -32,7 +32,7 @@ export function QualityRulesSettings() {
   if (!data) return null;
   return (
     <section className="space-y-3">
-      <h2 className="font-medium">NCR and CAPA rules</h2>
+      <h2 className="text-base font-semibold text-[#1b2a55]">NCR and CAPA rules</h2>
       <p className="text-sm text-muted-foreground">
         A change applies to open NCRs at once. A CAPA keeps the verification rule it was raised under.
       </p>
@@ -44,7 +44,7 @@ export function QualityRulesSettings() {
           </Label>
           <select
             id={key}
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm sm:w-72"
+            className="h-9 w-full rounded-xl border bg-white/70 px-3 text-sm sm:w-72"
             value={data[key]}
             disabled={!canManage || update.isPending}
             onChange={(event) => update.mutate({ [key]: event.target.value as SeverityThreshold })}

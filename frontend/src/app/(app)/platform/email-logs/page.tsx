@@ -49,7 +49,7 @@ export default function PlatformEmailLogsPage() {
           <Label htmlFor="email-state">Delivery</Label>
           <select
             id="email-state"
-            className="h-9 rounded-md border bg-background px-2 text-sm"
+            className="h-9 rounded-xl border bg-white/70 px-2 text-sm"
             value={state}
             onChange={(event) => { setState(event.target.value); setPage(0); }}
           >
@@ -83,7 +83,7 @@ export default function PlatformEmailLogsPage() {
                 {data.items.map((email) => (
                   <TableRow key={email.id}>
                     <TableCell>
-                      <div>{email.recipient}</div>
+                      <div className="[overflow-wrap:anywhere]">{email.recipient}</div>
                       <div className="text-sm text-muted-foreground">{email.organisation ?? "Account email"}</div>
                     </TableCell>
                     <TableCell>{email.template}</TableCell>

@@ -63,7 +63,7 @@ export function DataTable<T>({ path, columns, searchLabel, emptyMessage, filter 
         />
       )}
       {error && <p className="text-sm text-destructive">{error.message}</p>}
-      <div className="overflow-x-auto rounded-md border">
+      <div className="glass overflow-x-auto rounded-2xl">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((group) => (

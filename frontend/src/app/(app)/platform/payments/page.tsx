@@ -44,7 +44,7 @@ export default function PlatformPaymentsPage() {
           <Label htmlFor="payment-status">Status</Label>
           <select
             id="payment-status"
-            className="h-9 rounded-md border bg-background px-2 text-sm"
+            className="h-9 rounded-xl border bg-white/70 px-2 text-sm"
             value={filter.status}
             onChange={(event) => narrow({ status: event.target.value })}
           >
@@ -81,13 +81,10 @@ export default function PlatformPaymentsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Paid on</TableHead>
-                  <TableHead>Organisation</TableHead>
-                  <TableHead>Invoice</TableHead>
+                  <TableHead>Organisation and invoice</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Method</TableHead>
-                  <TableHead>Reference</TableHead>
+                  <TableHead>Method and reference</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Recorded by</TableHead>
                   <TableHead>Recorded</TableHead>
                   <TableHead>Notes</TableHead>
                 </TableRow>
@@ -95,22 +92,30 @@ export default function PlatformPaymentsPage() {
               <TableBody>
                 {data.items.map((row) => (
                   <TableRow key={row.id}>
-                    <TableCell>{formatDate(row.paidOn ?? row.recordedAt)}</TableCell>
+                    <TableCell className="whitespace-nowrap">{formatDate(row.paidOn ?? row.recordedAt)}</TableCell>
                     <TableCell>
                       <Link className="underline" href={`/platform/organisations/${row.tenantId}`}>
                         {row.organisation}
                       </Link>
+                      <div className="text-sm text-muted-foreground">{row.invoiceNumber}</div>
                     </TableCell>
-                    <TableCell>{row.invoiceNumber}</TableCell>
-                    <TableCell className="text-right">{formatMoney(row.amount)}</TableCell>
-                    <TableCell>{row.method?.replace("_", " ").toLowerCase() ?? "Not recorded"}</TableCell>
-                    <TableCell>{row.reference}</TableCell>
+                    <TableCell className="text-right whitespace-nowrap">{formatMoney(row.amount)}</TableCell>
+                    <TableCell>
+                      {row.method?.replace("_", " ").toLowerCase() ?? "Not recorded"}
+                      {row.reference && (
+                        <div className="text-sm text-muted-foreground">{row.reference}</div>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {row.status.toLowerCase()}
                       {row.failureReason && `: ${row.failureReason}`}
                     </TableCell>
-                    <TableCell>{row.recordedBy ?? "Not recorded"}</TableCell>
-                    <TableCell>{formatDate(row.recordedAt)}</TableCell>
+                    <TableCell>
+                      <div className="whitespace-nowrap">{formatDate(row.recordedAt)}</div>
+                      <div className="text-sm [overflow-wrap:anywhere] text-muted-foreground">
+                        {row.recordedBy ? `by ${row.recordedBy}` : "By: not recorded"}
+                      </div>
+                    </TableCell>
                     <TableCell>{row.notes}</TableCell>
                   </TableRow>
                 ))}

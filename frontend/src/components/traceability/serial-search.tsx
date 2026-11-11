@@ -12,7 +12,7 @@ import { api, type PageResponse } from "@/lib/api";
 import type { SerialSearchResult } from "@/lib/types";
 
 const PATH = "/traceability/serials";
-const SELECT = "h-9 w-full rounded-md border bg-background px-2 text-sm";
+const SELECT = "h-9 w-full rounded-xl border bg-white/70 px-2 text-sm";
 const FIELDS = [
   ["", "All fields"],
   ["SERIAL", "Serial number"],
@@ -129,7 +129,7 @@ export function SerialSearch() {
               <Label htmlFor="serial-sort">Sort by</Label>
               <select
                 id="serial-sort"
-                className="h-9 rounded-md border bg-background px-2 text-sm"
+                className="h-9 rounded-xl border bg-white/70 px-2 text-sm"
                 value={params.get("sort") ?? "serialNumber"}
                 onChange={(event) => go({ sort: event.target.value, page: "" })}
               >

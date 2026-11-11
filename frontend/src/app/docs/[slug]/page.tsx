@@ -58,7 +58,7 @@ export default async function DocsTopic({ params }: Props) {
       <p className="text-sm font-medium text-primary">{page.group}</p>
       <h1 className="mt-1 text-3xl font-semibold tracking-tight">{page.title}</h1>
       <p className="mt-3 text-lg text-muted-foreground">{page.summary}</p>
-      <dl className="mt-5 grid gap-3 rounded-lg border p-4 text-sm sm:grid-cols-3">
+      <dl className="mt-5 grid gap-3 glass rounded-2xl p-4 text-sm sm:grid-cols-3">
         <div>
           <dt className="text-muted-foreground">Find it under</dt>
           <dd className="font-medium">{page.menu}</dd>

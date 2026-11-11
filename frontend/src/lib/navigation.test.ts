@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { landingPage, leavesWorkspace, visibleNavItems, workspaceNavItems } from "./navigation";
+import { activeNavHref, landingPage, leavesWorkspace, NAV_ITEMS, visibleNavItems, workspaceNavItems } from "./navigation";
 
 const labels = (permissions: string[]) => visibleNavItems(permissions).map((item) => item.label);
 
@@ -61,5 +61,25 @@ describe("visibleNavItems", () => {
   it("shows items for any matching permission", () => {
     expect(labels(["USER_MANAGE"])).toEqual(["Dashboard", "Users", "Roles", "Settings", "Documentation"]);
     expect(labels(["ROLE_MANAGE"])).toEqual(["Dashboard", "Roles", "Settings", "Documentation"]);
+  });
+});
+
+describe("activeNavHref", () => {
+  it("highlights serial search, not traceability, on a serial page", () => {
+    expect(activeNavHref("/traceability/serials", NAV_ITEMS)).toBe("/traceability/serials");
+    expect(activeNavHref("/traceability/serials/SN-1", NAV_ITEMS)).toBe("/traceability/serials");
+  });
+
+  it("keeps traceability for a batch trace", () => {
+    expect(activeNavHref("/traceability/PB-2026-00001", NAV_ITEMS)).toBe("/traceability");
+  });
+
+  it("highlights billing, not settings, on the billing page", () => {
+    expect(activeNavHref("/settings/billing", NAV_ITEMS)).toBe("/settings/billing");
+    expect(activeNavHref("/settings", NAV_ITEMS)).toBe("/settings");
+  });
+
+  it("does not match a longer word that only starts the same", () => {
+    expect(activeNavHref("/materials-x", NAV_ITEMS)).toBeUndefined();
   });
 });

@@ -19,7 +19,7 @@ export default function DocsHome() {
           <h2 className="text-lg font-semibold">{group}</h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {DOC_PAGES.filter((page) => page.group === group).map((page) => (
-              <Link key={page.slug} href={`/docs/${page.slug}`} className="rounded-lg border p-4 hover:border-primary">
+              <Link key={page.slug} href={`/docs/${page.slug}`} className="glass rounded-2xl p-4 transition hover:bg-white">
                 <h3 className="font-medium">{page.title}</h3>
                 <p className="mt-1 text-sm text-muted-foreground">{page.summary}</p>
               </Link>

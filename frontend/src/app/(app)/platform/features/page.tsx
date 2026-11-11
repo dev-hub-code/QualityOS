@@ -147,7 +147,7 @@ export default function PlatformFeaturesPage() {
                 <TableCell>{feature.active ? "Active" : "Inactive"}</TableCell>
                 <TableCell>{feature.enforced ? "Enforced" : "Listed only, not enforced"}</TableCell>
                 <TableCell>{feature.organisations}</TableCell>
-                <TableCell className="space-x-2 whitespace-nowrap">
+                <TableCell className="min-w-36 whitespace-normal [&>*]:m-0.5">
                   {billing && (
                     <>
                       <Button size="sm" variant="outline" onClick={() => setEditing(feature)}>

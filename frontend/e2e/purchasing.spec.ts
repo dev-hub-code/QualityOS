@@ -47,7 +47,7 @@ test("categories are managed in one place, and one in use cannot be deleted", as
   await expect(suppliers.getByText("Castings")).toBeVisible();
 
   await page.getByRole("link", { name: "Suppliers" }).click();
-  await page.getByRole("button", { name: "Add supplier" }).click();
+  await page.getByRole("button", { name: "Add supplier", exact: true }).click();
   await page.getByLabel("Code", { exact: true }).fill("SUP-USE");
   await page.getByLabel("Name", { exact: true }).fill("Used Category Supplier");
   await page.getByLabel("Category", { exact: true }).selectOption({ label: "Castings" });

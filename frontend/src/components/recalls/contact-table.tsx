@@ -83,7 +83,7 @@ export function ContactTable({
     <div className="space-y-3">
       <FormError message={message} />
       {contacts.length === 0 && <p className="text-sm text-muted-foreground">No customers match.</p>}
-      <ul className="divide-y rounded-lg border text-sm">
+      <ul className="divide-y glass rounded-2xl text-sm">
         {contacts.map((contact) => (
           <li key={contact.id} className="space-y-2 p-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -116,7 +116,7 @@ export function ContactTable({
                   </Button>
                   <select
                     aria-label={`Move ${contact.customerName} to`}
-                    className="h-8 rounded-md border bg-background px-2 text-sm"
+                    className="h-8 rounded-xl border bg-white/70 px-2 text-sm"
                     value=""
                     onChange={(event) => {
                       // Read now: this select snaps back to blank before the request is built.

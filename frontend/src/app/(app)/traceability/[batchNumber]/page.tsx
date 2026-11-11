@@ -114,13 +114,13 @@ export default function TraceReportPage() {
       </PageHeader>
       {correcting && <CorrectLotDialog lot={subject} onClose={() => setCorrecting(false)} />}
       {affectedCustomers.length > 0 && (
-        <p className="rounded-lg border p-3 text-sm">
+        <p className="glass rounded-2xl p-3 text-sm">
           <span className="font-medium">Customers who received this:</span> {affectedCustomers.join(", ")}.{" "}
           <RecordLink href={`/traceability/${encodeURIComponent(subject.batchNumber)}/recall`}>Recall report</RecordLink>
         </p>
       )}
       {unconfirmedCustomers.length > 0 && (
-        <p className="rounded-lg border p-3 text-sm">
+        <p className="glass rounded-2xl p-3 text-sm">
           <span className="font-medium">Shipment not confirmed for:</span> {unconfirmedCustomers.join(", ")}. These goods
           may not have left yet.
         </p>

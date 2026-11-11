@@ -152,3 +152,10 @@ export function visibleNavItems(permissions: readonly string[], items = NAV_ITEM
     (item) => !item.anyPermission || item.anyPermission.some((p) => permissions.includes(p)),
   );
 }
+
+/** The one link to highlight: the longest href that the path is, or sits under. */
+export function activeNavHref(pathname: string, items: readonly NavItem[]): string | undefined {
+  return items
+    .filter(({ href }) => pathname === href || pathname.startsWith(`${href}/`))
+    .reduce<string | undefined>((best, { href }) => (!best || href.length > best.length ? href : best), undefined);
+}

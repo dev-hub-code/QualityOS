@@ -13,7 +13,7 @@ import { formatQuantity } from "@/lib/record-form";
 import { templateDraftSchema, type TemplateDraftValues } from "@/lib/schemas";
 import type { ParameterSpec, TemplateVersion } from "@/lib/types";
 
-const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm";
+const SELECT_CLASS = "h-9 w-full rounded-xl border border-input bg-white/70 px-2 text-sm";
 
 const blankParameter: TemplateDraftValues["parameters"][number] = {
   code: "",

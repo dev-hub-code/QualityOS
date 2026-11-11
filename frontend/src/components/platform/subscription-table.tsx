@@ -59,7 +59,7 @@ export function SubscriptionTable({ state, stateOptions, columns, empty }: Subsc
             <Label htmlFor="subscription-state">Status</Label>
             <select
               id="subscription-state"
-              className="h-9 rounded-md border bg-background px-2 text-sm"
+              className="h-9 rounded-xl border bg-white/70 px-2 text-sm"
               value={chosen}
               onChange={(event) => {
                 setChosen(event.target.value);

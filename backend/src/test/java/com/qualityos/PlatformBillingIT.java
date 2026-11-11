@@ -11,7 +11,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.subscription.dto.SubscriptionDtos.RecordPaymentRequest;
+import com.qualityos.subscription.dto.SubscriptionDtos.PaymentMethod;
+import com.qualityos.subscription.service.SubscriptionService;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +40,9 @@ class PlatformBillingIT extends AbstractIntegrationTest {
 
     @Autowired
     private PlatformTransactionManager transactions;
+
+    @Autowired
+    private SubscriptionService subscriptions;
 
     private Session owner;
     private Session admin;
@@ -286,6 +294,28 @@ class PlatformBillingIT extends AbstractIntegrationTest {
                 .isEqualTo(1);
         pay(other, invoice(other), utr.toLowerCase(), "1180.00", on).andExpect(status().isConflict());
         pay(owner, invoice(owner), utr, "1180.00", on).andExpect(status().isConflict());
+    }
+
+    @Test
+    void theDatabaseRefusesAReferenceThatRacedPastTheCheck() throws Exception {
+        Session other = register();
+        String utr = reference();
+        LocalDate on = LocalDate.now().minusDays(1);
+        pay(owner, invoice(owner), utr, "1180.00", on).andExpect(status().isCreated());
+        String theirs = invoice(other);
+
+        // A payment arriving at the same moment passes the platform check, and cannot see the first organisation's row.
+        var request = new RecordPaymentRequest(utr.toLowerCase(), new BigDecimal("1180.00"), false, null,
+                PaymentMethod.UPI, on, null);
+        assertThatThrownBy(() -> TenantContext.runAs(other.tenantId(), other.userId(),
+                () -> subscriptions.settle(UUID.fromString(theirs), "CASHFREE", request)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("already used on another invoice");
+
+        assertThat(asDatabaseSuperuser().queryForObject(
+                "SELECT count(*)::int FROM payment_transactions WHERE upper(provider_reference) = upper(?)",
+                Integer.class, utr)).isEqualTo(1);
+        as(admin, get(organisation(other) + "/invoices/" + theirs)).andExpect(jsonPath("$.data.status").value("ISSUED"));
     }
 
     @Test

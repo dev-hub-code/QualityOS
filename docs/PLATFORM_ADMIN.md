@@ -1,17 +1,25 @@
 # Platform administration
 
 The Control Center is where the people who run ProductionOS manage plans and customers. It lives in the main app at
-`/platform`, with its own navigation. It is built in phases, and this page describes what works today.
+`/platform`, with its own navigation. It was built in five phases, all now built, and this page describes what works today.
 
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Dashboard, plans, organisation search and detail | Built |
-| 2 | Subscriptions, trials, invoices, payments | Not started |
-| 3 | Feature catalogue, usage limits, analytics | Not started |
-| 4 | Operators and roles, audit log, email log, jobs | Not started |
-| 5 | Support console, announcements, settings | Not started |
+| 2 | Subscriptions, trials, invoices, payments | Built |
+| 3 | Feature catalogue, usage limits, analytics | Built |
+| 4 | Operators and roles, audit log, email log, jobs | Built |
+| 5 | Support console, announcements, settings | Built |
 
 A page joins the navigation only once it works.
+
+Not built yet:
+
+- Two-factor sign-in for operators. Sensitive actions ask for the password again (see Re-authentication), but nothing
+  beyond the password protects an operator account.
+- Refunds. A refund is made in Cashfree or the bank, and nothing in ProductionOS records it.
+- Partial payments and automatic renewal. Each invoice is paid in full, and each renewal is a new invoice.
+- Tickets raised by customers. Operators open support tickets on a customer's behalf.
 
 ## Online payment
 
@@ -91,7 +99,7 @@ or bank details are replaced with `[hidden]` when shown or exported, and each ex
   cannot make them answer for an ordinary member.
 - Anything about one organisation is read under that organisation's own tenant context. Row-level security stays on.
 - The organisation page shows counts and event names, not the content of quality records.
-- Not yet built: re-authentication for sensitive actions, and separate operator roles. Both are Phase 4.
+- Sensitive actions need the password again, and each operator has a role. See Re-authentication and Operator roles.
 
 ## Plans
 
@@ -107,8 +115,8 @@ Each saved state is kept in `subscription_plan_versions`, which the application 
 | Archive | Refused while anyone is on the plan, and for the trial plan. Cannot be undone |
 | Website visibility | Hides a plan from the public price list. It can still be chosen in the app while offered |
 
-Storage, monthly inspection, attachment and API limits are not offered yet, because nothing would enforce them. They
-come with Phase 3. All amounts are in INR. The database refuses another currency until conversion exists.
+Limits on users, facilities, storage, attachments and monthly inspections are described under Usage limits. API
+requests are not limited. All amounts are in INR. The database refuses another currency until conversion exists.
 
 ## States
 
@@ -120,7 +128,8 @@ come with Phase 3. All amounts are in INR. The database refuses another currency
 | Read-only | Grace has ended. Records can be read and exported, not changed |
 
 A cancelled subscription keeps its state until its period ends. There is no separate stored `EXPIRED` or `CANCELLED`
-state. Suspension does not exist yet (Phase 2).
+state. Suspension is separate again: it is set on the organisation, not the subscription, and stops members whatever
+the subscription's state (see Subscription lifecycle).
 
 ## Dashboard figures
 
@@ -170,11 +179,11 @@ Every action writes an audit row in that organisation's trail, with its reason.
 
 ### Payments
 
-Payments are recorded by hand against one invoice, and the amount must equal the invoice total, because partial payments are not part of the financial model. Failed attempts are kept and listed under the Failed filter. These are what needs following up.
+Payments are recorded by hand or arrive through Cashfree (see Online payment). Each pays one invoice, and the amount must equal the invoice total, because partial payments are not part of the financial model. Failed attempts are kept and listed under the Failed filter. These are what needs following up.
 
-A reference pays one invoice across the whole platform, ignoring case. Repeating it on the same invoice returns the first payment. The check reads existing payments, so two identical references saved at the same moment for different organisations could both pass it.
+A reference pays one invoice across the whole platform, ignoring case and provider. Repeating it on the same invoice returns the first payment, so a gateway callback can safely arrive twice. A unique index in the database enforces this, so two payments with the same reference arriving at the same moment for different organisations cannot both be saved: the second is refused as already used.
 
-There is no gateway. `SubscriptionService.settle` already takes a provider name and treats a repeated reference as a retry, so a gateway's webhook can call it. It needs its own signature check when one is chosen.
+Every payment, by hand or through Cashfree, goes through `SubscriptionService.settle`.
 
 ### GST on invoices
 

@@ -8,7 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PaymentTransactionRepository extends JpaRepository<PaymentTransaction, UUID> {
 
-    Optional<PaymentTransaction> findByProviderAndProviderReference(String provider, String reference);
+    /** Matches the unique index: one reference per platform, whatever the provider or letter case. */
+    Optional<PaymentTransaction> findByProviderReferenceIgnoreCase(String reference);
 
     List<PaymentTransaction> findAllByOrderByOccurredAtDesc();
 }

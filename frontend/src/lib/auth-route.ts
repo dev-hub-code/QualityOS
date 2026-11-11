@@ -2,8 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   ACCESS_COOKIE,
   backendUrl,
+  clearChallengeCookie,
   forwardedHeaders,
   isTrustedOrigin,
+  setChallengeCookie,
   setPendingVerificationCookie,
   setSessionCookies,
   type TokenResponse,
@@ -35,8 +37,17 @@ export async function issueSessionVia(
   if (!upstream.ok) {
     return NextResponse.json(payload, { status: upstream.status });
   }
-  // Accepted: the account has to confirm its email address first. Any token stays out of the browser's reach.
+  // Accepted: either the account has to confirm its email address first, or an operator still has to enter the
+  // code from their authenticator app. Either way, any token stays out of the browser's reach.
   if (upstream.status === 202) {
+    if (payload.data?.challengeToken) {
+      const challenge = NextResponse.json(
+        { success: true, data: { secondFactorRequired: true } },
+        { status: 202 },
+      );
+      setChallengeCookie(challenge, payload.data);
+      return challenge;
+    }
     const pending = NextResponse.json(
       { success: true, data: { verificationRequired: true } },
       { status: 202 },
@@ -46,5 +57,6 @@ export async function issueSessionVia(
   }
   const response = NextResponse.json({ success: true });
   setSessionCookies(response, payload.data as TokenResponse);
+  clearChallengeCookie(response);
   return response;
 }

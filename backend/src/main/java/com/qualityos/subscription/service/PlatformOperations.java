@@ -8,6 +8,7 @@ import com.qualityos.common.exception.QualityOsException;
 import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.job.JobMonitor;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.identity.service.AccountEmailService;
 import com.qualityos.identity.service.AuthService;
 import com.qualityos.notification.service.NotificationService;
 import com.qualityos.subscription.dto.PlatformOperationsDtos.AddOperatorRequest;
@@ -60,6 +61,7 @@ public class PlatformOperations {
     private final JdbcTemplate jdbc;
     private final AuditService audit;
     private final AuthService auth;
+    private final AccountEmailService accountEmails;
     private final PlatformStepUp stepUp;
     private final NotificationService notifications;
     private final JobMonitor jobs;
@@ -70,6 +72,7 @@ public class PlatformOperations {
             JdbcTemplate jdbc,
             AuditService audit,
             AuthService auth,
+            AccountEmailService accountEmails,
             PlatformStepUp stepUp,
             NotificationService notifications,
             JobMonitor jobs,
@@ -78,6 +81,7 @@ public class PlatformOperations {
         this.jdbc = jdbc;
         this.audit = audit;
         this.auth = auth;
+        this.accountEmails = accountEmails;
         this.stepUp = stepUp;
         this.notifications = notifications;
         this.jobs = jobs;
@@ -99,7 +103,7 @@ public class PlatformOperations {
         return tx.execute(status -> jdbc.query("SELECT * FROM platform_operators()", (rows, row) -> new Operator(
                 rows.getObject("user_id", UUID.class), rows.getString("email"), rows.getString("full_name"),
                 rows.getString("role"), instant(rows, "added_at"), instant(rows, "deactivated_at"),
-                rows.getString("added_by"), instant(rows, "last_activity"))));
+                rows.getString("added_by"), instant(rows, "last_activity"), rows.getString("second_factor"))));
     }
 
     public void add(AddOperatorRequest request) {
@@ -133,6 +137,19 @@ public class PlatformOperations {
             }
             audit.record(request.active() ? "OPERATOR_UPDATED" : "OPERATOR_DEACTIVATED", "PlatformOperator", user, null,
                     Map.of("role", request.role(), "active", request.active(), "reason", request.reason()));
+        });
+    }
+
+    /** For a lost device. The operator is told, and sets up a new authenticator on their next visit. */
+    public void resetSecondFactor(UUID user, String reason) {
+        stepUp.require();
+        tx.executeWithoutResult(status -> {
+            String outcome = jdbc.queryForObject("SELECT platform_second_factor_reset(?)", String.class, user);
+            if ("NOT_FOUND".equals(outcome)) {
+                throw new ResourceNotFoundException("Operator", user.toString());
+            }
+            audit.record("OPERATOR_SECOND_FACTOR_RESET", "PlatformOperator", user, null, Map.of("reason", reason));
+            accountEmails.sendSecondFactorReset(user);
         });
     }
 

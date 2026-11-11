@@ -998,6 +998,7 @@ export const DOC_PAGES: DocPage[] = [
           "The Control Center link only appears for platform administrators.",
           "Each operator has a role: Super Admin, Billing Admin, Support Admin or Read-only Auditor.",
           "Critical actions ask for your password again, then allow 10 minutes.",
+          "Operators sign in with a code from an authenticator app as well as their password, and set the app up on their first visit. A Super Admin can reset it for a lost phone.",
           "Support sees account and billing facts only, and support notes are never shown to customers.",
           "Maintenance mode lets customers read their records but pauses changes.",
           "Suspending an organisation stops its members signing in, but changes none of its records. Every action there needs a reason.",

@@ -8,6 +8,7 @@ import com.qualityos.common.exception.QualityOsException;
 import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.mail.EmailService;
 import com.qualityos.common.security.JwtProperties;
+import com.qualityos.common.security.TenantJwtAuthenticationConverter;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.common.util.UuidV7;
 import com.qualityos.identity.dto.AuthDtos.ChangePasswordRequest;
@@ -16,6 +17,7 @@ import com.qualityos.identity.dto.AuthDtos.MeResponse;
 import com.qualityos.identity.dto.AuthDtos.OrganizationSummary;
 import com.qualityos.identity.dto.AuthDtos.PendingVerificationSession;
 import com.qualityos.identity.dto.AuthDtos.RegisterRequest;
+import com.qualityos.identity.dto.AuthDtos.SecondFactorChallenge;
 import com.qualityos.identity.dto.AuthDtos.TokenResponse;
 import com.qualityos.identity.dto.AuthDtos.UserSummary;
 import com.qualityos.identity.entity.RefreshToken;
@@ -27,11 +29,15 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -65,6 +71,8 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuditService audit;
     private final JwtProperties jwtProperties;
+    private final JwtDecoder jwtDecoder;
+    private final OperatorSecondFactor secondFactor;
     private final TransactionTemplate tx;
     private final JdbcTemplate jdbc;
     private final String unusablePasswordHash;
@@ -83,6 +91,8 @@ public class AuthService {
             PasswordEncoder passwordEncoder,
             AuditService audit,
             JwtProperties jwtProperties,
+            JwtDecoder jwtDecoder,
+            OperatorSecondFactor secondFactor,
             PlatformTransactionManager transactionManager) {
         this.jdbc = jdbc;
         this.users = users;
@@ -97,6 +107,8 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
         this.audit = audit;
         this.jwtProperties = jwtProperties;
+        this.jwtDecoder = jwtDecoder;
+        this.secondFactor = secondFactor;
         this.tx = new TransactionTemplate(transactionManager);
         this.unusablePasswordHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
@@ -155,8 +167,11 @@ public class AuthService {
         accountEmails.sendVerification(user);
     }
 
-    /** Holds a full session, or else a session restricted to an account that is still pending. */
-    public record LoginResult(TokenResponse session, PendingVerificationSession pending) {
+    /**
+     * Holds a full session, or else a session restricted to an account that is still pending, or else a challenge
+     * for an operator whose authenticator code is still to come.
+     */
+    public record LoginResult(TokenResponse session, PendingVerificationSession pending, SecondFactorChallenge challenge) {
     }
 
     public LoginResult login(LoginRequest request) {
@@ -173,18 +188,54 @@ public class AuthService {
             TenantContext.runAs(null, user.getId(), () -> tx.executeWithoutResult(status ->
                     audit.record("PENDING_VERIFICATION_LOGIN", "User", user.getId())));
             return new LoginResult(null, new PendingVerificationSession(
-                    accessTokens.issuePendingVerification(user.getId()), accessTokens.ttlSeconds(), true));
+                    accessTokens.issuePendingVerification(user.getId()), accessTokens.ttlSeconds(), true), null);
         }
 
         UUID tenantId = chooseTenant(user.getId(), request.tenantId());
-        return new LoginResult(TenantContext.callAs(tenantId, user.getId(), () -> tx.execute(status -> {
-            User current = users.findById(user.getId()).orElseThrow();
+        if (secondFactor.required(user.getId())) {
+            return new LoginResult(null, null, new SecondFactorChallenge(
+                    accessTokens.issueSecondFactorChallenge(user.getId(), tenantId),
+                    AccessTokenIssuer.SECOND_FACTOR_TTL.toSeconds(), true));
+        }
+        return new LoginResult(startSession(user.getId(), tenantId, Map.of()), null, null);
+    }
+
+    /** The second half of an operator's sign-in. A wrong code counts towards the lockout like a wrong password. */
+    public TokenResponse completeSecondFactor(String challengeToken, String code) {
+        Jwt challenge;
+        try {
+            challenge = jwtDecoder.decode(challengeToken);
+        } catch (JwtException expired) {
+            throw signInExpired();
+        }
+        if (!Boolean.TRUE.equals(challenge.getClaimAsBoolean(TenantJwtAuthenticationConverter.SECOND_FACTOR_CLAIM))) {
+            throw signInExpired();
+        }
+        UUID userId = UUID.fromString(challenge.getSubject());
+        User user = tx.execute(status -> users.findById(userId)).orElseThrow(AuthService::signInExpired);
+        boolean locked = user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now());
+        if (locked || user.getStatus() != User.Status.ACTIVE) {
+            throw invalidCredentials();
+        }
+        if (!secondFactor.verifyAtLogin(userId, code)) {
+            recordFailedLogin(userId);
+            throw new QualityOsException(ErrorCode.INVALID_CREDENTIALS, "That code is not right.");
+        }
+        // The membership is checked again: it may have ended in the minutes since the password was given.
+        UUID tenantId = chooseTenant(userId,
+                UUID.fromString(challenge.getClaimAsString(TenantJwtAuthenticationConverter.TENANT_CLAIM)));
+        return startSession(userId, tenantId, Map.of("secondFactor", true));
+    }
+
+    private TokenResponse startSession(UUID userId, UUID tenantId, Map<String, Object> details) {
+        return TenantContext.callAs(tenantId, userId, () -> tx.execute(status -> {
+            User current = users.findById(userId).orElseThrow();
             current.setFailedLoginCount(0);
             current.setLockedUntil(null);
             current.setLastLoginAt(Instant.now());
-            audit.record("USER_LOGGED_IN", "User", user.getId());
-            return issueSession(user.getId(), tenantId);
-        })), null);
+            audit.record("USER_LOGGED_IN", "User", userId, null, details.isEmpty() ? null : details);
+            return issueSession(userId, tenantId);
+        }));
     }
 
     /** Must run with no open transaction. Applies the same lockout rules wherever a password is presented. */
@@ -373,6 +424,10 @@ public class AuthService {
 
     private static QualityOsException invalidCredentials() {
         return new QualityOsException(ErrorCode.INVALID_CREDENTIALS, "Email or password is incorrect.");
+    }
+
+    private static QualityOsException signInExpired() {
+        return new QualityOsException(ErrorCode.INVALID_CREDENTIALS, "The sign-in has expired. Please start again.");
     }
 
     private static QualityOsException invalidRefreshToken() {

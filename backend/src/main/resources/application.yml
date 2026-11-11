@@ -109,6 +109,9 @@ qualityos:
     local-root: ${STORAGE_LOCAL_ROOT}
   security:
     auth-rate-limit-per-minute: ${AUTH_RATE_LIMIT_PER_MINUTE:30}
+    # Seals operators' authenticator secrets in the database: 32 random bytes, base64. Losing it ends every enrolment.
+    second-factor:
+      key: ${SECOND_FACTOR_KEY:}
     jwt:
       issuer: qualityos
       audience: qualityos-api

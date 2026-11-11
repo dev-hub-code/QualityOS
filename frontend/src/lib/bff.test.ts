@@ -12,6 +12,7 @@ describe("isProxyablePath", () => {
     expect(isProxyablePath(["auth", "invitations", "preview"])).toBe(true);
     expect(isProxyablePath(["auth", "invitations", "accept"])).toBe(false);
     expect(isProxyablePath(["auth", "login"])).toBe(false);
+    expect(isProxyablePath(["auth", "login", "second-factor"])).toBe(false);
   });
 
   it("allows business endpoints", () => {

@@ -404,14 +404,14 @@ public class SubscriptionService {
         String body;
         if (SubscriptionState.of(endsAt, plan.getGraceDays(), now) == SubscriptionState.READ_ONLY) {
             stage = -plan.getGraceDays();
-            body = "Your subscription has ended, so QualityOS is now read-only. All records are safe and can be read"
+            body = "Your subscription has ended, so ProductionOS is now read-only. All records are safe and can be read"
                     + " and exported. Renew to carry on working.";
         } else if (now.isBefore(endsAt)) {
             stage = NOTICE_DAYS.stream().filter(days -> left < days).reduce((first, second) -> second).orElse(null);
             body = "Your subscription ends soon. Renew to keep working without a break.";
         } else {
             stage = 0;
-            body = "Your subscription has ended. QualityOS turns read-only after " + plan.getGraceDays() + " days.";
+            body = "Your subscription has ended. ProductionOS turns read-only after " + plan.getGraceDays() + " days.";
         }
         Integer sent = subscription.getLastNoticeDays();
         if (stage == null || (sent != null && sent <= stage)) {

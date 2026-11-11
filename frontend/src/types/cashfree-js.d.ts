@@ -1,4 +1,4 @@
-/** The package ships no types. This declares the part of it that QualityOS calls. */
+/** The package ships no types. This declares the part of it that ProductionOS calls. */
 declare module "@cashfreepayments/cashfree-js" {
   interface Cashfree {
     checkout(options: { paymentSessionId: string; redirectTarget?: "_self" }): Promise<unknown>;

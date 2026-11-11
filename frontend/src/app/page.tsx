@@ -9,20 +9,19 @@ import {
   Ban,
   ChartColumn,
   ClipboardCheck,
+  ClipboardList,
   Database,
   Factory,
   FileClock,
   FileDown,
   Gauge,
-  History,
   ListChecks,
   type LucideIcon,
   Network,
   PackageCheck,
-  Route,
   ScrollText,
+  Send,
   ShieldCheck,
-  Smartphone,
   TriangleAlert,
   UserCheck,
   Users,
@@ -33,37 +32,41 @@ import { backendUrl } from "@/lib/bff";
 
 export const metadata: Metadata = {
   description:
-    "Incoming inspection, NCR and CAPA, batch traceability, calibration and audits, in one connected record.",
+    "Purchasing, goods-in, production batches, inspection, NCR and CAPA, dispatch and traceability, in one connected record.",
 };
 
 const WORKFLOW: [LucideIcon, string, string][] = [
-  [PackageCheck, "Receive", "Log each delivery against its purchase order. Every lot gets its own internal batch number."],
-  [Smartphone, "Inspect", "Work through a published template on a phone, with limits checked as results go in."],
-  [UserCheck, "Decide", "A second person approves the result and records the disposition."],
+  [ClipboardList, "Order", "Raise purchase orders against your suppliers, and see what is still to arrive on each line."],
+  [PackageCheck, "Receive and inspect", "Log each delivery against its order. Every lot gets its own batch number and is inspected from a published template."],
+  [Factory, "Produce", "Open a production batch with a planned quantity, record which lots went in, and check it in process."],
+  [UserCheck, "Release", "A final inspection, approved by a second person, releases the batch. Nothing ships before that."],
   [Wrench, "Correct", "A failure raises an NCR, and containment, root cause and CAPA follow to a verified close."],
-  [Factory, "Produce", "Record which lots went into which batch, with serial numbers where you need them."],
-  [Route, "Trace", "Go from a lot to its customers, or back again, and run a recall from what you find."],
+  [Send, "Dispatch and trace", "Ship to customers, take returns, and trace any lot forward or back to run a recall."],
 ];
 
 const CONTROLS: [LucideIcon, string, string][] = [
   [Ban, "Failed material stays held", "A failed lot moves on only through a recorded conditional acceptance, never by default."],
+  [ShieldCheck, "Nothing ships unreleased", "A production batch cannot be dispatched until a final inspection has released it."],
   [Users, "No one approves their own work", "Inspections, NCR closure and CAPA verification each need a second person."],
-  [History, "Specifications keep their history", "An inspection stays tied to the template version it was carried out against."],
   [FileClock, "Corrections leave a trail", "A wrong lot record is put right by two approvers, and the original stays visible."],
 ];
 
 const MODULES: [LucideIcon, string, string][] = [
-  [ClipboardCheck, "Incoming and in-process inspection", "Template versions, sampling, evidence and printable reports."],
+  [ClipboardList, "Purchasing and goods-in", "Suppliers, purchase orders, part deliveries, and a batch number for every lot received."],
+  [Factory, "Production batches", "Planned and produced quantities, the lots each batch used, and serial numbers where you need them."],
+  [Send, "Dispatch and returns", "Ship released batches to customers, record what comes back, and keep quantities straight."],
+  [ClipboardCheck, "Inspection at every stage", "Incoming, in-process and final inspection from versioned templates, with sampling and evidence."],
   [TriangleAlert, "NCR and CAPA", "Severity, containment, root cause, actions, due dates and effectiveness checks."],
-  [Network, "Batch traceability", "Forward and backward traces, serial search, dispatch, returns and recalls."],
+  [Network, "Batch traceability", "Forward and backward traces, serial search, and recalls run from what you find."],
   [Gauge, "Calibration", "Instrument register, QR labels, due reminders and inspections flagged after a failed calibration."],
   [ListChecks, "Quality audits", "Checklists, findings that raise NCRs, and a generated audit report."],
   [ChartColumn, "Analytics and reports", "Pass rate, first pass yield, supplier scorecards, Pareto, and PDF or Excel exports."],
 ];
 
 const HIGHLIGHTS: [LucideIcon, string][] = [
-  [ClipboardCheck, "Inspection"],
-  [TriangleAlert, "NCR and CAPA"],
+  [ClipboardList, "Purchasing"],
+  [Factory, "Production"],
+  [ClipboardCheck, "Quality"],
   [Network, "Traceability"],
 ];
 
@@ -122,7 +125,7 @@ export default function Home() {
             <span aria-hidden className="grid size-8 place-items-center rounded-xl bg-gradient-to-br from-[#2f4590] to-[#16224f] text-white shadow">
               <ShieldCheck className="size-4" />
             </span>
-            QualityOS
+            ProductionOS
           </Link>
           <nav aria-label="Page" className="order-last flex w-full gap-5 text-sm text-muted-foreground sm:order-none sm:w-auto">
             <a className="transition-colors hover:text-foreground" href="#workflow">How it works</a>
@@ -151,15 +154,15 @@ export default function Home() {
                   <span className="absolute inline-flex size-full rounded-full bg-[#3b56b0] opacity-60 motion-safe:animate-ping" />
                   <span className="relative inline-flex size-2 rounded-full bg-[#1e2d5a]" />
                 </span>
-                Quality and traceability for Indian manufacturers
+                Production, quality and traceability for Indian manufacturers
               </p>
               <h1 className="mt-6 text-4xl leading-[1.08] font-bold tracking-tight text-balance text-[#1b2a55] sm:text-5xl lg:text-[3.5rem]">
-                Know what passed, what failed,{" "}
-                <span className="bg-gradient-to-r from-[#5b6785] to-[#97a3bd] bg-clip-text text-transparent">and where every lot went.</span>
+                From purchase order to dispatch,{" "}
+                <span className="bg-gradient-to-r from-[#5b6785] to-[#97a3bd] bg-clip-text text-transparent">every lot accounted for.</span>
               </h1>
               <p className="mt-6 max-w-xl text-lg text-pretty text-muted-foreground">
-                QualityOS replaces inspection registers and spreadsheets with one connected record, from the goods-in bay
-                to the customer who received the batch.
+                ProductionOS replaces the registers and spreadsheets behind purchasing, goods-in, production, inspection and
+                dispatch with one connected record. Know what you made, what passed, and where every lot went.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link href="/register" className={buttonVariants({ size: "lg", className: "h-11 px-5" })}>
@@ -189,7 +192,7 @@ export default function Home() {
 
         <section id="workflow" className="glass mx-4 scroll-mt-20 rounded-[2rem] sm:mx-6 xl:mx-auto xl:max-w-6xl">
           <div className="mx-auto max-w-6xl px-5 py-16 sm:px-10 sm:py-20">
-            <Heading eyebrow="How it works" title="One record, from delivery to dispatch">
+            <Heading eyebrow="How it works" title="One record, from purchase order to dispatch">
               Each step picks up where the last one stopped, so nobody retypes a batch number.
             </Heading>
             <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -232,7 +235,9 @@ export default function Home() {
         </section>
 
         <section id="product" className="mx-auto max-w-6xl scroll-mt-20 px-4 sm:px-6">
-          <Heading eyebrow="Product" title="What is in the product" center />
+          <Heading eyebrow="Product" title="Production and quality, in one place" center>
+            Every module works from the same lots and batches, and more production features are on the way.
+          </Heading>
           <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {MODULES.map(([Icon, title, text]) => (
               <div
@@ -256,7 +261,7 @@ export default function Home() {
                 <p className="mb-3 text-sm font-semibold tracking-wide text-[#a9baf0] uppercase">Security</p>
                 <h2 className="text-3xl font-bold tracking-tight text-balance sm:text-4xl">Your records stay yours</h2>
                 <p className="mt-4 text-lg text-white/70">
-                  These protections are built into how QualityOS keeps your data, not left to a setting.
+                  These protections are built into how ProductionOS keeps your data, not left to a setting.
                 </p>
               </div>
               <ul className="grid gap-5">
@@ -289,10 +294,10 @@ export default function Home() {
           <div className="glass relative overflow-hidden rounded-[2rem] px-6 py-14 text-center sm:px-12">
             <div aria-hidden className="pointer-events-none absolute -bottom-24 left-1/2 -z-10 h-64 w-[40rem] -translate-x-1/2 rounded-full bg-[#9fb2dc]/50 blur-3xl" />
             <h2 className="text-3xl font-bold tracking-tight text-balance text-[#1b2a55] sm:text-4xl">
-              Put the inspection register away
+              Put the registers away
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
-              Set up your suppliers and first inspection template, and receive your next delivery in QualityOS.
+              Set up your suppliers and products, and receive your next delivery in ProductionOS.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Link href="/register" className={buttonVariants({ size: "lg", className: "h-11 px-5" })}>
@@ -311,9 +316,9 @@ export default function Home() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-8 text-sm text-muted-foreground sm:px-6">
           <div className="flex items-center gap-2 font-semibold text-[#1b2a55]">
             <ShieldCheck aria-hidden className="size-4" />
-            QualityOS
+            ProductionOS
           </div>
-          <p className="max-w-xl">QualityOS supports your quality system. It does not certify it or confer any regulatory approval.</p>
+          <p className="max-w-xl">ProductionOS supports your quality system. It does not certify it or confer any regulatory approval.</p>
           <div className="flex gap-5">
             <Link className="hover:text-foreground" href="/docs">Docs</Link>
             <Link className="hover:text-foreground" href="/status">System status</Link>

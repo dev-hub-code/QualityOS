@@ -26,7 +26,7 @@ public class EmailService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
     private static final String DEFAULT_LANGUAGE = "en";
-    private static final String DEFAULT_BRAND = "QualityOS";
+    private static final String DEFAULT_BRAND = "ProductionOS";
     private static final int MAX_ATTEMPTS = 3;
     private static final String INSERT_LOG = """
             INSERT INTO email_delivery_logs (id, tenant_id, recipient, template, language, status, attempt, error_type,

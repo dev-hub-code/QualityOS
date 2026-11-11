@@ -24,7 +24,7 @@ public class SystemInfoController {
     @GetMapping("/info")
     @Operation(summary = "Application name and version")
     ApiResponse<SystemInfo> info() {
-        return ApiResponse.ok(new SystemInfo("QualityOS", version, "v1"));
+        return ApiResponse.ok(new SystemInfo("ProductionOS", version, "v1"));
     }
 
     public record SystemInfo(String application, String version, String apiVersion) {

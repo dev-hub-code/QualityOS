@@ -72,7 +72,7 @@ class EmailRendererTest {
 
     @Test
     void aLanguageWithoutTemplatesFallsBackToEnglish() {
-        assertThat(renderer.render(EmailTemplate.WELCOME, "ta", variables()).subject()).isEqualTo("Welcome to QualityOS");
+        assertThat(renderer.render(EmailTemplate.WELCOME, "ta", variables()).subject()).isEqualTo("Welcome to ProductionOS");
     }
 
     @Test

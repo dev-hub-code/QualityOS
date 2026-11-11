@@ -61,7 +61,7 @@ export default function LoginPage() {
         </Link>
       </p>
       <p className="text-sm text-muted-foreground">
-        New to QualityOS?{" "}
+        New to ProductionOS?{" "}
         <Link href="/register" className="text-primary underline underline-offset-4">
           Create an organisation
         </Link>

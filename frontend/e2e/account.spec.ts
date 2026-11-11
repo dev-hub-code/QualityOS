@@ -106,7 +106,7 @@ test("a user who chooses Hindi receives a Hindi HTML email with a plain text par
   await visitor.getByLabel("Email").fill(email);
   await visitor.getByRole("button", { name: /send/i }).click();
 
-  const message = await emailWithSubject(email, "अपना QualityOS पासवर्ड रीसेट करें");
+  const message = await emailWithSubject(email, "अपना ProductionOS पासवर्ड रीसेट करें");
   expect(message.HTML).toContain('<html lang="hi">');
   expect(message.HTML).toContain("पासवर्ड रीसेट करें");
   expect(message.Text).toMatch(/reset-password\?token=/);

@@ -117,7 +117,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-svh flex-col md:flex-row md:gap-6 md:p-4 print:block print:p-0">
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/70 bg-white/70 px-4 py-3 backdrop-blur-lg md:hidden print:hidden">
-        <Brand name={controlCenter ? "Control Center" : "QualityOS"} light={false} />
+        <Brand name={controlCenter ? "Control Center" : "ProductionOS"} light={false} />
         <span className="flex-1" />
         <NotificationBell />
         <Button
@@ -141,7 +141,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         }`}
       >
         <div className={`hidden items-center justify-between gap-1 md:flex ${collapsed ? "md:flex-col md:gap-2" : ""}`}>
-          <Brand name={controlCenter ? "Control Center" : "QualityOS"} light={controlCenter} compact={collapsed} />
+          <Brand name={controlCenter ? "Control Center" : "ProductionOS"} light={controlCenter} compact={collapsed} />
           <span className={`flex items-center gap-1 ${collapsed ? "flex-col" : ""}`}>
             <NotificationBell />
             <Button

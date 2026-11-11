@@ -1,4 +1,4 @@
 {{{content}}}
 
 --
-Sent by QualityOS on behalf of {{brandName}}. Please do not reply to this email.
+Sent by ProductionOS on behalf of {{brandName}}. Please do not reply to this email.

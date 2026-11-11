@@ -10,7 +10,7 @@ import type { Checkout, Invoice } from "@/lib/types";
 
 const MOBILE = /^[6-9]\d{9}$/;
 
-/** Leaves the page for Cashfree's own checkout, so card and UPI details never reach QualityOS. */
+/** Leaves the page for Cashfree's own checkout, so card and UPI details never reach ProductionOS. */
 async function openCheckout(invoiceId: string, phone: string) {
   const { paymentSessionId, mode } = await api.post<Checkout>(`/subscription/invoices/${invoiceId}/checkout`, { phone });
   const { load } = await import("@cashfreepayments/cashfree-js");

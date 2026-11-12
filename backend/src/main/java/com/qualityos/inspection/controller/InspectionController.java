@@ -12,6 +12,7 @@ import com.qualityos.inspection.dto.InspectionDtos.RecordInstrumentsRequest;
 import com.qualityos.inspection.dto.InspectionDtos.InspectionDetail;
 import com.qualityos.inspection.dto.InspectionDtos.InspectionSummary;
 import com.qualityos.inspection.dto.InspectionDtos.SendBackRequest;
+import com.qualityos.inspection.dto.TemplateDtos.ApplicableTemplates;
 import com.qualityos.inspection.entity.Inspection;
 import com.qualityos.inspection.service.InspectionService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -59,6 +60,16 @@ public class InspectionController {
     @PreAuthorize(Require.INSPECTION_VIEW)
     public ApiResponse<InspectionDetail> get(@PathVariable UUID id) {
         return ApiResponse.ok(inspections.get(id));
+    }
+
+    /** Name one of the three. */
+    @GetMapping("/applicable-templates")
+    @PreAuthorize(Require.INSPECTION_CREATE)
+    public ApiResponse<ApplicableTemplates> applicableTemplates(
+            @RequestParam(required = false) UUID receiptItemId,
+            @RequestParam(required = false) UUID productionBatchId,
+            @RequestParam(required = false) UUID returnItemId) {
+        return ApiResponse.ok(inspections.applicableTemplates(receiptItemId, productionBatchId, returnItemId));
     }
 
     @PostMapping

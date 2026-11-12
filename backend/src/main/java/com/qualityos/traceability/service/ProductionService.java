@@ -288,6 +288,12 @@ public class ProductionService {
         return detail(id);
     }
 
+    /** @return IPQC or FQC, whichever the batch is ready for, or empty when it takes no inspection now */
+    @Transactional(readOnly = true)
+    public Optional<String> dueInspection(UUID id) {
+        return load(id).dueInspection();
+    }
+
     /** Joins the inspection's transaction: an inspection cannot be recorded without its effect on the batch. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void requireInspectable(UUID id, String inspectionType) {

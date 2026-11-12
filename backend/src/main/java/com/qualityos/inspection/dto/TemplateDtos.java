@@ -46,6 +46,14 @@ public final class TemplateDtos {
     public record TemplateDetail(TemplateSummary template, List<VersionResponse> versions) {
     }
 
+    /**
+     * The published templates an inspection can use, the item's own before general ones.
+     *
+     * @param suggestedId the one an inspection without a template gets, or null when none or several fit
+     */
+    public record ApplicableTemplates(List<TemplateSummary> templates, UUID suggestedId) {
+    }
+
     public record SaveDraftRequest(
             @Size(max = 1000) String changeNote,
             @NotNull SamplingType samplingType,

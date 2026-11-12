@@ -51,9 +51,9 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Overdue reminders cover the CAPA as a whole, not each action | When a user needs it |
 | Only inspection failures raise NCRs automatically. Evidence is attached to the CAPA, not to each action | When a user needs it |
 | A single inspection's report is a printable page, not a generated PDF. The inspection report across a period is one | When a user needs it |
-| A template can only be chosen by hand; none is picked automatically for a material | When a user needs it |
+| An inspection takes the one published template that fits when none is chosen: the material's or product's own before a general one, of IQC for a lot, the type due at a batch's stage, or FQC/OQC for returns. When several or none fit, the person chooses, and the start dialogs list only fitting templates with that one preselected | Review after real use |
 | Production batches take IPQC and FQC inspections only. OQC and the other template types have no production flow | When a user needs it |
-| A template cannot yet be limited to a product in the UI | When a user needs it |
+| A template's material or product is set when it is created and cannot be changed afterwards | When a user needs it |
 | Material used can be entered in any unit of the same kind as its lot or batch, and is converted to that unit. The dialog lists every unit and the server refuses one that does not convert. A correction of material used is still entered in the source's own unit. Units are added through the API alone, as before | When a user needs it |
 | A customer who returned everything still shows as having received the batch. This is deliberate: a recall should reach them | By design |
 | The return screen takes one line at a time, though the API takes several. Credit notes and refunds are separate and not built | When a user needs it |

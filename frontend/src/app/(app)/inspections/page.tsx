@@ -2,16 +2,15 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createColumnHelper } from "@tanstack/react-table";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { StartInspectionDialog } from "@/components/inspections/start-inspection-dialog";
 import { DataTable } from "@/components/records/data-table";
-import { PageHeader, RecordLink, Section, StatusBadge, useRefresh } from "@/components/records/parts";
-import { RecordDialog } from "@/components/records/record-dialog";
+import { PageHeader, RecordLink, Section, StatusBadge } from "@/components/records/parts";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api, type PageResponse } from "@/lib/api";
-import { formatQuantity, type FieldDef } from "@/lib/record-form";
-import type { Inspection, InspectionSummary, ReceivedBatch, TemplateSummary } from "@/lib/types";
+import { formatQuantity } from "@/lib/record-form";
+import type { InspectionSummary, ReceivedBatch } from "@/lib/types";
 
 const column = createColumnHelper<InspectionSummary>();
 const columns = [
@@ -31,42 +30,6 @@ const columns = [
     },
   }),
 ];
-
-function StartDialog({ batch, onClose }: { batch: ReceivedBatch; onClose: () => void }) {
-  const router = useRouter();
-  const refresh = useRefresh();
-  const query = `size=100&materialId=${batch.materialId}`;
-  const { data } = useQuery({
-    queryKey: ["/inspection-templates", query],
-    queryFn: () => api.get<PageResponse<TemplateSummary>>(`/inspection-templates?${query}`),
-  });
-  const published = (data?.items ?? []).filter((template) => template.publishedVersion !== null);
-  const fields: FieldDef[] = [
-    {
-      name: "templateId",
-      label: "Template",
-      type: "select",
-      required: true,
-      options: published.map((template) => ({
-        value: template.id,
-        label: `${template.code} – ${template.name}`,
-      })),
-    },
-  ];
-  if (!data) return null;
-  return (
-    <RecordDialog
-      title={`Inspect ${batch.internalBatch}`}
-      fields={fields}
-      onClose={onClose}
-      onSubmit={async (values) => {
-        const created = await api.post<Inspection>("/inspections", { ...values, receiptItemId: batch.itemId });
-        await refresh();
-        router.push(`/inspections/${created.id}`);
-      }}
-    />
-  );
-}
 
 function Queue() {
   const canCreate = usePermission("INSPECTION_CREATE");
@@ -95,7 +58,13 @@ function Queue() {
           </li>
         ))}
       </ul>
-      {starting && <StartDialog batch={starting} onClose={() => setStarting(null)} />}
+      {starting && (
+        <StartInspectionDialog
+          title={`Inspect ${starting.internalBatch}`}
+          subject={{ receiptItemId: starting.itemId }}
+          onClose={() => setStarting(null)}
+        />
+      )}
     </Section>
   );
 }

@@ -13,6 +13,7 @@ import {
   useRefresh,
   useUnits,
 } from "@/components/records/parts";
+import { StartInspectionDialog } from "@/components/inspections/start-inspection-dialog";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
@@ -22,10 +23,8 @@ import { inspectionTypeFor, parseSerials, toConsumeRequest } from "@/lib/traceab
 import type {
   BatchDetail,
   CorrectionDetail,
-  Inspection,
   ProductionBatch,
   ReleasedLot,
-  TemplateSummary,
 } from "@/lib/types";
 
 const RELEASED = "/production-batches?status=RELEASED&size=100";
@@ -102,40 +101,6 @@ function CorrectConsumptionDialog({ consumptionId, onClose }: { consumptionId: s
       onSubmit={async (values) => {
         const created = await api.post<CorrectionDetail>("/material-corrections", { ...values, consumptionId });
         router.push(`/material-corrections/${created.id}`);
-      }}
-    />
-  );
-}
-
-function InspectDialog({ batch, type, onClose }: { batch: ProductionBatch; type: string; onClose: () => void }) {
-  const router = useRouter();
-  const refresh = useRefresh();
-  const query = `size=100&type=${type}`;
-  const { data } = useQuery({
-    queryKey: ["/inspection-templates", query],
-    queryFn: () => api.get<PageResponse<TemplateSummary>>(`/inspection-templates?${query}`),
-  });
-  if (!data) return null;
-  const fields: FieldDef[] = [
-    {
-      name: "templateId",
-      label: "Template",
-      type: "select",
-      required: true,
-      options: data.items
-        .filter((template) => template.publishedVersion !== null)
-        .map((template) => ({ value: template.id, label: `${template.code} – ${template.name}` })),
-    },
-  ];
-  return (
-    <RecordDialog
-      title={`${type} inspection of ${batch.batchNumber}`}
-      fields={fields}
-      onClose={onClose}
-      onSubmit={async (values) => {
-        const created = await api.post<Inspection>("/inspections", { ...values, productionBatchId: batch.id });
-        await refresh();
-        router.push(`/inspections/${created.id}`);
       }}
     />
   );
@@ -245,7 +210,13 @@ export default function ProductionBatchPage() {
         />
       )}
       {open === "consume" && <ConsumeDialog path={path} batchId={id} onClose={close} />}
-      {open === "inspect" && inspectionType && <InspectDialog batch={batch} type={inspectionType} onClose={close} />}
+      {open === "inspect" && inspectionType && (
+        <StartInspectionDialog
+          title={`${inspectionType} inspection of ${batch.batchNumber}`}
+          subject={{ productionBatchId: batch.id }}
+          onClose={close}
+        />
+      )}
       {open === "complete" && (
         <RecordDialog
           title="Complete batch"

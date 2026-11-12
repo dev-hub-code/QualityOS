@@ -324,8 +324,15 @@ export interface TemplateSummary {
   name: string;
   inspectionType: string;
   materialId: string | null;
+  productId: string | null;
   publishedVersion: number | null;
   hasDraft: boolean;
+}
+
+/** The published templates an inspection can use, and the one already chosen when only one fits. */
+export interface ApplicableTemplates {
+  templates: TemplateSummary[];
+  suggestedId: string | null;
 }
 
 export interface TemplateVersion {

@@ -58,6 +58,16 @@ public class ProductionBatch extends TenantOwnedEntity {
         status = Status.COMPLETED;
     }
 
+    /** The inspection this batch is ready for at its stage, if any: in-process on the line, final once complete. */
+    public java.util.Optional<String> dueInspection() {
+        return switch (status) {
+            case IN_PROGRESS -> java.util.Optional.of(IN_PROCESS);
+            case COMPLETED -> java.util.Optional.of(FINAL);
+            case ON_HOLD -> java.util.Optional.of(producedQuantity == null ? IN_PROCESS : FINAL);
+            case RELEASED, REJECTED -> java.util.Optional.empty();
+        };
+    }
+
     public void requireInspectable(String inspectionType) {
         if (IN_PROCESS.equals(inspectionType)) {
             // A batch held for rework is re-inspected, which is the only way it gets back on the line.

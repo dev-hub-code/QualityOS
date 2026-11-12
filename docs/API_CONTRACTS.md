@@ -323,7 +323,7 @@ every permission below; after a downgrade only `MANUFACTURING_VIEW` stays. See [
 
 | Method and path | Also needs | Purpose |
 |---|---|---|
-| `GET /settings`, `PUT /settings` | `PUT`: `MANUFACTURING_MANAGE` | `manufacturingModel` (DISCRETE, PROCESS, HYBRID) and `separateApprover`. A model that products still use cannot be dropped |
+| `GET /settings`, `PUT /settings` | `PUT`: `MANUFACTURING_MANAGE` | `manufacturingModel` (DISCRETE, PROCESS, HYBRID), `separateApprover`, and optionally `workOrderRequiresBom` (default true) and `workOrderRequiresRouting` (default false); left out, those two keep their value. A model that products still use cannot be dropped |
 | `GET /products/{productId}/settings`, `PUT ...` | `PUT`: `MANUFACTURING_MANAGE` | How one product is made. `manufacturingModel` is null while a hybrid organisation has not chosen |
 | `GET /work-centers`, `POST /work-centers` | `POST`: `MANUFACTURING_MANAGE` | Filter by `q`, `facilityId`. Limited members see their facilities only |
 | `GET /work-centers/{id}`, `PUT ...`, `DELETE ...` | `MANUFACTURING_MANAGE` to change | Detail with machines. `DELETE` archives, and is refused while a machine is not inactive |
@@ -342,3 +342,29 @@ every permission below; after a downgrade only `MANUFACTURING_VIEW` stays. See [
 Refusals are `422` with a message: a BOM for a process product, a circular structure, a unit that does not convert, a
 change to anything that is not a draft, approval by the submitter under `separateApprover`, or an effective date before
 today or before the current revision's. A second revision in progress for the same product is `409`.
+
+### Production plans and work orders
+
+Reading needs `WORK_ORDER_VIEW`, for plans as well as work orders. Members limited to some facilities see and change
+only those facilities' plans and orders; anything else is `404`.
+
+| Method and path | Also needs | Purpose |
+|---|---|---|
+| `GET /production-plans`, `POST /production-plans` | `POST`: `PRODUCTION_PLAN_MANAGE` | Filter by `q`, `status`, `facilityId`. `POST` takes `name`, `facilityId`, `periodStart`, `periodEnd`, `notes`; the number is `PP-yyyy-nnnnn` |
+| `GET /production-plans/{id}`, `PUT ...` | `PUT`: `PRODUCTION_PLAN_MANAGE` | Detail with lines; each line has `orderedQuantity` (its work orders, cancelled ones aside), `remainingQuantity`, `overOrdered` and its work orders. `PUT` on drafts only; the facility cannot change |
+| `POST /production-plans/{id}/lines`, `PUT .../lines/{lineId}`, `DELETE ...` | `PRODUCTION_PLAN_MANAGE` | `productId`, `quantity`, `dueDate` within the period, `notes`. Draft only |
+| `POST /production-plans/{id}/approve` | `PRODUCTION_PLAN_APPROVE` | Needs a line |
+| `POST /production-plans/{id}/close` | `PRODUCTION_PLAN_APPROVE` | Optional `note`. Refused while any of its work orders is open |
+| `POST /production-plans/{id}/cancel` | `PRODUCTION_PLAN_APPROVE` | `reason`. Refused if any work order raised from it is not cancelled |
+| `GET /work-orders`, `POST /work-orders` | `POST`: `WORK_ORDER_MANAGE` | Filter by `q` (number or product), `status`, `facilityId`, `productId`, `planId`. `POST` takes `productId`, `facilityId`, `productionLineId`, `quantity` (in the product's unit), `plannedStart`, `plannedEnd`, `priority` (LOW, NORMAL, HIGH, URGENT), `notes`, `planLineId`. From a plan line: the plan must be approved, and product and facility must match it |
+| `GET /work-orders/{id}`, `PUT ...` | `PUT`: `WORK_ORDER_MANAGE` | Detail: the order, `definition` (the BOM or recipe and routing a release would use or did use, and `problems` that would stop it), `materials` and `operations` frozen at release, and the status `history`. `PUT` on drafts only |
+| `POST /work-orders/{id}/submit` | `WORK_ORDER_MANAGE` | DRAFT → SUBMITTED |
+| `POST /work-orders/{id}/send-back` | `WORK_ORDER_APPROVE` | `note`. SUBMITTED → DRAFT |
+| `POST /work-orders/{id}/approve` | `WORK_ORDER_APPROVE` | Optional `note`. SUBMITTED → APPROVED; the submitter cannot approve under `separateApprover`, except as a recorded self-review |
+| `POST /work-orders/{id}/release` | `WORK_ORDER_RELEASE` | APPROVED → RELEASED. Freezes the BOM or recipe and routing in effect on the planned start and writes the materials and operations |
+| `POST /work-orders/{id}/start` | `WORK_ORDER_RELEASE` | RELEASED → IN_PROGRESS. Opens the production batch (`productionBatchId`, `productionBatchNumber`) |
+| `POST /work-orders/{id}/hold`, `/resume` | `WORK_ORDER_RELEASE` | `hold` takes `reason`, from APPROVED, RELEASED or IN_PROGRESS; `resume` returns to that status |
+| `POST /work-orders/{id}/cancel` | `WORK_ORDER_MANAGE` before approval, `WORK_ORDER_APPROVE` after | `reason`. Never once production has started |
+
+A step from the wrong status is `422` naming the order's status; a concurrent change to the same order is `409`.
+Nothing reaches COMPLETED or PARTIALLY_COMPLETED yet: that comes with finished-goods receipt in phase 6.

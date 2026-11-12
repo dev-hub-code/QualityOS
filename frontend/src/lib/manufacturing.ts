@@ -1,4 +1,4 @@
-import type { ManufacturingModel, RevisionStatus } from "@/lib/types";
+import type { ManufacturingModel, PlanStatus, RevisionStatus, WorkOrderStatus } from "@/lib/types";
 
 export type DefinitionKind = "BOM" | "RECIPE" | "ROUTING";
 
@@ -71,3 +71,55 @@ export function describeLimits(parameter: { target: string | null; minimum: stri
   const sentence = text.charAt(0).toUpperCase() + text.slice(1);
   return parameter.unit ? `${sentence} ${parameter.unit}` : sentence;
 }
+
+export type WorkOrderAction = "edit" | "submit" | "sendBack" | "approve" | "release" | "start" | "hold" | "resume" | "cancel";
+
+/**
+ * What a person may do with a work order at its stage, as the server allows it. Before approval, whoever manages work
+ * orders may cancel; once approved, only an approver may, and never after production has started.
+ */
+export function workOrderActions(
+  order: { status: WorkOrderStatus; heldFrom: WorkOrderStatus | null },
+  can: { manage: boolean; approve: boolean; release: boolean },
+): WorkOrderAction[] {
+  const actions: WorkOrderAction[] = [];
+  switch (order.status) {
+    case "DRAFT":
+      if (can.manage) actions.push("edit", "submit", "cancel");
+      break;
+    case "SUBMITTED":
+      if (can.approve) actions.push("approve", "sendBack");
+      if (can.manage) actions.push("cancel");
+      break;
+    case "APPROVED":
+      if (can.release) actions.push("release", "hold");
+      if (can.approve) actions.push("cancel");
+      break;
+    case "RELEASED":
+      if (can.release) actions.push("start", "hold");
+      if (can.approve) actions.push("cancel");
+      break;
+    case "IN_PROGRESS":
+      if (can.release) actions.push("hold");
+      break;
+    case "ON_HOLD":
+      if (can.release) actions.push("resume");
+      if (can.approve && order.heldFrom !== "IN_PROGRESS") actions.push("cancel");
+      break;
+  }
+  return actions;
+}
+
+export type PlanAction = "edit" | "approve" | "close" | "cancel" | "order";
+
+export function planActions(status: PlanStatus, can: { manage: boolean; approve: boolean; order: boolean }): PlanAction[] {
+  const actions: PlanAction[] = [];
+  if (status === "DRAFT" && can.manage) actions.push("edit");
+  if (status === "DRAFT" && can.approve) actions.push("approve");
+  if (status === "APPROVED" && can.order) actions.push("order");
+  if (status === "APPROVED" && can.approve) actions.push("close");
+  if ((status === "DRAFT" || status === "APPROVED") && can.approve) actions.push("cancel");
+  return actions;
+}
+
+export const PRIORITY_LABELS = { LOW: "Low", NORMAL: "Normal", HIGH: "High", URGENT: "Urgent" } as const;

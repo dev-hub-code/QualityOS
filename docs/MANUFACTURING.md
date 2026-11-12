@@ -48,8 +48,12 @@ Status: **Built** (in this branch, tested), **Phase n** (planned), **Reused** (a
 | Resources | Machines with statuses AVAILABLE, RUNNING, IDLE, MAINTENANCE, BREAKDOWN, INACTIVE, enforced transitions and history | Built (Phase 1) |
 | Security | MANUFACTURING_VIEW/MANAGE, BOM_MANAGE/APPROVE, RECIPE_MANAGE/APPROVE, ROUTING_MANAGE/APPROVE in roles and the `MANUFACTURING` plan feature | Built (Phase 1) |
 | UI | Manufacturing navigation group shown by permission and model | Built (Phase 1) |
-| Planning | Production plans | Phase 2 |
-| Work orders | DRAFT → SUBMITTED → APPROVED → RELEASED → IN_PROGRESS → COMPLETED, ON_HOLD, CANCELLED, PARTIALLY_COMPLETED; BOM, recipe and routing snapshot on release | Phase 2 |
+| Configuration | Whether releasing a work order needs a BOM or recipe, and a routing | Built (Phase 2) |
+| Planning | Production plans per facility and period, with lines, approval, close and cancel; ordered quantity against each line | Built (Phase 2) |
+| Work orders | DRAFT → SUBMITTED → APPROVED → RELEASED → IN_PROGRESS, ON_HOLD, CANCELLED, enforced in the entity and audited with an append-only history | Built (Phase 2) |
+| Work orders | BOM or recipe and routing frozen on release; materials and operations worked out from them | Built (Phase 2) |
+| Work orders | Starting opens the existing production batch, so traceability and inspections follow it | Built (Phase 2) |
+| Work orders | COMPLETED and PARTIALLY_COMPLETED | Phase 6 |
 | Inventory | Material availability, concurrency-safe reservation, issue, consumption, return; shortages reported, never ignored | Phase 3 |
 | Shop floor | Operations PENDING → READY → IN_PROGRESS → PAUSED → COMPLETED, BLOCKED, CANCELLED; quantity reconciliation | Phase 4 |
 | Quality | Quality checkpoints on operations reusing inspections, NCR and CAPA; completion blocked by open mandatory gates | Phase 5 |
@@ -123,6 +127,7 @@ which Phase 7 uses for downtime and OEE.
 Work centres and machines belong to a facility, so a member limited to some facilities sees and changes only theirs.
 BOMs, recipes and routings are product master data and are visible to every member with `MANUFACTURING_VIEW`, as
 products are. Choosing a work centre for a routing operation requires access to that work centre's facility.
+Production plans and work orders belong to a facility in the same way.
 
 ### Permissions
 
@@ -132,28 +137,92 @@ products are. Choosing a work centre for a routing operation requires access to 
 | MANUFACTURING_MANAGE (settings, work centres, machines) | ✓ | ✓ | | |
 | BOM_MANAGE, RECIPE_MANAGE, ROUTING_MANAGE | ✓ | ✓ | | |
 | BOM_APPROVE, RECIPE_APPROVE, ROUTING_APPROVE | ✓ | ✓ | ✓ | |
+| WORK_ORDER_VIEW (plans and work orders) | ✓ | ✓ | ✓ | Production Planner (new), Quality Engineer, Inspector, Auditor, Viewer |
+| WORK_ORDER_MANAGE, PRODUCTION_PLAN_MANAGE | ✓ | ✓ | | Production Planner |
+| WORK_ORDER_APPROVE, WORK_ORDER_RELEASE, PRODUCTION_PLAN_APPROVE | ✓ | ✓ | | |
+
+The Production Planner also gets MANUFACTURING_VIEW and the views of facilities, products, purchasing, traceability
+and reports.
 
 All of them belong to the `MANUFACTURING` plan feature, on Professional and Enterprise. As with other features, the
 `_VIEW` permission stays after a downgrade so existing records remain readable.
+
+### Production plans
+
+A plan belongs to one facility and a period, and lists products with quantities and due dates within it. Lines change
+only while the plan is a draft. Work orders are raised from the lines of an approved plan, for the line's product in
+the plan's facility. Ordering more than a line planned is allowed and shown, not refused. A plan is closed once none
+of its work orders is open, and cancelled only while none of them stands.
+
+### Work order lifecycle
+
+| From | To | Who | Notes |
+|---|---|---|---|
+| DRAFT | SUBMITTED | WORK_ORDER_MANAGE | The only status in which the order can be edited |
+| SUBMITTED | DRAFT | WORK_ORDER_APPROVE | Sent back with a note |
+| SUBMITTED | APPROVED | WORK_ORDER_APPROVE | Someone other than the submitter, under the separate-approver rule |
+| APPROVED | RELEASED | WORK_ORDER_RELEASE | See release below |
+| RELEASED | IN_PROGRESS | WORK_ORDER_RELEASE | Opens the production batch |
+| APPROVED, RELEASED, IN_PROGRESS | ON_HOLD | WORK_ORDER_RELEASE | With a reason; resume returns to the status it was held from |
+| DRAFT, SUBMITTED | CANCELLED | WORK_ORDER_MANAGE | With a reason |
+| APPROVED, RELEASED, ON_HOLD | CANCELLED | WORK_ORDER_APPROVE | With a reason; not when held from IN_PROGRESS |
+
+The allowed moves are in `WorkOrder.TRANSITIONS`. Each move is checked against the current status and the row's
+version, so two people releasing or starting the same order cannot both succeed; the loser gets `409` or `422`. Every
+move writes a row to `work_order_status_history`, which the database keeps append-only, and an audit entry.
+
+**Release** uses the revisions in effect on the planned start. For a discrete product that is its BOM, for a process
+product its recipe, as the product's model says. Whether a BOM or recipe, and a routing, must exist is the
+organisation's choice (`workOrderRequiresBom`, default on; `workOrderRequiresRouting`, default off). A routing in
+effect is used even when not required, and each of its work centres must be in the order's facility and not archived.
+Release stores the approved snapshots on the order and writes:
+
+- one material line per BOM or recipe line, one level deep: the quantity scaled to the order (fixed lines stay as they
+  are), plus scrap, converted to the component's own unit. A sub-assembly is listed as needed; it is made on its own
+  work order.
+- one operation per routing operation, with setup time as it is and run time multiplied by the order quantity, since
+  routing run time is per unit. Each starts PENDING; phase 4 moves them.
+
+The detail page shows before release which revisions would be used and what would stop the release.
+
+**Start** creates the production batch through the existing `ProductionService`, for the order's product, facility and
+quantity. Consumption, inspections, genealogy and recall then work on it as on any batch.
+
+**Protection in the database.** Work orders are never deleted. Once released, the product, quantity, revisions and
+snapshots cannot change, and the batch, once set, stays. Completed and cancelled orders cannot change at all. Released
+material lines cannot be rewritten or deleted, and operations keep their order.
 
 ## 4. Phase plan and progress
 
 | Phase | Scope | Status |
 |---|---|---|
 | 1 Foundation | Settings, product settings, BOMs, recipes, routings, work centres, machines, permissions, navigation | **Built** |
-| 2 Planning and work orders | Production plans, work orders and their lifecycle, snapshots on release | Not started |
+| 2 Planning and work orders | Production plans, work orders and their lifecycle, snapshots on release | **Built** |
 | 3 Inventory integration | Availability, reservation, issue, consumption, return | Not started |
 | 4 Shop floor | Operation execution, quantity reconciliation, machine use | Not started |
 | 5 Quality and rework | Quality gates on operations, NCR/CAPA links, rework | Not started |
 | 6 Completion | Finished-goods receipt, batch completion, closing work orders | Not started |
 | 7 Advanced | Downtime, scheduling, costing, OEE, analytics | Not started |
 
-## 5. Phase 1 limitations
+## 5. Limitations
+
+Phase 1:
 
 - The product's flat material list stays as it was. A BOM can be started from it, but the two are not kept in step.
 - Routing operations record standard times; nothing uses them until scheduling and costing (Phase 7).
 - Parameters on recipes and operations are definitions only. Recording actual values is Phase 4.
 - Machine status is changed by hand. Work orders do not move it until Phase 4.
+
+Phase 2:
+
+- Release lists what the order needs but does not check or reserve stock; that is phase 3, which will report
+  shortages rather than ignore them.
+- Starting an order opens its batch. Consumption is still recorded on the batch as before, without reference to the
+  order's material list, until phase 3.
+- A plan line's due date is shown, not enforced against the work order's planned dates.
+- Requests are made safe to repeat by the status check and the row version, not by an idempotency key: a repeated
+  release or start is refused, never applied twice.
+- Nothing reaches COMPLETED or PARTIALLY_COMPLETED until phase 6, so a plan with started orders cannot yet be closed.
 
 ## 6. Phase 1 delivery
 
@@ -180,3 +249,29 @@ editing, parameters, BOM explosion and recipe scaling; a Manufacturing section o
 - Vitest: `manufacturing.test.ts` and navigation tests.
 - Playwright: `manufacturing.spec.ts`, which drafts, approves and explodes a two-level BOM and changes a machine's
   status, all from the pages.
+
+## 7. Phase 2 delivery
+
+**Migration.** `V23__production_plans_and_work_orders.sql`: two settings columns; six tenant tables with row-level
+security (plans, plan lines, work orders, work-order materials, work-order operations, status history); triggers that
+keep work orders and released requirements from being deleted or rewritten and the history append-only; six
+permissions; the Production Planner role.
+
+**Backend.** In `com.qualityos.production`: `ProductionPlan`, `ProductionPlanLine`, `WorkOrder` (with its transition
+table), `WorkOrderMaterial`, `WorkOrderOperation`, `WorkOrderStatusChange`, their repositories,
+`ProductionPlanService`, `WorkOrderService`, and two controllers. `ManufacturingSettingsService` gains the two release
+rules and `definitionKind`. Reused: `ProductionService.create` for the batch, `ReviewPolicy` for the separate approver,
+`DocumentNumberService` for PP- and WO- numbers, `FacilityScope`, `AuditService`, `MaterialService.convert`.
+
+**Screens.** Production plans and Work orders in the Manufacturing menu: lists, a plan page with lines, ordered
+quantities and "Raise work order", and a work order page with each allowed step, what release would use and what stops
+it, the frozen materials and operations, the batch link and the status history. The configuration page has the two
+release rules.
+
+**Tests.**
+- `WorkOrderIT`: 6 tests. They cover the full lifecycle into a production batch, invalid steps, the separate approver,
+  release arithmetic and snapshots, double start, hold and resume, cancel rules by permission and stage, the
+  configurable release rules, routing work centres in another facility, plans (period, approval, ordering, over-ordering,
+  close and cancel), facility scope and isolation between organisations, and the database protections.
+- Vitest: `workOrderActions`, `planActions` and the navigation entries.
+- Playwright: `work-orders.spec.ts`, from a plan through approval, release, start, hold and resume, from the pages.

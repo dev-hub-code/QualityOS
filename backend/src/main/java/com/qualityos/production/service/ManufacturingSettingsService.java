@@ -51,7 +51,8 @@ public class ManufacturingSettingsService {
     @Transactional(readOnly = true)
     public SettingsResponse get() {
         ManufacturingSettings current = current();
-        return new SettingsResponse(current.getManufacturingModel(), current.isSeparateApprover());
+        return new SettingsResponse(current.getManufacturingModel(), current.isSeparateApprover(),
+                current.isWorkOrderRequiresBom(), current.isWorkOrderRequiresRouting());
     }
 
     /**
@@ -75,13 +76,17 @@ public class ManufacturingSettingsService {
                         .formatted(otherKind == Bom.Kind.BOM ? "BOMs" : "recipes"));
             }
         }
-        Map<String, Object> before = Map.of("manufacturingModel", current.getManufacturingModel().name(),
-                "separateApprover", current.isSeparateApprover());
+        Map<String, Object> before = snapshot(current);
         current.setManufacturingModel(model);
         current.setSeparateApprover(request.separateApprover());
+        if (request.workOrderRequiresBom() != null) {
+            current.setWorkOrderRequiresBom(request.workOrderRequiresBom());
+        }
+        if (request.workOrderRequiresRouting() != null) {
+            current.setWorkOrderRequiresRouting(request.workOrderRequiresRouting());
+        }
         settings.save(current);
-        audit.record("MANUFACTURING_SETTINGS_CHANGED", ENTITY, current.getId(), before,
-                Map.of("manufacturingModel", model.name(), "separateApprover", request.separateApprover()));
+        audit.record("MANUFACTURING_SETTINGS_CHANGED", ENTITY, current.getId(), before, snapshot(current));
         return get();
     }
 
@@ -137,6 +142,29 @@ public class ManufacturingSettingsService {
     @Transactional(readOnly = true)
     public boolean separateApprover() {
         return current().isSeparateApprover();
+    }
+
+    @Transactional(readOnly = true)
+    public boolean workOrderRequiresBom() {
+        return current().isWorkOrderRequiresBom();
+    }
+
+    @Transactional(readOnly = true)
+    public boolean workOrderRequiresRouting() {
+        return current().isWorkOrderRequiresRouting();
+    }
+
+    /** Whether the product takes a BOM or a recipe. Empty when a hybrid organisation has not chosen for it. */
+    @Transactional(readOnly = true)
+    public java.util.Optional<Bom.Kind> definitionKind(UUID productId) {
+        return java.util.Optional.ofNullable(productModel(productId)).map(ManufacturingSettingsService::kindFor);
+    }
+
+    private static Map<String, Object> snapshot(ManufacturingSettings current) {
+        return Map.of("manufacturingModel", current.getManufacturingModel().name(),
+                "separateApprover", current.isSeparateApprover(),
+                "workOrderRequiresBom", current.isWorkOrderRequiresBom(),
+                "workOrderRequiresRouting", current.isWorkOrderRequiresRouting());
     }
 
     private ManufacturingModel productModel(UUID productId) {

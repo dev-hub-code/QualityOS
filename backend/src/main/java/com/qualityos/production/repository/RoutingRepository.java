@@ -19,4 +19,11 @@ public interface RoutingRepository extends JpaRepository<Routing, UUID>, JpaSpec
 
     @Query("SELECT coalesce(max(r.revision), 0) FROM Routing r WHERE r.productId = ?1")
     int lastRevision(UUID productId);
+
+    /** The routing in effect for the product on the date. */
+    @Query("""
+            SELECT r FROM Routing r WHERE r.productId = ?1 AND r.status = ?3 AND r.effectiveFrom <= ?2
+            AND (r.effectiveTo IS NULL OR r.effectiveTo >= ?2)
+            """)
+    List<Routing> findApprovedOn(UUID productId, java.time.LocalDate on, Status approved);
 }

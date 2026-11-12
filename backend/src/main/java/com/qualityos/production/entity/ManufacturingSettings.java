@@ -20,4 +20,10 @@ public class ManufacturingSettings extends TenantOwnedEntity {
     private ManufacturingModel manufacturingModel = ManufacturingModel.DISCRETE;
 
     private boolean separateApprover = true;
+
+    /** Releasing a work order needs an approved BOM or recipe in effect. */
+    private boolean workOrderRequiresBom = true;
+
+    /** Releasing a work order needs an approved routing in effect. */
+    private boolean workOrderRequiresRouting;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeLimits, revisionActions, toLineRequest, usesKind } from "@/lib/manufacturing";
+import { describeLimits, planActions, revisionActions, toLineRequest, usesKind, workOrderActions } from "@/lib/manufacturing";
 
 describe("usesKind", () => {
   it("offers BOMs to discrete and recipes to process organisations, and both to hybrid ones", () => {
@@ -53,5 +53,40 @@ describe("describeLimits", () => {
       "Target 180, 175 to 185 °C",
     );
     expect(describeLimits({ target: null, minimum: "800", maximum: null, unit: null })).toBe("At least 800");
+  });
+});
+
+describe("workOrderActions", () => {
+  const everyone = { manage: true, approve: true, release: true };
+  const order = (status: Parameters<typeof workOrderActions>[0]["status"], heldFrom: Parameters<typeof workOrderActions>[0]["heldFrom"] = null) => ({
+    status,
+    heldFrom,
+  });
+
+  it("offers each stage's next step only", () => {
+    expect(workOrderActions(order("DRAFT"), everyone)).toEqual(["edit", "submit", "cancel"]);
+    expect(workOrderActions(order("SUBMITTED"), everyone)).toEqual(["approve", "sendBack", "cancel"]);
+    expect(workOrderActions(order("APPROVED"), everyone)).toEqual(["release", "hold", "cancel"]);
+    expect(workOrderActions(order("RELEASED"), everyone)).toEqual(["start", "hold", "cancel"]);
+    expect(workOrderActions(order("IN_PROGRESS"), everyone)).toEqual(["hold"]);
+    expect(workOrderActions(order("CANCELLED"), everyone)).toEqual([]);
+  });
+
+  it("keeps cancelling a committed order to approvers, and never once production started", () => {
+    const planner = { manage: true, approve: false, release: false };
+    expect(workOrderActions(order("SUBMITTED"), planner)).toEqual(["cancel"]);
+    expect(workOrderActions(order("APPROVED"), planner)).toEqual([]);
+    expect(workOrderActions(order("ON_HOLD", "RELEASED"), everyone)).toEqual(["resume", "cancel"]);
+    expect(workOrderActions(order("ON_HOLD", "IN_PROGRESS"), everyone)).toEqual(["resume"]);
+  });
+});
+
+describe("planActions", () => {
+  it("edits drafts, raises orders from approved plans, and closes or cancels only open ones", () => {
+    const all = { manage: true, approve: true, order: true };
+    expect(planActions("DRAFT", all)).toEqual(["edit", "approve", "cancel"]);
+    expect(planActions("APPROVED", all)).toEqual(["order", "close", "cancel"]);
+    expect(planActions("CLOSED", all)).toEqual([]);
+    expect(planActions("APPROVED", { manage: true, approve: false, order: false })).toEqual([]);
   });
 });

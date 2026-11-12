@@ -1560,6 +1560,10 @@ export type ManufacturingModel = "DISCRETE" | "PROCESS" | "HYBRID";
 export interface ManufacturingSettings {
   manufacturingModel: ManufacturingModel;
   separateApprover: boolean;
+  /** Releasing a work order needs an approved BOM or recipe in effect. */
+  workOrderRequiresBom: boolean;
+  /** Releasing a work order needs an approved routing in effect. */
+  workOrderRequiresRouting: boolean;
 }
 
 export interface ProductManufacturingSettings {
@@ -1709,4 +1713,136 @@ export interface RoutingOperation {
 export interface RoutingDetail {
   revision: Revision;
   operations: RoutingOperation[];
+}
+
+export type PlanStatus = "DRAFT" | "APPROVED" | "CLOSED" | "CANCELLED";
+
+export interface ProductionPlan {
+  id: string;
+  planNumber: string;
+  name: string;
+  facilityId: string;
+  facilityCode: string;
+  periodStart: string;
+  periodEnd: string;
+  status: PlanStatus;
+  statusReason: string | null;
+  notes: string | null;
+  approvedBy: string | null;
+  approvedByName: string | null;
+  approvedAt: string | null;
+  createdAt: string;
+}
+
+export interface PlanLine {
+  id: string;
+  productId: string;
+  productCode: string;
+  productName: string;
+  uomId: string;
+  quantity: string;
+  dueDate: string;
+  notes: string | null;
+  /** What its work orders, cancelled ones aside, add up to. */
+  orderedQuantity: string;
+  remainingQuantity: string;
+  overOrdered: boolean;
+  workOrders: { id: string; workOrderNumber: string; status: WorkOrderStatus; quantity: string }[];
+}
+
+export interface PlanDetail {
+  plan: ProductionPlan;
+  lines: PlanLine[];
+}
+
+export type WorkOrderStatus =
+  | "DRAFT"
+  | "SUBMITTED"
+  | "APPROVED"
+  | "RELEASED"
+  | "IN_PROGRESS"
+  | "ON_HOLD"
+  | "PARTIALLY_COMPLETED"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export type WorkOrderPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
+
+export interface WorkOrder {
+  id: string;
+  workOrderNumber: string;
+  productId: string;
+  productCode: string;
+  productName: string;
+  facilityId: string;
+  facilityCode: string;
+  productionLineId: string | null;
+  productionLineCode: string | null;
+  quantity: string;
+  uomId: string;
+  plannedStart: string;
+  plannedEnd: string;
+  priority: WorkOrderPriority;
+  status: WorkOrderStatus;
+  heldFrom: WorkOrderStatus | null;
+  statusReason: string | null;
+  notes: string | null;
+  planId: string | null;
+  planNumber: string | null;
+  planLineId: string | null;
+  productionBatchId: string | null;
+  productionBatchNumber: string | null;
+  submittedBy: string | null;
+  submittedByName: string | null;
+  submittedAt: string | null;
+  approvedBy: string | null;
+  approvedByName: string | null;
+  approvedAt: string | null;
+  releasedBy: string | null;
+  releasedByName: string | null;
+  releasedAt: string | null;
+  startedAt: string | null;
+  createdAt: string;
+}
+
+export interface WorkOrderDetail {
+  workOrder: WorkOrder;
+  /** What a release would use, or did use, and what would stop it. */
+  definition: {
+    definitionKind: "BOM" | "RECIPE" | null;
+    definitionId: string | null;
+    definitionRevision: number | null;
+    routingId: string | null;
+    routingRevision: number | null;
+    problems: string[];
+  };
+  materials: {
+    lineNumber: number;
+    componentType: "MATERIAL" | "PRODUCT";
+    componentId: string;
+    componentCode: string;
+    componentName: string;
+    requiredQuantity: string;
+    uomId: string;
+  }[];
+  operations: {
+    id: string;
+    sequence: number;
+    name: string;
+    workCenterId: string;
+    workCenterCode: string;
+    workCenterName: string;
+    plannedSetupMinutes: string;
+    plannedRunMinutes: string;
+    instructions: string | null;
+    status: string;
+  }[];
+  history: {
+    fromStatus: WorkOrderStatus | null;
+    toStatus: WorkOrderStatus;
+    reason: string | null;
+    changedBy: string | null;
+    changedByName: string | null;
+    changedAt: string;
+  }[];
 }

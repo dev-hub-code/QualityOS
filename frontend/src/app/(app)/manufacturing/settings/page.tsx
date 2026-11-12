@@ -21,7 +21,13 @@ const FIELDS: FieldDef[] = [
     required: true,
     options: (Object.keys(MODEL_LABELS) as ManufacturingModel[]).map((value) => ({ value, label: MODEL_LABELS[value] })),
   },
-  { name: "separateApprover", label: "Someone other than the submitter approves BOMs, recipes and routings", type: "checkbox" },
+  {
+    name: "separateApprover",
+    label: "Someone other than the submitter approves BOMs, recipes, routings and work orders",
+    type: "checkbox",
+  },
+  { name: "workOrderRequiresBom", label: "Releasing a work order needs an approved BOM or recipe", type: "checkbox" },
+  { name: "workOrderRequiresRouting", label: "Releasing a work order needs an approved routing", type: "checkbox" },
 ];
 
 export default function ManufacturingSettingsPage() {
@@ -40,6 +46,8 @@ export default function ManufacturingSettingsPage() {
           items={[
             ["Manufacturing model", MODEL_LABELS[data.manufacturingModel]],
             ["Separate approver", data.separateApprover ? "Required" : "The submitter may approve their own"],
+            ["Work order release needs a BOM or recipe", data.workOrderRequiresBom ? "Yes" : "No"],
+            ["Work order release needs a routing", data.workOrderRequiresRouting ? "Yes" : "No"],
           ]}
         />
         <p className="mt-3 text-sm text-muted-foreground">

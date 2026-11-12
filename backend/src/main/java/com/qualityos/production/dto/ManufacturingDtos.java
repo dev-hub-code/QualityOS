@@ -25,10 +25,19 @@ public final class ManufacturingDtos {
 
     // Settings
 
-    public record SettingsResponse(ManufacturingModel manufacturingModel, boolean separateApprover) {
+    public record SettingsResponse(
+            ManufacturingModel manufacturingModel,
+            boolean separateApprover,
+            boolean workOrderRequiresBom,
+            boolean workOrderRequiresRouting) {
     }
 
-    public record UpdateSettingsRequest(@NotNull ManufacturingModel manufacturingModel, @NotNull Boolean separateApprover) {
+    /** The work-order rules are optional: left out, they stay as they are. */
+    public record UpdateSettingsRequest(
+            @NotNull ManufacturingModel manufacturingModel,
+            @NotNull Boolean separateApprover,
+            Boolean workOrderRequiresBom,
+            Boolean workOrderRequiresRouting) {
     }
 
     /**

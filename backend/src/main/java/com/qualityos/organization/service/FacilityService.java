@@ -23,6 +23,9 @@ import com.qualityos.organization.repository.FacilityRepository;
 import com.qualityos.organization.repository.ProductionLineRepository;
 import com.qualityos.organization.repository.ShiftRepository;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -169,6 +172,26 @@ public class FacilityService {
         if (load(id).getArchivedAt() != null) {
             throw new BusinessRuleException("This facility is archived.");
         }
+    }
+
+    /** For other modules placing work on a line: it must be active and belong to the facility. */
+    @Transactional(readOnly = true)
+    public void requireActiveLine(UUID facilityId, UUID lineId) {
+        ProductionLine line = lines.findById(lineId)
+                .filter(found -> found.getFacilityId().equals(facilityId))
+                .orElseThrow(() -> new BusinessRuleException("This production line is not part of the facility."));
+        if (line.getArchivedAt() != null) {
+            throw new BusinessRuleException("This production line is archived.");
+        }
+    }
+
+    /** Codes of facilities and production lines, by id, for other modules to show. */
+    @Transactional(readOnly = true)
+    public Map<UUID, String> codes(Collection<UUID> ids) {
+        Map<UUID, String> codes = new HashMap<>();
+        facilities.findAllById(ids).forEach(facility -> codes.put(facility.getId(), facility.getCode()));
+        lines.findAllById(ids).forEach(line -> codes.put(line.getId(), line.getCode()));
+        return codes;
     }
 
     private Facility load(UUID id) {

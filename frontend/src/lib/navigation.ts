@@ -1,3 +1,5 @@
+import { usesKind } from "@/lib/manufacturing";
+import type { ManufacturingModel } from "@/lib/types";
 import {
   Banknote,
   BookOpen,
@@ -11,6 +13,10 @@ import {
   ClipboardX,
   CreditCard,
   Factory,
+  FlaskConical,
+  Cog,
+  Layers,
+  Route,
   FileChartColumn,
   FileCog,
   FilePen,
@@ -55,6 +61,10 @@ export interface NavItem {
   icon: LucideIcon;
   /** Shown when the user holds any of these; omit for everyone. */
   anyPermission?: string[];
+  /** Items of a group sit together under its heading. */
+  group?: string;
+  /** Shown only when the organisation's manufacturing model uses this kind of definition. */
+  definition?: "BOM" | "RECIPE";
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -81,6 +91,12 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Analytics", href: "/analytics", icon: ChartColumn, anyPermission: ["REPORT_VIEW"] },
   { label: "Reports", href: "/reports", icon: FileChartColumn, anyPermission: ["REPORT_VIEW"] },
   { label: "Corrections", href: "/material-corrections", icon: FilePen, anyPermission: ["TRACEABILITY_VIEW"] },
+  { label: "Work centres", href: "/manufacturing/work-centers", icon: Factory, anyPermission: ["MANUFACTURING_VIEW"], group: "Manufacturing" },
+  { label: "Machines", href: "/manufacturing/machines", icon: Cog, anyPermission: ["MANUFACTURING_VIEW"], group: "Manufacturing" },
+  { label: "BOMs", href: "/manufacturing/boms", icon: Layers, anyPermission: ["MANUFACTURING_VIEW"], group: "Manufacturing", definition: "BOM" },
+  { label: "Recipes", href: "/manufacturing/recipes", icon: FlaskConical, anyPermission: ["MANUFACTURING_VIEW"], group: "Manufacturing", definition: "RECIPE" },
+  { label: "Routings", href: "/manufacturing/routings", icon: Route, anyPermission: ["MANUFACTURING_VIEW"], group: "Manufacturing" },
+  { label: "Configuration", href: "/manufacturing/settings", icon: SlidersHorizontal, anyPermission: ["MANUFACTURING_VIEW"], group: "Manufacturing" },
   { label: "Categories", href: "/categories", icon: Tags, anyPermission: ["SUPPLIER_VIEW", "PRODUCT_VIEW", "NCR_VIEW"] },
   { label: "Facilities", href: "/facilities", icon: Factory, anyPermission: ["FACILITY_VIEW"] },
   { label: "Users", href: "/users", icon: Users, anyPermission: ["USER_MANAGE"] },
@@ -151,6 +167,11 @@ export function visibleNavItems(permissions: readonly string[], items = NAV_ITEM
   return items.filter(
     (item) => !item.anyPermission || item.anyPermission.some((p) => permissions.includes(p)),
   );
+}
+
+/** Drops BOMs or recipes when the organisation's manufacturing model does not use them. */
+export function forManufacturingModel(items: NavItem[], model: ManufacturingModel | undefined): NavItem[] {
+  return items.filter((item) => !item.definition || usesKind(model, item.definition));
 }
 
 /** The one link to highlight: the longest href that the path is, or sits under. */

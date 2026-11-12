@@ -315,3 +315,30 @@ was made from. `POST /dispatches` with a held batch returns `422 RECALL_HOLD`, n
 `403`. The dispatch is audited as `RECALL_HOLD_OVERRIDDEN` with the recalls and the reason, and its customer is added to
 each recall's contact list in the same transaction. Closing the recall releases the hold.
 
+
+## Manufacturing
+
+All under `/api/v1/manufacturing`. Reading needs `MANUFACTURING_VIEW`. The `MANUFACTURING` plan feature carries
+every permission below; after a downgrade only `MANUFACTURING_VIEW` stays. See [MANUFACTURING.md](MANUFACTURING.md).
+
+| Method and path | Also needs | Purpose |
+|---|---|---|
+| `GET /settings`, `PUT /settings` | `PUT`: `MANUFACTURING_MANAGE` | `manufacturingModel` (DISCRETE, PROCESS, HYBRID) and `separateApprover`. A model that products still use cannot be dropped |
+| `GET /products/{productId}/settings`, `PUT ...` | `PUT`: `MANUFACTURING_MANAGE` | How one product is made. `manufacturingModel` is null while a hybrid organisation has not chosen |
+| `GET /work-centers`, `POST /work-centers` | `POST`: `MANUFACTURING_MANAGE` | Filter by `q`, `facilityId`. Limited members see their facilities only |
+| `GET /work-centers/{id}`, `PUT ...`, `DELETE ...` | `MANUFACTURING_MANAGE` to change | Detail with machines. `DELETE` archives, and is refused while a machine is not inactive |
+| `GET /machines`, `POST /machines` | `POST`: `MANUFACTURING_MANAGE` | Filter by `q`, `workCenterId`, `status` |
+| `GET /machines/{id}`, `PUT ...` | `PUT`: `MANUFACTURING_MANAGE` | Detail with the last 100 status changes |
+| `POST /machines/{id}/status` | `MANUFACTURING_MANAGE` | `status` and `reason`. Only allowed transitions; a reason for maintenance, breakdown and inactive |
+| `GET /boms`, `POST /boms` | `POST`: `BOM_MANAGE` | Filter by `q` (product), `productId`, `status`. `POST` takes `productId`, `changeNote`, `baseQuantity`, and `copyFromId` or `fromProductMaterials` |
+| `GET /boms/{id}`, `PUT ...`, `DELETE ...` | `BOM_MANAGE` to change | `DELETE` discards a draft that was never submitted |
+| `POST /boms/{id}/lines`, `PUT .../lines/{lineId}`, `DELETE ...` | `BOM_MANAGE` | One of `materialId` or `componentProductId`, `quantity`, `uomId`, `scrapPercent`, `scales`, `notes`. Draft only |
+| `POST /boms/{id}/submit` | `BOM_MANAGE` | Needs at least one line |
+| `POST /boms/{id}/send-back`, `/approve`, `/retire` | `BOM_APPROVE` | `approve` takes optional `effectiveFrom` (today or later) and `note` |
+| `GET /boms/{id}/explosion?quantity=&on=` | | Every level, in each component's unit, with scrap, and leaf totals |
+| `/recipes/...` | `RECIPE_MANAGE`, `RECIPE_APPROVE` | As `/boms`, plus `POST`/`DELETE /recipes/{id}/parameters` and `GET /recipes/{id}/scaled?batchSize=` |
+| `/routings/...` | `ROUTING_MANAGE`, `ROUTING_APPROVE` | As `/boms` without lines, with `POST`/`PUT`/`DELETE /routings/{id}/operations[/{operationId}]` and `.../operations/{operationId}/parameters` |
+
+Refusals are `422` with a message: a BOM for a process product, a circular structure, a unit that does not convert, a
+change to anything that is not a draft, approval by the submitter under `separateApprover`, or an effective date before
+today or before the current revision's. A second revision in progress for the same product is `409`.

@@ -179,6 +179,16 @@ public class ProductService implements AttachmentPolicy {
         productMaterials.delete(mapping);
     }
 
+    /** For other modules starting new work on a product. */
+    @Transactional(readOnly = true)
+    public ProductReference requireActive(UUID id) {
+        Product product = load(id);
+        if (product.getArchivedAt() != null) {
+            throw new BusinessRuleException("Product %s is archived.".formatted(product.getCode()));
+        }
+        return new ProductReference(product.getId(), product.getCode(), product.getName(), product.getUomId());
+    }
+
     @Transactional(readOnly = true)
     public void requireExists(UUID id) {
         load(id);

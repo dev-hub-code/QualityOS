@@ -24,6 +24,7 @@ class EndpointAuthorizationIT extends AbstractIntegrationTest {
             "POST /api/v1/auth/invitations/accept",
             "POST /api/v1/auth/invitations/preview",
             "POST /api/v1/auth/login",
+            "POST /api/v1/auth/login/second-factor",
             "POST /api/v1/auth/logout",
             "POST /api/v1/auth/password-reset/confirm",
             "POST /api/v1/auth/password-reset/request",

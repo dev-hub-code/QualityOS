@@ -17,6 +17,7 @@ import com.qualityos.identity.dto.AuthDtos.RefreshRequest;
 import com.qualityos.identity.dto.AuthDtos.RegisterRequest;
 import com.qualityos.identity.dto.AuthDtos.RegistrationPending;
 import com.qualityos.identity.dto.AuthDtos.ResendVerificationRequest;
+import com.qualityos.identity.dto.AuthDtos.SecondFactorLoginRequest;
 import com.qualityos.identity.dto.AuthDtos.SwitchTenantRequest;
 import com.qualityos.identity.dto.AuthDtos.TokenResponse;
 import com.qualityos.identity.dto.AuthDtos.VerificationStatus;
@@ -63,9 +64,17 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<?>> login(@Valid @RequestBody LoginRequest request) {
         AuthService.LoginResult result = auth.login(request);
-        return result.session() != null
-                ? ResponseEntity.ok(ApiResponse.ok(result.session()))
-                : ResponseEntity.accepted().body(ApiResponse.ok(result.pending()));
+        if (result.session() != null) {
+            return ResponseEntity.ok(ApiResponse.ok(result.session()));
+        }
+        return ResponseEntity.accepted()
+                .body(ApiResponse.ok(result.pending() != null ? result.pending() : result.challenge()));
+    }
+
+    /** Finishes an operator's sign-in with the code from their authenticator app. */
+    @PostMapping("/login/second-factor")
+    public ApiResponse<TokenResponse> completeSecondFactor(@Valid @RequestBody SecondFactorLoginRequest request) {
+        return ApiResponse.ok(auth.completeSecondFactor(request.challengeToken(), request.code()));
     }
 
     @PostMapping("/refresh")

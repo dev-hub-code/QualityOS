@@ -15,8 +15,6 @@ A page joins the navigation only once it works.
 
 Not built yet:
 
-- Two-factor sign-in for operators. Sensitive actions ask for the password again (see Re-authentication), but nothing
-  beyond the password protects an operator account.
 - Refunds. A refund is made in Cashfree or the bank, and nothing in ProductionOS records it.
 - Partial payments and automatic renewal. Each invoice is paid in full, and each renewal is a new invoice.
 - Tickets raised by customers. Operators open support tickets on a customer's behalf.
@@ -34,6 +32,20 @@ Search the audit log for `PAYMENT_NEEDS_REVIEW`. It means money was taken but co
 invoice was replaced or already paid. Refund it in Cashfree, or record it by hand against the right invoice.
 
 ## Signing in
+
+An operator signs in with their password and then a six-digit code from an authenticator app on their phone. The
+first time an operator opens the Control Center, it shows nothing else until the app is set up: they scan a code
+(or type a key) and enter the code the app shows. From then on every sign-in asks for a code. A wrong code counts
+towards the same lockout as a wrong password, and a code works once. Anyone who is not an operator signs in with
+their password alone.
+
+The secret behind the codes is sealed in the database with `SECOND_FACTOR_KEY`, 32 random bytes in base64
+(`openssl rand -base64 32`). The local profile has a fixed key so that enrolments survive a restart; production
+does not start without one. Losing the key ends every enrolment: each operator sets up their app again.
+
+For a lost phone, a Super Admin opens Operators and resets that operator's authenticator, with a reason. The
+operator is told by email, and sets up a new app on their next visit. Setting up and resetting are both in the
+audit log, and the operator is emailed each time, so an app set up by somebody else does not go unnoticed.
 
 Every sign-in goes through `/start`. An operator lands on the Control Center and anyone else on their organisation's
 dashboard. This only picks the page; the backend refuses platform requests on its own. **Back to workspace** still takes
@@ -58,9 +70,13 @@ DELETE FROM subscriptions WHERE tenant_id = (
     SELECT m.tenant_id FROM tenant_memberships m JOIN users u ON u.id = m.user_id WHERE u.email = 'someone@example.com');
 ```
 
+The first operator is asked to set up an authenticator app the first time they open the Control Center.
+
 The same statement is the recovery process if no Super Admin can sign in. The application refuses to remove or demote
 the last active Super Admin, so this only arises when that account is lost. For a deactivated row, run
-`UPDATE platform_admins SET deactivated_at = NULL, role = 'SUPER_ADMIN' WHERE user_id = ...` instead.
+`UPDATE platform_admins SET deactivated_at = NULL, role = 'SUPER_ADMIN' WHERE user_id = ...` instead. If the last
+Super Admin has lost their phone, `DELETE FROM platform_second_factors WHERE user_id = ...` lets them set up a new
+app on their next visit.
 
 ## Operator roles
 
@@ -100,6 +116,8 @@ or bank details are replaced with `[hidden]` when shown or exported, and each ex
 - Anything about one organisation is read under that organisation's own tenant context. Row-level security stays on.
 - The organisation page shows counts and event names, not the content of quality records.
 - Sensitive actions need the password again, and each operator has a role. See Re-authentication and Operator roles.
+- Operators sign in with an authenticator code as well as their password, and the Control Center is closed to an
+  operator who has not set one up. See Signing in.
 
 ## Plans
 

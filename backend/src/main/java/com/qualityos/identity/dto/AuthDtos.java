@@ -3,6 +3,7 @@ package com.qualityos.identity.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.Set;
@@ -122,6 +123,25 @@ public final class AuthDtos {
      * verification. It comes with no refresh token, and registration never issues one, because that would show
      * whether an address was already taken.
      */
+    /** The password was right, and an operator's authenticator code is still to come. Carries no session. */
+    public record SecondFactorChallenge(String challengeToken, long expiresInSeconds, boolean secondFactorRequired) {
+
+        @Override
+        public String toString() {
+            return "SecondFactorChallenge[]";
+        }
+    }
+
+    public record SecondFactorLoginRequest(
+            @NotBlank @Size(max = 4096) String challengeToken,
+            @NotBlank @Pattern(regexp = "[0-9]{6}", message = "Enter the six-digit code.") String code) {
+
+        @Override
+        public String toString() {
+            return "SecondFactorLoginRequest[]";
+        }
+    }
+
     public record PendingVerificationSession(String accessToken, long expiresInSeconds, boolean verificationRequired) {
 
         @Override

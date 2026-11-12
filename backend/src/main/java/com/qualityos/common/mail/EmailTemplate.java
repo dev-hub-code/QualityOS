@@ -7,6 +7,8 @@ public enum EmailTemplate {
     PASSWORD_RESET("auth/password-reset"),
     PASSWORD_CHANGED("auth/password-changed"),
     SECURITY_ALERT("auth/security-alert"),
+    SECOND_FACTOR_ENROLLED("auth/second-factor-enrolled"),
+    SECOND_FACTOR_RESET("auth/second-factor-reset"),
     INVITATION("auth/invitation"),
     INSPECTION_ASSIGNMENT("inspection/assignment"),
     INSPECTION_FAILED("inspection/failed"),

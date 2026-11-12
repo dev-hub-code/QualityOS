@@ -23,6 +23,9 @@ public class TenantJwtAuthenticationConverter implements Converter<Jwt, Abstract
     /** Marks a token that proves a password for an account still waiting to confirm its email address. */
     public static final String PENDING_VERIFICATION_CLAIM = "pev";
 
+    /** Marks a token that proves an operator's password while their authenticator code is still to come. */
+    public static final String SECOND_FACTOR_CLAIM = "sfc";
+
     /** Held by every token that belongs to an organisation. Permissions are additional to this. */
     public static final String MEMBER = "ORGANIZATION_MEMBER";
     public static final String PENDING_VERIFICATION = "PENDING_VERIFICATION";
@@ -35,6 +38,9 @@ public class TenantJwtAuthenticationConverter implements Converter<Jwt, Abstract
 
     @Override
     public AbstractAuthenticationToken convert(Jwt jwt) {
+        if (Boolean.TRUE.equals(jwt.getClaimAsBoolean(SECOND_FACTOR_CLAIM))) {
+            throw new InvalidBearerTokenException("Sign-in is not complete");
+        }
         UUID userId = UUID.fromString(jwt.getSubject());
         String tenant = jwt.getClaimAsString(TENANT_CLAIM);
         if (tenant == null) {

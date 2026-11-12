@@ -16,3 +16,6 @@ qualityos:
     jwt:
       # Generates a throwaway key pair at startup, so local logins end when the backend restarts.
       allow-ephemeral-keys: true
+    second-factor:
+      # A fixed local key, so that authenticator enrolments survive a restart. The browser tests rely on it.
+      key: ${SECOND_FACTOR_KEY:bG9jYWwtZGV2LXNlY29uZC1mYWN0b3Ita2V5LTAwMDE=}

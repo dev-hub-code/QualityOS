@@ -1,14 +1,31 @@
 import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { apiCaller, PASSWORD, signUp, unique } from "./helpers";
+import { fromBase32, sealedForSql, TEST_SECRET, totp } from "./second-factor";
 
-/** Being a platform administrator can only be granted in the database, on purpose. */
-function makePlatformAdmin(email: string, recentlyConfirmed = true) {
-  execFileSync("docker", [
-    "compose", "exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "qualityos", "-c",
+/**
+ * Being a platform administrator can only be granted in the database, on purpose. The operator gets an
+ * authenticator app already set up, unless a test wants to watch that happen.
+ */
+function makePlatformAdmin(email: string, recentlyConfirmed = true, enrolled = true) {
+  const statements = [
     `INSERT INTO platform_admins (user_id, reauthenticated_until) SELECT id, ${recentlyConfirmed ? "now() + INTERVAL '1 hour'" : "NULL"} FROM users WHERE email = '${email}'`,
+  ];
+  if (enrolled) {
+    statements.push(
+      `INSERT INTO platform_second_factors (user_id, secret, confirmed_at) SELECT id, ${sealedForSql(TEST_SECRET)}, now() FROM users WHERE email = '${email}'`,
+    );
+  }
+  execFileSync("docker", [
+    "compose", "exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "qualityos", "-c", statements.join("; "),
   ]);
+}
+
+/** The second step of an operator's sign-in, with the code the test's authenticator would show. */
+async function enterSecondFactor(page: Page, secret = TEST_SECRET) {
+  await page.getByLabel("Six-digit code").fill(totp(secret));
+  await page.getByRole("button", { name: "Continue" }).click();
 }
 
 test("an owner chooses a plan, a platform admin records the payment, and the plan starts", async ({ page, browser }) => {
@@ -72,6 +89,12 @@ test("signing in opens the Control Center for an operator and the organisation f
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
+  // The password alone opens nothing for an operator: the authenticator code comes next.
+  await expect(page.getByRole("heading", { name: "Enter your authenticator code" })).toBeVisible();
+  await page.getByLabel("Six-digit code").fill("000000");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "code is not right" })).toBeVisible();
+  await enterSecondFactor(page);
   await expect(page).toHaveURL(/\/platform\/dashboard/);
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 
@@ -90,6 +113,31 @@ test("signing in opens the Control Center for an operator and the organisation f
   await owner.getByRole("button", { name: "Sign in" }).click();
   await expect(owner).toHaveURL(/\/dashboard$/);
   await context.close();
+});
+
+test("a new operator sets up an authenticator before the Control Center opens, and can be reset", async ({ page }) => {
+  const email = `admin-${unique()}@example.com`;
+  await signUp(page, email);
+  makePlatformAdmin(email, true, false);
+
+  await page.goto("/platform/dashboard");
+  await expect(page.getByRole("heading", { name: "Set up your authenticator app" })).toBeVisible();
+  await page.getByRole("button", { name: "Show the code to scan" }).click();
+  await expect(page.getByRole("img", { name: "Code for your authenticator app" })).toBeVisible();
+  const key = (await page.getByTestId("second-factor-secret").textContent()) ?? "";
+  await page.getByLabel("Six-digit code from the app").fill("000000");
+  await page.getByRole("button", { name: "Confirm" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "code is not right" })).toBeVisible();
+  await page.getByLabel("Six-digit code from the app").fill(totp(fromBase32(key)));
+  await page.getByRole("button", { name: "Confirm" }).click();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+
+  await page.goto("/platform/operators");
+  await expect(page.getByRole("row", { name: email })).toContainText("Set up");
+  await page.getByRole("row", { name: email }).getByRole("button", { name: "Reset authenticator" }).click();
+  await page.getByLabel("Reason").fill("Lost phone");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("heading", { name: "Set up your authenticator app" })).toBeVisible();
 });
 
 test("an open invoice offers online payment only when a gateway is set up", async ({ page }) => {

@@ -1389,6 +1389,17 @@ export interface PlatformOperator {
   deactivatedAt: string | null;
   addedBy: string | null;
   lastActivity: string | null;
+  /** Whether the operator has an authenticator app: without one, the Control Center is closed to them. */
+  secondFactor: "NONE" | "PENDING" | "ENROLLED";
+}
+
+export interface SecondFactorState {
+  state: "NONE" | "PENDING" | "ENROLLED";
+}
+
+export interface SecondFactorEnrolment {
+  secret: string;
+  otpauthUri: string;
 }
 
 export interface PlatformAuditEntry {

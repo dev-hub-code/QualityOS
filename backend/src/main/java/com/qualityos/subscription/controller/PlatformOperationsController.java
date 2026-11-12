@@ -11,6 +11,7 @@ import com.qualityos.subscription.dto.PlatformOperationsDtos.EmailList;
 import com.qualityos.subscription.dto.PlatformOperationsDtos.NotificationList;
 import com.qualityos.subscription.dto.PlatformOperationsDtos.Operator;
 import com.qualityos.subscription.dto.PlatformOperationsDtos.ReauthenticateRequest;
+import com.qualityos.subscription.dto.PlatformOperationsDtos.ResetSecondFactorRequest;
 import com.qualityos.subscription.dto.PlatformOperationsDtos.RetryEmailRequest;
 import com.qualityos.subscription.service.PlatformOperations;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -75,6 +76,13 @@ class PlatformOperationsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void changeOperator(@PathVariable UUID userId, @Valid @RequestBody ChangeOperatorRequest request) {
         operations.change(userId, request);
+    }
+
+    @PostMapping("/operators/{userId}/second-factor/reset")
+    @PreAuthorize(Require.PLATFORM_OPERATOR_MANAGE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetSecondFactor(@PathVariable UUID userId, @Valid @RequestBody ResetSecondFactorRequest request) {
+        operations.resetSecondFactor(userId, request.reason());
     }
 
     @GetMapping("/audit-logs")

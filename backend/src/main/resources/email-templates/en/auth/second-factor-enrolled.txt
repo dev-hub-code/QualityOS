@@ -1,0 +1,9 @@
+Subject: An authenticator app was added to your ProductionOS account
+
+An authenticator app was added
+
+Hello {{recipientName}},
+An authenticator app was just set up for signing in to the ProductionOS Control Center with your account. From now on, signing in asks for a code from it.
+If this was not you, change your password now and tell another Super Admin.
+
+Sign in: {{actionUrl}}

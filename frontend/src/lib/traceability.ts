@@ -13,10 +13,14 @@ export function inspectionTypeFor(batch: Pick<ProductionBatch, "status" | "produ
   return null;
 }
 
-/** The consume dialog offers lots and batches in one list, so each option carries its kind. */
-export function toConsumeRequest(source: string, quantity: string) {
+/**
+ * The consume dialog offers lots and batches in one list, so each option carries its kind. Without a unit, the
+ * quantity is in the lot's or batch's own.
+ */
+export function toConsumeRequest(source: string, quantity: string, uomId?: string) {
   const [kind, id] = source.split(":");
-  return kind === "lot" ? { receiptItemId: id, quantity } : { parentBatchId: id, quantity };
+  const unit = uomId ? { uomId } : {};
+  return kind === "lot" ? { receiptItemId: id, quantity, ...unit } : { parentBatchId: id, quantity, ...unit };
 }
 
 /** The dispatch form numbers its lines: productionBatchId1, quantity1, serials1, and so on. */

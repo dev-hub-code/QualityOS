@@ -25,6 +25,8 @@ describe("toConsumeRequest", () => {
   it("names the right source", () => {
     expect(toConsumeRequest("lot:1", "2")).toEqual({ receiptItemId: "1", quantity: "2" });
     expect(toConsumeRequest("batch:9", "2")).toEqual({ parentBatchId: "9", quantity: "2" });
+    expect(toConsumeRequest("lot:1", "2500", "")).toEqual({ receiptItemId: "1", quantity: "2500" });
+    expect(toConsumeRequest("lot:1", "2500", "g")).toEqual({ receiptItemId: "1", quantity: "2500", uomId: "g" });
   });
 });
 

@@ -24,7 +24,11 @@ class ReportingIT extends TraceabilityFixture {
     private String iqcTemplate;
 
     private String decideLot(String quantity, String value, String disposition) throws Exception {
-        Lot lot = lot(material(owner, true), quantity);
+        return decideLot(quantity, "KG", value, disposition);
+    }
+
+    private String decideLot(String quantity, String unit, String value, String disposition) throws Exception {
+        Lot lot = lot(material(owner, true, unit), quantity);
         if (iqcTemplate == null) {
             iqcTemplate = template("IQC");
         }
@@ -84,6 +88,22 @@ class ReportingIT extends TraceabilityFixture {
                 .andExpect(jsonPath("$.data.inspectionTrend[0].passed").value(1))
                 .andExpect(jsonPath("$.data.inspectionTrend[0].failed").value(1))
                 .andExpect(jsonPath("$.data.inspectionTrend[0].rejectedLots").value(1));
+    }
+
+    @Test
+    void materialRejectionConvertsUnitsAndNeverAddsKilogramsToPieces() throws Exception {
+        decideLot("10", "KG", "20.0", "ACCEPT");
+        decideLot("30000", "GM", "25.0", "REJECT");
+        decideLot("5", "PCS", "20.0", "ACCEPT");
+
+        // Mass: 30 of 40 kg rejected, 75%, over two lots. Count: none of 5 pieces, over one. Weighed by lots, 50%.
+        as(owner, get(OVERVIEW)).andExpect(jsonPath("$.data.kpis.materialRejectionRate").value(50.0));
+        List<List<String>> rows = JsonPath.read(body(as(owner, get("/api/v1/reports/material-rejection"))),
+                "$.data.rows");
+        assertThat(rows).extracting(row -> row.get(2)).containsExactlyInAnyOrder("KG", "GM", "PCS");
+        assertThat(rows).filteredOn(row -> row.get(2).equals("GM"))
+                .extracting(row -> row.get(4) + " " + row.get(5) + " " + row.get(6))
+                .containsExactly("30000 30000 100.0");
     }
 
     @Test

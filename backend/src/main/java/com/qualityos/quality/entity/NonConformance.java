@@ -61,6 +61,7 @@ public class NonConformance extends TenantOwnedEntity {
     private String title;
     private String description;
     private BigDecimal rejectedQuantity;
+    private UUID rejectedUomId;
     private UUID assignedTo;
     private String containmentAction;
     private String rootCause;
@@ -103,6 +104,12 @@ public class NonConformance extends TenantOwnedEntity {
         this.title = title;
         this.description = description;
         this.rejectedQuantity = rejectedQuantity;
+    }
+
+    /** Names the unit of the rejected quantity. Without a quantity there is nothing to measure. */
+    public NonConformance rejectedIn(UUID uomId) {
+        this.rejectedUomId = rejectedQuantity == null ? null : uomId;
+        return this;
     }
 
     /** Moves a new NCR into investigation. Reassigning later does not change the status. */

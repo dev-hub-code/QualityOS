@@ -174,18 +174,28 @@ public class MaterialReceiptService implements AttachmentPolicy {
                 materials.references(Set.of(item.getMaterialId())).get(item.getMaterialId()));
     }
 
-    /** Claims a batch for inspection. The item's version stops this racing with a void. */
+    /** Takes stock from a lot for production, in the lot's unit. The lot is locked while it does. */
     @Transactional(propagation = Propagation.MANDATORY)
-    public LotView consume(UUID itemId, BigDecimal quantity) {
+    public void consume(UUID itemId, BigDecimal quantity) {
+        consume(itemId, unit -> quantity);
+    }
+
+    /**
+     * @param inLotUnit turns the lot's unit into the quantity to take, once the lot is known to be reachable
+     * @return the quantity taken, in the lot's unit
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public BigDecimal consume(UUID itemId, java.util.function.Function<UUID, BigDecimal> inLotUnit) {
         MaterialReceiptItem item = items.findForUpdate(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Batch", itemId));
         scope.requireAllowed(item.getReceipt().getFacilityId(), "Batch", itemId.toString());
         if (item.getReceipt().getStatus() == MaterialReceipt.Status.VOIDED) {
             throw new BusinessRuleException("This receipt was voided.");
         }
+        BigDecimal quantity = inLotUnit.apply(item.getUomId());
         item.consume(quantity);
         items.flush();
-        return lots(List.of(item)).getFirst();
+        return quantity;
     }
 
     @Transactional
@@ -281,6 +291,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
                     item.getInternalBatch(),
                     item.getQuantity(),
                     item.remainingQuantity(),
+                    item.getUomId(),
                     item.getInspectionStatus().name(),
                     item.getDisposition(),
                     item.isReleased());

@@ -53,7 +53,8 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A single inspection's report is a printable page, not a generated PDF. The inspection report across a period is one | When a user needs it |
 | A template can only be chosen by hand; none is picked automatically for a material | When a user needs it |
 | Production batches take IPQC and FQC inspections only. OQC and the other template types have no production flow | When a user needs it |
-| A template cannot yet be limited to a product in the UI, and quantities consumed are not converted between units | When a user needs it |
+| A template cannot yet be limited to a product in the UI | When a user needs it |
+| Material used can be entered in any unit of the same kind as its lot or batch, and is converted to that unit. The dialog lists every unit and the server refuses one that does not convert. A correction of material used is still entered in the source's own unit. Units are added through the API alone, as before | When a user needs it |
 | A customer who returned everything still shows as having received the batch. This is deliberate: a recall should reach them | By design |
 | The return screen takes one line at a time, though the API takes several. Credit notes and refunds are separate and not built | When a user needs it |
 | Search covers lots, batches, products and serial numbers, not NCRs, CAPAs or suppliers. Serial search reports where a unit is now; earlier customers are on its detail page | When a user needs it |
@@ -78,7 +79,8 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Dashboard figures are kept for 60 seconds per organisation, period and facility scope. Anything written to the audit log clears them at once on the same instance. Other changes, and changes on another instance, show within 60 seconds | With production work: use a shared cache if the figures must agree across instances |
 | A report stops at 5,000 rows and says so, so a larger period must be split | When a user needs it |
 | Key figures and charts show to anyone with `REPORT_VIEW`, as totals, even without the view permission for each kind of record. Lists and reports need that permission too | Review after real use |
-| Material rejection adds quantities as recorded, without converting units | When a user needs it |
+| The material rejection rate converts quantities to the base unit of their kind. Kinds that cannot be added together, such as kilograms and pieces, each get a rate, and the figure weighs those rates by their lots. The material rejection report shows each material in its own unit | Review after real use |
+| NCRs raised before unit conversion keep their rejected quantity without a unit | By design |
 | Cashfree checkout is built but has not been run against Cashfree's sandbox. Its calls were tested against a local stand-in | Before enabling live keys |
 | No refund flow exists. A refund is made in the Cashfree dashboard and is not recorded here | When a user needs it |
 | A payment that cannot be applied, such as one for a replaced invoice, shows only in the audit log as `PAYMENT_NEEDS_REVIEW`. A person must refund it or apply it by hand | Before customer launch |

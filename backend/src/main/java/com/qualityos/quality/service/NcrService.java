@@ -198,7 +198,7 @@ public class NcrService implements AttachmentPolicy {
                 request.severity(),
                 request.title().trim(),
                 request.description().trim(),
-                request.rejectedQuantity())));
+                request.rejectedQuantity()).rejectedIn(rejectedUnit(request))));
     }
 
     /** Joins the disposition's transaction, so a failure cannot be recorded without its NCR. Repeats do nothing. */
@@ -218,7 +218,7 @@ public class NcrService implements AttachmentPolicy {
                 failure.critical() ? NonConformance.Severity.CRITICAL : NonConformance.Severity.MAJOR,
                 "Inspection " + failure.inspectionNumber() + " failed",
                 failure.description(),
-                failure.rejectedQuantity()));
+                failure.rejectedQuantity()).rejectedIn(failure.rejectedUomId()));
     }
 
     /** Joins the finding's transaction, so a finding cannot exist without its NCR. Repeats return the same NCR. */
@@ -459,6 +459,18 @@ public class NcrService implements AttachmentPolicy {
         }
     }
 
+    private UUID rejectedUnit(CreateNcrRequest request) {
+        if (request.rejectedQuantity() == null) {
+            return null;
+        }
+        if (request.rejectedUomId() != null) {
+            materials.requireUnit(request.rejectedUomId());
+            return request.rejectedUomId();
+        }
+        return request.materialId() == null ? null
+                : materials.references(Set.of(request.materialId())).get(request.materialId()).uomId();
+    }
+
     private void requireCategory(UUID id) {
         categories.findById(id)
                 .filter(category -> category.getArchivedAt() == null)
@@ -524,6 +536,7 @@ public class NcrService implements AttachmentPolicy {
                 ncr.getDefectCategoryId(),
                 category.map(DefectCategory::getName).orElse(null),
                 ncr.getRejectedQuantity(),
+                ncr.getRejectedUomId(),
                 ncr.getAssignedTo(),
                 members.get(ncr.getAssignedTo()),
                 ncr.getContainmentAction(),

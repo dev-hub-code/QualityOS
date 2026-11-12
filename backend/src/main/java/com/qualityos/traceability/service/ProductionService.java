@@ -8,6 +8,7 @@ import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
+import com.qualityos.material.service.MaterialService;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.LotView;
 import com.qualityos.materialreceipt.service.MaterialReceiptService;
 import com.qualityos.organization.service.FacilityService;
@@ -74,6 +75,7 @@ public class ProductionService {
     private final TraceCorrectionRepository corrections;
     private final MaterialReceiptService receipts;
     private final ProductService products;
+    private final MaterialService materials;
     private final FacilityService facilities;
     private final DocumentNumberService numbers;
     private final AuditService audit;
@@ -87,6 +89,7 @@ public class ProductionService {
             TraceCorrectionRepository corrections,
             MaterialReceiptService receipts,
             ProductService products,
+            MaterialService materials,
             FacilityService facilities,
             DocumentNumberService numbers,
             AuditService audit,
@@ -99,6 +102,7 @@ public class ProductionService {
         this.corrections = corrections;
         this.receipts = receipts;
         this.products = products;
+        this.materials = materials;
         this.facilities = facilities;
         this.numbers = numbers;
         this.audit = audit;
@@ -156,7 +160,10 @@ public class ProductionService {
         return detail(batch.getId());
     }
 
-    /** Locks the source, so that two batches drawing on the same lot cannot both take its last kilogram. */
+    /**
+     * Locks the source, so that two batches drawing on the same lot cannot both take its last kilogram. A quantity
+     * in another unit is converted to the source's own, and what was typed is kept beside it.
+     */
     @Transactional
     public BatchDetail consume(UUID id, ConsumeRequest request) {
         if ((request.receiptItemId() == null) == (request.parentBatchId() == null)) {
@@ -164,18 +171,35 @@ public class ProductionService {
         }
         ProductionBatch batch = lock(id);
         batch.requireInProgress();
+        BigDecimal quantity;
         if (request.receiptItemId() != null) {
-            receipts.consume(request.receiptItemId(), request.quantity());
+            quantity = receipts.consume(request.receiptItemId(), unit -> inUnit(request, unit));
         } else {
             if (request.parentBatchId().equals(id)) {
                 throw new BusinessRuleException("A batch cannot consume itself.");
             }
-            lock(request.parentBatchId()).use(request.quantity());
+            ProductionBatch parent = lock(request.parentBatchId());
+            quantity = inUnit(request, unitOf(parent));
+            parent.use(quantity);
         }
-        relationships.save(new BatchRelationship(
-                request.receiptItemId(), request.parentBatchId(), id, request.quantity()));
-        audit.record("BATCH_CONSUMED", ENTITY, id, null, Map.of("quantity", request.quantity()));
+        relationships.save(new BatchRelationship(request.receiptItemId(), request.parentBatchId(), id, quantity,
+                request.uomId() == null ? null : request.quantity(), request.uomId()));
+        Map<String, Object> details = new HashMap<>(Map.of("quantity", quantity));
+        if (request.uomId() != null) {
+            details.put("enteredQuantity", request.quantity());
+            details.put("enteredUomId", request.uomId());
+        }
+        audit.record("BATCH_CONSUMED", ENTITY, id, null, details);
         return detail(id);
+    }
+
+    private BigDecimal inUnit(ConsumeRequest request, UUID sourceUnit) {
+        return request.uomId() == null ? request.quantity()
+                : materials.convert(request.quantity(), request.uomId(), sourceUnit);
+    }
+
+    private UUID unitOf(ProductionBatch batch) {
+        return products.references(Set.of(batch.getProductId())).get(batch.getProductId()).uomId();
     }
 
     /**
@@ -315,12 +339,14 @@ public class ProductionService {
             String reason = reasons.get(edge.getId());
             if (edge.getParentLotId() != null) {
                 LotView lot = lots.get(edge.getParentLotId());
-                return new Consumption(edge.getId(), lot.internalBatch(),
-                        lot.materialCode() + " – " + lot.materialName(), edge.getQuantity(), edge.getCreatedAt(), reason);
+                return new Consumption(edge.getId(), lot.internalBatch(), lot.materialCode() + " – " + lot.materialName(),
+                        edge.getQuantity(), lot.uomId(), edge.getEnteredQuantity(), edge.getEnteredUomId(),
+                        edge.getCreatedAt(), reason);
             }
             ProductionBatchView parent = parents.get(edge.getParentBatchId());
-            return new Consumption(edge.getId(), parent.batchNumber(),
-                    parent.productCode() + " – " + parent.productName(), edge.getQuantity(), edge.getCreatedAt(), reason);
+            return new Consumption(edge.getId(), parent.batchNumber(), parent.productCode() + " – " + parent.productName(),
+                    edge.getQuantity(), parent.uomId(), edge.getEnteredQuantity(), edge.getEnteredUomId(),
+                    edge.getCreatedAt(), reason);
         }).toList();
     }
 
@@ -341,6 +367,7 @@ public class ProductionService {
                 batch.getProductId(),
                 product.code(),
                 product.name(),
+                product.uomId(),
                 batch.getFacilityId(),
                 batch.getStatus().name(),
                 batch.getPlannedQuantity(),

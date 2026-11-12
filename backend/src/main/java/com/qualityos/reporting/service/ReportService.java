@@ -139,20 +139,27 @@ public class ReportService {
                             scope.facility(AnalyticsService.NCR_FACILITY)),
                     "Lots whose receiving inspection reached a final disposition in the period.");
             case MATERIAL_REJECTION -> new Definition(
-                    List.of(text("Code", 14), text("Material", 34), number("Lots decided", 12),
+                    List.of(text("Code", 14), text("Material", 28), text("Unit", 6), number("Lots decided", 12),
                             number("Quantity inspected", 14), number("Quantity rejected", 14), number("Rejection %", 12)),
                     """
-                    SELECT m.code, m.name, count(*)::text, trim_scale(sum(i.quantity))::text,
-                           trim_scale(COALESCE(sum(i.quantity) FILTER (WHERE i.disposition = 'REJECT'), 0))::text,
+                    SELECT m.code, m.name, u.code, count(*)::text, trim_scale(round(sum(q.quantity), 6))::text,
+                           trim_scale(round(COALESCE(sum(q.quantity) FILTER (WHERE i.disposition = 'REJECT'), 0), 6))::text,
                            %s
                     FROM inspections i
                     JOIN materials m ON m.tenant_id = i.tenant_id AND m.id = i.material_id
+                    JOIN material_receipt_items r ON r.tenant_id = i.tenant_id AND r.id = i.receipt_item_id
+                    CROSS JOIN LATERAL (SELECT convert_quantity(i.quantity, r.uom_id, m.uom_id) AS converted) c
+                    CROSS JOIN LATERAL (SELECT COALESCE(c.converted, i.quantity) AS quantity,
+                                               CASE WHEN c.converted IS NULL THEN r.uom_id ELSE m.uom_id END AS uom_id) q
+                    JOIN units_of_measure u ON u.id = q.uom_id
                     WHERE %s%s
-                    GROUP BY m.code, m.name
-                    ORDER BY COALESCE(sum(i.quantity) FILTER (WHERE i.disposition = 'REJECT'), 0) / sum(i.quantity) DESC, m.code
-                    """.formatted(RATE.formatted("COALESCE(sum(i.quantity) FILTER (WHERE i.disposition = 'REJECT'), 0)",
-                            "sum(i.quantity)"), LOTS, scope.facility("i.facility_id")),
-                    "Quantities are added as recorded, so compare materials in the same unit.");
+                    GROUP BY m.code, m.name, u.code
+                    ORDER BY COALESCE(sum(q.quantity) FILTER (WHERE i.disposition = 'REJECT'), 0) / sum(q.quantity) DESC,
+                             m.code, u.code
+                    """.formatted(RATE.formatted("COALESCE(sum(q.quantity) FILTER (WHERE i.disposition = 'REJECT'), 0)",
+                            "sum(q.quantity)"), LOTS, scope.facility("i.facility_id")),
+                    "Quantities are in the material's own unit. A lot received in a unit that does not convert to"
+                            + " it has a row of its own.");
             case NCR -> new Definition(
                     List.of(text("NCR", 13), text("Title", 29), text("Severity", 8), text("Status", 13),
                             text("Source", 9), text("Facility", 12), text("Raised", 9), text("Closed", 9),

@@ -25,6 +25,9 @@ test("raw material is traced through production and inspection to the customer",
     await dialog.getByLabel("Quantity used").fill("20");
   });
   await expect(page.getByText("EN8 – EN8 Bar")).toBeVisible();
+  // Quantities carry their unit.
+  await expect(page.getByText("20 PCS", { exact: true })).toBeVisible();
+  await expect(page.getByText("10 PCS", { exact: true })).toBeVisible();
   await step(page, "Complete batch", (dialog) => dialog.getByLabel("Produced quantity").fill("10"));
   await step(page, "Add serial numbers", (dialog) =>
     dialog.getByLabel("Serial numbers (one per line)").fill("SN-1\nSN-2"),

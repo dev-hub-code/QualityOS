@@ -19,12 +19,23 @@ public class BatchRelationship extends TenantOwnedEntity {
     private UUID parentLotId;
     private UUID parentBatchId;
     private UUID childBatchId;
+    /** In the source's own unit. */
     private BigDecimal quantity;
+    private BigDecimal enteredQuantity;
+    private UUID enteredUomId;
 
     public BatchRelationship(UUID parentLotId, UUID parentBatchId, UUID childBatchId, BigDecimal quantity) {
+        this(parentLotId, parentBatchId, childBatchId, quantity, null, null);
+    }
+
+    /** @param enteredQuantity what was typed, in {@code enteredUomId}, before it became {@code quantity} */
+    public BatchRelationship(UUID parentLotId, UUID parentBatchId, UUID childBatchId, BigDecimal quantity,
+            BigDecimal enteredQuantity, UUID enteredUomId) {
         this.parentLotId = parentLotId;
         this.parentBatchId = parentBatchId;
         this.childBatchId = childBatchId;
         this.quantity = quantity;
+        this.enteredQuantity = enteredQuantity;
+        this.enteredUomId = enteredUomId;
     }
 }

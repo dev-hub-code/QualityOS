@@ -164,6 +164,8 @@ export interface Unit {
   code: string;
   name: string;
   dimension: string;
+  /** How many of the dimension's base unit one of this holds. Null when it converts only to itself. */
+  toBase: string | null;
   system: boolean;
 }
 
@@ -489,6 +491,7 @@ export interface Ncr extends NcrSummary {
   defectCategoryId: string | null;
   defectCategoryName: string | null;
   rejectedQuantity: string | null;
+  rejectedUomId: string | null;
   assignedTo: string | null;
   containmentAction: string | null;
   rootCause: string | null;
@@ -557,6 +560,7 @@ export interface ReleasedLot {
   materialName: string;
   internalBatch: string;
   remainingQuantity: string;
+  uomId: string;
 }
 
 export interface ProductionBatch {
@@ -565,6 +569,7 @@ export interface ProductionBatch {
   productId: string;
   productCode: string;
   productName: string;
+  uomId: string;
   status: string;
   plannedQuantity: string;
   producedQuantity: string | null;
@@ -577,7 +582,12 @@ export interface BatchDetail {
     id: string;
     sourceBatch: string;
     description: string;
+    /** In the source's unit, {@link uomId}. */
     quantity: string;
+    uomId: string;
+    /** As typed, when a unit was named. */
+    enteredQuantity: string | null;
+    enteredUomId: string | null;
     at: string;
     reversalReason: string | null;
   }[];

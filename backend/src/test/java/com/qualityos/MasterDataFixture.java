@@ -53,8 +53,13 @@ abstract class MasterDataFixture extends AbstractIntegrationTest {
     }
 
     protected String material(Session session, boolean inspectionRequired) throws Exception {
+        return material(session, inspectionRequired, "KG");
+    }
+
+    /** A material kept in the given unit, which its orders and lots then use. */
+    protected String material(Session session, boolean inspectionRequired, String unitCode) throws Exception {
         return idOf(body(as(session, postJson("/api/v1/materials", Map.of(
-                        "code", code(), "name", "EN8 Bar", "uomId", unitId(session, "KG"),
+                        "code", code(), "name", "EN8 Bar", "uomId", unitId(session, unitCode),
                         "inspectionRequired", inspectionRequired)))
                 .andExpect(status().isCreated())));
     }

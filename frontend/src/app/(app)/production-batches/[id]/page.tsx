@@ -11,6 +11,7 @@ import {
   Section,
   StatusBadge,
   useRefresh,
+  useUnits,
 } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
@@ -30,8 +31,14 @@ import type {
 const RELEASED = "/production-batches?status=RELEASED&size=100";
 const LOTS = "/material-receipts/released-lots";
 
+/** A quantity with its unit's code, such as "7.5 KG". */
+function withUnit(quantity: string, unit: string) {
+  return unit ? `${formatQuantity(quantity)} ${unit}` : formatQuantity(quantity);
+}
+
 function ConsumeDialog({ path, batchId, onClose }: { path: string; batchId: string; onClose: () => void }) {
   const refresh = useRefresh();
+  const units = useUnits();
   const { data: lots = [] } = useQuery({ queryKey: [LOTS], queryFn: () => api.get<ReleasedLot[]>(LOTS) });
   const { data: batches } = useQuery({
     queryKey: [RELEASED],
@@ -40,18 +47,19 @@ function ConsumeDialog({ path, batchId, onClose }: { path: string; batchId: stri
   const options = [
     ...lots.map((lot) => ({
       value: `lot:${lot.itemId}`,
-      label: `${lot.internalBatch} – ${lot.materialCode} (${formatQuantity(lot.remainingQuantity)} left)`,
+      label: `${lot.internalBatch} – ${lot.materialCode} (${withUnit(lot.remainingQuantity, units.label(lot.uomId))} left)`,
     })),
     ...(batches?.items ?? [])
       .filter((batch) => batch.id !== batchId && Number(batch.availableQuantity) > 0)
       .map((batch) => ({
         value: `batch:${batch.id}`,
-        label: `${batch.batchNumber} – ${batch.productCode} (${formatQuantity(batch.availableQuantity)} left)`,
+        label: `${batch.batchNumber} – ${batch.productCode} (${withUnit(batch.availableQuantity, units.label(batch.uomId))} left)`,
       })),
   ];
   const fields: FieldDef[] = [
     { name: "source", label: "Lot or batch", type: "select", required: true, options },
     { name: "quantity", label: "Quantity used", type: "decimal", required: true },
+    { name: "uomId", label: "Unit, if not the lot's or batch's own", type: "select", options: units.options },
   ];
   return (
     <RecordDialog
@@ -60,7 +68,10 @@ function ConsumeDialog({ path, batchId, onClose }: { path: string; batchId: stri
       onClose={onClose}
       onSubmit={(values) =>
         api
-          .post(`${path}/consume`, toConsumeRequest(String(values.source), String(values.quantity)))
+          .post(
+            `${path}/consume`,
+            toConsumeRequest(String(values.source), String(values.quantity), String(values.uomId ?? "")),
+          )
           .then(refresh)
       }
     />
@@ -141,6 +152,7 @@ export default function ProductionBatchPage() {
   const [reversing, setReversing] = useState<string | null>(null);
   const [correcting, setCorrecting] = useState<string | null>(null);
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<BatchDetail>(path) });
+  const units = useUnits();
   if (!data) return <QueryState error={error} />;
 
   const { batch, consumptions, serialNumbers } = data;
@@ -178,9 +190,9 @@ export default function ProductionBatchPage() {
       <Section title="Details">
         <Details
           items={[
-            ["Planned", formatQuantity(batch.plannedQuantity)],
-            ["Produced", batch.producedQuantity && formatQuantity(batch.producedQuantity)],
-            ["Available", formatQuantity(batch.availableQuantity)],
+            ["Planned", withUnit(batch.plannedQuantity, units.label(batch.uomId))],
+            ["Produced", batch.producedQuantity && withUnit(batch.producedQuantity, units.label(batch.uomId))],
+            ["Available", withUnit(batch.availableQuantity, units.label(batch.uomId))],
           ]}
         />
       </Section>
@@ -193,7 +205,15 @@ export default function ProductionBatchPage() {
                 {used.sourceBatch} · {used.description}
               </span>
               <span className="flex shrink-0 items-center gap-2">
-                {formatQuantity(used.quantity)}
+                <span>
+                  {withUnit(used.quantity, units.label(used.uomId))}
+                  {used.enteredQuantity && used.enteredUomId !== used.uomId && (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      (entered as {withUnit(used.enteredQuantity, units.label(used.enteredUomId))})
+                    </span>
+                  )}
+                </span>
                 {used.reversalReason && <span className="text-muted-foreground">Reversed: {used.reversalReason}</span>}
                 {canManage && batch.status === "IN_PROGRESS" && !used.reversalReason && (
                   <Button variant="ghost" size="sm" onClick={() => setReversing(used.id)}>

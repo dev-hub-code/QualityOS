@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { FormError } from "@/components/forms/field";
 import { ContactTable } from "@/components/recalls/contact-table";
 import { RecallDashboardTiles } from "@/components/recalls/recall-dashboard";
@@ -127,6 +127,9 @@ export default function RecallPage() {
             ["Date", recall.recallDate],
             ["Reason", recall.reason],
             ["What customers must do", recall.instructions],
+            ...(recall.capaId
+              ? [["CAPA", <RecordLink key="capa" href={`/capas/${recall.capaId}`}>Open the linked CAPA</RecordLink>] as [string, ReactNode]]
+              : []),
           ]}
         />
       </Section>

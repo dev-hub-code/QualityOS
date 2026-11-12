@@ -131,15 +131,24 @@ test("one recall covers several batches with the same fault", async ({ page, bro
   await page.goto(`/traceability/${encodeURIComponent(batchNumber)}/recall`);
   await page.getByRole("button", { name: "Start a recall" }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Other batches in this recall (one per line)").fill("PB-NOT-A-BATCH");
+  await dialog.getByLabel("Other production batches in this recall (one per line)").fill("PB-NOT-A-BATCH");
   await dialog.getByLabel("Recall date").fill(today);
   await dialog.getByLabel("Reason for recall").fill("Same heat of steel");
   await dialog.getByLabel("What customers must do").fill("Quarantine and return");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog.getByText(/PB-NOT-A-BATCH/)).toBeVisible();
 
-  await dialog.getByLabel("Other batches in this recall (one per line)").fill(second.batch.batchNumber);
+  await dialog.getByLabel("Other production batches in this recall (one per line)").fill(second.batch.batchNumber);
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("heading", { name: /^RCL-/ })).toBeVisible();
   await expect(page.getByText(`Batches ${[batchNumber, second.batch.batchNumber].sort().join(", ")}`)).toBeVisible();
+
+  // A lot is traced with its unit, and its recall report points to its batches instead of starting a recall.
+  const trace = await owner("GET", `/traceability/batches/${encodeURIComponent(batchNumber)}`);
+  const lot: string = trace.backward[0].batchNumber;
+  await page.goto(`/traceability/${encodeURIComponent(batchNumber)}`);
+  await expect(page.getByText(/· \d+ PCS/).first()).toBeVisible();
+  await page.goto(`/traceability/${encodeURIComponent(lot)}/recall`);
+  await expect(page.getByText("A recall covers production batches.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start a recall" })).toHaveCount(0);
 });

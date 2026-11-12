@@ -62,7 +62,7 @@ export default function InspectionTemplatePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={template.name} subtitle={`${template.code} · ${template.inspectionType}`}>
+      <PageHeader title={template.name} subtitle={`${template.code} · ${template.inspectionType} · ${template.appliesTo ? `Only for ${template.appliesTo}` : "For any item"}`}>
         {canManage && !draft && (
           <Button disabled={pending} onClick={() => run(() => api.post(`${path}/versions`))}>
             New version

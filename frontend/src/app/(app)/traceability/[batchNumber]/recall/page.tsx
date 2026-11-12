@@ -24,7 +24,7 @@ export default function RecallReportPage() {
         title={`Recall report: ${data.subject.batchNumber}`}
         subtitle="Everyone this batch reached, including customers who have returned it."
       >
-        {canStart && (
+        {canStart && data.subject.kind === "PRODUCTION_BATCH" && (
           <Button className="print:hidden" onClick={() => setStarting(true)}>
             Start a recall
           </Button>
@@ -33,6 +33,12 @@ export default function RecallReportPage() {
           Print
         </Button>
       </PageHeader>
+      {canStart && data.subject.kind === "LOT" && (
+        <p className="text-sm text-muted-foreground print:hidden">
+          A recall covers production batches. Start one from a batch made from this lot, and add the other batches it
+          went into.
+        </p>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>

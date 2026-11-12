@@ -79,6 +79,7 @@ function ConsumeDialog({ path, batchId, onClose }: { path: string; batchId: stri
 
 function CorrectConsumptionDialog({ consumptionId, onClose }: { consumptionId: string; onClose: () => void }) {
   const router = useRouter();
+  const units = useUnits();
   const { data: lots = [] } = useQuery({ queryKey: [LOTS], queryFn: () => api.get<ReleasedLot[]>(LOTS) });
   const fields: FieldDef[] = [
     {
@@ -87,10 +88,11 @@ function CorrectConsumptionDialog({ consumptionId, onClose }: { consumptionId: s
       type: "select",
       options: lots.map((lot) => ({
         value: lot.itemId,
-        label: `${lot.internalBatch} – ${lot.materialCode} (${formatQuantity(lot.remainingQuantity)} left)`,
+        label: `${lot.internalBatch} – ${lot.materialCode} (${withUnit(lot.remainingQuantity, units.label(lot.uomId))} left)`,
       })),
     },
-    { name: "quantity", label: "Quantity actually used", type: "decimal" },
+    // A correction takes no unit of its own: it is in the unit of the lot or batch it draws on.
+    { name: "quantity", label: "Quantity actually used, in that lot's own unit", type: "decimal" },
     { name: "reason", label: "Why this entry is wrong", type: "textarea", required: true },
   ];
   return (

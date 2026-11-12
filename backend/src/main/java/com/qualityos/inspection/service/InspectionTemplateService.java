@@ -316,9 +316,22 @@ public class InspectionTemplateService {
                 template.getInspectionType().name(),
                 template.getMaterialId(),
                 template.getProductId(),
+                appliesTo(template),
                 all.stream().filter(v -> v.getStatus() == Status.PUBLISHED).findFirst()
                         .map(TemplateVersion::getVersionNumber).orElse(null),
                 all.stream().anyMatch(v -> v.getStatus() == Status.DRAFT));
+    }
+
+    private String appliesTo(InspectionTemplate template) {
+        if (template.getMaterialId() != null) {
+            var material = materials.references(Set.of(template.getMaterialId())).get(template.getMaterialId());
+            return material == null ? null : material.code() + " – " + material.name();
+        }
+        if (template.getProductId() != null) {
+            var product = products.references(Set.of(template.getProductId())).get(template.getProductId());
+            return product == null ? null : product.code() + " – " + product.name();
+        }
+        return null;
     }
 
     private static VersionResponse toResponse(TemplateVersion version) {

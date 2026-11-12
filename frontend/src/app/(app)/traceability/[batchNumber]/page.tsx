@@ -11,6 +11,7 @@ import {
   StatusBadge,
   useApprovedSuppliers,
   useMaterials,
+  useUnits,
 } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { CorrectionDetail, TimelineEvent, TraceNode, TraceReport } from "@/lib/types";
 
 function Node({ node }: { node: TraceNode }) {
+  const unit = useUnits().label(node.uomId);
   return (
     <li className="py-2 text-sm">
       <span className="flex flex-wrap items-center gap-2">
@@ -28,6 +30,7 @@ function Node({ node }: { node: TraceNode }) {
       </span>
       <p>
         {node.code} – {node.name} · {formatQuantity(node.quantity)}
+        {unit && ` ${unit}`}
       </p>
       {node.supplierName && (
         <p className="text-muted-foreground">

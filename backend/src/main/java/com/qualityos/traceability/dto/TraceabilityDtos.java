@@ -293,6 +293,7 @@ public final class TraceabilityDtos {
             String code,
             String name,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
+            UUID uomId,
             String status,
             String supplierName,
             String supplierBatch,

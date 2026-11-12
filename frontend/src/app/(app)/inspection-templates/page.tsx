@@ -22,6 +22,7 @@ const columns = [
   }),
   column.accessor("name", { header: "Name" }),
   column.accessor("inspectionType", { header: "Type" }),
+  column.accessor("appliesTo", { header: "For", cell: (info) => info.getValue() ?? "Any item" }),
   column.accessor("publishedVersion", {
     header: "Published",
     cell: (info) => (info.getValue() ? `Version ${info.getValue()}` : "Not published"),

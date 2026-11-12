@@ -205,7 +205,7 @@ A feature is something a plan can include. Keep this apart from roles: a plan de
 
 Plans keep their `features` list, and any value sits beside it in `feature_values`. A value is a number, text or structured JSON. A blank number means unlimited.
 
-**A feature only restricts anything once the product enforces it.** Enforcement is code, in `PlanAccess`, and today covers `NCR_CAPA`, `REPORTS` and `ADVANCED`. The Features page marks anything else "Listed only, not enforced": it appears on plans and the website, but leaving it out takes nothing away.
+**A feature only restricts anything once the product enforces it.** Enforcement is code, in `PlanAccess`, and today covers `NCR_CAPA`, `REPORTS` and `ADVANCED`. The Features page shows these as "Restricted by the app". Every other feature is "Delivered by your team": it appears on plans and the website, but leaving it out of a plan takes nothing away in the product. Creating one needs the operator to confirm that, so a feature that looks like a paid module but unlocks nothing cannot be added by mistake. `PlatformEntitlementsIT` checks that an organisation without each enforced feature loses every permission it covers.
 
 An inactive feature cannot be added to another plan. Plans that have it keep it, and an enforced feature stays enforced. On a plan with subscribers, a change needs a reason, reaches them at once, and joins the plan's history.
 

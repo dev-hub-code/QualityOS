@@ -7,6 +7,7 @@ import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.subscription.dto.SubscriptionDtos.AssignFeatureRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.CreateFeatureRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.FeatureActiveRequest;
+import com.qualityos.subscription.dto.SubscriptionDtos.FeatureDelivery;
 import com.qualityos.subscription.dto.SubscriptionDtos.FeatureOrganisation;
 import com.qualityos.subscription.dto.SubscriptionDtos.FeatureOrganisationList;
 import com.qualityos.subscription.dto.SubscriptionDtos.FeatureResponse;
@@ -27,8 +28,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * What plans can include. A feature only restricts anything once {@link PlanAccess} knows it. Until then it is a
- * record of what a plan offers, and the catalogue says so rather than implying it is enforced.
+ * What plans can include. A feature only restricts anything once {@link PlanAccess} knows it. Every other feature is
+ * something people deliver, such as priority support, and has to be created as one: an operator cannot make a feature
+ * that looks like a paid module but unlocks nothing, because nothing would stop a customer without it.
  */
 @Service
 public class FeatureCatalogue {
@@ -70,6 +72,11 @@ public class FeatureCatalogue {
         return tx.execute(status -> {
             if (features.findByCode(request.code()).isPresent()) {
                 throw new ConflictException("A feature with this code already exists.");
+            }
+            if (delivery(request.code()) == FeatureDelivery.TEAM && !Boolean.TRUE.equals(request.deliveredByTeam())) {
+                throw new BusinessRuleException("ProductionOS cannot restrict this feature, so a customer without it "
+                        + "could still use anything it names. Create it only as something your team delivers, such as "
+                        + "support or onboarding.");
             }
             FeatureDefinition feature = new FeatureDefinition(request.code(), request.name().trim(), request.valueType());
             feature.setDescription(request.description() == null ? "" : request.description().trim());
@@ -174,9 +181,15 @@ public class FeatureCatalogue {
         return features.findByCode(code).orElseThrow(() -> new ResourceNotFoundException("Feature", code));
     }
 
+    /** Follows the code, so a feature becomes restricted by the app as soon as {@link PlanAccess} enforces it. */
+    static FeatureDelivery delivery(String code) {
+        return PlanAccess.FEATURES.containsKey(code) ? FeatureDelivery.APP : FeatureDelivery.TEAM;
+    }
+
     private static FeatureResponse toResponse(FeatureDefinition feature, long organisations) {
+        FeatureDelivery delivery = delivery(feature.getCode());
         return new FeatureResponse(feature.getCode(), feature.getName(), feature.getDescription(), feature.getValueType(),
-                feature.isActive(), feature.isDefaultEnabled(), PlanAccess.FEATURES.containsKey(feature.getCode()),
+                feature.isActive(), feature.isDefaultEnabled(), delivery == FeatureDelivery.APP, delivery,
                 organisations, feature.getVersion());
     }
 }

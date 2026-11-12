@@ -53,7 +53,11 @@ class PlatformEntitlementsIT extends MasterDataFixture {
 
     private ResultActions createFeature(String code, String type, boolean byDefault) throws Exception {
         return as(admin, postJson(PLATFORM + "/features", Map.of("code", code, "name", "Feature " + code,
-                "valueType", type, "defaultEnabled", byDefault)));
+                "valueType", type, "defaultEnabled", byDefault, "deliveredByTeam", true)));
+    }
+
+    private List<String> permissions(Session session) throws Exception {
+        return JsonPath.read(body(as(session, get("/api/v1/auth/me")).andExpect(status().isOk())), "$.data.permissions");
     }
 
     private long featureVersion(String code) {
@@ -162,6 +166,65 @@ class PlatformEntitlementsIT extends MasterDataFixture {
         as(admin, get(PLATFORM + "/features"))
                 .andExpect(jsonPath("$.data[?(@.code == 'REPORTS')].enforced", hasItem(true)))
                 .andExpect(jsonPath("$.data[?(@.code == '" + custom + "')].enforced", hasItem(false)));
+    }
+
+    @Test
+    void aFeatureTheAppCannotRestrictMustBeCreatedAsDeliveredByTheTeam() throws Exception {
+        String custom = featureCode();
+        for (Map<String, Object> unconfirmed : List.of(
+                Map.<String, Object>of("code", custom, "name", "Inventory", "valueType", "BOOLEAN", "defaultEnabled", false),
+                Map.<String, Object>of("code", custom, "name", "Inventory", "valueType", "BOOLEAN", "defaultEnabled", false,
+                        "deliveredByTeam", false))) {
+            as(admin, postJson(PLATFORM + "/features", unconfirmed))
+                    .andExpect(status().isUnprocessableContent())
+                    .andExpect(jsonPath("$.error.message", containsString("cannot restrict")));
+        }
+        as(admin, get(PLATFORM + "/features"))
+                .andExpect(jsonPath("$.data[?(@.code == '" + custom + "')]").isEmpty());
+
+        createFeature(custom, "BOOLEAN", false).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.delivery").value("TEAM"))
+                .andExpect(jsonPath("$.data.enforced").value(false));
+        as(admin, get(PLATFORM + "/features"))
+                .andExpect(jsonPath("$.data[?(@.code == 'NCR_CAPA')].delivery", hasItem("APP")))
+                .andExpect(jsonPath("$.data[?(@.code == 'REPORTS')].delivery", hasItem("APP")))
+                .andExpect(jsonPath("$.data[?(@.code == 'ADVANCED')].delivery", hasItem("APP")));
+    }
+
+    /**
+     * The contract each paid feature sells, written out here rather than read from the code under test: without the
+     * feature, an owner keeps none of these permissions, except a view of records already made. Reports are the paid
+     * feature itself, so their view goes too.
+     */
+    @Test
+    void anOrganisationWithoutAnEnforcedFeatureCannotUseWhatItCovers() throws Exception {
+        Map<String, List<String>> covers = Map.of(
+                "NCR_CAPA", List.of("NCR_CREATE", "NCR_ASSIGN", "NCR_CLOSE", "CAPA_MANAGE", "CAPA_APPROVE"),
+                "REPORTS", List.of("REPORT_VIEW"),
+                "ADVANCED", List.of("TRACEABILITY_MANAGE", "RECALL_MANAGE", "RECALL_CLOSE", "CALIBRATION_MANAGE",
+                        "AUDIT_MANAGE", "AUDIT_CLOSE", "MATERIAL_CORRECTION_REQUEST", "MATERIAL_CORRECTION_APPROVE"));
+        Map<String, List<String>> keeps = Map.of(
+                "NCR_CAPA", List.of("NCR_VIEW", "CAPA_VIEW"),
+                "REPORTS", List.of(),
+                "ADVANCED", List.of("TRACEABILITY_VIEW", "RECALL_VIEW", "CALIBRATION_VIEW", "AUDIT_VIEW"));
+        planWith(owner, "max_users", 50);
+        String plan = asDatabaseSuperuser().queryForObject(
+                "SELECT plan_id::text FROM subscriptions WHERE tenant_id = ?", String.class, owner.tenantId());
+        List<String> full = permissions(owner);
+        covers.values().forEach(each -> assertThat(full).containsAll(each));
+
+        for (String feature : covers.keySet()) {
+            assign(feature, plan, false, null, REASON).andExpect(status().isOk());
+            List<String> without = permissions(owner);
+            assertThat(without).as(feature).doesNotContainAnyElementsOf(covers.get(feature));
+            assertThat(without).as(feature).containsAll(keeps.get(feature));
+            covers.entrySet().stream().filter(other -> !other.getKey().equals(feature))
+                    .forEach(other -> assertThat(without).as(feature + " leaves " + other.getKey())
+                            .containsAll(other.getValue()));
+
+            assign(feature, plan, true, null, REASON).andExpect(status().isOk());
+            assertThat(permissions(owner)).as(feature + " restored").containsAll(covers.get(feature));
+        }
     }
 
     @Test

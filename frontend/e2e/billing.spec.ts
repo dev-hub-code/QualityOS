@@ -250,12 +250,15 @@ test("a platform admin defines a feature, puts it on a plan, and reads usage and
   const code = `E2E_${Date.now()}`;
 
   await page.goto("/platform/features");
-  await expect(page.getByRole("row", { name: /Dashboards and reports/ }).first()).toContainText("Enforced");
+  await expect(page.getByRole("row", { name: /Dashboards and reports/ }).first()).toContainText("Restricted by the app");
   await page.getByRole("button", { name: "New feature" }).click();
   await page.getByLabel("Code, such as PRIORITY_SUPPORT").fill(code);
   await page.getByLabel("Name").fill(`Support ${code}`);
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("row", { name: code }).first()).toContainText("Listed only, not enforced");
+  await expect(page.getByText(/cannot restrict this feature/)).toBeVisible();
+  await page.getByLabel(/My team delivers this feature/).check();
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("row", { name: code }).first()).toContainText("Delivered by your team");
 
   await page.getByRole("button", { name: `Support ${code} on Starter: not included` }).click();
   await page.getByLabel(/Reason/).fill("Testing the catalogue");

@@ -56,7 +56,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A template's material or product is set when it is created and cannot be changed afterwards | When a user needs it |
 | Material used can be entered in any unit of the same kind as its lot or batch, and is converted to that unit. The dialog lists every unit and the server refuses one that does not convert. A correction of material used is still entered in the source's own unit. Units are added through the API alone, as before | When a user needs it |
 | A customer who returned everything still shows as having received the batch. This is deliberate: a recall should reach them | By design |
-| The return screen takes one line at a time, though the API takes several. Credit notes and refunds are separate and not built | When a user needs it |
+| A return covers any lines of one dispatch at once. A return across several dispatches is recorded once per dispatch. Credit notes and refunds are separate and not built | When a user needs it |
 | Search covers lots, batches, products and serial numbers, not NCRs, CAPAs or suppliers. Serial search reports where a unit is now; earlier customers are on its detail page | When a user needs it |
 | A lot's internal batch number cannot be corrected, because other records refer to it by number. It is generated, so it cannot be mistyped | By design |
 | A corrected lot keeps its original purchase order line, and a finished NCR keeps its original supplier and material | By design: history is preserved |

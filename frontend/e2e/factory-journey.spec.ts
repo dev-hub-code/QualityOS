@@ -243,9 +243,8 @@ test("a lot keeps its history from the order through a conditional release, prod
   await page.goto("/dispatches");
   await page.getByRole("row", { name: /Tata Motors/ }).getByRole("button", { name: "Record return" }).click();
   const returning = page.getByRole("dialog");
-  await returning.getByLabel("Line", { exact: true }).selectOption({ index: 1 });
-  await returning.getByLabel("Returned quantity").fill("5");
-  await returning.getByLabel("Serial numbers, if tracked (one per line)").fill(serials(1, 5));
+  await returning.getByLabel(/^Returned from /).fill("5");
+  await returning.getByLabel(/^Serial numbers from /).fill(serials(1, 5));
   await returning.getByLabel("Return reference").fill("RMA-9");
   await returning.getByLabel("Date received or expected").fill(today());
   await returning.getByLabel("Reason for return").fill("Scored on the journal");

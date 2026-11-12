@@ -34,3 +34,16 @@ export function toDispatchItems(values: Record<string, unknown>, lines: number) 
     };
   });
 }
+
+/**
+ * The return form has a quantity and serials for each line that can still come back: quantity1, serials1, and so on.
+ * Lines left blank are not part of the return.
+ */
+export function toReturnItems(values: Record<string, unknown>, lineIds: string[]) {
+  return lineIds.flatMap((dispatchItemId, index) => {
+    const line = index + 1;
+    const quantity = String(values[`quantity${line}`] ?? "").trim();
+    if (!quantity) return [];
+    return [{ dispatchItemId, quantity, serialNumbers: parseSerials(String(values[`serials${line}`] ?? "")) }];
+  });
+}

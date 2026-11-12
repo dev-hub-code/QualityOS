@@ -6,6 +6,7 @@ import com.qualityos.common.security.Permissions;
 import com.qualityos.identity.service.OperatorSecondFactor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -24,9 +25,10 @@ class SecondFactorGate implements HandlerInterceptor {
     static final String PLATFORM = "/api/v1/platform/**";
     static final String ENROLMENT = "/api/v1/platform/second-factor/**";
 
-    private final OperatorSecondFactor secondFactor;
+    /** Looked up when first needed, so that a web slice test without the service can still start. */
+    private final ObjectProvider<OperatorSecondFactor> secondFactor;
 
-    SecondFactorGate(OperatorSecondFactor secondFactor) {
+    SecondFactorGate(ObjectProvider<OperatorSecondFactor> secondFactor) {
         this.secondFactor = secondFactor;
     }
 
@@ -35,7 +37,7 @@ class SecondFactorGate implements HandlerInterceptor {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         boolean operator = authentication != null && authentication.getAuthorities().stream()
                 .anyMatch(granted -> Permissions.PLATFORM_ADMIN.equals(granted.getAuthority()));
-        if (operator && !secondFactor.enrolled()) {
+        if (operator && !secondFactor.getObject().enrolled()) {
             throw new QualityOsException(ErrorCode.SECOND_FACTOR_REQUIRED,
                     "Set up an authenticator app to use the Control Center.");
         }

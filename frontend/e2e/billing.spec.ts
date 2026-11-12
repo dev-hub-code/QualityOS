@@ -93,7 +93,7 @@ test("signing in opens the Control Center for an operator and the organisation f
   await expect(page.getByRole("heading", { name: "Enter your authenticator code" })).toBeVisible();
   await page.getByLabel("Six-digit code").fill("000000");
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("alert")).toContainText("code is not right");
+  await expect(page.getByRole("alert").filter({ hasText: "code is not right" })).toBeVisible();
   await enterSecondFactor(page);
   await expect(page).toHaveURL(/\/platform\/dashboard/);
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
@@ -127,7 +127,7 @@ test("a new operator sets up an authenticator before the Control Center opens, a
   const key = (await page.getByTestId("second-factor-secret").textContent()) ?? "";
   await page.getByLabel("Six-digit code from the app").fill("000000");
   await page.getByRole("button", { name: "Confirm" }).click();
-  await expect(page.getByRole("alert")).toContainText("code is not right");
+  await expect(page.getByRole("alert").filter({ hasText: "code is not right" })).toBeVisible();
   await page.getByLabel("Six-digit code from the app").fill(totp(fromBase32(key)));
   await page.getByRole("button", { name: "Confirm" }).click();
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();

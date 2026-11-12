@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
-import { unique } from "./helpers";
+import { apiCaller, unique } from "./helpers";
 import { dispatchedBatch, step } from "./trace-setup";
 
 test("a recall runs from the report through contact, acknowledgement and approved closure", async ({
@@ -114,4 +114,32 @@ test("goods under an open recall stay in until a recall manager gives a reason",
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByRole("cell", { name: `${batchNumber} × 1` }).first()).toBeVisible();
+});
+
+test("one recall covers several batches with the same fault", async ({ page, browser }) => {
+  test.setTimeout(90_000);
+  const { batchNumber, facilityId } = await dispatchedBatch(page, browser);
+  const owner = apiCaller(page);
+  const products: { items: { id: string }[] } = await owner("GET", "/products");
+  const second = await owner("POST", "/production-batches", {
+    productId: products.items[0].id,
+    facilityId,
+    plannedQuantity: "5",
+  });
+  const today = new Date().toISOString().slice(0, 10);
+
+  await page.goto(`/traceability/${encodeURIComponent(batchNumber)}/recall`);
+  await page.getByRole("button", { name: "Start a recall" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Other batches in this recall (one per line)").fill("PB-NOT-A-BATCH");
+  await dialog.getByLabel("Recall date").fill(today);
+  await dialog.getByLabel("Reason for recall").fill("Same heat of steel");
+  await dialog.getByLabel("What customers must do").fill("Quarantine and return");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog.getByText(/PB-NOT-A-BATCH/)).toBeVisible();
+
+  await dialog.getByLabel("Other batches in this recall (one per line)").fill(second.batch.batchNumber);
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("heading", { name: /^RCL-/ })).toBeVisible();
+  await expect(page.getByText(`Batches ${[batchNumber, second.batch.batchNumber].sort().join(", ")}`)).toBeVisible();
 });

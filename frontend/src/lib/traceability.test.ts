@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inspectionTypeFor, parseSerials, toConsumeRequest, toDispatchItems, toReturnItems } from "./traceability";
+import { inspectionTypeFor, parseSerials, toConsumeRequest, toDispatchItems, toReturnItems, recallBatchNumbers } from "./traceability";
 
 describe("parseSerials", () => {
   it("splits on lines and commas, and drops blanks and repeats", () => {
@@ -51,5 +51,15 @@ describe("toReturnItems", () => {
 
   it("is empty when no line has a quantity", () => {
     expect(toReturnItems({}, ["a"])).toEqual([]);
+  });
+});
+
+describe("recallBatchNumbers", () => {
+  it("starts with the traced batch and adds the others once each", () => {
+    expect(recallBatchNumbers("PB-1", " PB-2\nPB-3, PB-1\n\nPB-2 ")).toEqual(["PB-1", "PB-2", "PB-3"]);
+  });
+
+  it("is the traced batch alone when nothing else is typed", () => {
+    expect(recallBatchNumbers("PB-1", "")).toEqual(["PB-1"]);
   });
 });

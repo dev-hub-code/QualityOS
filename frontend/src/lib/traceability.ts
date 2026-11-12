@@ -47,3 +47,8 @@ export function toReturnItems(values: Record<string, unknown>, lineIds: string[]
     return [{ dispatchItemId, quantity, serialNumbers: parseSerials(String(values[`serials${line}`] ?? "")) }];
   });
 }
+
+/** The traced batch first, then any others typed one per line or separated by commas, each once. */
+export function recallBatchNumbers(batchNumber: string, others: string) {
+  return [...new Set([batchNumber, ...parseSerials(others)])];
+}

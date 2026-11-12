@@ -64,9 +64,11 @@ export const INSPECTION_TYPES: FieldOption[] = [
   { value: "FUNCTIONAL", label: "Functional" },
 ];
 
-export const templateFields = (materials: FieldOption[]): FieldDef[] => [
+/** A template for one material or one product is chosen for it before a general one. Leave both blank for any. */
+export const templateFields = (materials: FieldOption[], products: FieldOption[]): FieldDef[] => [
   { name: "code", label: "Code", required: true },
   { name: "name", label: "Name", required: true },
   { name: "inspectionType", label: "Type", type: "select", required: true, options: INSPECTION_TYPES },
-  { name: "materialId", label: "Material (blank for any)", type: "select", options: materials },
+  { name: "materialId", label: "Only for material", type: "select", options: materials },
+  { name: "productId", label: "Only for product", type: "select", options: products },
 ];

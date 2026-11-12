@@ -7,6 +7,7 @@ import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.inspection.dto.TemplateDtos.ApplicableTemplates;
 import com.qualityos.inspection.dto.TemplateDtos.ParameterRequest;
 import com.qualityos.inspection.dto.TemplateDtos.ParameterSpec;
 import com.qualityos.inspection.dto.TemplateDtos.SaveDraftRequest;
@@ -27,6 +28,7 @@ import com.qualityos.product.service.ProductService;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -221,6 +223,51 @@ public class InspectionTemplateService {
             throw new BusinessRuleException("This template is for a different item.");
         }
         return template;
+    }
+
+    /**
+     * Published templates for a material or a product, of the given types: the item's own, then general ones. The
+     * suggestion comes from the preferred types: the item's own if exactly one, else the only general one.
+     *
+     * @param materialId the material, or null for a product
+     * @param productId the product, or null for a material
+     */
+    @Transactional(readOnly = true)
+    public ApplicableTemplates applicable(
+            UUID materialId, UUID productId, Set<InspectionTemplate.Type> types, Set<InspectionTemplate.Type> preferred) {
+        if (types.isEmpty()) {
+            return new ApplicableTemplates(List.of(), null);
+        }
+        Specification<InspectionTemplate> filter = Specification.<InspectionTemplate>where(Searches.notArchived())
+                .and((root, query, builder) -> root.get("inspectionType").in(types))
+                .and(appliesTo(materialId, productId));
+        LocalDate today = LocalDate.now();
+        List<InspectionTemplate> usable = templates.findAll(filter).stream()
+                .filter(template -> !versions.findInForce(template.getId(), today).isEmpty())
+                .sorted(Comparator.comparing((InspectionTemplate template) -> isGeneral(template))
+                        .thenComparing(InspectionTemplate::getCode))
+                .toList();
+        List<InspectionTemplate> candidates = usable.stream()
+                .filter(template -> preferred.contains(template.getInspectionType()))
+                .toList();
+        List<InspectionTemplate> own = candidates.stream().filter(template -> !isGeneral(template)).toList();
+        List<InspectionTemplate> tier = own.isEmpty() ? candidates : own;
+        return new ApplicableTemplates(
+                usable.stream().map(this::toSummary).toList(),
+                tier.size() == 1 ? tier.getFirst().getId() : null);
+    }
+
+    private static boolean isGeneral(InspectionTemplate template) {
+        return template.getMaterialId() == null && template.getProductId() == null;
+    }
+
+    /** A material's or a product's own templates, and general ones. Never the other kind's. */
+    private static Specification<InspectionTemplate> appliesTo(UUID materialId, UUID productId) {
+        return (root, query, builder) -> materialId != null
+                ? builder.and(builder.isNull(root.get("productId")),
+                        builder.or(builder.isNull(root.get("materialId")), builder.equal(root.get("materialId"), materialId)))
+                : builder.and(builder.isNull(root.get("materialId")),
+                        builder.or(builder.isNull(root.get("productId")), builder.equal(root.get("productId"), productId)));
     }
 
     private InspectionTemplate load(UUID id) {

@@ -23,6 +23,7 @@ import com.qualityos.inspection.dto.InspectionDtos.InspectionDetail;
 import com.qualityos.inspection.dto.InspectionDtos.InspectionSummary;
 import com.qualityos.inspection.dto.InspectionDtos.ResultRequest;
 import com.qualityos.inspection.dto.InspectionDtos.ResultResponse;
+import com.qualityos.inspection.dto.TemplateDtos.ApplicableTemplates;
 import com.qualityos.inspection.dto.TemplateDtos.ParameterSpec;
 import com.qualityos.inspection.dto.TemplateDtos.SpecSnapshot;
 import com.qualityos.inspection.entity.Inspection;
@@ -45,6 +46,7 @@ import com.qualityos.materialreceipt.service.MaterialReceiptService;
 import com.qualityos.supplier.dto.SupplierDtos.SupplierReference;
 import com.qualityos.supplier.service.SupplierService;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -193,17 +195,53 @@ public class InspectionService implements AttachmentPolicy {
 
     /** Freezes the specification in force today. Later template changes never reach this inspection. */
     @Transactional
-    public InspectionDetail create(CreateInspectionRequest request) {
-        long subjects = Stream.of(request.receiptItemId(), request.productionBatchId(), request.returnItemId())
-                .filter(Objects::nonNull)
-                .count();
-        if (subjects != 1) {
-            throw new BusinessRuleException("Choose one received batch, production batch or return to inspect.");
-        }
+    public InspectionDetail create(CreateInspectionRequest given) {
+        requireOneSubject(given.receiptItemId(), given.productionBatchId(), given.returnItemId());
+        CreateInspectionRequest request = given.templateId() != null ? given : new CreateInspectionRequest(
+                given.receiptItemId(), given.productionBatchId(), given.returnItemId(), chooseTemplate(given));
         if (request.receiptItemId() != null) {
             return toDetail(inspectLot(request));
         }
         return toDetail(request.returnItemId() != null ? inspectReturn(request) : inspectProductionBatch(request));
+    }
+
+    /**
+     * The published templates that fit an inspection, and the one it gets when none is chosen. A lot takes any type,
+     * preferring IQC. A production batch takes the type due at its stage. Returned goods take FQC or OQC.
+     */
+    @Transactional(readOnly = true)
+    public ApplicableTemplates applicableTemplates(UUID receiptItemId, UUID productionBatchId, UUID returnItemId) {
+        requireOneSubject(receiptItemId, productionBatchId, returnItemId);
+        if (receiptItemId != null) {
+            return templates.applicable(receipts.batch(receiptItemId).materialId(), null,
+                    EnumSet.allOf(InspectionTemplate.Type.class), Set.of(InspectionTemplate.Type.IQC));
+        }
+        if (productionBatchId != null) {
+            Set<InspectionTemplate.Type> due = production.dueInspection(productionBatchId)
+                    .map(type -> Set.of(InspectionTemplate.Type.valueOf(type)))
+                    .orElse(Set.of());
+            return templates.applicable(null, production.batch(productionBatchId).productId(), due, due);
+        }
+        UUID batch = returns.returnedGoods(returnItemId).productionBatchId();
+        Set<InspectionTemplate.Type> outgoing = Set.of(InspectionTemplate.Type.FQC, InspectionTemplate.Type.OQC);
+        return templates.applicable(null, production.batch(batch).productId(), outgoing, outgoing);
+    }
+
+    private UUID chooseTemplate(CreateInspectionRequest request) {
+        ApplicableTemplates fit =
+                applicableTemplates(request.receiptItemId(), request.productionBatchId(), request.returnItemId());
+        if (fit.suggestedId() != null) {
+            return fit.suggestedId();
+        }
+        throw new BusinessRuleException(fit.templates().isEmpty()
+                ? "No published template fits this inspection. Publish one first."
+                : "More than one template fits this inspection. Choose one.");
+    }
+
+    private static void requireOneSubject(UUID receiptItemId, UUID productionBatchId, UUID returnItemId) {
+        if (Stream.of(receiptItemId, productionBatchId, returnItemId).filter(Objects::nonNull).count() != 1) {
+            throw new BusinessRuleException("Choose one received batch, production batch or return to inspect.");
+        }
     }
 
     private Inspection inspectReturn(CreateInspectionRequest request) {

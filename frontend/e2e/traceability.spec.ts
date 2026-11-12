@@ -35,7 +35,8 @@ test("raw material is traced through production and inspection to the customer",
   await expect(page.getByText("SN-1, SN-2")).toBeVisible();
 
   await page.getByRole("button", { name: "Inspect" }).click();
-  await page.getByLabel("Template").selectOption({ label: "FINAL – Final check" });
+  // The only published final template is chosen already.
+  await expect(page.getByLabel("Template").locator("option:checked")).toHaveText("FINAL – Final check");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page).toHaveURL(/inspections\//);
   await page.getByLabel("DIA sample 1").fill("20.0");

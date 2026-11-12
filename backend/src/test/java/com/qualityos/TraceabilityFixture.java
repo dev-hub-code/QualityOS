@@ -73,8 +73,14 @@ abstract class TraceabilityFixture extends MasterDataFixture {
     }
 
     protected String template(String type) throws Exception {
-        String template = JsonPath.read(body(as(owner, postJson("/api/v1/inspection-templates",
-                        Map.of("code", code(), "name", "Shaft check", "inspectionType", type)))
+        return template(type, Map.of());
+    }
+
+    /** @param target materialId or productId, to make the template the item's own; empty for a general one */
+    protected String template(String type, Map<String, Object> target) throws Exception {
+        Map<String, Object> request = new HashMap<>(Map.of("code", code(), "name", "Shaft check", "inspectionType", type));
+        request.putAll(target);
+        String template = JsonPath.read(body(as(owner, postJson("/api/v1/inspection-templates", request))
                 .andExpect(status().isCreated())), "$.data.template.id");
         List<String> drafts = JsonPath.read(body(as(owner, get("/api/v1/inspection-templates/" + template))),
                 "$.data.versions[?(@.status == 'DRAFT')].id");

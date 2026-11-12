@@ -40,6 +40,7 @@ import com.qualityos.inspection.service.EvaluationEngine.Value;
 import com.qualityos.material.dto.MaterialDtos.MaterialReference;
 import com.qualityos.material.service.MaterialService;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceivedBatch;
+import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.LotView;
 import com.qualityos.materialreceipt.service.MaterialReceiptService;
 import com.qualityos.supplier.dto.SupplierDtos.SupplierReference;
 import com.qualityos.supplier.service.SupplierService;
@@ -561,7 +562,18 @@ public class InspectionService implements AttachmentPolicy {
                 failed.stream().anyMatch(code -> criticality.getOrDefault(code, false)),
                 description,
                 rejected ? inspection.getQuantity() : null,
+                rejected ? unitOf(inspection) : null,
                 inspection.getFacilityId()));
+    }
+
+    /** What the inspected quantity is counted in: the lot's unit, or the unit of the batch's product. */
+    private UUID unitOf(Inspection inspection) {
+        if (inspection.getReceiptItemId() != null) {
+            return receipts.lots(List.of(inspection.getReceiptItemId())).stream()
+                    .findFirst().map(LotView::uomId).orElse(null);
+        }
+        return inspection.getProductionBatchId() == null ? null
+                : production.batch(inspection.getProductionBatchId()).uomId();
     }
 
     private SpecSnapshot specificationOf(Inspection inspection) {

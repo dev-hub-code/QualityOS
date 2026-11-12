@@ -44,7 +44,9 @@ public final class QualityDtos {
             UUID materialId,
             @Size(max = 100) String batchNumber,
             @PositiveOrZero @Digits(integer = 12, fraction = 6) BigDecimal rejectedQuantity,
-            UUID facilityId) {
+            UUID facilityId,
+            /* The rejected quantity's unit. Left out, it is the material's. */
+            UUID rejectedUomId) {
     }
 
     /** What an audit hands over when a finding raises an NCR. */
@@ -84,6 +86,7 @@ public final class QualityDtos {
             boolean critical,
             String description,
             BigDecimal rejectedQuantity,
+            UUID rejectedUomId,
             UUID facilityId) {
     }
 
@@ -145,6 +148,7 @@ public final class QualityDtos {
             UUID defectCategoryId,
             String defectCategoryName,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal rejectedQuantity,
+            UUID rejectedUomId,
             UUID assignedTo,
             String assigneeName,
             String containmentAction,

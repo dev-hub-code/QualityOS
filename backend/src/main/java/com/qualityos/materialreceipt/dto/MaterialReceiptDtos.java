@@ -109,6 +109,7 @@ public final class MaterialReceiptDtos {
             String internalBatch,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal remainingQuantity,
+            UUID uomId,
             String inspectionStatus,
             String disposition,
             boolean released) {

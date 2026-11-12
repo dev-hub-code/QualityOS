@@ -54,7 +54,9 @@ public final class TraceabilityDtos {
     public record ConsumeRequest(
             UUID receiptItemId,
             UUID parentBatchId,
-            @NotNull @Positive @Digits(integer = 12, fraction = 6) BigDecimal quantity) {
+            @NotNull @Positive @Digits(integer = 12, fraction = 6) BigDecimal quantity,
+            /* The unit the quantity is in. Left out, it is the lot's or batch's own unit. */
+            UUID uomId) {
     }
 
     public record CompleteBatchRequest(
@@ -133,6 +135,7 @@ public final class TraceabilityDtos {
             UUID productId,
             String productCode,
             String productName,
+            UUID uomId,
             UUID facilityId,
             String status,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal plannedQuantity,
@@ -150,7 +153,12 @@ public final class TraceabilityDtos {
             UUID id,
             String sourceBatch,
             String description,
+            /* In the source's unit, which is what was taken from it. */
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
+            UUID uomId,
+            /* As typed, when it was typed in another unit or named one. */
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal enteredQuantity,
+            UUID enteredUomId,
             Instant at,
             String reversalReason) {
     }

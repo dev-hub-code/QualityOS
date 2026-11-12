@@ -14,6 +14,7 @@ import {
   useAssignees,
   useDefectCategories,
   useRefresh,
+  useUnits,
 } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { StatusHistory } from "@/components/records/status-history";
@@ -47,6 +48,7 @@ export default function NcrPage() {
   const canRaiseCapa = usePermission("CAPA_MANAGE");
   const assignees = useAssignees();
   const categories = useDefectCategories();
+  const units = useUnits();
   const [step, setStep] = useState<Step | null>(null);
   const [raisingCapa, setRaisingCapa] = useState(false);
   const { data: ncr, error } = useQuery({ queryKey: [path], queryFn: () => api.get<Ncr>(path) });
@@ -144,7 +146,10 @@ export default function NcrPage() {
             ["Supplier", ncr.supplierName],
             ["Material", ncr.materialName],
             ["Batch", ncr.batchNumber],
-            ["Rejected quantity", ncr.rejectedQuantity && formatQuantity(ncr.rejectedQuantity)],
+            [
+              "Rejected quantity",
+              ncr.rejectedQuantity && `${formatQuantity(ncr.rejectedQuantity)} ${units.label(ncr.rejectedUomId)}`.trim(),
+            ],
             ["Defect category", ncr.defectCategoryName],
             ["Assigned to", ncr.assigneeName],
             ["Containment", ncr.containmentAction],

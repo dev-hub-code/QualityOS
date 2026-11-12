@@ -400,6 +400,40 @@ class QualityIT extends AbstractIntegrationTest {
                 .andExpect(status().isUnprocessableContent());
     }
 
+    private ResultActions uploadEvidence(Session session, String action) throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "control-plan.pdf", "application/pdf", "%PDF-1.4 plan".getBytes(StandardCharsets.UTF_8));
+        return mvc.perform(multipart("/api/v1/attachments").file(file)
+                .param("entityType", "CAPA_ACTION").param("entityId", action)
+                .header(HttpHeaders.AUTHORIZATION, session.bearer()));
+    }
+
+    @Test
+    void eachActionKeepsItsOwnEvidenceUntilTheCapaIsFinished() throws Exception {
+        String capa = capa(null, owner);
+        analyse(capa);
+        String first = addAction(capa, "CORRECTIVE");
+        String second = addAction(capa, "PREVENTIVE");
+
+        uploadEvidence(owner, first).andExpect(status().isCreated());
+        as(owner, get("/api/v1/attachments").param("entityType", "CAPA_ACTION").param("entityId", first))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].fileName").value("control-plan.pdf"));
+        as(owner, get("/api/v1/attachments").param("entityType", "CAPA_ACTION").param("entityId", second))
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        Session viewer = addMember(owner, "VIEWER");
+        uploadEvidence(viewer, second).andExpect(status().isForbidden());
+        Session stranger = register();
+        uploadEvidence(stranger, second).andExpect(status().isNotFound());
+        uploadEvidence(owner, UUID.randomUUID().toString()).andExpect(status().isNotFound());
+
+        act(owner, "/capas/" + capa + "/cancel", Map.of("note", "Superseded")).andExpect(status().isOk());
+        uploadEvidence(owner, second)
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value("This record is closed, so its files cannot change."));
+    }
+
     @Test
     void theDatabaseProtectsClosedRecordsAndHistory() throws Exception {
         String ncr = ncrAwaitingAction("MINOR");

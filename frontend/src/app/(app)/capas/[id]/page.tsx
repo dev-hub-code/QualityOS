@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
-import { AttachmentPanel } from "@/components/records/attachment-panel";
+import { AttachmentList, AttachmentPanel } from "@/components/records/attachment-panel";
 import { CapaAnalysisForm } from "@/components/records/capa-analysis-form";
 import {
   Details,
@@ -200,17 +200,29 @@ export default function CapaPage() {
         {capa.actions.length === 0 && <p className="text-sm text-muted-foreground">No actions yet.</p>}
         <ul className="divide-y text-sm">
           {capa.actions.map((action) => (
-            <li key={action.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
-              <span>
-                <span className="font-medium">{action.actionType === "CORRECTIVE" ? "Corrective" : "Preventive"}:</span>{" "}
-                {action.description} · {action.ownerName} · due {action.targetDate}
-                {action.completionNote && ` · done: ${action.completionNote}`}
-              </span>
-              {canManage && status === "IMPLEMENTATION" && !action.completedAt && (
-                <Button variant="outline" size="sm" onClick={() => setStep(complete(action))}>
-                  Complete
-                </Button>
-              )}
+            <li key={action.id} className="space-y-2 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span>
+                  <span className="font-medium">{action.actionType === "CORRECTIVE" ? "Corrective" : "Preventive"}:</span>{" "}
+                  {action.description} · {action.ownerName} · due {action.targetDate}
+                  {action.completionNote && ` · done: ${action.completionNote}`}
+                </span>
+                {canManage && status === "IMPLEMENTATION" && !action.completedAt && (
+                  <Button variant="outline" size="sm" onClick={() => setStep(complete(action))}>
+                    Complete
+                  </Button>
+                )}
+              </div>
+              <div className="border-l-2 pl-3">
+                <p className="text-xs font-medium text-muted-foreground">Evidence</p>
+                <AttachmentList
+                  entityType="CAPA_ACTION"
+                  entityId={action.id}
+                  canManage={canManage && !finished}
+                  uploadLabel={`Upload evidence for: ${action.description}`}
+                  emptyMessage="No evidence yet."
+                />
+              </div>
             </li>
           ))}
         </ul>

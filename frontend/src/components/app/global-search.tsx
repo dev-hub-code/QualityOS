@@ -16,7 +16,7 @@ export function GlobalSearch() {
     <form role="search" onSubmit={submit}>
       <Input
         aria-label="Search everything"
-        placeholder="Serial, batch, lot, product"
+        placeholder="Batch, serial, NCR, CAPA, supplier"
         value={term}
         onChange={(event) => setTerm(event.target.value)}
       />

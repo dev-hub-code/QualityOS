@@ -124,3 +124,29 @@ test("serial pages stay closed to anyone who should not see them", async ({ page
   await manager.goto(`/traceability/serials?q=${serial}`);
   await expect(manager.getByText("No serial numbers match.")).toBeVisible();
 });
+
+test("global search also finds NCRs, CAPAs and suppliers", async ({ page }) => {
+  await signUp(page);
+  const call = apiCaller(page);
+  const word = `Chatter${unique()}`;
+  const supplier = await call("POST", "/suppliers", { code: `S-${unique()}`, name: `${word} Forgings` });
+  const ncr = await call("POST", "/ncrs", { title: `${word} marks on bore`, description: "Seen at final", severity: "MINOR" });
+  const capa = await call("POST", "/capas", {
+    title: `Stop ${word} on the lathe`,
+    problemStatement: "Recurring marks",
+    targetDate: new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10),
+    ownerId: (await call("GET", "/auth/me")).user.id,
+    effectivenessRequired: false,
+  });
+
+  await page.goto("/dashboard");
+  await page.getByLabel("Search everything").fill(word.toLowerCase());
+  await page.getByLabel("Search everything").press("Enter");
+  await expect(page.getByRole("link", { name: ncr.ncrNumber })).toBeVisible();
+  await expect(page.getByRole("link", { name: capa.capaNumber })).toBeVisible();
+  await expect(page.getByRole("link", { name: supplier.code })).toBeVisible();
+  await expect(page.getByText(`${word} Forgings`)).toBeVisible();
+
+  await page.getByRole("link", { name: ncr.ncrNumber }).click();
+  await expect(page).toHaveURL(new RegExp(`/ncrs/${ncr.id}$`));
+});

@@ -217,14 +217,21 @@ public class InspectionService implements AttachmentPolicy {
                     EnumSet.allOf(InspectionTemplate.Type.class), Set.of(InspectionTemplate.Type.IQC));
         }
         if (productionBatchId != null) {
+            ProductionBatchView batch = reachable(production.batch(productionBatchId));
             Set<InspectionTemplate.Type> due = production.dueInspection(productionBatchId)
                     .map(type -> Set.of(InspectionTemplate.Type.valueOf(type)))
                     .orElse(Set.of());
-            return templates.applicable(null, production.batch(productionBatchId).productId(), due, due);
+            return templates.applicable(null, batch.productId(), due, due);
         }
-        UUID batch = returns.returnedGoods(returnItemId).productionBatchId();
+        ProductionBatchView batch = reachable(production.batch(returns.returnedGoods(returnItemId).productionBatchId()));
         Set<InspectionTemplate.Type> outgoing = Set.of(InspectionTemplate.Type.FQC, InspectionTemplate.Type.OQC);
-        return templates.applicable(null, production.batch(batch).productId(), outgoing, outgoing);
+        return templates.applicable(null, batch.productId(), outgoing, outgoing);
+    }
+
+    /** A batch outside the person's facilities is as good as missing, so nothing about it shows. */
+    private ProductionBatchView reachable(ProductionBatchView batch) {
+        scope.requireAllowed(batch.facilityId(), "Batch", batch.id().toString());
+        return batch;
     }
 
     private UUID chooseTemplate(CreateInspectionRequest request) {

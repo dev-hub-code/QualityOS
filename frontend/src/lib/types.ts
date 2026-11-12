@@ -325,6 +325,8 @@ export interface TemplateSummary {
   inspectionType: string;
   materialId: string | null;
   productId: string | null;
+  /** The material's or product's code and name, or null for a general template. */
+  appliesTo: string | null;
   publishedVersion: number | null;
   hasDraft: boolean;
 }
@@ -636,6 +638,7 @@ export interface TraceNode {
   code: string;
   name: string;
   quantity: string;
+  uomId: string;
   status: string;
   supplierName: string | null;
   supplierBatch: string | null;

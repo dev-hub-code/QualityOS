@@ -10,7 +10,7 @@ import { recallBatchNumbers } from "@/lib/traceability";
 import type { CapaSummary, RecallDetail } from "@/lib/types";
 
 const FIELDS: FieldDef[] = [
-  { name: "otherBatches", label: "Other batches in this recall (one per line)", type: "textarea" },
+  { name: "otherBatches", label: "Other production batches in this recall (one per line)", type: "textarea" },
   { name: "recallDate", label: "Recall date", type: "date", required: true },
   { name: "reason", label: "Reason for recall", type: "textarea", required: true },
   { name: "instructions", label: "What customers must do", type: "textarea", required: true },

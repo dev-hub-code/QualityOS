@@ -414,14 +414,14 @@ public class TraceabilityService {
 
     private static TraceNode node(LotView lot, Map<UUID, String> orderNumbers) {
         return new TraceNode(lot.itemId(), LOT, lot.internalBatch(), lot.materialCode(), lot.materialName(), lot.quantity(),
-                lot.disposition() != null ? lot.disposition() : lot.inspectionStatus(), lot.supplierName(),
+                lot.uomId(), lot.disposition() != null ? lot.disposition() : lot.inspectionStatus(), lot.supplierName(),
                 lot.supplierBatch(), lot.grnNumber(), orderNumbers.get(lot.purchaseOrderId()));
     }
 
     private static TraceNode node(ProductionBatchView batch) {
         return new TraceNode(batch.id(), BATCH, batch.batchNumber(), batch.productCode(), batch.productName(),
                 batch.producedQuantity() != null ? batch.producedQuantity() : batch.plannedQuantity(),
-                batch.status(), null, null, null, null);
+                batch.uomId(), batch.status(), null, null, null, null);
     }
 
     private static RecallLine recallLine(DispatchResponse dispatch, Set<String> batches) {

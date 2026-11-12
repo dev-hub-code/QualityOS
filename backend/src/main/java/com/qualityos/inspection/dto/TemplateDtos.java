@@ -39,6 +39,8 @@ public final class TemplateDtos {
             String inspectionType,
             UUID materialId,
             UUID productId,
+            /* The material's or product's code and name, or null for a general template. */
+            String appliesTo,
             Integer publishedVersion,
             boolean hasDraft) {
     }

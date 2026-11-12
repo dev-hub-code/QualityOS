@@ -122,6 +122,30 @@ class TemplateSelectionIT extends TraceabilityFixture {
     }
 
     @Test
+    void aBatchElsewhereShowsNothingToSomeoneLimitedToAnotherFacility() throws Exception {
+        template("IPQC");
+        String batch = startBatch(product());
+        Session limited = addMember(owner, "QUALITY_MANAGER");
+        limit(limited, facility(owner));
+
+        as(limited, get(APPLICABLE + "productionBatchId=" + batch)).andExpect(status().isNotFound());
+        as(limited, postJson("/api/v1/inspections", Map.of("productionBatchId", batch))).andExpect(status().isNotFound());
+        as(owner, get(APPLICABLE + "productionBatchId=" + batch)).andExpect(status().isOk());
+    }
+
+    @Test
+    void aTemplateSaysWhatItIsFor() throws Exception {
+        String material = material(owner, true);
+        String own = template("IQC", Map.of("materialId", material));
+        String general = template("IQC");
+
+        as(owner, get("/api/v1/inspection-templates/" + own))
+                .andExpect(jsonPath("$.data.template.appliesTo").value(org.hamcrest.Matchers.endsWith(" – EN8 Bar")));
+        as(owner, get("/api/v1/inspection-templates/" + general))
+                .andExpect(jsonPath("$.data.template.appliesTo").isEmpty());
+    }
+
+    @Test
     void theSubjectMustBeNamedOnce() throws Exception {
         as(owner, get(APPLICABLE)).andExpect(status().isUnprocessableContent());
     }

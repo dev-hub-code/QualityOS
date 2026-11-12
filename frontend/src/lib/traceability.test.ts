@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inspectionTypeFor, parseSerials, toConsumeRequest, toDispatchItems } from "./traceability";
+import { inspectionTypeFor, parseSerials, toConsumeRequest, toDispatchItems, toReturnItems } from "./traceability";
 
 describe("parseSerials", () => {
   it("splits on lines and commas, and drops blanks and repeats", () => {
@@ -37,5 +37,19 @@ describe("toDispatchItems", () => {
       { productionBatchId: "a", quantity: "2", serialNumbers: ["S1", "S2"] },
       { productionBatchId: "b", quantity: "1", serialNumbers: [] },
     ]);
+  });
+});
+
+describe("toReturnItems", () => {
+  it("keeps each line given a quantity, with its serials, and leaves out blank lines", () => {
+    const values = { quantity1: "2", serials1: "SN-1\nSN-2", quantity2: " ", quantity3: "1", serials3: "" };
+    expect(toReturnItems(values, ["a", "b", "c"])).toEqual([
+      { dispatchItemId: "a", quantity: "2", serialNumbers: ["SN-1", "SN-2"] },
+      { dispatchItemId: "c", quantity: "1", serialNumbers: [] },
+    ]);
+  });
+
+  it("is empty when no line has a quantity", () => {
+    expect(toReturnItems({}, ["a"])).toEqual([]);
   });
 });

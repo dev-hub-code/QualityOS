@@ -143,8 +143,7 @@ test("returned goods stay out of stock until an inspection accepts them", async 
   );
   await expect(page.getByRole("button", { name: "Reverse", exact: true })).toHaveCount(0);
   await step(page, "Record return", async (dialog) => {
-    await dialog.getByLabel("Line", { exact: true }).selectOption({ index: 1 });
-    await dialog.getByLabel("Returned quantity").fill("4");
+    await dialog.getByLabel(/^Returned from .* \(up to 10\)$/).fill("4");
     await dialog.getByLabel("Return reference").fill("RMA-1");
     await dialog.getByLabel("Date received").fill(new Date().toISOString().slice(0, 10));
     await dialog.getByLabel("Reason for return").fill("Scratched in transit");
@@ -193,8 +192,7 @@ test("an expected return waits for the goods, and the recall report shows what i
   await expect(page.getByText("awaiting shipment", { exact: false }).first()).toBeVisible();
   await step(page, "Confirm shipment", (dialog) => dialog.getByLabel("Shipped on").fill(today));
   await step(page, "Record return", async (dialog) => {
-    await dialog.getByLabel("Line", { exact: true }).selectOption({ index: 1 });
-    await dialog.getByLabel("Returned quantity").fill("3");
+    await dialog.getByLabel(/^Returned from /).fill("3");
     await dialog.getByLabel("Return reference").fill("RMA-EXPECTED");
     await dialog.getByLabel("Date received or expected").fill(today);
     await dialog.getByLabel("Reason for return").fill("Wrong size");
@@ -213,4 +211,32 @@ test("an expected return waits for the goods, and the recall report shows what i
   const row = page.getByRole("row").nth(1);
   await expect(row.getByRole("cell").nth(4)).toHaveText("3");
   await expect(row.getByRole("cell").nth(5)).toHaveText("7");
+});
+
+test("one return takes goods back from several lines of a dispatch", async ({ page, browser }) => {
+  test.setTimeout(90_000);
+  await dispatchedBatch(page, browser, [], true);
+  const today = new Date().toISOString().slice(0, 10);
+
+  await page.goto("/dispatches");
+  await step(page, "Confirm shipment", (dialog) => dialog.getByLabel("Shipped on").fill(today));
+  await page.getByRole("button", { name: "Record return" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Return reference").fill("RMA-BOTH");
+  await dialog.getByLabel("Date received or expected").fill(today);
+  await dialog.getByLabel("Reason for return").fill("Customer cancelled part of the order");
+
+  // Nothing to return yet: the form says so rather than sending an empty return.
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog.getByText("Enter the quantity returned from at least one batch.")).toBeVisible();
+
+  await dialog.getByLabel(/^Returned from .*, line 1 \(up to 5\)$/).fill("2");
+  await dialog.getByLabel(/^Returned from .*, line 2 \(up to 5\)$/).fill("3");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText("(2 returned)")).toBeVisible();
+  await expect(page.getByText("(3 returned)")).toBeVisible();
+
+  await page.goto("/dispatch-reversals");
+  await expect(page.getByRole("link", { name: /^RET-/ })).toHaveCount(1);
 });

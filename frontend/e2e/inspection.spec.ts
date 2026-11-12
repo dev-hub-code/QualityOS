@@ -160,6 +160,13 @@ test("a template is published, and a failed critical measurement never releases 
     await dialog.getByLabel("Target date").fill("2036-01-10");
   });
   await page.getByRole("button", { name: "Start implementation" }).click();
+  // Evidence belongs to the action it proves.
+  await page.getByLabel("Upload evidence for: Replace thermocouple").setInputFiles({
+    name: "thermocouple-cert.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4 calibration certificate"),
+  });
+  await expect(page.getByRole("link", { name: "thermocouple-cert.pdf" })).toBeVisible();
   await step(page, "Complete", (dialog) => dialog.getByLabel("What was done").fill("Replaced and calibrated"));
   await page.getByRole("button", { name: "Submit for verification" }).click();
   await expect(page.getByText("Someone other than the CAPA owner")).toBeVisible();
@@ -172,6 +179,8 @@ test("a template is published, and a failed critical measurement never releases 
   });
   await step(manager, "Close CAPA", (dialog) => dialog.getByLabel("Closure note").fill("Effective"));
   await expect(manager.getByText("closed", { exact: true }).first()).toBeVisible();
+  await expect(manager.getByRole("link", { name: "thermocouple-cert.pdf" })).toBeVisible();
+  await expect(manager.getByLabel("Upload evidence for: Replace thermocouple")).toHaveCount(0);
 
   await page.goto(ncrUrl);
   await step(page, "Request verification");

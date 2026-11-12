@@ -49,7 +49,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | An NCR raised on a held lot has no rejected quantity, and a later reject does not fill it in | Review after real use |
 | Completing a CAPA action needs `CAPA_MANAGE`, so an action owner without it must ask someone who has it | Review after real use |
 | Overdue reminders cover the CAPA as a whole, not each action | When a user needs it |
-| Only inspection failures raise NCRs automatically. Evidence is attached to the CAPA, not to each action | When a user needs it |
+| Only inspection failures raise NCRs automatically. Evidence can be attached to the CAPA as a whole or to each action (`CAPA_ACTION`); both follow the CAPA's permissions and lock when it is finished. Evidence is not required to complete an action | When a user needs it |
 | A single inspection's report is a printable page, not a generated PDF. The inspection report across a period is one | When a user needs it |
 | An inspection takes the one published template that fits when none is chosen: the material's or product's own before a general one, of IQC for a lot, the type due at a batch's stage, or FQC/OQC for returns. When several or none fit, the person chooses, and the start dialogs list only fitting templates with that one preselected | Review after real use |
 | Production batches take IPQC and FQC inspections only. OQC and the other template types have no production flow | When a user needs it |

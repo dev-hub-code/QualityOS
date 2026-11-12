@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { activeNavHref, landingPage, leavesWorkspace, NAV_ITEMS, visibleNavItems, workspaceNavItems } from "./navigation";
+import {
+  activeNavHref,
+  forManufacturingModel,
+  landingPage,
+  leavesWorkspace,
+  NAV_ITEMS,
+  visibleNavItems,
+  workspaceNavItems,
+} from "./navigation";
 
 const labels = (permissions: string[]) => visibleNavItems(permissions).map((item) => item.label);
 
@@ -81,5 +89,24 @@ describe("activeNavHref", () => {
 
   it("does not match a longer word that only starts the same", () => {
     expect(activeNavHref("/materials-x", NAV_ITEMS)).toBeUndefined();
+  });
+});
+
+describe("forManufacturingModel", () => {
+  const manufacturing = visibleNavItems(["MANUFACTURING_VIEW"]).filter((item) => item.group === "Manufacturing");
+  const shown = (model?: "DISCRETE" | "PROCESS" | "HYBRID") =>
+    forManufacturingModel(manufacturing, model).map((item) => item.label);
+
+  it("shows BOMs to discrete, recipes to process, and both to hybrid organisations", () => {
+    expect(shown("DISCRETE")).toContain("BOMs");
+    expect(shown("DISCRETE")).not.toContain("Recipes");
+    expect(shown("PROCESS")).toEqual(["Work centres", "Machines", "Recipes", "Routings", "Configuration"]);
+    expect(shown("HYBRID")).toEqual(expect.arrayContaining(["BOMs", "Recipes"]));
+  });
+
+  it("keeps the group together and hidden from people without the permission", () => {
+    const indexes = NAV_ITEMS.flatMap((item, index) => (item.group === "Manufacturing" ? [index] : []));
+    expect(indexes.at(-1)! - indexes[0]).toBe(indexes.length - 1);
+    expect(visibleNavItems(["NCR_VIEW"]).some((item) => item.group === "Manufacturing")).toBe(false);
   });
 });

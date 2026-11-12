@@ -5,14 +5,23 @@ import { SubscriptionBanner } from "@/components/billing/subscription-banner";
 import { ArrowLeft, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Search, ShieldCheck, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { GlobalSearch } from "@/components/app/global-search";
 import { NotificationBell } from "@/components/app/notification-bell";
 import { VerifyEmailBanner } from "@/components/app/verify-email-banner";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/hooks/use-me";
-import { hardNavigate, session } from "@/lib/api";
-import { activeNavHref, CONTROL_CENTER_NAV, leavesWorkspace, visibleNavItems, workspaceNavItems } from "@/lib/navigation";
+import { api, hardNavigate, session } from "@/lib/api";
+import type { ManufacturingSettings } from "@/lib/types";
+import {
+  activeNavHref,
+  CONTROL_CENTER_NAV,
+  forManufacturingModel,
+  leavesWorkspace,
+  visibleNavItems,
+  workspaceNavItems,
+} from "@/lib/navigation";
 
 const LINK = {
   workspace: {
@@ -60,6 +69,12 @@ function initials(name: string) {
 export function AppShell({ children }: { children: ReactNode }) {
   const { data: me } = useMe();
   const pathname = usePathname();
+  // The organisation's manufacturing model decides whether BOMs, recipes or both appear.
+  const { data: manufacturing } = useQuery({
+    queryKey: ["/manufacturing/settings"],
+    queryFn: () => api.get<ManufacturingSettings>("/manufacturing/settings"),
+    enabled: Boolean(me?.permissions.includes("MANUFACTURING_VIEW") && me.hasSubscription),
+  });
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   // Collapsing applies from the md breakpoint up; on a phone the menu opens in full.
@@ -111,7 +126,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     return <p className="p-6 text-sm text-muted-foreground">Loading…</p>;
   }
 
-  const workspaceItems = workspaceNavItems(me.permissions, me.hasSubscription);
+  const workspaceItems = forManufacturingModel(
+    workspaceNavItems(me.permissions, me.hasSubscription),
+    manufacturing?.manufacturingModel,
+  );
   const activeWorkspaceHref = activeNavHref(pathname, workspaceItems);
 
   return (
@@ -222,11 +240,18 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
         ) : (
           <nav aria-label="Main" className="flex flex-1 flex-col gap-1">
-            {workspaceItems.map(({ href, label: text, icon: Icon }) => {
+            {workspaceItems.map(({ href, label: text, icon: Icon, group }, index) => {
               const active = href === activeWorkspaceHref;
+              const startsGroup = group && workspaceItems[index - 1]?.group !== group;
+              const endsGroup = group && workspaceItems[index + 1]?.group !== group;
               return (
+                <Fragment key={href}>
+                {startsGroup && (
+                  <p className={`mt-2 px-3 pt-1 text-xs font-medium tracking-wide text-muted-foreground uppercase ${collapsed ? "md:sr-only" : ""}`}>
+                    {group}
+                  </p>
+                )}
                 <Link
-                  key={href}
                   href={href}
                   aria-current={active ? "page" : undefined}
                   title={collapsed ? text : undefined}
@@ -236,6 +261,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <Icon aria-hidden className="size-4 shrink-0" />
                   {label(text)}
                 </Link>
+                {endsGroup && <hr aria-hidden className="mx-3 my-1 border-[#1b2a55]/10" />}
+                </Fragment>
               );
             })}
           </nav>

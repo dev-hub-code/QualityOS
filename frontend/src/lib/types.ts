@@ -1554,3 +1554,159 @@ export interface SupportError {
   template: string;
   errorType: string | null;
 }
+
+export type ManufacturingModel = "DISCRETE" | "PROCESS" | "HYBRID";
+
+export interface ManufacturingSettings {
+  manufacturingModel: ManufacturingModel;
+  separateApprover: boolean;
+}
+
+export interface ProductManufacturingSettings {
+  productId: string;
+  /** Null when a hybrid organisation has not chosen for this product. */
+  manufacturingModel: Exclude<ManufacturingModel, "HYBRID"> | null;
+  chosen: boolean;
+}
+
+export interface WorkCenter {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  facilityId: string;
+  facilityCode: string | null;
+  productionLineId: string | null;
+  productionLineCode: string | null;
+  archived: boolean;
+}
+
+export type MachineStatus = "AVAILABLE" | "RUNNING" | "IDLE" | "MAINTENANCE" | "BREAKDOWN" | "INACTIVE";
+
+export interface Machine {
+  id: string;
+  code: string;
+  name: string;
+  manufacturer: string | null;
+  model: string | null;
+  serialNumber: string | null;
+  workCenterId: string;
+  workCenterCode: string | null;
+  facilityId: string | null;
+  status: MachineStatus;
+  statusReason: string | null;
+  statusChangedAt: string;
+  nextStatuses: MachineStatus[];
+}
+
+export interface MachineStatusEvent {
+  fromStatus: MachineStatus | null;
+  toStatus: MachineStatus;
+  reason: string | null;
+  changedBy: string | null;
+  changedByName: string | null;
+  changedAt: string;
+}
+
+export type RevisionStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "OBSOLETE";
+
+export interface Revision {
+  id: string;
+  kind: "BOM" | "RECIPE" | "ROUTING";
+  productId: string;
+  productCode: string | null;
+  productName: string | null;
+  productUomId: string | null;
+  revision: number;
+  status: RevisionStatus;
+  /** Null for a routing. */
+  baseQuantity: string | null;
+  changeNote: string | null;
+  reviewNote: string | null;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+  inEffect: boolean;
+  submittedBy: string | null;
+  submittedByName: string | null;
+  submittedAt: string | null;
+  approvedBy: string | null;
+  approvedByName: string | null;
+  approvedAt: string | null;
+  obsoletedAt: string | null;
+  createdAt: string;
+}
+
+export interface BomLine {
+  id: string;
+  lineNumber: number;
+  componentType: "MATERIAL" | "PRODUCT";
+  componentId: string;
+  componentCode: string;
+  componentName: string;
+  quantity: string;
+  uomId: string;
+  scrapPercent: string;
+  scales: boolean;
+  notes: string | null;
+}
+
+export interface ProcessParameter {
+  id: string;
+  code: string;
+  name: string;
+  unit: string | null;
+  target: string | null;
+  minimum: string | null;
+  maximum: string | null;
+}
+
+export interface BomDetail {
+  revision: Revision;
+  lines: BomLine[];
+  parameters: ProcessParameter[];
+}
+
+export interface ExplosionRow {
+  level: number;
+  componentType: "MATERIAL" | "PRODUCT";
+  componentId: string;
+  componentCode: string;
+  componentName: string;
+  quantity: string;
+  uomId: string;
+  exploded: boolean;
+}
+
+export interface Explosion {
+  quantity: string;
+  uomId: string;
+  on: string;
+  rows: ExplosionRow[];
+  totals: Omit<ExplosionRow, "level" | "exploded">[];
+}
+
+export interface ScaledRecipe {
+  batchSize: string;
+  uomId: string;
+  factor: string;
+  lines: (Omit<BomLine, "id" | "scrapPercent" | "notes">)[];
+  parameters: ProcessParameter[];
+}
+
+export interface RoutingOperation {
+  id: string;
+  sequence: number;
+  name: string;
+  workCenterId: string;
+  workCenterCode: string;
+  workCenterName: string;
+  setupMinutes: string;
+  runMinutes: string;
+  instructions: string | null;
+  parameters: ProcessParameter[];
+}
+
+export interface RoutingDetail {
+  revision: Revision;
+  operations: RoutingOperation[];
+}

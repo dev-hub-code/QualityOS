@@ -55,6 +55,8 @@ public final class Permissions {
     public static final String MATERIAL_CORRECTION_REQUEST = "MATERIAL_CORRECTION_REQUEST";
     public static final String MATERIAL_CORRECTION_APPROVE = "MATERIAL_CORRECTION_APPROVE";
     public static final String INSPECTION_EXECUTE = "INSPECTION_EXECUTE";
+    public static final String MANUFACTURING_VIEW = "MANUFACTURING_VIEW";
+    public static final String MANUFACTURING_MANAGE = "MANUFACTURING_MANAGE";
 
     private Permissions() {
     }
@@ -110,6 +112,14 @@ public final class Permissions {
         public static final String AUDIT_CLOSE = "hasAuthority('AUDIT_CLOSE')";
         public static final String MATERIAL_CORRECTION_REQUEST = "hasAuthority('MATERIAL_CORRECTION_REQUEST')";
         public static final String MATERIAL_CORRECTION_APPROVE = "hasAuthority('MATERIAL_CORRECTION_APPROVE')";
+        public static final String MANUFACTURING_VIEW = "hasAuthority('MANUFACTURING_VIEW')";
+        public static final String MANUFACTURING_MANAGE = "hasAuthority('MANUFACTURING_MANAGE')";
+        public static final String BOM_MANAGE = "hasAuthority('BOM_MANAGE')";
+        public static final String BOM_APPROVE = "hasAuthority('BOM_APPROVE')";
+        public static final String RECIPE_MANAGE = "hasAuthority('RECIPE_MANAGE')";
+        public static final String RECIPE_APPROVE = "hasAuthority('RECIPE_APPROVE')";
+        public static final String ROUTING_MANAGE = "hasAuthority('ROUTING_MANAGE')";
+        public static final String ROUTING_APPROVE = "hasAuthority('ROUTING_APPROVE')";
 
         private Require() {
         }

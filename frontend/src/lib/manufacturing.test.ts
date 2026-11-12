@@ -1,0 +1,57 @@
+import { describe, expect, it } from "vitest";
+import { describeLimits, revisionActions, toLineRequest, usesKind } from "@/lib/manufacturing";
+
+describe("usesKind", () => {
+  it("offers BOMs to discrete and recipes to process organisations, and both to hybrid ones", () => {
+    expect(usesKind("DISCRETE", "BOM")).toBe(true);
+    expect(usesKind("DISCRETE", "RECIPE")).toBe(false);
+    expect(usesKind("PROCESS", "RECIPE")).toBe(true);
+    expect(usesKind("HYBRID", "BOM")).toBe(true);
+    expect(usesKind("HYBRID", "RECIPE")).toBe(true);
+    expect(usesKind(undefined, "BOM")).toBe(false);
+  });
+});
+
+describe("revisionActions", () => {
+  const all = { manage: true, approve: true };
+
+  it("follows the revision's stage", () => {
+    expect(revisionActions("DRAFT", false, all)).toEqual(["edit", "submit", "discard"]);
+    expect(revisionActions("DRAFT", true, all)).toEqual(["edit", "submit"]);
+    expect(revisionActions("SUBMITTED", true, all)).toEqual(["sendBack", "approve"]);
+    expect(revisionActions("APPROVED", true, all)).toEqual(["retire"]);
+    expect(revisionActions("OBSOLETE", true, all)).toEqual([]);
+  });
+
+  it("offers only what the person's permissions allow", () => {
+    expect(revisionActions("SUBMITTED", true, { manage: true, approve: false })).toEqual([]);
+    expect(revisionActions("DRAFT", false, { manage: false, approve: true })).toEqual([]);
+  });
+});
+
+describe("toLineRequest", () => {
+  it("splits the chosen component into a material or a product", () => {
+    expect(toLineRequest({ component: "material:m1", quantity: "2", uomId: "u", scrapPercent: "", fixed: false })).toEqual({
+      materialId: "m1",
+      componentProductId: null,
+      quantity: "2",
+      uomId: "u",
+      scrapPercent: null,
+      scales: true,
+      notes: null,
+    });
+    const product = toLineRequest({ component: "product:p1", quantity: "1", uomId: "u", scrapPercent: "5", fixed: true });
+    expect(product.componentProductId).toBe("p1");
+    expect(product.scrapPercent).toBe("5");
+    expect(product.scales).toBe(false);
+  });
+});
+
+describe("describeLimits", () => {
+  it("reads as a short sentence", () => {
+    expect(describeLimits({ target: "180.000000", minimum: "175", maximum: "185", unit: "°C" })).toBe(
+      "Target 180, 175 to 185 °C",
+    );
+    expect(describeLimits({ target: null, minimum: "800", maximum: null, unit: null })).toBe("At least 800");
+  });
+});

@@ -1578,6 +1578,14 @@ export interface ManufacturingSettings {
   overReportPercent: string;
   /** Starting an operation at a work centre with machines needs one of them. */
   operationRequiresMachine: boolean;
+  /** A receipt this far below the order quantity, in percent, still closes the order as completed. */
+  completionTolerancePercent: string;
+  /** Material use further off than this, in percent, needs a reason at receipt. */
+  materialVariancePercent: string;
+  /** Closing waits until the batch's final inspection has decided. */
+  completionRequiresFinalInspection: boolean;
+  /** Discrete products are received with one serial number for each unit. */
+  serialTracking: boolean;
 }
 
 export interface ProductManufacturingSettings {
@@ -1816,6 +1824,7 @@ export interface WorkOrder {
   releasedByName: string | null;
   releasedAt: string | null;
   startedAt: string | null;
+  completedAt: string | null;
   createdAt: string;
 }
 
@@ -2159,4 +2168,80 @@ export interface WorkOrderQuality {
   rejected: { rejected: string; toRework: string; scrapped: string; inRework: string; reworkedAccepted: string };
   /** What completion waits for. */
   unresolved: string[];
+}
+
+/** A material line at receipt: what the received quantity needed against what was issued. */
+export interface MaterialVariance {
+  lineNumber: number;
+  componentCode: string;
+  componentName: string;
+  uomId: string;
+  expected: string;
+  issued: string;
+  difference: string;
+  percent: string | null;
+  /** Further off than the organisation's material variance tolerance. */
+  outside: boolean;
+}
+
+export interface FinishedGoodsReceipt {
+  id: string;
+  quantity: string;
+  orderedQuantity: string;
+  expectedQuantity: string | null;
+  rejectedQuantity: string;
+  scrapQuantity: string;
+  reworkedQuantity: string;
+  shortReason: string | null;
+  varianceReason: string | null;
+  materials: MaterialVariance[];
+  serialCount: number;
+  receivedBy: string | null;
+  receivedByName: string | null;
+  receivedAt: string;
+}
+
+/** Receiving a work order's finished goods and closing it. */
+export interface WorkOrderCompletion {
+  orderedQuantity: string;
+  /** What the operations turned out good, with accepted rework; null without operations. */
+  expectedQuantity: string | null;
+  rejectedQuantity: string;
+  scrapQuantity: string;
+  reworkedQuantity: string;
+  serialsRequired: boolean;
+  materials: MaterialVariance[];
+  receiveBlockers: string[];
+  receipt: FinishedGoodsReceipt | null;
+  closeBlockers: string[];
+  /** How the order closes, or closed, once received. */
+  closesAs: "COMPLETED" | "PARTIALLY_COMPLETED" | null;
+  completedAt: string | null;
+  completedByName: string | null;
+}
+
+/** How a batch was made, when a work order made it. */
+export interface ProductionRecord {
+  workOrderId: string;
+  workOrderNumber: string;
+  status: WorkOrderStatus;
+  definitionKind: "BOM" | "RECIPE" | null;
+  definitionRevision: number | null;
+  routingRevision: number | null;
+  operations: {
+    sequence: number;
+    name: string;
+    workCenterCode: string | null;
+    status: string;
+    operators: string[];
+    machines: string[];
+    startedAt: string | null;
+    completedAt: string | null;
+    goodQuantity: string;
+    rejectedQuantity: string;
+    scrapQuantity: string;
+  }[];
+  gates: string[];
+  reworkOrders: string[];
+  receipt: FinishedGoodsReceipt | null;
 }

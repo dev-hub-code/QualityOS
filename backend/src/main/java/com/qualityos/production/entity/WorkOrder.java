@@ -33,23 +33,24 @@ public class WorkOrder extends TenantOwnedEntity {
     public enum Status {
         DRAFT, SUBMITTED, APPROVED, RELEASED, IN_PROGRESS, ON_HOLD, PARTIALLY_COMPLETED, COMPLETED, CANCELLED;
 
+        /** Completed, partially completed and cancelled orders are closed for good. */
         public boolean isOpen() {
-            return this != COMPLETED && this != CANCELLED;
+            return this != COMPLETED && this != PARTIALLY_COMPLETED && this != CANCELLED;
         }
     }
 
     public enum Priority { LOW, NORMAL, HIGH, URGENT }
 
     /**
-     * Which status each status may change to. Completion comes with finished-goods receipt in phase 6, so nothing
-     * reaches COMPLETED or PARTIALLY_COMPLETED yet.
+     * Which status each status may change to. An order in progress closes as COMPLETED or PARTIALLY_COMPLETED once its
+     * finished goods are received; see CompletionService.
      */
     public static final Map<Status, Set<Status>> TRANSITIONS = Map.of(
             Status.DRAFT, EnumSet.of(Status.SUBMITTED, Status.CANCELLED),
             Status.SUBMITTED, EnumSet.of(Status.DRAFT, Status.APPROVED, Status.CANCELLED),
             Status.APPROVED, EnumSet.of(Status.RELEASED, Status.ON_HOLD, Status.CANCELLED),
             Status.RELEASED, EnumSet.of(Status.IN_PROGRESS, Status.ON_HOLD, Status.CANCELLED),
-            Status.IN_PROGRESS, EnumSet.of(Status.ON_HOLD),
+            Status.IN_PROGRESS, EnumSet.of(Status.ON_HOLD, Status.COMPLETED, Status.PARTIALLY_COMPLETED),
             Status.ON_HOLD, EnumSet.of(Status.APPROVED, Status.RELEASED, Status.IN_PROGRESS, Status.CANCELLED),
             Status.PARTIALLY_COMPLETED, EnumSet.noneOf(Status.class),
             Status.COMPLETED, EnumSet.noneOf(Status.class),
@@ -105,6 +106,8 @@ public class WorkOrder extends TenantOwnedEntity {
     private Instant releasedAt;
     private Instant startedAt;
     private UUID productionBatchId;
+    private UUID completedBy;
+    private Instant completedAt;
 
     @JdbcTypeCode(SqlTypes.JSON)
     private String definitionSnapshot;
@@ -183,6 +186,19 @@ public class WorkOrder extends TenantOwnedEntity {
         transition(Status.CANCELLED);
         status = Status.CANCELLED;
         heldFrom = null;
+        statusReason = reason;
+    }
+
+    /**
+     * Closes the order once its finished goods are received: completed, or partially completed when it closes short.
+     * Nothing about it changes afterwards.
+     */
+    public void complete(boolean full, UUID actor, Instant now, String reason) {
+        Status target = full ? Status.COMPLETED : Status.PARTIALLY_COMPLETED;
+        transition(target);
+        status = target;
+        completedBy = actor;
+        completedAt = now;
         statusReason = reason;
     }
 

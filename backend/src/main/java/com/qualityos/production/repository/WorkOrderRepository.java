@@ -20,5 +20,9 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, UUID>, Jpa
     @Query("select w from WorkOrder w where w.id = :id")
     Optional<WorkOrder> findForUpdate(UUID id);
 
+    Optional<WorkOrder> findByProductionBatchId(UUID productionBatchId);
+
+    boolean existsByProductionBatchId(UUID productionBatchId);
+
     boolean existsByPlanLineIdInAndStatusIn(Collection<UUID> planLineIds, Collection<WorkOrder.Status> statuses);
 }

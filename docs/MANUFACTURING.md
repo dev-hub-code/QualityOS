@@ -53,7 +53,7 @@ Status: **Built** (in this branch, tested), **Phase n** (planned), **Reused** (a
 | Work orders | DRAFT → SUBMITTED → APPROVED → RELEASED → IN_PROGRESS, ON_HOLD, CANCELLED, enforced in the entity and audited with an append-only history | Built (Phase 2) |
 | Work orders | BOM or recipe and routing frozen on release; materials and operations worked out from them | Built (Phase 2) |
 | Work orders | Starting opens the existing production batch, so traceability and inspections follow it | Built (Phase 2) |
-| Work orders | COMPLETED and PARTIALLY_COMPLETED | Phase 6 |
+| Work orders | COMPLETED and PARTIALLY_COMPLETED, both final and frozen by the database | Built (Phase 6) |
 | Inventory | Material availability per work order line, from free stock in the order's facility | Built (Phase 3) |
 | Inventory | Concurrency-safe reservation on lots, by hand or oldest-first, and release of reservations | Built (Phase 3) |
 | Inventory | Issue to the order's batch (reserved stock first), partial return, consumption counted from the genealogy | Built (Phase 3) |
@@ -68,8 +68,10 @@ Status: **Built** (in this branch, tested), **Phase n** (planned), **Reused** (a
 | Quality | NCRs and CAPAs on the batch shown on the work order (existing NCR engine, raised automatically on failure) | Built (Phase 5) |
 | Quality | Rejected production summary: rejected, to rework, in rework, reworked and accepted, scrapped | Built (Phase 5) |
 | Rework | Rework orders from an operation's rejects, an inspection disposed of as rework, or an NCR; approved by an authorised person (separately, when configured); steps; reinspection; closed on its decision | Built (Phase 5) |
-| Quality | Completion blocked by open mandatory gates and open rework | Phase 6 (the list of what blocks it is built and shown) |
-| Completion | Finished-goods receipt into existing inventory; production batch completed through traceability | Phase 6 |
+| Quality | Completion blocked by open mandatory gates and open rework, and by a batch on hold or awaiting final inspection | Built (Phase 6) |
+| Completion | Finished-goods receipt into existing inventory: the order's production batch completed through traceability, never a separate balance | Built (Phase 6) |
+| Completion | Quantity reconciliation (operations' good output plus accepted rework), short and excess output, material variance per line, serial numbers | Built (Phase 6) |
+| Completion | Production record of a batch: work order, definition revisions, operations with operators and machines, gates, rework, receipt | Built (Phase 6) |
 | Advanced | Downtime, scheduling, costing, OEE, manufacturing analytics | Phase 7 |
 | Traceability | Batch genealogy, recalls, serials | Reused |
 | Inventory ledger | Lot balances | Reused: lots gain a reserved quantity beside the consumed one; work-order movements are kept in their own append-only ledger |
@@ -158,6 +160,7 @@ Production plans and work orders belong to a facility in the same way.
 | QUALITY_CHECKPOINT_MANAGE (quality checkpoints) | ✓ | | ✓ | |
 | REWORK_MANAGE (raise, cancel and close rework orders) | ✓ | ✓ | | Quality Engineer |
 | REWORK_APPROVE (authorise rework) | ✓ | ✓ | ✓ | |
+| WORK_ORDER_COMPLETE (receive finished goods, close work orders) | ✓ | ✓ | | |
 
 Inspecting a gate and reinspecting rework need the existing INSPECTION_CREATE; a quality hold needs INSPECTION_APPROVE;
 working rework steps needs PRODUCTION_EXECUTE. NCRs and CAPAs appear on the work order only for people with NCR_VIEW.
@@ -187,6 +190,7 @@ of its work orders is open, and cancelled only while none of them stands.
 | APPROVED, RELEASED, IN_PROGRESS | ON_HOLD | WORK_ORDER_RELEASE | With a reason; resume returns to the status it was held from |
 | DRAFT, SUBMITTED | CANCELLED | WORK_ORDER_MANAGE | With a reason |
 | APPROVED, RELEASED, ON_HOLD | CANCELLED | WORK_ORDER_APPROVE | With a reason; not when held from IN_PROGRESS |
+| IN_PROGRESS | COMPLETED, PARTIALLY_COMPLETED | WORK_ORDER_COMPLETE | After finished-goods receipt; see Completion. Both are final |
 
 The allowed moves are in `WorkOrder.TRANSITIONS`. Each move is checked against the current status and the row's
 version, so two people releasing or starting the same order cannot both succeed; the loser gets `409` or `422`. Every
@@ -342,10 +346,48 @@ a pointer from a work order to inspections that the existing engine carries out 
   cannot change, and its status history is append-only.
 - **On the work order.** The quality view shows the gates, NCRs and CAPAs on the batch, rework orders, the rejected
   summary (rejected, to rework, in rework, reworked and accepted, and scrapped on operations and in rework), and one
-  sentence for each mandatory gate not passed and each rework order still open: the list completion will check in
-  phase 6.
+  sentence for each mandatory gate not passed and each rework order still open: the list completion checks.
 - **Concurrency.** Inspecting a gate, a quality hold and every rework change lock the work order row first; rework
   changes then lock the rework order. Status changes are safe to repeat through their status checks.
+
+### Completion
+
+Finished goods are not kept in a stock of their own. A work order's output goes into the production batch it opened
+when it started, which is what the existing inventory, inspections, dispatches and recalls already work on. Finishing
+an order takes two steps, both needing WORK_ORDER_COMPLETE.
+
+- **Receiving finished goods** completes the batch through `ProductionService.completeGuarded`, with the quantity made.
+  It needs the order in progress and the batch in progress; every operation completed or cancelled; every mandatory
+  gate other than final release passed and no rework order open; and material issued to the batch, so that it can be
+  traced.
+  - *Quantity.* With operations, the quantity is the last running operation's good output plus what rework orders from
+    an operation reworked and reinspection accepted; a different quantity is refused. Without operations it must be
+    given. It cannot pass the order quantity plus `overReportPercent` (excess output within that allowance is
+    accepted). Counted units take whole numbers.
+  - *Short output.* Below the order quantity less `completionTolerancePercent`, a `shortReason` is required.
+  - *Material.* For each material line, what the received quantity needed (scaled from the order's requirement) is
+    compared with what was issued, net of returns. A line off by more than `materialVariancePercent` needs a
+    `varianceReason`. The comparison is stored with the receipt.
+  - *Serials.* With `serialTracking` on, a discrete product (made from a BOM) is received with one distinct serial
+    number per unit, registered through `ProductionService.addSerials`.
+  - Open reservations are released. A receipt (`finished_goods_receipts`, append-only, one per order and per batch)
+    records the quantities, reasons, variances and serial count.
+  - Completing a work order's batch from the batch page is refused (`BatchCompletionGuard`); traceability does not
+    depend on manufacturing for this, manufacturing registers the guard.
+- **Closing** completes the order. It needs the receipt; no mandatory gate unresolved other than a final inspection
+  decided as REJECT; no rework open; the batch not on hold; and, with `completionRequiresFinalInspection` (default on),
+  the batch's final inspection decided, so the batch is released or rejected. The order becomes COMPLETED, or
+  PARTIALLY_COMPLETED with a reason when it was short beyond the tolerance or the batch was rejected.
+- **Corrections.** A completed or partially completed order is frozen by the `protect_work_order` trigger, and the
+  receipt by the append-only trigger. Quantities on a completed batch are corrected through the existing material
+  correction and dispatch return workflows; there is no reopen.
+- **Idempotency and concurrency.** Both steps lock the work order first. A receipt repeated with the same
+  `Idempotency-Key` returns the current state; any other second receipt is refused, and the unique constraints on the
+  order and batch back that up. A repeated close is refused by the status check.
+- **Production record.** `GET /work-orders/production-record?batchId=` gives the batch page how the batch was made:
+  the order, its BOM or recipe revision and routing revision, each operation with its operators (from events and
+  reports) and machines, gates with their latest inspection, rework orders and the receipt. With the existing trace
+  (suppliers and lots, inspections, NCRs, CAPAs, dispatches and customers) this covers the batch end to end.
 
 ## 4. Phase plan and progress
 
@@ -356,7 +398,7 @@ a pointer from a work order to inspections that the existing engine carries out 
 | 3 Inventory integration | Availability, reservation, issue, consumption, return | **Built** |
 | 4 Shop floor | Operation execution, quantity reconciliation, machine use | **Built** |
 | 5 Quality and rework | Quality gates on operations, NCR/CAPA links, rework | **Built** |
-| 6 Completion | Finished-goods receipt, batch completion, closing work orders | Not started |
+| 6 Completion | Finished-goods receipt, batch completion, closing work orders | **Built** |
 | 7 Advanced | Downtime, scheduling, costing, OEE, analytics | Not started |
 
 ## 5. Limitations
@@ -371,7 +413,6 @@ Phase 2:
 - A plan line's due date is shown, not enforced against the work order's planned dates.
 - Status changes are made safe to repeat by the status check and the row version, not by an idempotency key: a
   repeated release or start is refused, never applied twice.
-- Nothing reaches COMPLETED or PARTIALLY_COMPLETED until phase 6, so a plan with started orders cannot yet be closed.
 
 Phase 3:
 
@@ -394,12 +435,9 @@ Phase 4:
   operation needs.
 - A machine runs one operation at a time. Machines that run several are not modelled.
 - Stop reasons are recorded on the timeline, but downtime is not yet summarised by machine or period (phase 7).
-- The good output of the last operation is not yet received as finished goods (phase 6).
 
 Phase 5:
 
-- Completion is not built yet, so the list of unresolved gates and rework is shown but first enforced in phase 6.
-  Final-release gates are inspected once the batch is complete, which also arrives with phase 6.
 - Material used in rework is issued through the work order's materials while the order is in progress; a rework order
   has no material lines of its own.
 - A batch put on hold by an inspection's disposition (rather than by a quality hold) does not pause operations already
@@ -409,6 +447,18 @@ Phase 5:
 - Rework steps are entered one per line on the screen, with one work centre for all of them; the API takes a work
   centre per step.
 - Raw-material checks on receipt stay with the existing incoming inspection (IQC); checkpoints cover production.
+
+Phase 6:
+
+- One receipt per work order: the batch is completed once, as traceability works today. Output made after the receipt
+  needs another work order.
+- There is no reopen of a closed order. Corrections go through the existing material correction and dispatch return
+  workflows.
+- Material variance is worked out from issued quantities against the order's frozen requirement; scrap of material is
+  not a separate stock movement.
+- Serial numbers are entered at receipt, not captured per unit as each operation runs.
+- Batches recorded by hand on the batch page are completed there as before; the guard applies only to batches a work
+  order opened.
 
 ## 6. Phase 1 delivery
 
@@ -564,3 +614,41 @@ with Inspect, and a notice when the batch is on hold or rejected.
 - Playwright: `production-quality.spec.ts` adds a checkpoint from its page, inspects the gate from the work order,
   raises a rework order from the failed gate, approves, works, completes, reinspects and closes it, inspects the gate
   again, starts the operation from the floor, and puts the batch on quality hold.
+
+## 11. Phase 6 delivery
+
+**Migration.** `V27__production_completion.sql`: four settings (`completion_tolerance_percent`, default 0;
+`material_variance_percent`, default 5; `completion_requires_final_inspection`, default on; `serial_tracking`, default
+off); `completed_by` and `completed_at` on work orders, with a check that they are set exactly when the order is
+completed or partially completed; `protect_work_order` freezing partially completed orders too; the append-only
+`finished_goods_receipts` with row-level security, one per order and per batch, foreign keys within the tenant; the
+WORK_ORDER_COMPLETE permission for Owner, Admin, Plant Manager and Production Manager.
+
+**Backend.** `CompletionService` (completion view, receipt, close, production record); on `WorkOrderController`
+`GET /{id}/completion`, `POST /{id}/receipt`, `POST /{id}/complete` and `GET /production-record`; `WorkOrderBatchGuard`
+implementing traceability's new `BatchCompletionGuard`; `ProductionService.completeGuarded`;
+`WorkOrderMaterialService.variances` and refusing reservations after receipt; `QualityGateService.receiveBlockers`
+and `closeBlockers`; `WorkOrder.complete`; `completedAt` on the work order response. PARTIALLY_COMPLETED is now a
+closed status, so a plan whose orders closed short can be closed. Reused: `ProductionService` batch completion and
+serial registration, `WorkOrderMaterialService.releaseAll`, `FacilityScope`, `AuditService`.
+
+**Screens.** The work order page has a Completion section: what receiving and closing wait for, the quantities so far,
+material use against need, Receive finished goods (quantity when there are no operations, short and variance reasons,
+serial numbers) and Complete order / Close short, then the receipt. A short close shows its reason above the details.
+Manufacturing settings show and edit the four new rules. The batch page shows the production record for a batch a work
+order made, and no longer offers Complete batch for it.
+
+**Tests.**
+- `ProductionCompletionIT`: 2 tests. They cover receipt blockers (operations, no material) and permission; direct
+  batch completion refused; the quantity fixed by the operations; short reason; material variance reason; serial
+  count and duplicates; receipt with an idempotency key repeated and a second receipt refused; one receipt and nine
+  serials in the database; the batch completed with the received quantity; reservations refused after receipt; close
+  waiting for the final inspection, then needing a reason when short, then partially completed with history and
+  audit; a second close and a hold refused; the order and receipt frozen in the database; the production record, and
+  none for a batch recorded by hand; excess output within the allowance closing completed without a reason; facility
+  scope and isolation between organisations; two receipts at once, one succeeding.
+- Vitest: `completionActions`.
+- Playwright: `production-completion.spec.ts` sets the rules on the settings page, receives finished goods with
+  reasons and serial numbers from the work order page, closes the order short, and checks the batch's serials and
+  production record.
+

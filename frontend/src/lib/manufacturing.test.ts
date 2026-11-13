@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  completionActions,
   describeLimits,
   formatDuration,
   freeQuantity,
@@ -226,5 +227,26 @@ describe("parseSteps", () => {
       { description: "Regrind bore", workCenterId: "wc" },
       { description: "Re-measure", workCenterId: "wc" },
     ]);
+  });
+});
+
+describe("completionActions", () => {
+  const open = { receiveBlockers: [], receipt: null, closeBlockers: [] };
+
+  it("offers receiving first, and only once nothing blocks it", () => {
+    expect(completionActions(open, "IN_PROGRESS", true)).toEqual(["receive"]);
+    expect(completionActions({ ...open, receiveBlockers: ["Operation 10 is ready."] }, "IN_PROGRESS", true)).toEqual([]);
+  });
+
+  it("offers closing once the goods are received and nothing blocks it", () => {
+    const received = { ...open, receipt: { id: "r" } };
+    expect(completionActions(received, "IN_PROGRESS", true)).toEqual(["close"]);
+    expect(completionActions({ ...received, closeBlockers: ["The batch is waiting for its final inspection."] }, "IN_PROGRESS", true)).toEqual([]);
+  });
+
+  it("offers nothing without the permission or once the order has left production", () => {
+    expect(completionActions(open, "IN_PROGRESS", false)).toEqual([]);
+    expect(completionActions(open, "ON_HOLD", true)).toEqual([]);
+    expect(completionActions({ ...open, receipt: { id: "r" } }, "PARTIALLY_COMPLETED", true)).toEqual([]);
   });
 });

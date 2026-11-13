@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
 import { workOrderFields } from "@/components/manufacturing/work-order-fields";
+import { WorkOrderCompletionPanel } from "@/components/manufacturing/work-order-completion";
 import { WorkOrderMaterialsPanel } from "@/components/manufacturing/work-order-materials";
 import { WorkOrderQualityPanel } from "@/components/manufacturing/work-order-quality";
 import {
@@ -27,7 +28,15 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { PRIORITY_LABELS, workOrderActions } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
-import type { WorkOrderDetail } from "@/lib/types";
+import type { WorkOrderDetail, WorkOrderStatus } from "@/lib/types";
+
+/** The statuses whose reason is shown above the details. */
+const REASON_LABELS: Partial<Record<WorkOrderStatus, string>> = {
+  DRAFT: "Sent back",
+  ON_HOLD: "On hold",
+  CANCELLED: "Cancelled",
+  PARTIALLY_COMPLETED: "Closed short",
+};
 
 const when = (value: string | null) => (value ? new Date(value).toLocaleString() : "–");
 const link = "text-primary hover:underline";
@@ -111,9 +120,9 @@ export default function WorkOrderPage() {
         )}
       </PageHeader>
       <FormError message={message} />
-      {order.statusReason && (order.status === "DRAFT" || order.status === "ON_HOLD" || order.status === "CANCELLED") && (
+      {order.statusReason && REASON_LABELS[order.status] && (
         <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-200">
-          {order.status === "DRAFT" ? "Sent back" : order.status === "ON_HOLD" ? "On hold" : "Cancelled"}: {order.statusReason}
+          {REASON_LABELS[order.status]}: {order.statusReason}
         </p>
       )}
       <Section title="Details">
@@ -236,6 +245,7 @@ export default function WorkOrderPage() {
         </Section>
       )}
       {released && <WorkOrderQualityPanel orderId={order.id} status={order.status} operations={operations} />}
+      {order.productionBatchId && <WorkOrderCompletionPanel orderId={order.id} status={order.status} uomId={order.uomId} />}
       <Section title="Status history">
         <ul className="divide-y text-sm">
           {history.map((change) => (

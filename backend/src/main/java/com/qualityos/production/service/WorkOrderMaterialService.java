@@ -24,6 +24,8 @@ import com.qualityos.production.entity.MaterialMovement;
 import com.qualityos.production.entity.MaterialReservation;
 import com.qualityos.production.entity.WorkOrder;
 import com.qualityos.production.entity.WorkOrderMaterial;
+import com.qualityos.production.dto.CompletionDtos.MaterialVariance;
+import com.qualityos.production.repository.FinishedGoodsReceiptRepository;
 import com.qualityos.production.repository.MaterialMovementRepository;
 import com.qualityos.production.repository.MaterialReservationRepository;
 import com.qualityos.production.repository.WorkOrderMaterialRepository;
@@ -84,6 +86,7 @@ public class WorkOrderMaterialService {
     private final FacilityScope scope;
     private final RevisionSupport support;
     private final AuditService audit;
+    private final FinishedGoodsReceiptRepository finishedGoods;
 
     WorkOrderMaterialService(
             WorkOrderRepository workOrders,
@@ -97,7 +100,8 @@ public class WorkOrderMaterialService {
             ManufacturingSettingsService settings,
             FacilityScope scope,
             RevisionSupport support,
-            AuditService audit) {
+            AuditService audit,
+            FinishedGoodsReceiptRepository finishedGoods) {
         this.workOrders = workOrders;
         this.requirements = requirements;
         this.reservations = reservations;
@@ -110,6 +114,7 @@ public class WorkOrderMaterialService {
         this.scope = scope;
         this.support = support;
         this.audit = audit;
+        this.finishedGoods = finishedGoods;
     }
 
     @Transactional(readOnly = true)
@@ -127,6 +132,7 @@ public class WorkOrderMaterialService {
             return view(order);
         }
         requireStatus(order, RESERVABLE, "reserve stock for it");
+        requireNotReceived(order);
         WorkOrderMaterial line = line(order, request.lineNumber());
         if (line.getMaterialId() == null) {
             throw new BusinessRuleException("Line %d is a sub-assembly. It is issued from its batches, not reserved."
@@ -157,6 +163,7 @@ public class WorkOrderMaterialService {
             return view(order);
         }
         requireStatus(order, RESERVABLE, "reserve stock for it");
+        requireNotReceived(order);
         reserveAvailable(order, key);
         return view(order);
     }
@@ -339,6 +346,33 @@ public class WorkOrderMaterialService {
                 found.add("%s needs %s %s, %s %s %s.".formatted(line.componentCode(), plain(line.required()), unit,
                         material ? "reserved" : "in stock", plain(covered), unit));
             }
+        }
+        return found;
+    }
+
+    /**
+     * Each line against what the received quantity needed: the line's requirement scaled to it. A line issued further
+     * off than the tolerance is outside it.
+     */
+    @Transactional(propagation = Propagation.SUPPORTS, readOnly = true)
+    public List<MaterialVariance> variances(WorkOrder order, BigDecimal received, BigDecimal tolerancePercent) {
+        Map<UUID, Coverage> cover = coverage(order);
+        MaterialsResponse view = view(order);
+        Map<Integer, MaterialLine> byNumber = view.lines().stream()
+                .collect(Collectors.toMap(MaterialLine::lineNumber, Function.identity()));
+        List<MaterialVariance> found = new ArrayList<>();
+        for (WorkOrderMaterial line : requirements.findByWorkOrderIdOrderByLineNumber(order.getId())) {
+            BigDecimal expected = scaled(line.getRequiredQuantity().multiply(received)
+                    .divide(order.getQuantity(), 6, RoundingMode.HALF_UP));
+            BigDecimal issued = cover.get(line.getId()).issued();
+            BigDecimal difference = issued.subtract(expected);
+            BigDecimal percent = expected.signum() == 0
+                    ? (issued.signum() == 0 ? BigDecimal.ZERO : BigDecimal.valueOf(100))
+                    : difference.multiply(BigDecimal.valueOf(100)).divide(expected, 2, RoundingMode.HALF_UP);
+            MaterialLine shown = byNumber.get(line.getLineNumber());
+            found.add(new MaterialVariance(line.getLineNumber(), shown.componentCode(), shown.componentName(),
+                    line.getUomId(), expected, issued, difference, percent,
+                    percent.abs().compareTo(tolerancePercent) > 0));
         }
         return found;
     }
@@ -599,6 +633,14 @@ public class WorkOrderMaterialService {
         WorkOrder order = workOrders.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException(ENTITY, id));
         scope.requireAllowed(order.getFacilityId(), ENTITY, order.getWorkOrderNumber());
         return order;
+    }
+
+    /** Once its finished goods are received, the batch is complete and takes nothing more. */
+    private void requireNotReceived(WorkOrder order) {
+        if (finishedGoods.existsByWorkOrderId(order.getId())) {
+            throw new BusinessRuleException("The finished goods of %s are received, so its materials are settled."
+                    .formatted(order.getWorkOrderNumber()));
+        }
     }
 
     private static void requireStatus(WorkOrder order, Set<WorkOrder.Status> allowed, String action) {

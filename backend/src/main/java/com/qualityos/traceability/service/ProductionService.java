@@ -82,6 +82,9 @@ public class ProductionService {
     private final FacilityScope scope;
     private final NamedParameterJdbcTemplate jdbc;
 
+    private final List<BatchCompletionGuard> guards;
+
+    @SuppressWarnings("java:S107")
     ProductionService(
             ProductionBatchRepository batches,
             BatchRelationshipRepository relationships,
@@ -94,8 +97,10 @@ public class ProductionService {
             DocumentNumberService numbers,
             AuditService audit,
             FacilityScope scope,
-            NamedParameterJdbcTemplate jdbc) {
+            NamedParameterJdbcTemplate jdbc,
+            List<BatchCompletionGuard> guards) {
         this.jdbc = jdbc;
+        this.guards = guards;
         this.batches = batches;
         this.relationships = relationships;
         this.finishedProducts = finishedProducts;
@@ -340,6 +345,20 @@ public class ProductionService {
 
     @Transactional
     public BatchDetail complete(UUID id, CompleteBatchRequest request) {
+        guards.forEach(guard -> guard.checkDirectCompletion(id));
+        return completeBatch(id, request);
+    }
+
+    /**
+     * For a module that completes batches under its own rules, such as a work order receiving its finished goods. It
+     * joins that module's transaction, so the batch and its record are completed together or not at all.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public BatchDetail completeGuarded(UUID id, CompleteBatchRequest request) {
+        return completeBatch(id, request);
+    }
+
+    private BatchDetail completeBatch(UUID id, CompleteBatchRequest request) {
         ProductionBatch batch = lock(id);
         if (relationships.findActiveByChildBatchIdIn(List.of(id)).isEmpty()) {
             throw new BusinessRuleException("Record what went into this batch first, or it cannot be traced.");

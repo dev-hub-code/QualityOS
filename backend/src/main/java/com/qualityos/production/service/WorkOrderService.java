@@ -39,6 +39,7 @@ import com.qualityos.production.entity.WorkOrderStatusChange;
 import com.qualityos.production.repository.BomLineRepository;
 import com.qualityos.production.repository.BomRepository;
 import com.qualityos.production.repository.ProductionPlanLineRepository;
+import com.qualityos.production.repository.ProcessParameterRepository;
 import com.qualityos.production.repository.ProductionPlanRepository;
 import com.qualityos.production.repository.RoutingOperationRepository;
 import com.qualityos.production.repository.RoutingRepository;
@@ -92,6 +93,9 @@ public class WorkOrderService {
     private final BomLineRepository bomLines;
     private final RoutingRepository routings;
     private final RoutingOperationRepository routingOperations;
+    private final ProcessParameterRepository parameters;
+    private final ShopFloorService shopFloor;
+    private final tools.jackson.databind.json.JsonMapper json;
     private final WorkCenterService workCenters;
     private final ManufacturingSettingsService settings;
     private final RevisionSupport support;
@@ -116,6 +120,9 @@ public class WorkOrderService {
             BomLineRepository bomLines,
             RoutingRepository routings,
             RoutingOperationRepository routingOperations,
+            ProcessParameterRepository parameters,
+            ShopFloorService shopFloor,
+            tools.jackson.databind.json.JsonMapper json,
             WorkCenterService workCenters,
             ManufacturingSettingsService settings,
             RevisionSupport support,
@@ -138,6 +145,9 @@ public class WorkOrderService {
         this.bomLines = bomLines;
         this.routings = routings;
         this.routingOperations = routingOperations;
+        this.parameters = parameters;
+        this.shopFloor = shopFloor;
+        this.json = json;
         this.workCenters = workCenters;
         this.settings = settings;
         this.support = support;
@@ -267,7 +277,7 @@ public class WorkOrderService {
             writeRequirements(order, definition);
         }
         if (routing != null) {
-            writeOperations(order, routing);
+            writeOperations(order, routing, definition);
         }
         if (definition != null && settings.rules().reserveOnRelease()) {
             orderMaterials.reserveAvailable(order, null);
@@ -304,6 +314,7 @@ public class WorkOrderService {
                 order.getProductId(), order.getFacilityId(), order.getQuantity())).batch();
         order.start(batch.id(), Instant.now());
         workOrders.saveAndFlush(order);
+        shopFloor.orderStarted(order);
         // Starting short is allowed when the organisation allows it, but never silently.
         String shortNote = shortfalls.isEmpty() ? null : "Started short: " + String.join(" ", shortfalls);
         record(order, from, shortNote);
@@ -322,6 +333,9 @@ public class WorkOrderService {
         WorkOrder.Status from = order.getStatus();
         String reason = request.reason().trim();
         order.hold(reason);
+        if (from == WorkOrder.Status.IN_PROGRESS) {
+            shopFloor.orderHeld(order, reason);
+        }
         return saved(order, from, reason, "WORK_ORDER_HELD");
     }
 
@@ -348,7 +362,7 @@ public class WorkOrderService {
         }
         String reason = request.reason().trim();
         order.cancel(reason);
-        steps.findByWorkOrderIdOrderBySequence(id).forEach(WorkOrderOperation::cancel);
+        steps.findByWorkOrderIdOrderBySequence(id).forEach(step -> step.cancel("Work order cancelled: " + reason));
         orderMaterials.releaseAll(order, "Work order cancelled: " + reason);
         return saved(order, from, reason, "WORK_ORDER_CANCELLED");
     }
@@ -471,15 +485,45 @@ public class WorkOrderService {
         requirements.flush();
     }
 
-    /** Run time in a routing is per unit of the product, so the order's run time is that times its quantity. */
-    private void writeOperations(WorkOrder order, Routing routing) {
-        for (RoutingOperation operation : routingOperations.findByRoutingIdOrderBySequence(routing.getId())) {
+    /**
+     * Run time in a routing is per unit of the product, so the order's run time is that times its quantity. Each
+     * operation keeps its own process parameters and the recipe's, as approved, to measure against.
+     */
+    private void writeOperations(WorkOrder order, Routing routing, Bom definition) {
+        List<RoutingOperation> operations = routingOperations.findByRoutingIdOrderBySequence(routing.getId());
+        Map<UUID, List<com.qualityos.production.entity.ProcessParameter>> own = parameters
+                .findByOperationIdInOrderByCode(operations.stream().map(RoutingOperation::getId).toList()).stream()
+                .collect(Collectors.groupingBy(com.qualityos.production.entity.ProcessParameter::getOperationId));
+        List<com.qualityos.production.entity.ProcessParameter> recipe = definition == null
+                || definition.getKind() != Bom.Kind.RECIPE ? List.of()
+                : parameters.findByBomIdOrderByCode(definition.getId());
+        for (RoutingOperation operation : operations) {
+            List<Map<String, Object>> limits = new ArrayList<>();
+            Set<String> codes = new HashSet<>();
+            own.getOrDefault(operation.getId(), List.of()).forEach(parameter -> {
+                codes.add(parameter.getCode());
+                limits.add(limit(parameter, "OPERATION"));
+            });
+            recipe.stream().filter(parameter -> !codes.contains(parameter.getCode()))
+                    .forEach(parameter -> limits.add(limit(parameter, "RECIPE")));
             steps.save(new WorkOrderOperation(order.getId(), operation.getSequence(), operation.getName(),
                     operation.getWorkCenterId(), operation.getSetupMinutes(),
                     operation.getRunMinutes().multiply(order.getQuantity()).setScale(4, RoundingMode.HALF_UP),
-                    operation.getInstructions()));
+                    operation.getInstructions(), json.writeValueAsString(limits)));
         }
         steps.flush();
+    }
+
+    private static Map<String, Object> limit(com.qualityos.production.entity.ProcessParameter parameter, String source) {
+        Map<String, Object> limit = new LinkedHashMap<>();
+        limit.put("code", parameter.getCode());
+        limit.put("name", parameter.getName());
+        limit.put("unit", parameter.getUnit());
+        limit.put("target", parameter.getTarget() == null ? null : parameter.getTarget().toPlainString());
+        limit.put("minimum", parameter.getMinimum() == null ? null : parameter.getMinimum().toPlainString());
+        limit.put("maximum", parameter.getMaximum() == null ? null : parameter.getMaximum().toPlainString());
+        limit.put("source", source);
+        return limit;
     }
 
     private WorkOrder load(UUID id) {
@@ -529,15 +573,22 @@ public class WorkOrderService {
         }).toList();
     }
 
+    /** With where each operation stands on the floor, once the order is released. */
     private List<WorkOrderOperationResponse> operationResponses(WorkOrder order) {
         List<WorkOrderOperation> rows = steps.findByWorkOrderIdOrderBySequence(order.getId());
         Map<UUID, WorkCenter> centres = workCenters.byId(
                 rows.stream().map(WorkOrderOperation::getWorkCenterId).collect(Collectors.toSet()));
+        Map<UUID, com.qualityos.production.dto.ShopFloorDtos.OperationSummary> floor = shopFloor.ofOrder(order)
+                .stream().collect(Collectors.toMap(
+                        com.qualityos.production.dto.ShopFloorDtos.OperationSummary::id, Function.identity()));
         return rows.stream().map(row -> {
             WorkCenter centre = centres.get(row.getWorkCenterId());
+            var summary = floor.get(row.getId());
             return new WorkOrderOperationResponse(row.getId(), row.getSequence(), row.getName(), row.getWorkCenterId(),
                     centre.getCode(), centre.getName(), row.getPlannedSetupMinutes(), row.getPlannedRunMinutes(),
-                    row.getInstructions(), row.getStatus());
+                    row.getInstructions(), row.getStatus(), row.getStatusReason(), summary.operatorName(),
+                    summary.machineCode(), summary.input(), row.getGoodQuantity(), row.getRejectedQuantity(),
+                    row.getScrapQuantity(), summary.waiting());
         }).toList();
     }
 

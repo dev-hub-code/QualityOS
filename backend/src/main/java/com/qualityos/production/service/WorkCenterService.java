@@ -54,6 +54,7 @@ public class WorkCenterService {
     private final FacilityScope scope;
     private final TenantAccessService access;
     private final AuditService audit;
+    private final jakarta.persistence.EntityManager entityManager;
 
     WorkCenterService(
             WorkCenterRepository workCenters,
@@ -62,7 +63,8 @@ public class WorkCenterService {
             FacilityService facilities,
             FacilityScope scope,
             TenantAccessService access,
-            AuditService audit) {
+            AuditService audit,
+            jakarta.persistence.EntityManager entityManager) {
         this.workCenters = workCenters;
         this.machines = machines;
         this.events = events;
@@ -70,6 +72,7 @@ public class WorkCenterService {
         this.scope = scope;
         this.access = access;
         this.audit = audit;
+        this.entityManager = entityManager;
     }
 
     @Transactional(readOnly = true)
@@ -135,6 +138,45 @@ public class WorkCenterService {
     @Transactional(readOnly = true)
     public WorkCenter requireUsable(UUID id) {
         return loadActive(id);
+    }
+
+    /** The machines at a work centre, for choosing one to run an operation on. */
+    @Transactional(readOnly = true)
+    public List<Machine> machinesAt(UUID workCenterId) {
+        return machines.findByWorkCenterIdOrderByCode(workCenterId);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<UUID, Machine> machinesById(Collection<UUID> ids) {
+        return machines.findAllById(ids).stream().collect(Collectors.toMap(Machine::getId, Function.identity()));
+    }
+
+    /**
+     * The machine, locked and read again, so that two operations cannot both take it. Must be called inside the
+     * caller's transaction.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public Machine lockMachine(UUID id) {
+        Machine machine = machines.findById(id).orElseThrow(() -> new ResourceNotFoundException(MACHINE, id));
+        entityManager.refresh(machine, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+        return machine;
+    }
+
+    /**
+     * Moves a machine because of what happens on the floor, keeping its history like a change made by hand. Does
+     * nothing when it is already there.
+     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void moveMachine(Machine machine, Machine.Status target, String reason) {
+        Machine.Status previous = machine.getStatus();
+        if (previous == target) {
+            return;
+        }
+        machine.changeStatus(target, reason, Instant.now());
+        machines.saveAndFlush(machine);
+        events.save(new MachineStatusEvent(machine.getId(), previous, target, machine.getStatusReason()));
+        audit.record("MACHINE_STATUS_CHANGED", MACHINE, machine.getId(), Map.of("status", previous.name()),
+                Map.of("status", target.name(), "reason", Objects.toString(machine.getStatusReason(), "")));
     }
 
     /** Work centres by id, whatever their facility, for showing what a routing already names. */

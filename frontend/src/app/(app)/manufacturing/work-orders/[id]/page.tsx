@@ -11,6 +11,7 @@ import {
   Details,
   PageHeader,
   QueryState,
+  RecordLink,
   Section,
   StatusBadge,
   useAction,
@@ -203,10 +204,29 @@ export default function WorkOrderPage() {
             {operations.map((operation) => (
               <li key={operation.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
                 <span>
-                  {operation.sequence}. {operation.name} at {operation.workCenterCode}
+                  <RecordLink href={`/manufacturing/shop-floor/${operation.id}`}>
+                    {operation.sequence}. {operation.name}
+                  </RecordLink>{" "}
+                  at {operation.workCenterCode}
+                  {(operation.operatorName || operation.machineCode) && (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {[operation.operatorName, operation.machineCode].filter(Boolean).join(" on ")}
+                    </span>
+                  )}
+                  {operation.statusReason && <span className="block text-muted-foreground">{operation.statusReason}</span>}
                 </span>
-                <span className="flex items-center gap-2 text-muted-foreground">
-                  Setup {formatQuantity(operation.plannedSetupMinutes)} min · run {formatQuantity(operation.plannedRunMinutes)} min
+                <span className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                  {order.startedAt ? (
+                    <>
+                      Good {formatQuantity(operation.goodQuantity)} · rejected {formatQuantity(operation.rejectedQuantity)} · scrap{" "}
+                      {formatQuantity(operation.scrapQuantity)} · waiting {formatQuantity(operation.waiting)} {unit}
+                    </>
+                  ) : (
+                    <>
+                      Setup {formatQuantity(operation.plannedSetupMinutes)} min · run {formatQuantity(operation.plannedRunMinutes)} min
+                    </>
+                  )}
                   <StatusBadge status={operation.status} />
                 </span>
               </li>

@@ -25,7 +25,7 @@ public class PlanAccess {
             "ADVANCED", List.of("TRACEABILITY_", "RECALL_", "CALIBRATION_", "AUDIT_VIEW", "AUDIT_MANAGE", "AUDIT_CLOSE",
                     "MATERIAL_CORRECTION_"),
             "MANUFACTURING", List.of("MANUFACTURING_", "BOM_", "RECIPE_", "ROUTING_", "WORK_ORDER_",
-                    "PRODUCTION_PLAN_"));
+                    "PRODUCTION_PLAN_", "PRODUCTION_EXECUTE", "PRODUCTION_SUPERVISE"));
 
     private static final String CURRENT = """
             SELECT s.current_period_ends_at, p.grace_days, array_to_string(p.features, ',') AS features

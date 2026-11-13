@@ -164,7 +164,15 @@ public final class WorkOrderDtos {
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal plannedSetupMinutes,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal plannedRunMinutes,
             String instructions,
-            WorkOrderOperation.Status status) {
+            WorkOrderOperation.Status status,
+            String statusReason,
+            String operatorName,
+            String machineCode,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal input,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal goodQuantity,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal rejectedQuantity,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal scrapQuantity,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal waiting) {
     }
 
     public record StatusChangeResponse(

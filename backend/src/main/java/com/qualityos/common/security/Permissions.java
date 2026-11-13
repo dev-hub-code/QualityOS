@@ -59,6 +59,9 @@ public final class Permissions {
     public static final String MANUFACTURING_MANAGE = "MANUFACTURING_MANAGE";
     public static final String WORK_ORDER_MANAGE = "WORK_ORDER_MANAGE";
     public static final String WORK_ORDER_APPROVE = "WORK_ORDER_APPROVE";
+    public static final String WORK_ORDER_VIEW = "WORK_ORDER_VIEW";
+    public static final String PRODUCTION_EXECUTE = "PRODUCTION_EXECUTE";
+    public static final String PRODUCTION_SUPERVISE = "PRODUCTION_SUPERVISE";
 
     private Permissions() {
     }
@@ -131,6 +134,8 @@ public final class Permissions {
         public static final String WORK_ORDER_MATERIAL_ISSUE = "hasAuthority('WORK_ORDER_MATERIAL_ISSUE')";
         public static final String PRODUCTION_PLAN_MANAGE = "hasAuthority('PRODUCTION_PLAN_MANAGE')";
         public static final String PRODUCTION_PLAN_APPROVE = "hasAuthority('PRODUCTION_PLAN_APPROVE')";
+        public static final String PRODUCTION_EXECUTE = "hasAuthority('PRODUCTION_EXECUTE')";
+        public static final String PRODUCTION_SUPERVISE = "hasAuthority('PRODUCTION_SUPERVISE')";
 
         private Require() {
         }

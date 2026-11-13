@@ -99,6 +99,7 @@ public class WorkOrderService {
     private final MaterialService materials;
     private final FacilityService facilities;
     private final ProductionService production;
+    private final WorkOrderMaterialService orderMaterials;
     private final FacilityScope scope;
     private final ReviewPolicy reviewPolicy;
     private final DocumentNumberService numbers;
@@ -122,6 +123,7 @@ public class WorkOrderService {
             MaterialService materials,
             FacilityService facilities,
             ProductionService production,
+            WorkOrderMaterialService orderMaterials,
             FacilityScope scope,
             ReviewPolicy reviewPolicy,
             DocumentNumberService numbers,
@@ -143,6 +145,7 @@ public class WorkOrderService {
         this.materials = materials;
         this.facilities = facilities;
         this.production = production;
+        this.orderMaterials = orderMaterials;
         this.scope = scope;
         this.reviewPolicy = reviewPolicy;
         this.numbers = numbers;
@@ -266,6 +269,9 @@ public class WorkOrderService {
         if (routing != null) {
             writeOperations(order, routing);
         }
+        if (definition != null && settings.rules().reserveOnRelease()) {
+            orderMaterials.reserveAvailable(order, null);
+        }
         record(order, from, null);
         Map<String, Object> details = new LinkedHashMap<>();
         details.put("status", order.getStatus().name());
@@ -289,13 +295,24 @@ public class WorkOrderService {
         WorkOrder order = load(id);
         WorkOrder.Status from = order.getStatus();
         order.requireStatus(WorkOrder.Status.RELEASED, "started");
+        List<String> shortfalls = orderMaterials.shortfalls(order);
+        if (!shortfalls.isEmpty() && settings.rules().startRequiresMaterials()) {
+            throw new BusinessRuleException("Production cannot start until the material is ready. "
+                    + String.join(" ", shortfalls));
+        }
         var batch = production.create(new CreateBatchRequest(
                 order.getProductId(), order.getFacilityId(), order.getQuantity())).batch();
         order.start(batch.id(), Instant.now());
         workOrders.saveAndFlush(order);
-        record(order, from, null);
-        audit.record("WORK_ORDER_STARTED", ENTITY, id, Map.of("status", from.name()),
-                Map.of("status", order.getStatus().name(), "batch", batch.batchNumber()));
+        // Starting short is allowed when the organisation allows it, but never silently.
+        String shortNote = shortfalls.isEmpty() ? null : "Started short: " + String.join(" ", shortfalls);
+        record(order, from, shortNote);
+        Map<String, Object> after = new LinkedHashMap<>(Map.of(
+                "status", order.getStatus().name(), "batch", batch.batchNumber()));
+        if (shortNote != null) {
+            after.put("shortfalls", shortfalls);
+        }
+        audit.record("WORK_ORDER_STARTED", ENTITY, id, Map.of("status", from.name()), after);
         return detail(order);
     }
 
@@ -332,6 +349,7 @@ public class WorkOrderService {
         String reason = request.reason().trim();
         order.cancel(reason);
         steps.findByWorkOrderIdOrderBySequence(id).forEach(WorkOrderOperation::cancel);
+        orderMaterials.releaseAll(order, "Work order cancelled: " + reason);
         return saved(order, from, reason, "WORK_ORDER_CANCELLED");
     }
 

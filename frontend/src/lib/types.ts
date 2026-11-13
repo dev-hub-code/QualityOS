@@ -569,6 +569,8 @@ export interface ReleasedLot {
   materialName: string;
   internalBatch: string;
   remainingQuantity: string;
+  /** Set aside for work orders, out of what remains. */
+  reservedQuantity: string;
   uomId: string;
 }
 
@@ -1564,6 +1566,12 @@ export interface ManufacturingSettings {
   workOrderRequiresBom: boolean;
   /** Releasing a work order needs an approved routing in effect. */
   workOrderRequiresRouting: boolean;
+  /** Release reserves what the order needs from the oldest free lots. */
+  reserveOnRelease: boolean;
+  /** Production starts only once all material is reserved and sub-assemblies are in stock. */
+  startRequiresMaterials: boolean;
+  /** More than an order needs may be issued. */
+  allowOverIssue: boolean;
 }
 
 export interface ProductManufacturingSettings {
@@ -1845,4 +1853,57 @@ export interface WorkOrderDetail {
     changedByName: string | null;
     changedAt: string;
   }[];
+}
+
+export interface WorkOrderMaterials {
+  lines: {
+    lineNumber: number;
+    componentType: "MATERIAL" | "PRODUCT";
+    componentId: string;
+    componentCode: string;
+    componentName: string;
+    uomId: string;
+    required: string;
+    issued: string;
+    reserved: string;
+    /** Needed and neither issued nor reserved. */
+    outstanding: string;
+    available: string;
+    shortage: string;
+    sources: { sourceType: "LOT" | "BATCH"; id: string; number: string; receivedOn: string | null; freeQuantity: string; uomId: string }[];
+  }[];
+  reservations: {
+    id: string;
+    lineNumber: number;
+    lotId: string;
+    lotNumber: string;
+    quantity: string;
+    openQuantity: string;
+    uomId: string;
+    createdAt: string;
+  }[];
+  consumptions: {
+    id: string;
+    lineNumber: number | null;
+    sourceType: "LOT" | "BATCH";
+    sourceId: string;
+    sourceNumber: string;
+    componentCode: string;
+    componentName: string;
+    quantity: string;
+    uomId: string;
+  }[];
+  movements: {
+    id: string;
+    movementType: "RESERVED" | "UNRESERVED" | "ISSUED" | "RETURNED";
+    lineNumber: number | null;
+    sourceNumber: string;
+    quantity: string;
+    uomId: string;
+    reason: string | null;
+    movedBy: string | null;
+    movedByName: string | null;
+    movedAt: string;
+  }[];
+  shortages: string[];
 }

@@ -28,6 +28,9 @@ const FIELDS: FieldDef[] = [
   },
   { name: "workOrderRequiresBom", label: "Releasing a work order needs an approved BOM or recipe", type: "checkbox" },
   { name: "workOrderRequiresRouting", label: "Releasing a work order needs an approved routing", type: "checkbox" },
+  { name: "reserveOnRelease", label: "Releasing a work order reserves its material from the oldest free lots", type: "checkbox" },
+  { name: "startRequiresMaterials", label: "Production starts only when all material is reserved", type: "checkbox" },
+  { name: "allowOverIssue", label: "More material than an order needs may be issued", type: "checkbox" },
 ];
 
 export default function ManufacturingSettingsPage() {
@@ -48,6 +51,9 @@ export default function ManufacturingSettingsPage() {
             ["Separate approver", data.separateApprover ? "Required" : "The submitter may approve their own"],
             ["Work order release needs a BOM or recipe", data.workOrderRequiresBom ? "Yes" : "No"],
             ["Work order release needs a routing", data.workOrderRequiresRouting ? "Yes" : "No"],
+            ["Release reserves material", data.reserveOnRelease ? "Yes" : "No"],
+            ["Start needs all material reserved", data.startRequiresMaterials ? "Yes" : "No, but a short start is recorded"],
+            ["Issuing more than needed", data.allowOverIssue ? "Allowed" : "Refused"],
           ]}
         />
         <p className="mt-3 text-sm text-muted-foreground">

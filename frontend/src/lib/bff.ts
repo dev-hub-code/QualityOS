@@ -74,7 +74,7 @@ export function clearChallengeCookie(response: NextResponse) {
 /** Headers carried from the browser request to the backend. */
 export function forwardedHeaders(request: NextRequest): Headers {
   const headers = new Headers();
-  for (const name of ["content-type", "accept", "x-correlation-id"]) {
+  for (const name of ["content-type", "accept", "x-correlation-id", "idempotency-key"]) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }

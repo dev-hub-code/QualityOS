@@ -34,6 +34,9 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
     private String internalBatch;
     private BigDecimal quantity;
     private BigDecimal consumedQuantity = BigDecimal.ZERO;
+
+    /** Set aside for work orders. Ordinary consumption cannot take it. */
+    private BigDecimal reservedQuantity = BigDecimal.ZERO;
     private boolean inspectionRequired;
 
     @Enumerated(EnumType.STRING)
@@ -80,14 +83,51 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
         return quantity.subtract(consumedQuantity);
     }
 
+    /** What is left and not set aside for a work order. */
+    public BigDecimal freeQuantity() {
+        return remainingQuantity().subtract(reservedQuantity);
+    }
+
     public void consume(BigDecimal amount) {
+        requireReleased();
+        if (amount.compareTo(freeQuantity()) > 0) {
+            throw new BusinessRuleException("Batch " + internalBatch + " has only " + plain(freeQuantity())
+                    + " free" + (reservedQuantity.signum() > 0 ? ", the rest is reserved." : "."));
+        }
+        consumedQuantity = consumedQuantity.add(amount);
+    }
+
+    /** Sets stock aside. Only released stock that is not already set aside can be. */
+    public void reserve(BigDecimal amount) {
+        requireReleased();
+        if (amount.compareTo(freeQuantity()) > 0) {
+            throw new BusinessRuleException("Batch " + internalBatch + " has only " + plain(freeQuantity()) + " free.");
+        }
+        reservedQuantity = reservedQuantity.add(amount);
+    }
+
+    public void unreserve(BigDecimal amount) {
+        if (amount.compareTo(reservedQuantity) > 0) {
+            throw new BusinessRuleException("Batch " + internalBatch + " has only " + plain(reservedQuantity) + " reserved.");
+        }
+        reservedQuantity = reservedQuantity.subtract(amount);
+    }
+
+    /** Uses stock that was set aside for this use. */
+    public void consumeReserved(BigDecimal amount) {
+        requireReleased();
+        unreserve(amount);
+        consumedQuantity = consumedQuantity.add(amount);
+    }
+
+    private void requireReleased() {
         if (!isReleased()) {
             throw new BusinessRuleException("Batch " + internalBatch + " has not been released for use.");
         }
-        if (amount.compareTo(remainingQuantity()) > 0) {
-            throw new BusinessRuleException("Batch " + internalBatch + " has only " + remainingQuantity() + " left.");
-        }
-        consumedQuantity = consumedQuantity.add(amount);
+    }
+
+    private static String plain(BigDecimal value) {
+        return value.stripTrailingZeros().toPlainString();
     }
 
     /** Corrections only: returns stock taken by a consumption that was reversed. */
@@ -106,6 +146,10 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
         if (quantity != null) {
             if (quantity.compareTo(consumedQuantity) < 0) {
                 throw new BusinessRuleException("Batch " + internalBatch + " has already used more than " + quantity + ".");
+            }
+            if (quantity.compareTo(consumedQuantity.add(reservedQuantity)) < 0) {
+                throw new BusinessRuleException("Batch " + internalBatch + " has stock reserved for work orders beyond "
+                        + quantity + ". Release those reservations first.");
             }
             this.quantity = quantity;
         }

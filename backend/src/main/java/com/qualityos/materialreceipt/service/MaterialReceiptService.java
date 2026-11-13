@@ -31,6 +31,8 @@ import com.qualityos.purchaseorder.service.PurchaseOrderService;
 import com.qualityos.supplier.dto.SupplierDtos.SupplierReference;
 import com.qualityos.supplier.service.SupplierService;
 import java.math.BigDecimal;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
@@ -61,6 +63,8 @@ public class MaterialReceiptService implements AttachmentPolicy {
     private final AuditService audit;
     private final FacilityScope scope;
 
+    private final EntityManager entityManager;
+
     MaterialReceiptService(
             MaterialReceiptRepository receipts,
             MaterialReceiptItemRepository items,
@@ -69,8 +73,10 @@ public class MaterialReceiptService implements AttachmentPolicy {
             MaterialService materials,
             DocumentNumberService numbers,
             AuditService audit,
-            FacilityScope scope) {
+            FacilityScope scope,
+            EntityManager entityManager) {
         this.scope = scope;
+        this.entityManager = entityManager;
         this.receipts = receipts;
         this.items = items;
         this.purchaseOrders = purchaseOrders;
@@ -142,6 +148,9 @@ public class MaterialReceiptService implements AttachmentPolicy {
         if (used) {
             throw new BusinessRuleException("This receipt cannot be voided: its material has gone into production.");
         }
+        if (receipt.getItems().stream().anyMatch(item -> item.getReservedQuantity().signum() > 0)) {
+            throw new BusinessRuleException("This receipt cannot be voided: some of it is reserved for work orders.");
+        }
         receipt.voidReceipt(reason);
         purchaseOrders.reverseReceipt(receipt.getPurchaseOrderId(), receipt.getItems().stream().collect(Collectors.toMap(
                 MaterialReceiptItem::getPurchaseOrderItemId, MaterialReceiptItem::getQuantity, BigDecimal::add)));
@@ -186,23 +195,92 @@ public class MaterialReceiptService implements AttachmentPolicy {
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public BigDecimal consume(UUID itemId, java.util.function.Function<UUID, BigDecimal> inLotUnit) {
-        MaterialReceiptItem item = items.findForUpdate(itemId)
-                .orElseThrow(() -> new ResourceNotFoundException("Batch", itemId));
-        scope.requireAllowed(item.getReceipt().getFacilityId(), "Batch", itemId.toString());
-        if (item.getReceipt().getStatus() == MaterialReceipt.Status.VOIDED) {
-            throw new BusinessRuleException("This receipt was voided.");
-        }
+        MaterialReceiptItem item = lockUsable(itemId);
         BigDecimal quantity = inLotUnit.apply(item.getUomId());
         item.consume(quantity);
         items.flush();
         return quantity;
     }
 
+    /**
+     * Sets stock aside for a work order, or gives it back, in the lot's unit. The lot is locked while it does, so two
+     * orders cannot both set aside its last kilogram.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public LotView reserve(UUID itemId, BigDecimal quantity) {
+        MaterialReceiptItem item = lockUsable(itemId);
+        item.reserve(quantity);
+        items.flush();
+        return lots(List.of(item)).getFirst();
+    }
+
+    /**
+     * Sets aside as much as the lot has free, up to {@code most}, without refusing when it has less: another order may
+     * have taken some since the lot was listed.
+     *
+     * @return what was set aside, possibly nothing
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public BigDecimal reserveUpTo(UUID itemId, BigDecimal most) {
+        MaterialReceiptItem item = lockUsable(itemId);
+        if (!item.isReleased()) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal amount = most.min(item.freeQuantity()).max(BigDecimal.ZERO);
+        if (amount.signum() > 0) {
+            item.reserve(amount);
+            items.flush();
+        }
+        return amount;
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void unreserve(UUID itemId, BigDecimal quantity) {
+        lockItem(itemId).unreserve(quantity);
+        items.flush();
+    }
+
+    /** Takes stock that was set aside, in the lot's unit. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void consumeReserved(UUID itemId, BigDecimal quantity) {
+        lockUsable(itemId).consumeReserved(quantity);
+        items.flush();
+    }
+
+    /** Released lots of the materials, in the facility, with stock not yet set aside, oldest first. */
+    @Transactional(readOnly = true)
+    public List<LotView> freeLots(Collection<UUID> materialIds, UUID facilityId) {
+        if (materialIds.isEmpty()) {
+            return List.of();
+        }
+        return lots(items.findLotsOf(materialIds, facilityId).stream()
+                .filter(item -> item.isReleased() && item.freeQuantity().signum() > 0)
+                .toList());
+    }
+
+    /**
+     * Locks the lot's row. The lot may have been read earlier in this transaction, so it is read again once locked:
+     * otherwise a change another transaction made in between would look like a conflict.
+     */
+    private MaterialReceiptItem lockItem(UUID itemId) {
+        MaterialReceiptItem item = items.findWithReceipt(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Batch", itemId));
+        entityManager.refresh(item, LockModeType.PESSIMISTIC_WRITE);
+        return item;
+    }
+
+    private MaterialReceiptItem lockUsable(UUID itemId) {
+        MaterialReceiptItem item = lockItem(itemId);
+        scope.requireAllowed(item.getReceipt().getFacilityId(), "Batch", itemId.toString());
+        if (item.getReceipt().getStatus() == MaterialReceipt.Status.VOIDED) {
+            throw new BusinessRuleException("This receipt was voided.");
+        }
+        return item;
+    }
+
     @Transactional
     public void restore(UUID itemId, BigDecimal quantity) {
-        items.findForUpdate(itemId)
-                .orElseThrow(() -> new ResourceNotFoundException("Batch", itemId))
-                .restore(quantity);
+        lockItem(itemId).restore(quantity);
         items.flush();
     }
 
@@ -212,8 +290,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
      */
     @Transactional
     public AppliedLotCorrection correct(UUID itemId, LotCorrection correction) {
-        MaterialReceiptItem item = items.findForUpdate(itemId)
-                .orElseThrow(() -> new ResourceNotFoundException("Batch", itemId));
+        MaterialReceiptItem item = lockItem(itemId);
         MaterialReceipt receipt = item.getReceipt();
         if (receipt.getStatus() == MaterialReceipt.Status.VOIDED) {
             throw new BusinessRuleException("This receipt was voided.");
@@ -244,7 +321,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
     @Transactional(readOnly = true)
     public List<LotView> releasedLots(UUID materialId) {
         return lots(items.findLots(materialId).stream()
-                .filter(item -> item.isReleased() && item.remainingQuantity().signum() > 0)
+                .filter(item -> item.isReleased() && item.freeQuantity().signum() > 0)
                 .filter(item -> scope.allows(item.getReceipt().getFacilityId()))
                 .toList());
     }
@@ -294,7 +371,9 @@ public class MaterialReceiptService implements AttachmentPolicy {
                     item.getUomId(),
                     item.getInspectionStatus().name(),
                     item.getDisposition(),
-                    item.isReleased());
+                    item.isReleased(),
+                    item.getReservedQuantity(),
+                    receipt.getFacilityId());
         }).toList();
     }
 

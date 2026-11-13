@@ -123,3 +123,14 @@ export function planActions(status: PlanStatus, can: { manage: boolean; approve:
 }
 
 export const PRIORITY_LABELS = { LOW: "Low", NORMAL: "Normal", HIGH: "High", URGENT: "Urgent" } as const;
+
+/** What a lot can still give to ordinary consumption: what remains, less what work orders have set aside. */
+export function freeQuantity(lot: { remainingQuantity: string; reservedQuantity?: string | null }): string {
+  const free = Number(lot.remainingQuantity) - Number(lot.reservedQuantity ?? 0);
+  return String(Number(Math.max(free, 0).toFixed(6)));
+}
+
+/** A fresh key for one stock movement, so that sending it twice moves stock once. */
+export function newRequestKey(): string {
+  return crypto.randomUUID();
+}

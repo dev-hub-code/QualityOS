@@ -18,6 +18,7 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api, type PageResponse } from "@/lib/api";
+import { freeQuantity } from "@/lib/manufacturing";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import { inspectionTypeFor, parseSerials, toConsumeRequest } from "@/lib/traceability";
 import type {
@@ -46,7 +47,7 @@ function ConsumeDialog({ path, batchId, onClose }: { path: string; batchId: stri
   const options = [
     ...lots.map((lot) => ({
       value: `lot:${lot.itemId}`,
-      label: `${lot.internalBatch} – ${lot.materialCode} (${withUnit(lot.remainingQuantity, units.label(lot.uomId))} left)`,
+      label: `${lot.internalBatch} – ${lot.materialCode} (${withUnit(freeQuantity(lot), units.label(lot.uomId))} free)`,
     })),
     ...(batches?.items ?? [])
       .filter((batch) => batch.id !== batchId && Number(batch.availableQuantity) > 0)
@@ -88,7 +89,7 @@ function CorrectConsumptionDialog({ consumptionId, onClose }: { consumptionId: s
       type: "select",
       options: lots.map((lot) => ({
         value: lot.itemId,
-        label: `${lot.internalBatch} – ${lot.materialCode} (${withUnit(lot.remainingQuantity, units.label(lot.uomId))} left)`,
+        label: `${lot.internalBatch} – ${lot.materialCode} (${withUnit(freeQuantity(lot), units.label(lot.uomId))} free)`,
       })),
     },
     // A correction takes no unit of its own: it is in the unit of the lot or batch it draws on.

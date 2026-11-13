@@ -13,7 +13,7 @@ test("a work order raised from a plan is approved, released and started", async 
   const call = apiCaller(page);
   const units: { id: string; code: string }[] = await call("GET", "/units");
   const unit = (code: string) => units.find((candidate) => candidate.code === code)!.id;
-  await call("POST", "/facilities", { code: "PUNE", name: "Pune Plant" });
+  const facility = await call("POST", "/facilities", { code: "PUNE", name: "Pune Plant" });
   const material = await call("POST", "/materials", { code: "EN8", name: "EN8 Bar", uomId: unit("KG"), inspectionRequired: false });
   const product = await call("POST", "/products", { code: "GB-1", name: "Gearbox", productType: "FINISHED", uomId: unit("PCS") });
 
@@ -28,6 +28,24 @@ test("a work order raised from a plan is approved, released and started", async 
   });
   await call("POST", `/manufacturing/boms/${bom.revision.id}/submit`);
   await call("POST", `/manufacturing/boms/${bom.revision.id}/approve`, {});
+
+  // 15 kg of bar in stock: not enough for ten gearboxes.
+  const supplier = await call("POST", "/suppliers", { code: "SUP", name: "Bharat Steels" });
+  await call("POST", `/suppliers/${supplier.id}/submit`);
+  await call("POST", `/suppliers/${supplier.id}/approve`);
+  const order = await call("POST", "/purchase-orders", {
+    supplierId: supplier.id,
+    facilityId: facility.id,
+    orderDate: day(0),
+    items: [{ materialId: material.id, quantity: "15" }],
+  });
+  await call("POST", `/purchase-orders/${order.id}/issue`);
+  const receipt = await call("POST", "/material-receipts", {
+    purchaseOrderId: order.id,
+    receivedOn: day(0),
+    items: [{ purchaseOrderItemId: order.items[0].id, supplierBatch: "HEAT-7", quantity: "15" }],
+  });
+  const lot: string = receipt.items[0].internalBatch;
 
   await page.goto("/manufacturing/production-plans");
   const menu = page.getByRole("navigation", { name: "Main" });
@@ -58,11 +76,33 @@ test("a work order raised from a plan is approved, released and started", async 
   await page.getByRole("button", { name: "Submit for approval" }).click();
   await step(page, "Approve", async () => {});
   await page.getByRole("button", { name: "Release" }).click();
-  const needed = page.locator("[data-slot='card']").filter({ hasText: "Materials needed" });
-  await expect(needed.getByText("22 KG")).toBeVisible();
+  const materials = page.locator("[data-slot='card']").filter({ hasText: "Still to find" });
+  await expect(materials.getByText("22 KG").first()).toBeVisible();
+  await expect(page.getByText("is short by 7 KG")).toBeVisible();
 
+  // The free lot is set aside for this order, and the order starts short, on the record.
+  await page.getByRole("button", { name: "Reserve what is free" }).click();
+  const reservations = page.locator("[data-slot='card']").filter({ hasText: "Reservations" });
+  await expect(reservations.getByText(`lot ${lot}`)).toBeVisible();
   await page.getByRole("button", { name: "Start production" }).click();
   await expect(page.getByRole("link", { name: /^PB-/ })).toBeVisible();
+  await expect(page.getByText(/Started short:/)).toBeVisible();
+
+  // Issue the reserved bar, then give some back.
+  await step(page, "Issue", async (dialog: Locator) => {
+    await dialog.getByLabel("Lot").selectOption({ label: `${lot} (15 KG reserved)` });
+    await dialog.getByLabel(/^Quantity/).fill("15");
+  });
+  const issued = page.locator("[data-slot='card']").filter({ hasText: "Issued to the batch" });
+  await expect(issued.getByText(`from ${lot} · 15 KG`)).toBeVisible();
+  await step(page, "Return", async (dialog: Locator) => {
+    await dialog.getByLabel(/^Quantity/).fill("3");
+    await dialog.getByLabel("Why it goes back").fill("Offcuts unused");
+  });
+  await expect(issued.getByText(`from ${lot} · 12 KG`)).toBeVisible();
+  const movements = page.locator("[data-slot='card']").filter({ hasText: "Stock movements" });
+  await expect(movements.getByText("Offcuts unused")).toBeVisible();
+
   await step(page, "Put on hold", async (dialog: Locator) => {
     await dialog.getByLabel("Why it is on hold").fill("Tooling check");
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeLimits, planActions, revisionActions, toLineRequest, usesKind, workOrderActions } from "@/lib/manufacturing";
+import { describeLimits, freeQuantity, planActions, revisionActions, toLineRequest, usesKind, workOrderActions } from "@/lib/manufacturing";
 
 describe("usesKind", () => {
   it("offers BOMs to discrete and recipes to process organisations, and both to hybrid ones", () => {
@@ -88,5 +88,13 @@ describe("planActions", () => {
     expect(planActions("APPROVED", all)).toEqual(["order", "close", "cancel"]);
     expect(planActions("CLOSED", all)).toEqual([]);
     expect(planActions("APPROVED", { manage: true, approve: false, order: false })).toEqual([]);
+  });
+});
+
+describe("freeQuantity", () => {
+  it("leaves out what work orders have set aside", () => {
+    expect(freeQuantity({ remainingQuantity: "20.000000", reservedQuantity: "7.500000" })).toBe("12.5");
+    expect(freeQuantity({ remainingQuantity: "5.000000", reservedQuantity: "5.000000" })).toBe("0");
+    expect(freeQuantity({ remainingQuantity: "3" })).toBe("3");
   });
 });

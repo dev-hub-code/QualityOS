@@ -54,14 +54,18 @@ Status: **Built** (in this branch, tested), **Phase n** (planned), **Reused** (a
 | Work orders | BOM or recipe and routing frozen on release; materials and operations worked out from them | Built (Phase 2) |
 | Work orders | Starting opens the existing production batch, so traceability and inspections follow it | Built (Phase 2) |
 | Work orders | COMPLETED and PARTIALLY_COMPLETED | Phase 6 |
-| Inventory | Material availability, concurrency-safe reservation, issue, consumption, return; shortages reported, never ignored | Phase 3 |
+| Inventory | Material availability per work order line, from free stock in the order's facility | Built (Phase 3) |
+| Inventory | Concurrency-safe reservation on lots, by hand or oldest-first, and release of reservations | Built (Phase 3) |
+| Inventory | Issue to the order's batch (reserved stock first), partial return, consumption counted from the genealogy | Built (Phase 3) |
+| Inventory | Shortages shown per line and on start; start blocked or recorded as short, as configured; over-issue refused unless allowed | Built (Phase 3) |
+| Inventory | Idempotency keys on reserve, issue and return | Built (Phase 3) |
 | Shop floor | Operations PENDING → READY → IN_PROGRESS → PAUSED → COMPLETED, BLOCKED, CANCELLED; quantity reconciliation | Phase 4 |
 | Quality | Quality checkpoints on operations reusing inspections, NCR and CAPA; completion blocked by open mandatory gates | Phase 5 |
 | Rework | Rework orders and their traceability | Phase 5 |
 | Completion | Finished-goods receipt into existing inventory; production batch completed through traceability | Phase 6 |
 | Advanced | Downtime, scheduling, costing, OEE, manufacturing analytics | Phase 7 |
 | Traceability | Batch genealogy, recalls, serials | Reused |
-| Inventory ledger | Lot balances | Reused (no separate movement ledger exists; Phase 3 adds reservations beside the lot balance) |
+| Inventory ledger | Lot balances | Reused: lots gain a reserved quantity beside the consumed one; work-order movements are kept in their own append-only ledger |
 
 ## 3. Design
 
@@ -192,13 +196,49 @@ quantity. Consumption, inspections, genealogy and recall then work on it as on a
 snapshots cannot change, and the batch, once set, stays. Completed and cancelled orders cannot change at all. Released
 material lines cannot be rewritten or deleted, and operations keep their order.
 
+### Work order materials
+
+Stock stays with the inventory module. A lot (a received material line) keeps its quantity, what was consumed, and
+now what is **reserved** for work orders. Ordinary consumption takes only free stock (remaining less reserved), and the
+database refuses consumed plus reserved beyond the quantity. Nothing in the production module writes a balance: it
+calls `MaterialReceiptService` to reserve, release and take, and `ProductionService` to consume into or return from a
+batch.
+
+- **Availability.** For each material line of a released order: needed, issued, reserved, still to find, and what is
+  free in the order's facility (released lots for materials, released batches for sub-assemblies). Anything still to
+  find beyond what is free is a **shortage**, listed by line. Lines naming the same component share what is free.
+- **Reservation.** By hand (a lot and a quantity) or "reserve what is free", which takes the oldest lots first. Only
+  released lots of the line's material in the order's facility, and never more than the line still needs. Allowed while
+  the order is released or in progress. Each reservation can be released; cancelling the order releases them all.
+  Sub-assemblies are not reserved: they are issued from their batches.
+- **Issue** needs the order in progress. From a lot, the order's own reservations on it are used first and any rest
+  comes from free stock. Each part becomes a consumption entry on the order's production batch, so genealogy, recall
+  and traceability see it at once. More than the line needs is refused unless the organisation allows it.
+- **Issued** is counted from the batch's consumption entries that still stand, however they were recorded, so
+  consumption entered on the batch page counts too. Entries for components not on the list are shown separately.
+- **Return** gives back part or all of one consumption entry to its lot or batch, with a reason. The entry is closed
+  and, for a part, a new one keeps what stayed used.
+- **Start.** If some line is not issued or reserved in full (or a sub-assembly is not in stock), the order is short.
+  With `startRequiresMaterials` start is refused and the shortfalls named; otherwise it starts and the history and
+  audit record "Started short" with them. `reserveOnRelease` reserves what is free when the order is released.
+
+**Concurrency.** Every change locks the work order row, so requests for one order are applied one after another, and
+each lot row, re-read once locked, so two orders cannot set aside or take the same stock. Automatic reservation takes
+what a lot has free at that moment and never fails because another order got there first.
+
+**Idempotency.** Reserve, automatic reserve, issue and return accept an `Idempotency-Key` header. A key already used
+on the order returns the current state without moving stock again. The web app sends a fresh key per dialog.
+
+**Record.** Every reservation, release, issue and return is a row in `work_order_material_movements`, which the
+database keeps append-only, and an audit entry. Reservations are never deleted, and their open quantity only falls.
+
 ## 4. Phase plan and progress
 
 | Phase | Scope | Status |
 |---|---|---|
 | 1 Foundation | Settings, product settings, BOMs, recipes, routings, work centres, machines, permissions, navigation | **Built** |
 | 2 Planning and work orders | Production plans, work orders and their lifecycle, snapshots on release | **Built** |
-| 3 Inventory integration | Availability, reservation, issue, consumption, return | Not started |
+| 3 Inventory integration | Availability, reservation, issue, consumption, return | **Built** |
 | 4 Shop floor | Operation execution, quantity reconciliation, machine use | Not started |
 | 5 Quality and rework | Quality gates on operations, NCR/CAPA links, rework | Not started |
 | 6 Completion | Finished-goods receipt, batch completion, closing work orders | Not started |
@@ -215,14 +255,20 @@ Phase 1:
 
 Phase 2:
 
-- Release lists what the order needs but does not check or reserve stock; that is phase 3, which will report
-  shortages rather than ignore them.
-- Starting an order opens its batch. Consumption is still recorded on the batch as before, without reference to the
-  order's material list, until phase 3.
 - A plan line's due date is shown, not enforced against the work order's planned dates.
-- Requests are made safe to repeat by the status check and the row version, not by an idempotency key: a repeated
-  release or start is refused, never applied twice.
+- Status changes are made safe to repeat by the status check and the row version, not by an idempotency key: a
+  repeated release or start is refused, never applied twice.
 - Nothing reaches COMPLETED or PARTIALLY_COMPLETED until phase 6, so a plan with started orders cannot yet be closed.
+
+Phase 3:
+
+- Sub-assemblies are issued from released batches but not reserved: batches have no reserved quantity yet.
+- There is no expiry on lots, so automatic reservation goes by receipt date (first in, first out), not first expiry.
+- Requirements are one level deep. A sub-assembly's own materials belong to its own work order.
+- Consumption recorded straight on the batch page is not checked against the order's lines or the over-issue rule; it
+  still counts as issued, and cannot take reserved stock.
+- Material is issued in the line's unit. A lot in another unit is converted, which may leave a remainder below six
+  decimal places.
 
 ## 6. Phase 1 delivery
 
@@ -275,3 +321,32 @@ release rules.
   close and cancel), facility scope and isolation between organisations, and the database protections.
 - Vitest: `workOrderActions`, `planActions` and the navigation entries.
 - Playwright: `work-orders.spec.ts`, from a plan through approval, release, start, hold and resume, from the pages.
+
+## 8. Phase 3 delivery
+
+**Migration.** `V24__work_order_materials.sql`: `reserved_quantity` on lots with a check that consumed plus reserved
+never exceeds the quantity; three settings; `material_reservations` and the append-only
+`work_order_material_movements`, both with row-level security, triggers that keep them from being deleted or rewritten;
+two permissions.
+
+**Backend.**
+- Inventory module (`materialreceipt`): lots reserve, release and take reserved stock under a row lock; free lots by
+  material and facility; voiding a receipt or correcting a lot below what is reserved is refused.
+- Traceability: `ProductionService.consumeReserved`, `consumeEntry`, `returnConsumption` (partial return),
+  `activeConsumptions` and `availableBatches`.
+- Production: `MaterialReservation`, `MaterialMovement`, `WorkOrderMaterialService`, and the materials endpoints on
+  `WorkOrderController`. Release, start and cancel use it.
+- The web server's proxy forwards `Idempotency-Key`.
+
+**Screens.** On a released work order: materials with needed, issued, reserved, still to find, free and shortage;
+reserve and issue per line; "Reserve what is free"; reservations with release; what went into the batch with return;
+and the stock movements. The batch page shows each lot's free stock. Configuration has the three new rules.
+
+**Tests.**
+- `WorkOrderMaterialIT`: 4 tests. They cover oldest-first reservation, the lot's reserved balance, reserved stock kept
+  from ordinary consumption, issue before start refused, reserved-first issue, over-issue refused, a repeated
+  idempotency key, partial return and genealogy, the movement ledger, database protections, shortages, both start
+  rules, reserve on release, three orders racing for one lot, cancel releasing reservations, voiding a reserved receipt,
+  releasing a reservation, permissions, facility scope and isolation.
+- Vitest: `freeQuantity` and the idempotency header in the proxy.
+- Playwright: `work-orders.spec.ts` now reserves, starts short, issues and returns from the pages.

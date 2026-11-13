@@ -52,7 +52,8 @@ public class ManufacturingSettingsService {
     public SettingsResponse get() {
         ManufacturingSettings current = current();
         return new SettingsResponse(current.getManufacturingModel(), current.isSeparateApprover(),
-                current.isWorkOrderRequiresBom(), current.isWorkOrderRequiresRouting());
+                current.isWorkOrderRequiresBom(), current.isWorkOrderRequiresRouting(), current.isReserveOnRelease(),
+                current.isStartRequiresMaterials(), current.isAllowOverIssue());
     }
 
     /**
@@ -84,6 +85,15 @@ public class ManufacturingSettingsService {
         }
         if (request.workOrderRequiresRouting() != null) {
             current.setWorkOrderRequiresRouting(request.workOrderRequiresRouting());
+        }
+        if (request.reserveOnRelease() != null) {
+            current.setReserveOnRelease(request.reserveOnRelease());
+        }
+        if (request.startRequiresMaterials() != null) {
+            current.setStartRequiresMaterials(request.startRequiresMaterials());
+        }
+        if (request.allowOverIssue() != null) {
+            current.setAllowOverIssue(request.allowOverIssue());
         }
         settings.save(current);
         audit.record("MANUFACTURING_SETTINGS_CHANGED", ENTITY, current.getId(), before, snapshot(current));
@@ -154,6 +164,12 @@ public class ManufacturingSettingsService {
         return current().isWorkOrderRequiresRouting();
     }
 
+    /** The organisation's settings as they stand, for rules read together. */
+    @Transactional(readOnly = true)
+    public SettingsResponse rules() {
+        return get();
+    }
+
     /** Whether the product takes a BOM or a recipe. Empty when a hybrid organisation has not chosen for it. */
     @Transactional(readOnly = true)
     public java.util.Optional<Bom.Kind> definitionKind(UUID productId) {
@@ -164,7 +180,10 @@ public class ManufacturingSettingsService {
         return Map.of("manufacturingModel", current.getManufacturingModel().name(),
                 "separateApprover", current.isSeparateApprover(),
                 "workOrderRequiresBom", current.isWorkOrderRequiresBom(),
-                "workOrderRequiresRouting", current.isWorkOrderRequiresRouting());
+                "workOrderRequiresRouting", current.isWorkOrderRequiresRouting(),
+                "reserveOnRelease", current.isReserveOnRelease(),
+                "startRequiresMaterials", current.isStartRequiresMaterials(),
+                "allowOverIssue", current.isAllowOverIssue());
     }
 
     private ManufacturingModel productModel(UUID productId) {

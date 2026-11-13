@@ -1,6 +1,8 @@
 package com.qualityos.production.repository;
 
 import com.qualityos.production.entity.WorkOrderOperation;
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -24,4 +26,7 @@ public interface WorkOrderOperationRepository
             and o.id <> :exceptId
             """)
     boolean machineBusy(UUID machineId, UUID exceptId);
+
+    List<WorkOrderOperation> findByWorkCenterIdInAndCompletedAtGreaterThanEqualAndCompletedAtLessThan(
+            Collection<UUID> workCenterIds, Instant from, Instant to);
 }

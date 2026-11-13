@@ -13,6 +13,7 @@ import type {
   DefectCategory,
   Category,
   Facility,
+  Machine,
   Material,
   Product,
   Specification,
@@ -166,6 +167,7 @@ export const useFacilities = () => useLookup<Facility>("/facilities");
 export const useMaterials = () => useLookup<Material>("/materials");
 export const useProducts = () => useLookup<Product>("/products");
 export const useWorkCenters = () => useLookup<WorkCenter>("/manufacturing/work-centers");
+export const useMachines = () => useLookup<Machine>("/manufacturing/machines");
 
 export function SpecificationTable({
   specifications,

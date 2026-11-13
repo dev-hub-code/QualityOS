@@ -17,6 +17,7 @@ import com.qualityos.purchaseorder.dto.PurchaseOrderDtos.PurchaseOrderSummary;
 import com.qualityos.purchaseorder.dto.PurchaseOrderDtos.ReceiptLine;
 import com.qualityos.purchaseorder.dto.PurchaseOrderDtos.ReceiptTarget;
 import com.qualityos.purchaseorder.dto.PurchaseOrderDtos.SavePurchaseOrderRequest;
+import com.qualityos.purchaseorder.dto.PurchaseOrderDtos.UnitPrice;
 import com.qualityos.purchaseorder.entity.PurchaseOrder;
 import com.qualityos.purchaseorder.entity.PurchaseOrderItem;
 import com.qualityos.purchaseorder.repository.PurchaseOrderRepository;
@@ -25,8 +26,12 @@ import com.qualityos.supplier.service.SupplierService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -155,6 +160,42 @@ public class PurchaseOrderService {
      *
      * @param quantities total received in this receipt for each order item
      */
+    /** The price on each purchase order line, for costing what was received against it. */
+    @Transactional(readOnly = true)
+    public Map<UUID, UnitPrice> linePrices(Collection<UUID> itemIds) {
+        if (itemIds.isEmpty()) {
+            return Map.of();
+        }
+        return orders.items(itemIds).stream().collect(Collectors.toMap(PurchaseOrderItem::getId,
+                item -> new UnitPrice(item.getMaterialId(), item.getUomId(), item.getUnitPrice())));
+    }
+
+    /**
+     * Each material's average price per unit, weighted by quantity ordered, over priced lines of orders that were
+     * issued; one per unit it was bought in.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, List<UnitPrice>> averagePrices(Collection<UUID> materialIds) {
+        if (materialIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, Map<UUID, BigDecimal[]>> sums = new HashMap<>();
+        for (PurchaseOrderItem item : orders.pricedItems(materialIds)) {
+            BigDecimal[] sum = sums.computeIfAbsent(item.getMaterialId(), ignored -> new HashMap<>())
+                    .computeIfAbsent(item.getUomId(), ignored -> new BigDecimal[] {BigDecimal.ZERO, BigDecimal.ZERO});
+            sum[0] = sum[0].add(item.getOrderedQuantity().multiply(item.getUnitPrice()));
+            sum[1] = sum[1].add(item.getOrderedQuantity());
+        }
+        Map<UUID, List<UnitPrice>> prices = new HashMap<>();
+        sums.forEach((material, byUnit) -> byUnit.forEach((unit, sum) -> {
+            if (sum[1].signum() > 0) {
+                prices.computeIfAbsent(material, ignored -> new ArrayList<>()).add(new UnitPrice(material,
+                        unit, sum[0].divide(sum[1], 6, RoundingMode.HALF_UP)));
+            }
+        }));
+        return prices;
+    }
+
     @Transactional(readOnly = true)
     public Map<UUID, String> numbers(Collection<UUID> ids) {
         return orders.findAllById(ids).stream()

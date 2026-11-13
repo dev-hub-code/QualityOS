@@ -72,7 +72,11 @@ Status: **Built** (in this branch, tested), **Phase n** (planned), **Reused** (a
 | Completion | Finished-goods receipt into existing inventory: the order's production batch completed through traceability, never a separate balance | Built (Phase 6) |
 | Completion | Quantity reconciliation (operations' good output plus accepted rework), short and excess output, material variance per line, serial numbers | Built (Phase 6) |
 | Completion | Production record of a batch: work order, definition revisions, operations with operators and machines, gates, rework, receipt | Built (Phase 6) |
-| Advanced | Downtime, scheduling, costing, OEE, manufacturing analytics | Phase 7 |
+| Downtime | One record per stop: from the shop floor (pause, block, hold, quality hold), from machine status (breakdown, maintenance) and by hand; categories, reason, responsible department, comments, evidence; summaries by machine, work centre, line, facility and category | Built (Phase 7) |
+| Scheduling | Capacity from facility shifts (days, break) × active machines (or the centre's own capacity), less planned maintenance; load from routings' standard times; conflicts and warnings; manual reschedule with priority. No optimisation engine | Built (Phase 7) |
+| Costing | Planned and actual material, labour, machine, overhead, scrap and rework cost; total and unit; planned against actual; organisation's currency; missing prices and rates reported, never guessed | Built (Phase 7) |
+| Analytics | OEE (availability, performance, quality) by machine and overall; production, planned against actual, status, efficiency, rejection, scrap and rework rates, material variance, utilisation, downtime, cost. Missing data shown as not known | Built (Phase 7) |
+| Shifts | Facility shifts (existing), now with working days and break | Reused and extended |
 | Traceability | Batch genealogy, recalls, serials | Reused |
 | Inventory ledger | Lot balances | Reused: lots gain a reserved quantity beside the consumed one; work-order movements are kept in their own append-only ledger |
 
@@ -161,6 +165,9 @@ Production plans and work orders belong to a facility in the same way.
 | REWORK_MANAGE (raise, cancel and close rework orders) | ✓ | ✓ | | Quality Engineer |
 | REWORK_APPROVE (authorise rework) | ✓ | ✓ | ✓ | |
 | WORK_ORDER_COMPLETE (receive finished goods, close work orders) | ✓ | ✓ | | |
+| DOWNTIME_MANAGE (record, correct and end downtime by hand) | ✓ | ✓ | | |
+| PRODUCTION_COST_VIEW (work order cost, cost summaries) | ✓ | ✓ | | Production Planner |
+| PRODUCTION_ANALYTICS_VIEW (production analytics, OEE) | ✓ | ✓ | ✓ | Production Planner |
 
 Inspecting a gate and reinspecting rework need the existing INSPECTION_CREATE; a quality hold needs INSPECTION_APPROVE;
 working rework steps needs PRODUCTION_EXECUTE. NCRs and CAPAs appear on the work order only for people with NCR_VIEW.
@@ -389,6 +396,76 @@ an order takes two steps, both needing WORK_ORDER_COMPLETE.
   reports) and machines, gates with their latest inspection, rework orders and the receipt. With the existing trace
   (suppliers and lots, inspections, NCRs, CAPAs, dispatches and customers) this covers the batch end to end.
 
+### Downtime
+
+A stop is a `downtime_records` row with its facility, work centre, and the machine, work order and operation where
+known; a category (the spec's eight plus ORDER_ON_HOLD), start and end, reason, responsible department, comments and
+attachments (entity type `DOWNTIME`). Planned maintenance is marked `planned`; every other category is unplanned.
+
+- **From the shop floor** (source SHOP_FLOOR). Pausing or blocking an operation with a loss category, putting the order
+  on hold (ORDER_ON_HOLD) and a quality hold (QUALITY_ISSUE) open a stop on the operation and its machine; resuming,
+  unblocking or completing ends it. One open stop per operation, enforced by a unique index.
+- **From machine status** (source MACHINE). Setting a machine to BREAKDOWN or MAINTENANCE by hand opens a stop; setting
+  it back ends it. One open stop of this kind per machine. A breakdown reported from the floor moves the machine
+  without opening a second stop, so time is never counted twice.
+- **By hand** (source MANUAL, DOWNTIME_MANAGE): on a machine or at a work centre in the caller's facilities. Only
+  planned maintenance may be entered ahead of time, and then with an end. Manual stops can be corrected and ended.
+  Stops recorded as they happened keep their times and category; only the reason, department and comments change.
+- **Protection.** `protect_downtime_record` refuses deletes, changes to where the stop was, and retiming or
+  recategorising an ended stop that was not entered by hand. Every change is audited.
+- **Summaries** (`GET /downtime/summary`): minutes within a period of up to 366 days, by machine, work centre,
+  production line, facility or category, split into planned and unplanned; open stops count to now. Days are in the
+  organisation's time zone.
+
+### Scheduling
+
+Basic capacity checking, not an optimiser: the board shows load against capacity and warns; the planner decides.
+
+- **Capacity** of a work centre on a day = the facility's shift minutes on that weekday (end past start, past midnight
+  allowed, less the break) × units, less planned maintenance on its machines. Units are its active machines, or the
+  centre's `capacityUnits` (default 1) when it has none. Shifts gained working days and a break for this.
+- **Load.** For approved, released, in-progress and on-hold orders: each operation's planned setup plus run time not
+  yet worked (released orders: from the order's operations less running time; approved orders: from the routing in
+  effect, setup + run × quantity), spread evenly over the working days left in the order's planned dates. A late order
+  is loaded on today, with a warning.
+- **Warnings** on each order: no shifts, no routing, operations at centres outside the facility, not enough hours in its
+  window, days over capacity. **Conflicts**: each centre-day over capacity, with the orders on it. Orders are listed by
+  priority, then planned start.
+- **Reschedule** (`POST /work-orders/{id}/reschedule`, WORK_ORDER_MANAGE): new planned dates and optionally priority,
+  with a reason; refused once the order is closed. It locks the order, is audited, and returns the order's place on
+  the board with any warnings. A board covers up to 62 days.
+
+### Costing
+
+Costs come from what the product already records, in the organisation's currency, rounded to two places. Nothing is
+guessed: a missing price or rate is listed and the cost marked incomplete.
+
+- **Material.** Planned: each line's required quantity × the average purchase price of the material (issued and later
+  purchase orders, weighted by quantity), converted to the line's unit. Actual: issued less returned, × the price on
+  the purchase order line each lot was received against.
+- **Labour, machine, overhead.** Hours × the work centre's rate per hour (three optional rates on the work centre).
+  Planned hours: setup + run; actual hours: the operation's running time.
+- **Scrap** = total × scrapped / made; **rework** = labour, machine and overhead × reworked / made. They are shares of
+  the total, shown separately, not added again. **Unit cost** = total / quantity received (actual) or ordered (planned).
+- `GET /costing/work-orders/{id}` for a released order; `GET /costing/summary` for orders closed in a period
+  (PRODUCTION_COST_VIEW).
+
+### OEE and analytics
+
+`GET /analytics?from&to&facilityId` (PRODUCTION_ANALYTICS_VIEW), up to 366 days:
+
+- **Per machine.** Shift time from the facility's shifts; planned production time = shift time less planned downtime;
+  running time from the operation timeline (in progress on that machine), clipped to the period.
+  Availability = running / planned production time (capped at 100%, with a note when work ran outside shifts);
+  Performance = Σ(ideal cycle × units reported) / running, the ideal cycle being the routing's run time per unit;
+  Quality = good / reported; OEE = A × P × Q; Utilisation = running / shift time. An overall row uses the same sums.
+- **Production.** Finished goods received by product; orders closed with ordered against received; completed, closed
+  short and on time; every order by status.
+- **Rates.** Rejection, scrap and rework rates from operation reports (reversals netted out); efficiency = planned
+  minutes / running minutes of operations completed in the period; material variance from receipts.
+- **Missing data.** A figure that cannot be worked out (no shifts, no running time, nothing reported) is null with a
+  note, shown as "Not known" — never zero. Cost appears only for callers with PRODUCTION_COST_VIEW.
+
 ## 4. Phase plan and progress
 
 | Phase | Scope | Status |
@@ -399,14 +476,14 @@ an order takes two steps, both needing WORK_ORDER_COMPLETE.
 | 4 Shop floor | Operation execution, quantity reconciliation, machine use | **Built** |
 | 5 Quality and rework | Quality gates on operations, NCR/CAPA links, rework | **Built** |
 | 6 Completion | Finished-goods receipt, batch completion, closing work orders | **Built** |
-| 7 Advanced | Downtime, scheduling, costing, OEE, analytics | Not started |
+| 7 Advanced | Downtime, scheduling, costing, OEE, analytics | **Built** |
 
 ## 5. Limitations
 
 Phase 1:
 
 - The product's flat material list stays as it was. A BOM can be started from it, but the two are not kept in step.
-- Routing operations record standard times; nothing uses them until scheduling and costing (Phase 7).
+- Routing operations record standard times, which scheduling, costing and OEE use (Phase 7).
 
 Phase 2:
 
@@ -434,7 +511,7 @@ Phase 4:
 - Rejected quantities are recorded on the operation. Phase 5 adds rework orders, quality holds and the inspections an
   operation needs.
 - A machine runs one operation at a time. Machines that run several are not modelled.
-- Stop reasons are recorded on the timeline, but downtime is not yet summarised by machine or period (phase 7).
+- Stop reasons are recorded on the timeline; phase 7 turns them into downtime records and summaries.
 
 Phase 5:
 
@@ -459,6 +536,18 @@ Phase 6:
 - Serial numbers are entered at receipt, not captured per unit as each operation runs.
 - Batches recorded by hand on the batch page are completed there as before; the guard applies only to batches a work
   order opened.
+
+Phase 7:
+
+- Scheduling checks capacity and warns; it does not sequence operations or move orders itself. Load is spread evenly
+  over an order's working days, and operation dependencies are reflected only through the order's dates.
+- Shifts are per facility, not per work centre, and there is no holiday calendar.
+- Purchase prices are taken as they are on the purchase order, in the organisation's currency; there is no exchange
+  rate handling or standard cost. Material without a priced purchase order is listed as missing.
+- Rates are per work centre, not per operator or machine. Labour time is running time; setup is not split out.
+- OEE uses units reported on the machine's operations in the period; work reported on another day than it ran shifts
+  performance between days.
+- Downtime before phase 7 was not recorded as stops, so summaries start from this release.
 
 ## 6. Phase 1 delivery
 
@@ -652,3 +741,43 @@ order made, and no longer offers Complete batch for it.
   reasons and serial numbers from the work order page, closes the order short, and checks the batch's serials and
   production record.
 
+
+## 12. Phase 7 delivery
+
+**Migration.** `V28__advanced_manufacturing.sql`: `break_minutes` and `days_of_week` on the existing `shifts`;
+`capacity_units` and labour, machine and overhead rates on `work_centers`; `downtime_records` with row-level security,
+foreign keys within the tenant, a check tying shop-floor stops to an operation, unique open stops per operation and per
+machine, and the `protect_downtime_record` trigger; DOWNTIME_MANAGE, PRODUCTION_COST_VIEW and PRODUCTION_ANALYTICS_VIEW
+for Owner, Admin, Plant Manager and Production Manager, cost and analytics for the Production Planner, analytics for
+the Quality Manager; the `MANUFACTURING` feature description updated.
+
+**Backend.** `DowntimeService` and `DowntimeController` (`/api/v1/manufacturing/downtime`); `SchedulingService`,
+`SchedulingController` (`/scheduling`) and `POST /work-orders/{id}/reschedule`; `CostingService` and
+`CostingController` (`/costing`); `ProductionAnalyticsService` and `ProductionAnalyticsController` (`/analytics`);
+`ProductionCalendar` (time zone, currency, shifts). `ShopFloorService` and `WorkCenterService` record stops as they
+happen. Reused: facility shifts (`FacilityService.shiftsOf`), purchase order prices (`PurchaseOrderService.linePrices`,
+`averagePrices`), lot prices (`MaterialReceiptService.lotPrices`), unit conversion, the operation timeline and reports,
+finished-goods receipts, `FacilityScope`, `AuditService`, `AttachmentPolicy`.
+
+**Screens.** Downtime page (summary by machine, centre, line, facility or category; list with filters; record, correct
+and end stops). Scheduling page (load against capacity per centre and day, conflicts, orders with warnings,
+reschedule). Production analytics page (headline figures, output, planned against actual, status, quality and
+material, OEE by machine with notes, downtime by category, cost). On the work order page: Cost (planned against
+actual, with what is missing) and Reschedule with its warnings. Facility shifts take working days and a break; work
+centres take capacity and rates.
+
+**Tests.**
+- `AdvancedManufacturingIT`: 2 tests. They cover stops from a floor breakdown (opened, refused to end by hand, ended on
+  resume), corrections limited to notes on recorded stops, database refusal of retiming and deleting, maintenance from
+  machine status, manual stops with permission, the ahead-of-time and end rules, ORDER_ON_HOLD and missing location
+  refused, corrections, summaries by category and machine, audit, facility scope and isolation between organisations;
+  capacity from a shift with a break, an overloaded day and its conflict and warnings, reschedule with permission
+  clearing it, planned maintenance reducing capacity; planned and actual material, labour and overhead cost, a missing
+  machine rate, scrap share, unknown actual unit cost, cost permission and an unreleased order refused; analytics
+  quality rates, machine quality and shift time, efficiency, status counts, cost only with PRODUCTION_COST_VIEW,
+  permission and the period limit.
+- Vitest: shift days, local dates and instants, minutes, percentages and money never shown as zero when unknown,
+  load share, reschedulable statuses, navigation.
+- Playwright: `production-advanced.spec.ts` adds a shift and work centre rates on their pages, sees an overloaded day
+  on the scheduling board and clears it by rescheduling, records and summarises a power failure, checks a work order's
+  cost and its missing machine rate, and reads OEE on the analytics page.

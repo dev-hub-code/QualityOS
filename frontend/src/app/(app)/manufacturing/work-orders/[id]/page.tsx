@@ -6,7 +6,9 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
 import { workOrderFields } from "@/components/manufacturing/work-order-fields";
+import { RescheduleDialog } from "@/components/manufacturing/reschedule-dialog";
 import { WorkOrderCompletionPanel } from "@/components/manufacturing/work-order-completion";
+import { WorkOrderCostPanel } from "@/components/manufacturing/work-order-cost";
 import { WorkOrderMaterialsPanel } from "@/components/manufacturing/work-order-materials";
 import { WorkOrderQualityPanel } from "@/components/manufacturing/work-order-quality";
 import {
@@ -26,7 +28,7 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
-import { PRIORITY_LABELS, workOrderActions } from "@/lib/manufacturing";
+import { PRIORITY_LABELS, reschedulable, workOrderActions } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
 import type { WorkOrderDetail, WorkOrderStatus } from "@/lib/types";
 
@@ -41,7 +43,7 @@ const REASON_LABELS: Partial<Record<WorkOrderStatus, string>> = {
 const when = (value: string | null) => (value ? new Date(value).toLocaleString() : "–");
 const link = "text-primary hover:underline";
 
-type Dialog = "edit" | "sendBack" | "approve" | "hold" | "cancel" | null;
+type Dialog = "edit" | "sendBack" | "approve" | "hold" | "cancel" | "reschedule" | null;
 
 export default function WorkOrderPage() {
   const { id } = useParams<{ id: string }>();
@@ -51,12 +53,14 @@ export default function WorkOrderPage() {
     approve: usePermission("WORK_ORDER_APPROVE"),
     release: usePermission("WORK_ORDER_RELEASE"),
   };
+  const canSeeCost = usePermission("PRODUCTION_COST_VIEW");
   const products = useProducts();
   const facilities = useFacilities();
   const units = useUnits();
   const refresh = useRefresh();
   const { run, pending, message } = useAction();
   const [dialog, setDialog] = useState<Dialog>(null);
+  const [warnings, setWarnings] = useState<string[] | null>(null);
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<WorkOrderDetail>(path) });
   if (!data) return <QueryState error={error} />;
 
@@ -108,6 +112,11 @@ export default function WorkOrderPage() {
             Resume
           </Button>
         )}
+        {can.manage && reschedulable(order.status) && (
+          <Button variant="outline" onClick={() => setDialog("reschedule")}>
+            Reschedule
+          </Button>
+        )}
         {actions.includes("hold") && (
           <Button variant="outline" onClick={() => setDialog("hold")}>
             Put on hold
@@ -120,6 +129,22 @@ export default function WorkOrderPage() {
         )}
       </PageHeader>
       <FormError message={message} />
+      {warnings && (
+        <div role="status" className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-200">
+          {warnings.length === 0 ? (
+            <p>Rescheduled. It fits within capacity.</p>
+          ) : (
+            <>
+              <p className="font-medium">Rescheduled, with warnings:</p>
+              <ul className="mt-1 list-disc pl-5">
+                {warnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
       {order.statusReason && REASON_LABELS[order.status] && (
         <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-200">
           {REASON_LABELS[order.status]}: {order.statusReason}
@@ -246,6 +271,7 @@ export default function WorkOrderPage() {
       )}
       {released && <WorkOrderQualityPanel orderId={order.id} status={order.status} operations={operations} />}
       {order.productionBatchId && <WorkOrderCompletionPanel orderId={order.id} status={order.status} uomId={order.uomId} />}
+      {released && canSeeCost && <WorkOrderCostPanel orderId={order.id} />}
       <Section title="Status history">
         <ul className="divide-y text-sm">
           {history.map((change) => (
@@ -274,6 +300,7 @@ export default function WorkOrderPage() {
           }
         />
       )}
+      {dialog === "reschedule" && <RescheduleDialog order={order} onClose={close} onDone={setWarnings} />}
       {dialog === "sendBack" && (
         <RecordDialog
           title="Send back to draft"

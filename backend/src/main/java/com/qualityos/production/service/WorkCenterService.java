@@ -56,6 +56,8 @@ public class WorkCenterService {
     private final AuditService audit;
     private final jakarta.persistence.EntityManager entityManager;
 
+    private final DowntimeService downtime;
+
     WorkCenterService(
             WorkCenterRepository workCenters,
             MachineRepository machines,
@@ -64,7 +66,8 @@ public class WorkCenterService {
             FacilityScope scope,
             TenantAccessService access,
             AuditService audit,
-            jakarta.persistence.EntityManager entityManager) {
+            jakarta.persistence.EntityManager entityManager,
+            DowntimeService downtime) {
         this.workCenters = workCenters;
         this.machines = machines;
         this.events = events;
@@ -73,6 +76,7 @@ public class WorkCenterService {
         this.access = access;
         this.audit = audit;
         this.entityManager = entityManager;
+        this.downtime = downtime;
     }
 
     @Transactional(readOnly = true)
@@ -256,6 +260,7 @@ public class WorkCenterService {
         machine.changeStatus(request.status(), request.reason(), Instant.now());
         machines.saveAndFlush(machine);
         events.save(new MachineStatusEvent(id, previous, machine.getStatus(), machine.getStatusReason()));
+        downtime.machineChanged(machine, previous, machine.getStatusReason());
         audit.record("MACHINE_STATUS_CHANGED", MACHINE, id, Map.of("status", previous.name()),
                 Map.of("status", machine.getStatus().name(), "reason", Objects.toString(machine.getStatusReason(), "")));
         return toResponse(machine, workCenters.findById(machine.getWorkCenterId()).orElseThrow());
@@ -270,6 +275,10 @@ public class WorkCenterService {
         centre.setName(request.name().trim());
         centre.setProductionLineId(request.productionLineId());
         centre.setDescription(request.description());
+        centre.setCapacityUnits(request.capacityUnits() == null ? 1 : request.capacityUnits());
+        centre.setLabourRate(request.labourRate());
+        centre.setMachineRate(request.machineRate());
+        centre.setOverheadRate(request.overheadRate());
     }
 
     private static void applyMachine(Machine machine, SaveMachineRequest request) {
@@ -316,7 +325,8 @@ public class WorkCenterService {
         return new WorkCenterResponse(centre.getId(), centre.getCode(), centre.getName(), centre.getDescription(),
                 centre.getFacilityId(), codes.get(centre.getFacilityId()), centre.getProductionLineId(),
                 centre.getProductionLineId() == null ? null : codes.get(centre.getProductionLineId()),
-                centre.getArchivedAt() != null);
+                centre.getArchivedAt() != null, centre.getCapacityUnits(), centre.getLabourRate(),
+                centre.getMachineRate(), centre.getOverheadRate());
     }
 
     private static MachineResponse toResponse(Machine machine, WorkCenter centre) {

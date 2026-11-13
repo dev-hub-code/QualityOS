@@ -78,7 +78,11 @@ public final class ManufacturingDtos {
             @NotBlank @Size(max = 200) String name,
             @NotNull UUID facilityId,
             UUID productionLineId,
-            @Size(max = 1000) String description) {
+            @Size(max = 1000) String description,
+            @Min(1) @Max(1000) Integer capacityUnits,
+            @DecimalMin("0") @Digits(integer = 14, fraction = 4) BigDecimal labourRate,
+            @DecimalMin("0") @Digits(integer = 14, fraction = 4) BigDecimal machineRate,
+            @DecimalMin("0") @Digits(integer = 14, fraction = 4) BigDecimal overheadRate) {
     }
 
     public record WorkCenterResponse(
@@ -90,7 +94,11 @@ public final class ManufacturingDtos {
             String facilityCode,
             UUID productionLineId,
             String productionLineCode,
-            boolean archived) {
+            boolean archived,
+            int capacityUnits,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal labourRate,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal machineRate,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal overheadRate) {
     }
 
     public record WorkCenterDetail(WorkCenterResponse workCenter, List<MachineResponse> machines) {

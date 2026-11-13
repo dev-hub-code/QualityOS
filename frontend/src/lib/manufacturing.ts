@@ -288,3 +288,70 @@ export function completionActions(
   return completion.closeBlockers.length === 0 ? ["close"] : [];
 }
 
+
+/** Shift days as the API holds them: Monday is 1, Tuesday 2 … Sunday 64. */
+export const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+
+export function daysToMask(days: readonly boolean[]): number {
+  return days.reduce((mask, on, index) => (on ? mask | (1 << index) : mask), 0);
+}
+
+export function maskToDays(mask: number): boolean[] {
+  return WEEKDAYS.map((_, index) => (mask & (1 << index)) !== 0);
+}
+
+export function describeDays(mask: number): string {
+  if (mask === 127) return "every day";
+  if (mask === 31) return "Mon–Fri";
+  if (mask === 63) return "Mon–Sat";
+  return WEEKDAYS.filter((_, index) => (mask & (1 << index)) !== 0).join(", ");
+}
+
+/** A date and time typed in the browser's own time zone, as an instant for the API. Null if either is missing. */
+export function toInstant(date: unknown, time: unknown): string | null {
+  if (typeof date !== "string" || typeof time !== "string" || !date || !time) return null;
+  const local = new Date(`${date}T${time}`);
+  return Number.isNaN(local.getTime()) ? null : local.toISOString();
+}
+
+/** "450.0" minutes reads as "7 h 30 min". */
+export function formatMinutes(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return "–";
+  const total = Math.round(Number(value));
+  const hours = Math.floor(total / 60);
+  if (hours === 0) return `${total} min`;
+  return total % 60 === 0 ? `${hours} h` : `${hours} h ${total % 60} min`;
+}
+
+/** A figure the server could not work out is shown as not known, never as zero. */
+export function formatPercent(value: string | null | undefined): string {
+  return value === null || value === undefined ? "Not known" : `${Number(value)}%`;
+}
+
+export function formatMoney(value: string | null | undefined, currency: string): string {
+  if (value === null || value === undefined) return "Not known";
+  try {
+    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(Number(value));
+  } catch {
+    return `${Number(value).toFixed(2)} ${currency}`;
+  }
+}
+
+/** Load against capacity, as a share; null where there is no capacity at all. */
+export function loadShare(day: { capacityMinutes: string; loadMinutes: string }): number | null {
+  const capacity = Number(day.capacityMinutes);
+  if (capacity <= 0) return Number(day.loadMinutes) > 0 ? Infinity : null;
+  return Number(day.loadMinutes) / capacity;
+}
+
+/** Statuses an order can be rescheduled in: approved and not yet closed. Drafts change by editing. */
+export function reschedulable(status: WorkOrderStatus): boolean {
+  return ["APPROVED", "RELEASED", "IN_PROGRESS", "ON_HOLD"].includes(status);
+}
+
+/** A day in the browser's time zone, as YYYY-MM-DD, some days from today. */
+export function localDate(offsetDays = 0, from: Date = new Date()): string {
+  const day = new Date(from.getFullYear(), from.getMonth(), from.getDate() + offsetDays);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`;
+}

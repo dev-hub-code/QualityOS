@@ -113,6 +113,9 @@ export interface Shift {
   name: string;
   startsAt: string;
   endsAt: string;
+  breakMinutes: number;
+  /** Monday is 1, Tuesday 2, Wednesday 4 … Sunday 64. */
+  daysOfWeek: number;
 }
 
 export interface FacilityDetail {
@@ -1605,6 +1608,10 @@ export interface WorkCenter {
   productionLineId: string | null;
   productionLineCode: string | null;
   archived: boolean;
+  capacityUnits: number;
+  labourRate: string | null;
+  machineRate: string | null;
+  overheadRate: string | null;
 }
 
 export type MachineStatus = "AVAILABLE" | "RUNNING" | "IDLE" | "MAINTENANCE" | "BREAKDOWN" | "INACTIVE";
@@ -2244,4 +2251,225 @@ export interface ProductionRecord {
   gates: string[];
   reworkOrders: string[];
   receipt: FinishedGoodsReceipt | null;
+}
+
+export type DowntimeSource = "SHOP_FLOOR" | "MACHINE" | "MANUAL";
+
+export interface DowntimeRecord {
+  id: string;
+  facilityId: string;
+  facilityCode: string | null;
+  workCenterId: string;
+  workCenterCode: string | null;
+  machineId: string | null;
+  machineCode: string | null;
+  workOrderId: string | null;
+  workOrderNumber: string | null;
+  operationId: string | null;
+  operationSequence: number | null;
+  source: DowntimeSource;
+  category: LossCategory;
+  planned: boolean;
+  startedAt: string;
+  endedAt: string | null;
+  minutes: string;
+  reason: string;
+  responsibleDepartment: string | null;
+  comments: string | null;
+  recordedByName: string | null;
+  endedByName: string | null;
+}
+
+export type DowntimeGroupBy = "MACHINE" | "WORK_CENTER" | "PRODUCTION_LINE" | "FACILITY" | "CATEGORY";
+
+export interface DowntimeSummaryRow {
+  key: string;
+  label: string;
+  stops: number;
+  minutes: string;
+  plannedMinutes: string;
+  unplannedMinutes: string;
+}
+
+export interface DowntimeSummary {
+  from: string;
+  to: string;
+  timezone: string;
+  groupBy: DowntimeGroupBy;
+  rows: DowntimeSummaryRow[];
+  totalMinutes: string;
+  plannedMinutes: string;
+  unplannedMinutes: string;
+}
+
+export interface DayLoad {
+  date: string;
+  capacityMinutes: string;
+  plannedDowntimeMinutes: string;
+  loadMinutes: string;
+  overloaded: boolean;
+}
+
+export interface CentreLoad {
+  id: string;
+  code: string;
+  name: string;
+  units: number;
+  days: DayLoad[];
+}
+
+export interface ScheduledOrder {
+  id: string;
+  workOrderNumber: string;
+  productCode: string;
+  status: WorkOrderStatus;
+  priority: WorkOrderPriority;
+  plannedStart: string;
+  plannedEnd: string;
+  remainingMinutes: string;
+  warnings: string[];
+}
+
+export interface SchedulingConflict {
+  workCenterId: string;
+  workCenterCode: string;
+  date: string;
+  capacityMinutes: string;
+  loadMinutes: string;
+  workOrderNumbers: string[];
+}
+
+export interface SchedulingBoard {
+  facilityId: string;
+  from: string;
+  to: string;
+  timezone: string;
+  shiftsDefined: boolean;
+  workCenters: CentreLoad[];
+  orders: ScheduledOrder[];
+  conflicts: SchedulingConflict[];
+}
+
+/** Money as text, in the organisation's currency; null when it is not known. */
+export interface CostTotals {
+  material: string | null;
+  labour: string | null;
+  machine: string | null;
+  overhead: string | null;
+  scrap: string | null;
+  rework: string | null;
+  total: string | null;
+  unit: string | null;
+}
+
+export interface WorkOrderCost {
+  workOrderId: string;
+  workOrderNumber: string;
+  status: WorkOrderStatus;
+  currency: string;
+  orderedQuantity: string;
+  receivedQuantity: string;
+  materials: {
+    lineNumber: number;
+    componentCode: string;
+    componentName: string;
+    uomId: string;
+    plannedQuantity: string;
+    plannedCost: string | null;
+    issuedQuantity: string;
+    actualCost: string | null;
+  }[];
+  operations: {
+    sequence: number;
+    name: string;
+    workCenterCode: string;
+    plannedHours: string;
+    actualHours: string;
+    plannedCost: string | null;
+    actualCost: string | null;
+  }[];
+  planned: CostTotals;
+  actual: CostTotals;
+  complete: boolean;
+  missing: string[];
+}
+
+export interface CostSummary {
+  from: string;
+  to: string;
+  currency: string;
+  orders: {
+    workOrderId: string;
+    workOrderNumber: string;
+    productCode: string;
+    status: WorkOrderStatus;
+    completedAt: string | null;
+    orderedQuantity: string;
+    receivedQuantity: string;
+    plannedTotal: string | null;
+    actualTotal: string | null;
+    plannedUnit: string | null;
+    actualUnit: string | null;
+    complete: boolean;
+  }[];
+  plannedTotal: string | null;
+  actualTotal: string | null;
+  complete: boolean;
+}
+
+export interface ProductOutput {
+  productId: string;
+  productCode: string;
+  productName: string;
+  uomId: string;
+  ordered: string | null;
+  received: string | null;
+  orders: number;
+}
+
+export interface MachineOee {
+  machineId: string | null;
+  machineCode: string | null;
+  workCenterCode: string | null;
+  shiftMinutes: string | null;
+  plannedDowntimeMinutes: string | null;
+  plannedProductionMinutes: string | null;
+  runningMinutes: string | null;
+  unplannedDowntimeMinutes: string | null;
+  utilisation: string | null;
+  availability: string | null;
+  performance: string | null;
+  quality: string | null;
+  oee: string | null;
+  notes: string[];
+}
+
+export interface ProductionAnalytics {
+  from: string;
+  to: string;
+  timezone: string;
+  facilityId: string | null;
+  production: ProductOutput[];
+  plannedVersusActual: ProductOutput[];
+  ordersCompleted: number;
+  ordersPartiallyCompleted: number;
+  ordersOnTime: number;
+  workOrderStatus: { status: WorkOrderStatus; count: number }[];
+  quality: {
+    processed: string;
+    good: string;
+    rejected: string;
+    scrap: string;
+    rework: string;
+    rejectionRate: string | null;
+    scrapRate: string | null;
+    reworkRate: string | null;
+  };
+  efficiency: { operations: number; plannedMinutes: string; actualMinutes: string; percent: string | null };
+  materialVariance: { receipts: number; lines: number; linesOutside: number; averageAbsolutePercent: string | null };
+  machines: MachineOee[];
+  overall: MachineOee;
+  downtimeByCategory: DowntimeSummaryRow[];
+  /** Absent for those who may not see production cost. */
+  cost?: CostSummary | null;
 }

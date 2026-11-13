@@ -5,6 +5,9 @@ import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.response.Pages;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.common.security.Permissions.Require;
+import com.qualityos.production.dto.ProductionQualityDtos.GateResponse;
+import com.qualityos.production.dto.ProductionQualityDtos.HoldRequest;
+import com.qualityos.production.dto.ProductionQualityDtos.QualityResponse;
 import com.qualityos.production.dto.WorkOrderDtos.NoteRequest;
 import com.qualityos.production.dto.WorkOrderDtos.ReasonRequest;
 import com.qualityos.production.dto.WorkOrderDtos.SaveWorkOrderRequest;
@@ -17,6 +20,8 @@ import com.qualityos.production.dto.WorkOrderMaterialDtos.MaterialsResponse;
 import com.qualityos.production.dto.WorkOrderMaterialDtos.ReserveRequest;
 import com.qualityos.production.dto.WorkOrderMaterialDtos.ReturnRequest;
 import com.qualityos.production.dto.WorkOrderMaterialDtos.UnreserveRequest;
+import com.qualityos.production.service.QualityGateService;
+import com.qualityos.production.service.ShopFloorService;
 import com.qualityos.production.service.WorkOrderMaterialService;
 import com.qualityos.production.service.WorkOrderService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -50,10 +55,18 @@ public class WorkOrderController {
 
     private final WorkOrderService workOrders;
     private final WorkOrderMaterialService orderMaterials;
+    private final QualityGateService qualityGates;
+    private final ShopFloorService shopFloor;
 
-    WorkOrderController(WorkOrderService workOrders, WorkOrderMaterialService orderMaterials) {
+    WorkOrderController(
+            WorkOrderService workOrders,
+            WorkOrderMaterialService orderMaterials,
+            QualityGateService qualityGates,
+            ShopFloorService shopFloor) {
         this.workOrders = workOrders;
         this.orderMaterials = orderMaterials;
+        this.qualityGates = qualityGates;
+        this.shopFloor = shopFloor;
     }
 
     @GetMapping
@@ -140,6 +153,27 @@ public class WorkOrderController {
         boolean canManage = holds(caller, Permissions.WORK_ORDER_MANAGE);
         boolean canApprove = holds(caller, Permissions.WORK_ORDER_APPROVE);
         return ApiResponse.ok(workOrders.cancel(id, request, canManage, canApprove));
+    }
+
+    /** Gates, NCRs and CAPAs on the batch (with NCR_VIEW), rework orders, and what still blocks completion. */
+    @GetMapping("/{id}/quality")
+    public ApiResponse<QualityResponse> quality(@PathVariable UUID id) {
+        return ApiResponse.ok(qualityGates.quality(id));
+    }
+
+    /** Starts the gate's inspection in the inspection engine, with the template frozen on the gate. */
+    @PostMapping("/{id}/quality-gates/{gateId}/inspections")
+    @PreAuthorize(Require.INSPECTION_CREATE)
+    public ApiResponse<GateResponse> inspectGate(@PathVariable UUID id, @PathVariable UUID gateId) {
+        return ApiResponse.ok(qualityGates.inspect(id, gateId));
+    }
+
+    /** Puts the batch on hold and pauses what is running. An in-process reinspection releases it. */
+    @PostMapping("/{id}/quality-hold")
+    @PreAuthorize(Require.INSPECTION_APPROVE)
+    public ApiResponse<QualityResponse> qualityHold(@PathVariable UUID id, @Valid @RequestBody HoldRequest request) {
+        shopFloor.qualityHold(id, request.reason());
+        return ApiResponse.ok(qualityGates.quality(id));
     }
 
     @GetMapping("/{id}/materials")

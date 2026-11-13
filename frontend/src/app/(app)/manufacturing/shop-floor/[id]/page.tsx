@@ -13,8 +13,10 @@ import { useMe } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import {
   LOSS_CATEGORY_LABELS,
+  STAGE_LABELS,
   describeLimits,
   formatDuration,
+  gateInspectable,
   newRequestKey,
   operationActions,
   reportMismatch,
@@ -48,6 +50,7 @@ export default function OperationPage() {
     execute: me?.permissions.includes("PRODUCTION_EXECUTE") ?? false,
     supervise: me?.permissions.includes("PRODUCTION_SUPERVISE") ?? false,
   };
+  const canInspect = me?.permissions.includes("INSPECTION_CREATE") ?? false;
   const actions = operationActions(operation, can);
   const unit = units.label(operation.uomId);
   const amount = (value: string) => `${formatQuantity(value)} ${unit}`;
@@ -80,8 +83,60 @@ export default function OperationPage() {
           The work order is on hold. Nothing runs until it is resumed.
         </p>
       )}
+      {(data.batchStatus === "ON_HOLD" || data.batchStatus === "REJECTED") && (
+        <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-900 ring-1 ring-red-200">
+          {data.batchStatus === "ON_HOLD"
+            ? "The batch is on hold for quality. Nothing more is made or reported until it is reinspected."
+            : "The batch was rejected. Nothing more is made on it."}
+        </p>
+      )}
       {operation.statusReason && (
         <p className="rounded-xl bg-muted px-3 py-2 text-sm">{operation.statusReason}</p>
+      )}
+      {data.gates.length > 0 && (
+        <Section title="Quality checks">
+          <ul className="divide-y text-sm">
+            {data.gates.map((gate) => {
+              const latest = gate.inspections.at(-1);
+              return (
+                <li key={gate.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+                  <span>
+                    <span className="font-medium">{gate.name}</span>
+                    {!gate.mandatory && <span className="text-muted-foreground"> (optional)</span>}
+                    <span className="block text-muted-foreground">
+                      {STAGE_LABELS[gate.stage]}
+                      {latest && (
+                        <>
+                          {" · "}
+                          <RecordLink href={`/inspections/${latest.id}`}>{latest.inspectionNumber}</RecordLink>
+                        </>
+                      )}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <StatusBadge status={gate.status} />
+                    {gateInspectable(gate, operation.workOrderStatus, canInspect) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={pending}
+                        onClick={() =>
+                          run(() =>
+                            api
+                              .post(`/manufacturing/work-orders/${operation.workOrderId}/quality-gates/${gate.id}/inspections`)
+                              .then(refresh),
+                          )
+                        }
+                      >
+                        {gate.status === "FAILED" ? "Inspect again" : "Inspect"}
+                      </Button>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </Section>
       )}
 
       <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">

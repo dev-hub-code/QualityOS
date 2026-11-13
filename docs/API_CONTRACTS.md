@@ -391,7 +391,7 @@ Reading needs `WORK_ORDER_VIEW`. Quantities are in the work order's unit. Every 
 | Endpoint | Permission | Notes |
 |---|---|---|
 | `GET /operations` | | Open operations of orders in progress or on hold, running first. `status` (repeatable), `facilityId`, `workCenterId`, `mine`, `q` (order number or product), paged |
-| `GET /operations/{id}` | | `operation` (with `input`, `processed`, `goodQuantity`, `rejectedQuantity`, `scrapQuantity`, `reworkQuantity`, `waiting`), `instructions`, planned and running times, `parameters`, `reports`, `measurements`, `events`, `machines` at its work centre, and `operators` who may run it |
+| `GET /operations/{id}` | | `operation` (with `input`, `processed`, `goodQuantity`, `rejectedQuantity`, `scrapQuantity`, `reworkQuantity`, `waiting`), `instructions`, planned and running times, `parameters`, `reports`, `measurements`, `events`, `machines` at its work centre, `operators` who may run it, `batchStatus`, and its quality `gates` |
 | `POST /operations/{id}/start` | `PRODUCTION_EXECUTE` | Optional `machineId`. Ready operations of orders in progress |
 | `POST /operations/{id}/pause` | `PRODUCTION_EXECUTE` | `category` (stop reason), optional `reason` |
 | `POST /operations/{id}/resume` | `PRODUCTION_EXECUTE` | |
@@ -405,6 +405,48 @@ Reading needs `WORK_ORDER_VIEW`. Quantities are in the work order's unit. Every 
 | `POST /operations/{id}/skip` | `PRODUCTION_SUPERVISE` | `reason`. Only when nothing was reported on it |
 | `POST /operations/{id}/reports/{reportId}/reverse` | `PRODUCTION_SUPERVISE` | `reason`. Once per report, while the operation is open |
 
+Since phase 5, `start` is refused while a mandatory start gate of the operation has not passed, and `complete` while a
+mandatory in-process or completion gate has not. While the batch is on hold or rejected, `start`, `resume`, `reports`,
+`measurements` and `complete` are refused. All are `422` with a message naming what is missing.
+
 An operation assigned to someone else is refused with 403 unless the caller holds `PRODUCTION_SUPERVISE`. Photographs
 use `/api/v1/attachments` with `entityType=WORK_ORDER_OPERATION`: viewing needs `WORK_ORDER_VIEW`, adding needs
 `PRODUCTION_EXECUTE`.
+
+#### Quality checkpoints: `/api/v1/manufacturing/quality-checkpoints`
+
+Reading needs `MANUFACTURING_VIEW`; changes need `QUALITY_CHECKPOINT_MANAGE`.
+
+| Endpoint | Notes |
+|---|---|
+| `GET /quality-checkpoints` | All checkpoints, by stage and name. `includeArchived=true` adds archived ones. Not paged |
+| `POST /quality-checkpoints` | `name`, `stage` (`OPERATION_START`, `IN_PROCESS`, `OPERATION_COMPLETION`, `FINAL_RELEASE`), `templateId` (a published IPQC template for the operation stages, FQC for final release, not for one material), optional `productId`, `workCenterId`, `operationSequence` (not for final release), `mandatory` (default true). `201` |
+| `PUT /quality-checkpoints/{id}` | The same body; the stage cannot change. Orders already released keep their gates |
+| `DELETE /quality-checkpoints/{id}` | Archives it. `204` |
+
+#### Quality on a work order
+
+| Endpoint | Permission | Notes |
+|---|---|---|
+| `GET /work-orders/{id}/quality` | `WORK_ORDER_VIEW` | `batchId`, `batchNumber`, `batchStatus`, `onHold`; `gates` (name, stage, mandatory, operation, template, `status` of `PENDING`, `IN_INSPECTION`, `ON_HOLD`, `PASSED` or `FAILED`, and every inspection started for it); `ncrs` and `capas` on the batch (empty without `NCR_VIEW`); `reworkOrders`; `rejected` (`rejected`, `toRework`, `scrapped`, `inRework`, `reworkedAccepted`); `unresolved`, one sentence per mandatory gate not passed and rework order still open |
+| `POST /work-orders/{id}/quality-gates/{gateId}/inspections` | `INSPECTION_CREATE` | Starts an inspection of the batch with the gate's template, through the inspection engine. Pending or failed gates, while the order is in progress or on hold; a start check before the operation starts, the others while it runs. Returns the gate |
+| `POST /work-orders/{id}/quality-hold` | `INSPECTION_APPROVE` | `reason`. Puts the batch on hold and pauses running operations (`QUALITY_ISSUE`). Only while the batch is in progress; an in-process reinspection releases it. Returns the quality view |
+
+#### Rework orders: `/api/v1/manufacturing/rework-orders`
+
+Reading needs `WORK_ORDER_VIEW`; members limited to some facilities see only their facilities' rework orders, anything
+else is `404`. Every change returns the detail.
+
+| Endpoint | Permission | Notes |
+|---|---|---|
+| `GET /rework-orders` | | Newest first. `status` (repeatable), `workOrderId`, `q` (rework or work order number), paged |
+| `GET /rework-orders/{id}` | | `rework` (number, work order, batch, product, operation, NCR, `quantity`, `status`, `finalDisposition`), `reason`, `instructions`, the source inspection, approval, times, `reworkedQuantity`, `scrappedQuantity`, `reinspection`, `steps`, `history` |
+| `POST /rework-orders` | `REWORK_MANAGE` | `workOrderId`, at least one of `operationId`, `inspectionId` (disposed of as REWORK, on this batch), `ncrId` (on this batch), `quantity` (at most what the operation marked for rework and is not on another rework order), `reason`, optional `instructions`, `steps` (1 to 50 of `description`, optional `workCenterId` in the order's facility). The order must be in progress or on hold; the number is `RW-…`. `201` |
+| `POST /rework-orders/{id}/approve` | `REWORK_APPROVE` | Optional `note`. OPEN → APPROVED; under `separateApprover`, not by whoever raised it, except as a recorded self-review |
+| `POST /rework-orders/{id}/start` | `PRODUCTION_EXECUTE` | APPROVED → IN_PROGRESS |
+| `POST /rework-orders/{id}/steps/{stepId}/complete` | `PRODUCTION_EXECUTE` | Optional `note`. Once per step, while in progress |
+| `POST /rework-orders/{id}/complete` | `PRODUCTION_EXECUTE` | `reworkedQuantity`, `scrappedQuantity`, adding up to the quantity; every step done. → AWAITING_INSPECTION |
+| `POST /rework-orders/{id}/reinspect` | `INSPECTION_CREATE` | Optional `templateId`. Starts the reinspection on the batch; refused while one is under way |
+| `POST /rework-orders/{id}/close` | `REWORK_MANAGE` | → CLOSED with the reinspection's disposition. Refused without a reinspection or before it has a decision other than HOLD |
+| `POST /rework-orders/{id}/cancel` | `REWORK_MANAGE` | `reason`. Only from OPEN or APPROVED |
+

@@ -7,6 +7,7 @@ import { useState } from "react";
 import { FormError } from "@/components/forms/field";
 import { workOrderFields } from "@/components/manufacturing/work-order-fields";
 import { WorkOrderMaterialsPanel } from "@/components/manufacturing/work-order-materials";
+import { WorkOrderQualityPanel } from "@/components/manufacturing/work-order-quality";
 import {
   Details,
   PageHeader,
@@ -234,6 +235,7 @@ export default function WorkOrderPage() {
           </ul>
         </Section>
       )}
+      {released && <WorkOrderQualityPanel orderId={order.id} status={order.status} operations={operations} />}
       <Section title="Status history">
         <ul className="divide-y text-sm">
           {history.map((change) => (

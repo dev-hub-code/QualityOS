@@ -16,7 +16,7 @@ account emails a real customer needs.
 | 9 Analytics | Dashboard, scorecards, Pareto, PDF and Excel exports | Reports honour tenant and facility scope | **Done** |
 | 10 Subscription | Plans, trials, limits, invoices | Limits enforced, prices editable by admin | **Done** |
 | 12 Control Center | Platform dashboard, plans, organisations, then billing, entitlements, operators and support. See [PLATFORM_ADMIN.md](PLATFORM_ADMIN.md) | Every acceptance item in the owner's brief | **All 5 phases built** |
-| 13 Manufacturing | BOMs, recipes, routings, work centres and machines, then work orders, inventory, shop floor, quality gates, completion and advanced analytics. See [MANUFACTURING.md](MANUFACTURING.md) | Each of its seven phases tested and documented | **Phases 1 to 4 of 7 built** |
+| 13 Manufacturing | BOMs, recipes, routings, work centres and machines, then work orders, inventory, shop floor, quality gates, completion and advanced analytics. See [MANUFACTURING.md](MANUFACTURING.md) | Each of its seven phases tested and documented | **Phases 1 to 5 of 7 built** |
 | 11 Production | Terraform, ECS, RDS, S3, Secrets Manager, CI/CD, monitoring, backups | Deployed and restore-tested | Deferred |
 
 Later: Module 12 (AI) after Phase 9, because it depends on accumulated data. SMS and WhatsApp stay behind
@@ -104,7 +104,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | Lists show only active records, with no way to restore an archived one | When a user needs it |
 | Facility, supplier, material and product pickers load the first 100 records | Add search when a tenant exceeds this |
-| Manufacturing has its foundation, production plans, work orders up to started production, material reservation, issue and return, and shop-floor execution of operations: no quality gates, rework or completion yet. See [MANUFACTURING.md](MANUFACTURING.md) for what each later phase adds | Manufacturing phases 5 to 7 |
+| Manufacturing has its foundation, production plans, work orders up to started production, material reservation, issue and return, shop-floor execution of operations, quality gates and rework: no completion or finished-goods receipt yet. See [MANUFACTURING.md](MANUFACTURING.md) for what each later phase adds | Manufacturing phases 6 and 7 |
 | Facility sub-records (departments, lines, shifts), supplier contacts, material-to-product mappings, and new units are not audited individually | Review after real use |
 
 ## Definition of done for each phase

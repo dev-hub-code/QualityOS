@@ -14,7 +14,6 @@ import com.qualityos.material.service.MaterialService;
 import com.qualityos.organization.service.FacilityService;
 import com.qualityos.product.dto.ProductDtos.ProductReference;
 import com.qualityos.product.service.ProductService;
-import com.qualityos.production.dto.ManufacturingDtos.SettingsResponse;
 import com.qualityos.production.dto.ShopFloorDtos.AssignRequest;
 import com.qualityos.production.dto.ShopFloorDtos.BlockRequest;
 import com.qualityos.production.dto.ShopFloorDtos.CommentRequest;
@@ -38,6 +37,7 @@ import com.qualityos.production.entity.OperationEvent;
 import com.qualityos.production.entity.OperationEvent.LossCategory;
 import com.qualityos.production.entity.OperationMeasurement;
 import com.qualityos.production.entity.OperationReport;
+import com.qualityos.production.entity.QualityCheckpoint.Stage;
 import com.qualityos.production.entity.WorkCenter;
 import com.qualityos.production.entity.WorkOrder;
 import com.qualityos.production.entity.WorkOrderOperation;
@@ -47,6 +47,7 @@ import com.qualityos.production.repository.OperationMeasurementRepository;
 import com.qualityos.production.repository.OperationReportRepository;
 import com.qualityos.production.repository.WorkOrderOperationRepository;
 import com.qualityos.production.repository.WorkOrderRepository;
+import com.qualityos.traceability.service.ProductionService;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
@@ -118,7 +119,10 @@ public class ShopFloorService implements AttachmentPolicy {
     private final TenantAccessService access;
     private final AuditService audit;
     private final JsonMapper json;
+    private final QualityGateService qualityGates;
+    private final ProductionService production;
 
+    @SuppressWarnings("java:S107")
     ShopFloorService(
             WorkOrderRepository workOrders,
             WorkOrderOperationRepository operations,
@@ -133,7 +137,9 @@ public class ShopFloorService implements AttachmentPolicy {
             FacilityScope scope,
             TenantAccessService access,
             AuditService audit,
-            JsonMapper json) {
+            JsonMapper json,
+            QualityGateService qualityGates,
+            ProductionService production) {
         this.workOrders = workOrders;
         this.operations = operations;
         this.reports = reports;
@@ -148,6 +154,8 @@ public class ShopFloorService implements AttachmentPolicy {
         this.access = access;
         this.audit = audit;
         this.json = json;
+        this.qualityGates = qualityGates;
+        this.production = production;
     }
 
     // Reading
@@ -234,6 +242,8 @@ public class ShopFloorService implements AttachmentPolicy {
         requireRunner(operation);
         Status from = operation.getStatus();
         operation.requireStatus(Status.READY, "started");
+        requireBatchOpen(locked.order(), operation, "started");
+        qualityGates.requirePassed(locked.order(), operation, EnumSet.of(Stage.OPERATION_START), "started");
         UUID machineId = request != null && request.machineId() != null ? request.machineId()
                 : operation.getMachineId();
         if (machineId == null && settings.rules().operationRequiresMachine()
@@ -258,6 +268,7 @@ public class ShopFloorService implements AttachmentPolicy {
         requireRunner(operation);
         Status from = operation.getStatus();
         operation.requireStatus(Status.PAUSED, "resumed");
+        requireBatchOpen(locked.order(), operation, "resumed");
         if (operation.getMachineId() != null) {
             occupy(locked.order(), operation, operation.getMachineId());
         }
@@ -292,6 +303,7 @@ public class ShopFloorService implements AttachmentPolicy {
         requireRunner(operation);
         Status from = operation.getStatus();
         operation.requireOneOf(REPORTABLE, "completed");
+        requireBatchOpen(order, operation, "completed");
         locked.siblings().stream()
                 .filter(other -> other.getSequence() < operation.getSequence() && !other.getStatus().isClosed())
                 .findFirst()
@@ -307,6 +319,8 @@ public class ShopFloorService implements AttachmentPolicy {
                     .formatted(BigDecimal.valueOf(operation.runningSecondsAt(now))
                             .divide(BigDecimal.valueOf(60), 0, RoundingMode.DOWN).toPlainString()));
         }
+        qualityGates.requirePassed(order, operation, EnumSet.of(Stage.IN_PROCESS, Stage.OPERATION_COMPLETION),
+                "completed");
         BigDecimal input = inputs(order, locked.siblings()).get(operation.getId());
         String reason = request == null ? null : blankToNull(request.reason());
         if (operation.processed().compareTo(input) < 0 && reason == null) {
@@ -425,6 +439,7 @@ public class ShopFloorService implements AttachmentPolicy {
         requireRunning(order, "reported on");
         requireRunner(operation);
         operation.requireOneOf(REPORTABLE, "reported on");
+        requireBatchOpen(order, operation, "reported on");
         BigDecimal good = request.goodQuantity();
         BigDecimal rejected = request.rejectedQuantity();
         BigDecimal scrap = request.scrapQuantity();
@@ -501,6 +516,7 @@ public class ShopFloorService implements AttachmentPolicy {
         requireRunning(order, "measured");
         requireRunner(operation);
         operation.requireOneOf(REPORTABLE, "measured");
+        requireBatchOpen(order, operation, "measured");
         ParameterLimits parameter = parameters(operation).stream()
                 .filter(found -> found.code().equalsIgnoreCase(request.parameterCode().trim()))
                 .findFirst()
@@ -550,6 +566,44 @@ public class ShopFloorService implements AttachmentPolicy {
                         LossCategory.ORDER_ON_HOLD, reason));
             }
         }
+    }
+
+    /**
+     * Stops the order's batch for quality: the batch goes on hold and whatever is running is paused, so nothing more
+     * is made or reported on it. Only an in-process reinspection of the batch releases it, through the inspection
+     * engine, as with any batch held for rework.
+     */
+    @Transactional
+    public void qualityHold(UUID orderId, String reason) {
+        WorkOrder order = workOrders.findForUpdate(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("WorkOrder", orderId));
+        scope.requireAllowed(order.getFacilityId(), "WorkOrder", order.getWorkOrderNumber());
+        if (!ON_FLOOR.contains(order.getStatus()) || order.getProductionBatchId() == null) {
+            throw new BusinessRuleException("Work order %s is %s. A quality hold stops production that is under way."
+                    .formatted(order.getWorkOrderNumber(), label(order.getStatus())));
+        }
+        String batchStatus = production.batch(order.getProductionBatchId()).status();
+        if (!"IN_PROGRESS".equals(batchStatus)) {
+            throw new BusinessRuleException("The batch of %s is %s, so it cannot be put on hold.".formatted(
+                    order.getWorkOrderNumber(), batchStatus.toLowerCase(Locale.ROOT).replace('_', ' ')));
+        }
+        String why = reason.trim();
+        production.holdForReinspection(order.getProductionBatchId(), why);
+        Instant now = Instant.now();
+        int paused = 0;
+        for (WorkOrderOperation operation : operations.findByWorkOrderIdOrderBySequence(orderId)) {
+            if (operation.getStatus() == Status.IN_PROGRESS) {
+                String note = "Quality hold: " + why;
+                operation.pause(now, note);
+                releaseMachine(order, operation, LossCategory.QUALITY_ISSUE, note);
+                operations.saveAndFlush(operation);
+                events.save(new OperationEvent(operation, OperationEvent.Type.PAUSED, Status.IN_PROGRESS,
+                        LossCategory.QUALITY_ISSUE, why));
+                paused++;
+            }
+        }
+        audit.record("WORK_ORDER_QUALITY_HOLD", WorkOrderService.ENTITY, orderId, Map.of("batch", batchStatus),
+                Map.of("batch", "ON_HOLD", "reason", why, "operationsPaused", paused));
     }
 
     // Attachments: photographs and other evidence from the floor
@@ -727,6 +781,18 @@ public class ShopFloorService implements AttachmentPolicy {
         }
     }
 
+    /** A batch on hold for quality, or rejected, takes no more production. */
+    private void requireBatchOpen(WorkOrder order, WorkOrderOperation operation, String action) {
+        if (order.getProductionBatchId() == null) {
+            return;
+        }
+        String status = production.batch(order.getProductionBatchId()).status();
+        if ("ON_HOLD".equals(status) || "REJECTED".equals(status)) {
+            throw new BusinessRuleException("The batch is %s for quality, so operation %d cannot be %s.".formatted(
+                    "ON_HOLD".equals(status) ? "on hold" : "rejected", operation.getSequence(), action));
+        }
+    }
+
     private void requireRunning(WorkOrder order, String action) {
         if (order.getStatus() != WorkOrder.Status.IN_PROGRESS) {
             throw new BusinessRuleException("Work order %s is %s, so its operations cannot be %s.".formatted(
@@ -852,7 +918,9 @@ public class ShopFloorService implements AttachmentPolicy {
                         .map(machine -> new MachineOption(machine.getId(), machine.getCode(), machine.getName(),
                                 machine.getStatus(), operations.machineBusy(machine.getId(), operation.getId())))
                         .toList(),
-                operators);
+                operators,
+                order.getProductionBatchId() == null ? null : production.batch(order.getProductionBatchId()).status(),
+                qualityGates.ofOperation(order, operation.getId()));
     }
 
     /** Looks up names and codes for a page of operations at once. */

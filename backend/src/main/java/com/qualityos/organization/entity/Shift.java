@@ -23,13 +23,22 @@ public class Shift extends TenantOwnedEntity {
     private LocalTime startsAt;
     private LocalTime endsAt;
 
+    /** Unpaid break within the shift, in minutes. */
+    private int breakMinutes;
+    /** The days it runs: Monday 1, Tuesday 2, Wednesday 4 ... Sunday 64. */
+    private int daysOfWeek = EVERY_DAY;
+
     @Setter
     private Instant archivedAt;
 
-    public Shift(UUID facilityId, String name, LocalTime startsAt, LocalTime endsAt) {
+    public static final int EVERY_DAY = 127;
+
+    public Shift(UUID facilityId, String name, LocalTime startsAt, LocalTime endsAt, int breakMinutes, int daysOfWeek) {
         this.facilityId = facilityId;
         this.name = name;
         this.startsAt = startsAt;
         this.endsAt = endsAt;
+        this.breakMinutes = breakMinutes;
+        this.daysOfWeek = daysOfWeek;
     }
 }

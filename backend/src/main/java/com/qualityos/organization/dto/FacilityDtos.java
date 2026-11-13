@@ -1,5 +1,7 @@
 package com.qualityos.organization.dto;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -52,9 +54,32 @@ public final class FacilityDtos {
     public record SaveShiftRequest(
             @NotBlank @Size(max = 100) String name,
             @NotNull LocalTime startsAt,
-            @NotNull LocalTime endsAt) {
+            @NotNull LocalTime endsAt,
+            @Min(0) @Max(1439) Integer breakMinutes,
+            @Min(1) @Max(127) Integer daysOfWeek) {
     }
 
-    public record ShiftResponse(UUID id, String name, LocalTime startsAt, LocalTime endsAt) {
+    /** {@code daysOfWeek}: Monday 1, Tuesday 2, Wednesday 4 ... Sunday 64. A shift ending at or before it starts runs
+     * past midnight. */
+    public record ShiftResponse(UUID id, String name, LocalTime startsAt, LocalTime endsAt, int breakMinutes,
+            int daysOfWeek) {
+    }
+
+    /** A facility's active shift, for working out capacity. */
+    public record ShiftCalendar(UUID facilityId, String name, LocalTime startsAt, LocalTime endsAt, int breakMinutes,
+            int daysOfWeek) {
+
+        public boolean worksOn(java.time.DayOfWeek day) {
+            return (daysOfWeek & (1 << (day.getValue() - 1))) != 0;
+        }
+
+        /** Its length, past midnight if need be, less its break. */
+        public long workingMinutes() {
+            long length = java.time.Duration.between(startsAt, endsAt).toMinutes();
+            if (length <= 0) {
+                length += 24 * 60;
+            }
+            return Math.max(length - breakMinutes, 0);
+        }
     }
 }

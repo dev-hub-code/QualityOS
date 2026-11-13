@@ -121,6 +121,7 @@ public class ShopFloorService implements AttachmentPolicy {
     private final JsonMapper json;
     private final QualityGateService qualityGates;
     private final ProductionService production;
+    private final DowntimeService downtime;
 
     @SuppressWarnings("java:S107")
     ShopFloorService(
@@ -139,7 +140,8 @@ public class ShopFloorService implements AttachmentPolicy {
             AuditService audit,
             JsonMapper json,
             QualityGateService qualityGates,
-            ProductionService production) {
+            ProductionService production,
+            DowntimeService downtime) {
         this.workOrders = workOrders;
         this.operations = operations;
         this.reports = reports;
@@ -156,6 +158,7 @@ public class ShopFloorService implements AttachmentPolicy {
         this.json = json;
         this.qualityGates = qualityGates;
         this.production = production;
+        this.downtime = downtime;
     }
 
     // Reading
@@ -564,6 +567,7 @@ public class ShopFloorService implements AttachmentPolicy {
                 operations.saveAndFlush(operation);
                 events.save(new OperationEvent(operation, OperationEvent.Type.PAUSED, Status.IN_PROGRESS,
                         LossCategory.ORDER_ON_HOLD, reason));
+                downtime.operationChanged(order, operation, LossCategory.ORDER_ON_HOLD, why);
             }
         }
     }
@@ -599,6 +603,7 @@ public class ShopFloorService implements AttachmentPolicy {
                 operations.saveAndFlush(operation);
                 events.save(new OperationEvent(operation, OperationEvent.Type.PAUSED, Status.IN_PROGRESS,
                         LossCategory.QUALITY_ISSUE, why));
+                downtime.operationChanged(order, operation, LossCategory.QUALITY_ISSUE, note);
                 paused++;
             }
         }
@@ -660,6 +665,9 @@ public class ShopFloorService implements AttachmentPolicy {
         WorkOrderOperation operation = locked.operation();
         operations.saveAndFlush(operation);
         events.save(new OperationEvent(operation, type, from, loss, comment));
+        if (from != operation.getStatus() || loss != null) {
+            downtime.operationChanged(locked.order(), operation, loss, comment);
+        }
         Map<String, Object> after = new LinkedHashMap<>();
         after.put("status", operation.getStatus().name());
         if (loss != null) {

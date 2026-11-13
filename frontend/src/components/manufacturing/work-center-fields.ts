@@ -7,7 +7,16 @@ export function workCenterFields(facilities: FieldOption[], lines: FieldOption[]
     { name: "facilityId", label: "Facility", type: "select", required: true, options: facilities },
     { name: "productionLineId", label: "Production line, if it sits on one", type: "select", options: lines },
     { name: "description", label: "Description", type: "textarea" },
+    { name: "capacityUnits", label: "Operations it can run at once, if it has no machines", type: "decimal" },
+    { name: "labourRate", label: "Labour cost per hour", type: "decimal" },
+    { name: "machineRate", label: "Machine cost per hour", type: "decimal" },
+    { name: "overheadRate", label: "Overhead per hour", type: "decimal" },
   ];
+}
+
+/** A work centre as the form holds it: numbers as text. */
+export function workCenterRecord(workCenter: { capacityUnits: number } & object) {
+  return { ...workCenter, capacityUnits: String(workCenter.capacityUnits) };
 }
 
 export function machineFields(workCenters: FieldOption[]): FieldDef[] {

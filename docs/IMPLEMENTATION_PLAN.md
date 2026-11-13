@@ -16,7 +16,7 @@ account emails a real customer needs.
 | 9 Analytics | Dashboard, scorecards, Pareto, PDF and Excel exports | Reports honour tenant and facility scope | **Done** |
 | 10 Subscription | Plans, trials, limits, invoices | Limits enforced, prices editable by admin | **Done** |
 | 12 Control Center | Platform dashboard, plans, organisations, then billing, entitlements, operators and support. See [PLATFORM_ADMIN.md](PLATFORM_ADMIN.md) | Every acceptance item in the owner's brief | **All 5 phases built** |
-| 13 Manufacturing | BOMs, recipes, routings, work centres and machines, then work orders, inventory, shop floor, quality gates, completion and advanced analytics. See [MANUFACTURING.md](MANUFACTURING.md) | Each of its seven phases tested and documented | **Phases 1 to 6 of 7 built** |
+| 13 Manufacturing | BOMs, recipes, routings, work centres and machines, then work orders, inventory, shop floor, quality gates, completion and advanced analytics. See [MANUFACTURING.md](MANUFACTURING.md) | Each of its seven phases tested and documented | **All 7 phases built** |
 | 11 Production | Terraform, ECS, RDS, S3, Secrets Manager, CI/CD, monitoring, backups | Deployed and restore-tested | Deferred |
 
 Later: Module 12 (AI) after Phase 9, because it depends on accumulated data. SMS and WhatsApp stay behind

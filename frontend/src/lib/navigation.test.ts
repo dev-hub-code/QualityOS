@@ -100,7 +100,7 @@ describe("forManufacturingModel", () => {
   it("shows BOMs to discrete, recipes to process, and both to hybrid organisations", () => {
     expect(shown("DISCRETE")).toContain("BOMs");
     expect(shown("DISCRETE")).not.toContain("Recipes");
-    expect(shown("PROCESS")).toEqual(["Work centres", "Machines", "Recipes", "Routings", "Quality checkpoints", "Configuration"]);
+    expect(shown("PROCESS")).toEqual(["Work centres", "Machines", "Recipes", "Routings", "Quality checkpoints", "Downtime", "Configuration"]);
     expect(shown("HYBRID")).toEqual(expect.arrayContaining(["BOMs", "Recipes"]));
   });
 

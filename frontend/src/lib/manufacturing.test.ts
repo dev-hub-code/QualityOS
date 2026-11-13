@@ -1,17 +1,27 @@
 import { describe, expect, it } from "vitest";
 import {
   completionActions,
+  daysToMask,
+  describeDays,
   describeLimits,
   formatDuration,
+  formatMinutes,
+  formatMoney,
+  formatPercent,
   freeQuantity,
   gateInspectable,
+  loadShare,
+  localDate,
+  maskToDays,
   operationActions,
   parseSteps,
   planActions,
   reinspectionState,
   reportMismatch,
+  reschedulable,
   revisionActions,
   reworkActions,
+  toInstant,
   toLineRequest,
   usesKind,
   workOrderActions,
@@ -248,5 +258,69 @@ describe("completionActions", () => {
     expect(completionActions(open, "IN_PROGRESS", false)).toEqual([]);
     expect(completionActions(open, "ON_HOLD", true)).toEqual([]);
     expect(completionActions({ ...open, receipt: { id: "r" } }, "PARTIALLY_COMPLETED", true)).toEqual([]);
+  });
+});
+
+describe("shift days", () => {
+  it("round-trips the API's days of the week", () => {
+    const weekdays = [true, true, true, true, true, false, false];
+    expect(daysToMask(weekdays)).toBe(31);
+    expect(maskToDays(31)).toEqual(weekdays);
+    expect(daysToMask(maskToDays(127))).toBe(127);
+    expect(daysToMask(Array(7).fill(false))).toBe(0);
+  });
+
+  it("reads plainly", () => {
+    expect(describeDays(127)).toBe("every day");
+    expect(describeDays(31)).toBe("Mon–Fri");
+    expect(describeDays(1 | 4 | 64)).toBe("Mon, Wed, Sun");
+  });
+});
+
+describe("toInstant", () => {
+  it("joins a local date and time, and needs both", () => {
+    expect(toInstant("2026-03-01", "08:30")).toBe(new Date(2026, 2, 1, 8, 30).toISOString());
+    expect(toInstant("2026-03-01", "")).toBeNull();
+    expect(toInstant(undefined, "08:30")).toBeNull();
+  });
+});
+
+describe("localDate", () => {
+  it("counts days in the browser's calendar", () => {
+    const at = new Date(2026, 1, 27, 23, 30);
+    expect(localDate(0, at)).toBe("2026-02-27");
+    expect(localDate(2, at)).toBe("2026-03-01");
+    expect(localDate(-30, at)).toBe("2026-01-28");
+  });
+});
+
+describe("figures", () => {
+  it("shows minutes as hours", () => {
+    expect(formatMinutes("450.0")).toBe("7 h 30 min");
+    expect(formatMinutes("120")).toBe("2 h");
+    expect(formatMinutes("20.0")).toBe("20 min");
+    expect(formatMinutes(null)).toBe("–");
+  });
+
+  it("never shows a missing figure as zero", () => {
+    expect(formatPercent("0.0")).toBe("0%");
+    expect(formatPercent("87.5")).toBe("87.5%");
+    expect(formatPercent(null)).toBe("Not known");
+    expect(formatPercent(undefined)).toBe("Not known");
+    expect(formatMoney(undefined, "INR")).toBe("Not known");
+    expect(formatMoney("1540.00", "INR")).toContain("1,540");
+  });
+
+  it("compares load with capacity", () => {
+    expect(loadShare({ capacityMinutes: "450.0", loadMinutes: "600.0" })).toBeCloseTo(1.333, 3);
+    expect(loadShare({ capacityMinutes: "0", loadMinutes: "0" })).toBeNull();
+    expect(loadShare({ capacityMinutes: "0", loadMinutes: "60" })).toBe(Infinity);
+  });
+});
+
+describe("reschedulable", () => {
+  it("covers approved orders until they close", () => {
+    expect(["APPROVED", "RELEASED", "IN_PROGRESS", "ON_HOLD"].every((status) => reschedulable(status as never))).toBe(true);
+    expect(["DRAFT", "SUBMITTED", "COMPLETED", "PARTIALLY_COMPLETED", "CANCELLED"].some((status) => reschedulable(status as never))).toBe(false);
   });
 });

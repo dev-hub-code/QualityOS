@@ -10,6 +10,8 @@ import com.qualityos.production.dto.CompletionDtos.CompletionResponse;
 import com.qualityos.production.dto.CompletionDtos.ProductionRecord;
 import com.qualityos.production.dto.CompletionDtos.ReceiptRequest;
 import com.qualityos.production.dto.ProductionQualityDtos.GateResponse;
+import com.qualityos.production.dto.SchedulingDtos.RescheduleRequest;
+import com.qualityos.production.dto.SchedulingDtos.RescheduleResponse;
 import com.qualityos.production.dto.ProductionQualityDtos.HoldRequest;
 import com.qualityos.production.dto.ProductionQualityDtos.QualityResponse;
 import com.qualityos.production.dto.WorkOrderDtos.NoteRequest;
@@ -25,6 +27,7 @@ import com.qualityos.production.dto.WorkOrderMaterialDtos.ReserveRequest;
 import com.qualityos.production.dto.WorkOrderMaterialDtos.ReturnRequest;
 import com.qualityos.production.dto.WorkOrderMaterialDtos.UnreserveRequest;
 import com.qualityos.production.service.CompletionService;
+import com.qualityos.production.service.SchedulingService;
 import com.qualityos.production.service.QualityGateService;
 import com.qualityos.production.service.ShopFloorService;
 import com.qualityos.production.service.WorkOrderMaterialService;
@@ -63,18 +66,21 @@ public class WorkOrderController {
     private final QualityGateService qualityGates;
     private final ShopFloorService shopFloor;
     private final CompletionService completion;
+    private final SchedulingService scheduling;
 
     WorkOrderController(
             WorkOrderService workOrders,
             WorkOrderMaterialService orderMaterials,
             QualityGateService qualityGates,
             ShopFloorService shopFloor,
-            CompletionService completion) {
+            CompletionService completion,
+            SchedulingService scheduling) {
         this.workOrders = workOrders;
         this.orderMaterials = orderMaterials;
         this.qualityGates = qualityGates;
         this.shopFloor = shopFloor;
         this.completion = completion;
+        this.scheduling = scheduling;
     }
 
     @GetMapping
@@ -231,6 +237,14 @@ public class WorkOrderController {
             @Valid @RequestBody ReturnRequest request,
             @RequestHeader(name = IDEMPOTENCY_KEY, required = false) String key) {
         return ApiResponse.ok(orderMaterials.returnMaterial(id, request, key));
+    }
+
+    /** Moves the planned dates, and the priority if given, of an open order; returns its capacity warnings. */
+    @PostMapping("/{id}/reschedule")
+    @PreAuthorize(Require.WORK_ORDER_MANAGE)
+    public ApiResponse<RescheduleResponse> reschedule(
+            @PathVariable UUID id, @Valid @RequestBody RescheduleRequest request) {
+        return ApiResponse.ok(scheduling.reschedule(id, request));
     }
 
     /** Totals, material variances, the receipt, and what receiving or closing still waits for. */

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
-import { machineFields, workCenterFields } from "@/components/manufacturing/work-center-fields";
+import { machineFields, workCenterFields, workCenterRecord } from "@/components/manufacturing/work-center-fields";
 import {
   Details,
   PageHeader,
@@ -26,6 +26,8 @@ interface WorkCenterDetail {
   workCenter: WorkCenter;
   machines: Machine[];
 }
+
+const rate = (value: string | null) => (value === null || value === undefined ? "Not set" : String(Number(value)));
 
 export default function WorkCenterPage() {
   const { id } = useParams<{ id: string }>();
@@ -82,6 +84,15 @@ export default function WorkCenterPage() {
             ["Facility", workCenter.facilityCode],
             ["Production line", workCenter.productionLineCode ?? "–"],
             ["Description", workCenter.description ?? "–"],
+            [
+              "Capacity",
+              machines.some((machine) => machine.status !== "INACTIVE")
+                ? "One operation per active machine"
+                : `${workCenter.capacityUnits} at once`,
+            ],
+            ["Labour per hour", rate(workCenter.labourRate)],
+            ["Machine per hour", rate(workCenter.machineRate)],
+            ["Overhead per hour", rate(workCenter.overheadRate)],
           ]}
         />
       </Section>
@@ -105,7 +116,7 @@ export default function WorkCenterPage() {
             // A work centre stays in its facility.
             field.name === "facilityId" ? { ...field, options: facilities.filter((f) => f.value === workCenter.facilityId) } : field,
           )}
-          record={workCenter}
+          record={workCenterRecord(workCenter)}
           onClose={() => setDialog(null)}
           onSubmit={(values) => api.put(path, values).then(refresh)}
         />

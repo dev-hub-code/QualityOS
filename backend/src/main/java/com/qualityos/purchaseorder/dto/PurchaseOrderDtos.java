@@ -76,4 +76,8 @@ public final class PurchaseOrderDtos {
 
     public record ReceiptLine(UUID itemId, UUID materialId, UUID uomId) {
     }
+
+    /** A purchase price per unit of {@code uomId}, in the organisation's currency; null when the line has none. */
+    public record UnitPrice(UUID materialId, UUID uomId, BigDecimal price) {
+    }
 }

@@ -27,22 +27,25 @@ import com.qualityos.materialreceipt.repository.MaterialReceiptItemRepository;
 import com.qualityos.materialreceipt.repository.MaterialReceiptRepository;
 import com.qualityos.purchaseorder.dto.PurchaseOrderDtos.ReceiptLine;
 import com.qualityos.purchaseorder.dto.PurchaseOrderDtos.ReceiptTarget;
+import com.qualityos.purchaseorder.dto.PurchaseOrderDtos.UnitPrice;
 import com.qualityos.purchaseorder.service.PurchaseOrderService;
 import com.qualityos.supplier.dto.SupplierDtos.SupplierReference;
 import com.qualityos.supplier.service.SupplierService;
 import java.math.BigDecimal;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.LockModeType;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.HashSet;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -324,6 +327,25 @@ public class MaterialReceiptService implements AttachmentPolicy {
                 .filter(item -> item.isReleased() && item.freeQuantity().signum() > 0)
                 .filter(item -> scope.allows(item.getReceipt().getFacilityId()))
                 .toList());
+    }
+
+    /** What each lot cost: its purchase order line's price, per that line's unit. Lots without a price are left out. */
+    @Transactional(readOnly = true)
+    public Map<UUID, UnitPrice> lotPrices(Collection<UUID> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        List<MaterialReceiptItem> found = items.findByIdIn(ids);
+        Map<UUID, UnitPrice> lines = purchaseOrders.linePrices(found.stream()
+                .map(MaterialReceiptItem::getPurchaseOrderItemId).filter(Objects::nonNull).toList());
+        Map<UUID, UnitPrice> prices = new HashMap<>();
+        for (MaterialReceiptItem item : found) {
+            UnitPrice line = item.getPurchaseOrderItemId() == null ? null : lines.get(item.getPurchaseOrderItemId());
+            if (line != null && line.price() != null) {
+                prices.put(item.getId(), line);
+            }
+        }
+        return prices;
     }
 
     @Transactional(readOnly = true)

@@ -61,6 +61,9 @@ public final class Permissions {
     public static final String WORK_ORDER_APPROVE = "WORK_ORDER_APPROVE";
     public static final String WORK_ORDER_VIEW = "WORK_ORDER_VIEW";
     public static final String WORK_ORDER_COMPLETE = "WORK_ORDER_COMPLETE";
+    public static final String DOWNTIME_MANAGE = "DOWNTIME_MANAGE";
+    public static final String PRODUCTION_COST_VIEW = "PRODUCTION_COST_VIEW";
+    public static final String PRODUCTION_ANALYTICS_VIEW = "PRODUCTION_ANALYTICS_VIEW";
     public static final String PRODUCTION_EXECUTE = "PRODUCTION_EXECUTE";
     public static final String PRODUCTION_SUPERVISE = "PRODUCTION_SUPERVISE";
     public static final String QUALITY_CHECKPOINT_MANAGE = "QUALITY_CHECKPOINT_MANAGE";
@@ -137,6 +140,9 @@ public final class Permissions {
         public static final String WORK_ORDER_MATERIAL_RESERVE = "hasAuthority('WORK_ORDER_MATERIAL_RESERVE')";
         public static final String WORK_ORDER_MATERIAL_ISSUE = "hasAuthority('WORK_ORDER_MATERIAL_ISSUE')";
         public static final String WORK_ORDER_COMPLETE = "hasAuthority('WORK_ORDER_COMPLETE')";
+        public static final String DOWNTIME_MANAGE = "hasAuthority('DOWNTIME_MANAGE')";
+        public static final String PRODUCTION_COST_VIEW = "hasAuthority('PRODUCTION_COST_VIEW')";
+        public static final String PRODUCTION_ANALYTICS_VIEW = "hasAuthority('PRODUCTION_ANALYTICS_VIEW')";
         public static final String PRODUCTION_PLAN_MANAGE = "hasAuthority('PRODUCTION_PLAN_MANAGE')";
         public static final String PRODUCTION_PLAN_APPROVE = "hasAuthority('PRODUCTION_PLAN_APPROVE')";
         public static final String PRODUCTION_EXECUTE = "hasAuthority('PRODUCTION_EXECUTE')";

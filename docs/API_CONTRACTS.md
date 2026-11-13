@@ -327,6 +327,8 @@ every permission below; after a downgrade only `MANUFACTURING_VIEW` stays. See [
 | `GET /products/{productId}/settings`, `PUT ...` | `PUT`: `MANUFACTURING_MANAGE` | How one product is made. `manufacturingModel` is null while a hybrid organisation has not chosen |
 | `GET /work-centers`, `POST /work-centers` | `POST`: `MANUFACTURING_MANAGE` | Filter by `q`, `facilityId`. Limited members see their facilities only |
 | `GET /work-centers/{id}`, `PUT ...`, `DELETE ...` | `MANUFACTURING_MANAGE` to change | Detail with machines. `DELETE` archives, and is refused while a machine is not inactive |
+
+Since phase 7 a work centre also takes `capacityUnits` (1 to 1000, default 1; used only when it has no active machines) and optional `labourRate`, `machineRate` and `overheadRate` per hour, in the organisation's currency; a `PUT` without a rate clears it. Facility shifts (`POST /api/v1/facilities/{id}/shifts`) take optional `breakMinutes` (default 0) and `daysOfWeek` (Monday 1, Tuesday 2 … Sunday 64, added together; default 127, every day).
 | `GET /machines`, `POST /machines` | `POST`: `MANUFACTURING_MANAGE` | Filter by `q`, `workCenterId`, `status` |
 | `GET /machines/{id}`, `PUT ...` | `PUT`: `MANUFACTURING_MANAGE` | Detail with the last 100 status changes |
 | `POST /machines/{id}/status` | `MANUFACTURING_MANAGE` | `status` and `reason`. Only allowed transitions; a reason for maintenance, breakdown and inactive |
@@ -463,3 +465,41 @@ else is `404`. Every change returns the detail.
 | `POST /rework-orders/{id}/close` | `REWORK_MANAGE` | → CLOSED with the reinspection's disposition. Refused without a reinspection or before it has a decision other than HOLD |
 | `POST /rework-orders/{id}/cancel` | `REWORK_MANAGE` | `reason`. Only from OPEN or APPROVED |
 
+#### Downtime: `/api/v1/manufacturing/downtime`
+
+Reading needs `MANUFACTURING_VIEW`; limited members see their facilities only, anything else is `404`. Times are
+instants; `minutes` runs to now while a stop is open.
+
+| Endpoint | Permission | Notes |
+|---|---|---|
+| `GET /downtime` | | Newest first, paged. Filters `facilityId`, `workCenterId`, `machineId`, `workOrderId`, `category`, `open`, `from`, `to` (instants; stops overlapping them) |
+| `GET /downtime/{id}` | | One stop: where, `source` (`SHOP_FLOOR`, `MACHINE`, `MANUAL`), `category`, `planned`, times, `minutes`, reason, department, comments, who recorded and ended it |
+| `GET /downtime/summary` | | `from`, `to` (dates, at most 366 days), optional `facilityId`, `groupBy` (`MACHINE` default, `WORK_CENTER`, `PRODUCTION_LINE`, `FACILITY`, `CATEGORY`). Rows of `stops`, `minutes`, `plannedMinutes`, `unplannedMinutes`, and totals |
+| `POST /downtime` | `DOWNTIME_MANAGE` | `machineId` or `workCenterId`, optional `workOrderId`, `category` (not `ORDER_ON_HOLD`), `startedAt`, optional `endedAt`, `reason`, optional `responsibleDepartment`, `comments`. Only `PLANNED_MAINTENANCE` may start in the future, and then needs `endedAt`. `201` |
+| `PUT /downtime/{id}` | `DOWNTIME_MANAGE` | Any of `category`, `startedAt`, `endedAt`, `reason`, `responsibleDepartment`, `comments`. On a stop not entered by hand only the last three may change |
+| `POST /downtime/{id}/end` | `DOWNTIME_MANAGE` | Optional `endedAt` (default now). Manual stops only; the others end when the operation resumes or the machine is set back |
+
+Stops from the floor and from machine status are recorded by the existing endpoints. Evidence uses
+`/api/v1/attachments` with `entityType=DOWNTIME`.
+
+#### Scheduling
+
+| Endpoint | Permission | Notes |
+|---|---|---|
+| `GET /scheduling?facilityId&from&to` | `WORK_ORDER_VIEW` | Up to 62 days. `shiftsDefined`; `workCenters` with `units` and per day `capacityMinutes`, `plannedDowntimeMinutes`, `loadMinutes`, `overloaded`; `orders` by priority with `remainingMinutes` and `warnings`; `conflicts` (centre, day, capacity, load, order numbers) |
+| `POST /work-orders/{id}/reschedule` | `WORK_ORDER_MANAGE` | `plannedStart`, `plannedEnd`, optional `priority`, `reason`. Until the order is completed or cancelled. Returns `order`: its place on the board with warnings. Audited as `WORK_ORDER_RESCHEDULED` |
+
+#### Costing: `/api/v1/manufacturing/costing`
+
+Needs `PRODUCTION_COST_VIEW`. Money is text, two decimal places, in the organisation's `currency`; null when unknown.
+
+| Endpoint | Notes |
+|---|---|
+| `GET /costing/work-orders/{id}` | Released orders only (`422` otherwise). `materials` and `operations` with planned and actual cost; `planned` and `actual` totals (`material`, `labour`, `machine`, `overhead`, `scrap`, `rework`, `total`, `unit`); `complete`, and `missing` listing each missing price or rate |
+| `GET /costing/summary?from&to&facilityId` | Orders closed in the period with planned and actual totals and unit costs; overall totals; `complete` |
+
+#### Production analytics
+
+| Endpoint | Permission | Notes |
+|---|---|---|
+| `GET /analytics?from&to&facilityId` | `PRODUCTION_ANALYTICS_VIEW` | Up to 366 days. `production`, `plannedVersusActual`, `ordersCompleted`, `ordersPartiallyCompleted`, `ordersOnTime`, `workOrderStatus`, `quality` (quantities and rejection, scrap and rework rates), `efficiency`, `materialVariance`, `machines` and `overall` (shift, planned production, running and unplanned downtime minutes; utilisation, availability, performance, quality, OEE; `notes`), `downtimeByCategory`, and `cost` only with `PRODUCTION_COST_VIEW`. Percentages are 0 to 100; a figure without the data it needs is left out, never zero |

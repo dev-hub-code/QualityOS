@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { landingPage, leavesWorkspace, visibleNavItems, workspaceNavItems } from "./navigation";
+import {
+  activeNavHref,
+  forManufacturingModel,
+  landingPage,
+  leavesWorkspace,
+  NAV_ITEMS,
+  visibleNavItems,
+  workspaceNavItems,
+} from "./navigation";
 
 const labels = (permissions: string[]) => visibleNavItems(permissions).map((item) => item.label);
 
@@ -61,5 +69,50 @@ describe("visibleNavItems", () => {
   it("shows items for any matching permission", () => {
     expect(labels(["USER_MANAGE"])).toEqual(["Dashboard", "Users", "Roles", "Settings", "Documentation"]);
     expect(labels(["ROLE_MANAGE"])).toEqual(["Dashboard", "Roles", "Settings", "Documentation"]);
+  });
+});
+
+describe("activeNavHref", () => {
+  it("highlights serial search, not traceability, on a serial page", () => {
+    expect(activeNavHref("/traceability/serials", NAV_ITEMS)).toBe("/traceability/serials");
+    expect(activeNavHref("/traceability/serials/SN-1", NAV_ITEMS)).toBe("/traceability/serials");
+  });
+
+  it("keeps traceability for a batch trace", () => {
+    expect(activeNavHref("/traceability/PB-2026-00001", NAV_ITEMS)).toBe("/traceability");
+  });
+
+  it("highlights billing, not settings, on the billing page", () => {
+    expect(activeNavHref("/settings/billing", NAV_ITEMS)).toBe("/settings/billing");
+    expect(activeNavHref("/settings", NAV_ITEMS)).toBe("/settings");
+  });
+
+  it("does not match a longer word that only starts the same", () => {
+    expect(activeNavHref("/materials-x", NAV_ITEMS)).toBeUndefined();
+  });
+});
+
+describe("forManufacturingModel", () => {
+  const manufacturing = visibleNavItems(["MANUFACTURING_VIEW"]).filter((item) => item.group === "Manufacturing");
+  const shown = (model?: "DISCRETE" | "PROCESS" | "HYBRID") =>
+    forManufacturingModel(manufacturing, model).map((item) => item.label);
+
+  it("shows BOMs to discrete, recipes to process, and both to hybrid organisations", () => {
+    expect(shown("DISCRETE")).toContain("BOMs");
+    expect(shown("DISCRETE")).not.toContain("Recipes");
+    expect(shown("PROCESS")).toEqual(["Work centres", "Machines", "Recipes", "Routings", "Quality checkpoints", "Downtime", "Configuration"]);
+    expect(shown("HYBRID")).toEqual(expect.arrayContaining(["BOMs", "Recipes"]));
+  });
+
+  it("keeps the group together and hidden from people without the permission", () => {
+    const indexes = NAV_ITEMS.flatMap((item, index) => (item.group === "Manufacturing" ? [index] : []));
+    expect(indexes.at(-1)! - indexes[0]).toBe(indexes.length - 1);
+    expect(visibleNavItems(["NCR_VIEW"]).some((item) => item.group === "Manufacturing")).toBe(false);
+  });
+
+  it("shows plans and work orders to whoever can see work orders, in every model", () => {
+    const labels = forManufacturingModel(visibleNavItems(["WORK_ORDER_VIEW"]), "PROCESS").map((item) => item.label);
+    expect(labels).toEqual(expect.arrayContaining(["Production plans", "Work orders"]));
+    expect(labels).not.toContain("Machines");
   });
 });

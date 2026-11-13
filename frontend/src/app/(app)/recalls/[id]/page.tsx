@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { FormError } from "@/components/forms/field";
 import { ContactTable } from "@/components/recalls/contact-table";
 import { RecallDashboardTiles } from "@/components/recalls/recall-dashboard";
@@ -20,7 +20,7 @@ const CLOSURE_FIELDS: FieldDef[] = [
   { name: "acceptOutstanding", label: "I accept that goods remain with customers, as explained above", type: "checkbox" },
 ];
 const SEND_BACK_FIELDS: FieldDef[] = [{ name: "reason", label: "What still needs doing", type: "textarea", required: true }];
-const SELECT = "h-9 rounded-md border bg-background px-2 text-sm";
+const SELECT = "h-9 rounded-xl border bg-white/70 px-2 text-sm";
 
 function Closure({ recall, path }: { recall: RecallDetail; path: string }) {
   const canRequest = usePermission("RECALL_MANAGE");
@@ -127,6 +127,9 @@ export default function RecallPage() {
             ["Date", recall.recallDate],
             ["Reason", recall.reason],
             ["What customers must do", recall.instructions],
+            ...(recall.capaId
+              ? [["CAPA", <RecordLink key="capa" href={`/capas/${recall.capaId}`}>Open the linked CAPA</RecordLink>] as [string, ReactNode]]
+              : []),
           ]}
         />
       </Section>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inspectionTypeFor, parseSerials, toConsumeRequest, toDispatchItems } from "./traceability";
+import { inspectionTypeFor, parseSerials, toConsumeRequest, toDispatchItems, toReturnItems, recallBatchNumbers } from "./traceability";
 
 describe("parseSerials", () => {
   it("splits on lines and commas, and drops blanks and repeats", () => {
@@ -25,6 +25,8 @@ describe("toConsumeRequest", () => {
   it("names the right source", () => {
     expect(toConsumeRequest("lot:1", "2")).toEqual({ receiptItemId: "1", quantity: "2" });
     expect(toConsumeRequest("batch:9", "2")).toEqual({ parentBatchId: "9", quantity: "2" });
+    expect(toConsumeRequest("lot:1", "2500", "")).toEqual({ receiptItemId: "1", quantity: "2500" });
+    expect(toConsumeRequest("lot:1", "2500", "g")).toEqual({ receiptItemId: "1", quantity: "2500", uomId: "g" });
   });
 });
 
@@ -35,5 +37,29 @@ describe("toDispatchItems", () => {
       { productionBatchId: "a", quantity: "2", serialNumbers: ["S1", "S2"] },
       { productionBatchId: "b", quantity: "1", serialNumbers: [] },
     ]);
+  });
+});
+
+describe("toReturnItems", () => {
+  it("keeps each line given a quantity, with its serials, and leaves out blank lines", () => {
+    const values = { quantity1: "2", serials1: "SN-1\nSN-2", quantity2: " ", quantity3: "1", serials3: "" };
+    expect(toReturnItems(values, ["a", "b", "c"])).toEqual([
+      { dispatchItemId: "a", quantity: "2", serialNumbers: ["SN-1", "SN-2"] },
+      { dispatchItemId: "c", quantity: "1", serialNumbers: [] },
+    ]);
+  });
+
+  it("is empty when no line has a quantity", () => {
+    expect(toReturnItems({}, ["a"])).toEqual([]);
+  });
+});
+
+describe("recallBatchNumbers", () => {
+  it("starts with the traced batch and adds the others once each", () => {
+    expect(recallBatchNumbers("PB-1", " PB-2\nPB-3, PB-1\n\nPB-2 ")).toEqual(["PB-1", "PB-2", "PB-3"]);
+  });
+
+  it("is the traced batch alone when nothing else is typed", () => {
+    expect(recallBatchNumbers("PB-1", "")).toEqual(["PB-1"]);
   });
 });

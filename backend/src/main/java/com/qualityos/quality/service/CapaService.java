@@ -10,6 +10,7 @@ import com.qualityos.common.security.Permissions;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.FacilityScope;
+import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.organization.service.FacilityService;
 import com.qualityos.organization.service.OrganizationService;
@@ -70,6 +71,8 @@ public class CapaService implements AttachmentPolicy {
     private final JsonMapper json;
     private final FacilityScope scope;
     private final FacilityService facilities;
+    private final ReviewPolicy reviewPolicy;
+    private final QualityRules rules;
 
     CapaService(
             CorrectiveActionRepository capas,
@@ -84,7 +87,11 @@ public class CapaService implements AttachmentPolicy {
             QualityAlerts alerts,
             JsonMapper json,
             FacilityScope scope,
-            FacilityService facilities) {
+            FacilityService facilities,
+            ReviewPolicy reviewPolicy,
+            QualityRules rules) {
+        this.rules = rules;
+        this.reviewPolicy = reviewPolicy;
         this.facilities = facilities;
         this.scope = scope;
         this.capas = capas;
@@ -132,7 +139,7 @@ public class CapaService implements AttachmentPolicy {
         UUID facilityId = request.facilityId();
         if (request.ncrId() != null) {
             NonConformance ncr = ncrs.requireOpen(request.ncrId());
-            effectiveness |= ncr.getSeverity() != NonConformance.Severity.MINOR;
+            effectiveness |= rules.effectivenessRequired(ncr.getSeverity());
             facilityId = ncr.getFacilityId();
         } else {
             scope.requirePlaced(facilityId);
@@ -229,7 +236,9 @@ public class CapaService implements AttachmentPolicy {
     @Transactional
     public CapaDetail verify(UUID id, VerifyRequest request) {
         CorrectiveAction capa = lock(id);
-        capa.requireVerifiableBy(TenantContext.getCurrentUserId());
+        UUID actor = TenantContext.getCurrentUserId();
+        capa.requireVerifiableBy(actor, reviewPolicy.permits(
+                actor, capa.getOwnerId(), ENTITY, id, "CAPA_VERIFY", request.note()));
         verifications.saveAndFlush(new CapaVerification(
                 id, request.effective(), request.method().trim(), request.note().trim()));
         audit.record("CAPA_VERIFIED", ENTITY, id, null, Map.of("effective", request.effective()));
@@ -250,7 +259,9 @@ public class CapaService implements AttachmentPolicy {
         if (capa.isEffectivenessRequired() && !verified) {
             throw new BusinessRuleException("This CAPA needs a successful effectiveness verification.");
         }
-        CapaDetail closed = apply(capa, note, closing -> closing.close(TenantContext.getCurrentUserId(), note, Instant.now()));
+        UUID actor = TenantContext.getCurrentUserId();
+        boolean selfReview = reviewPolicy.permits(actor, capa.getOwnerId(), ENTITY, id, "CAPA_CLOSE", note);
+        CapaDetail closed = apply(capa, note, closing -> closing.close(actor, note, Instant.now(), selfReview));
         alerts.capaClosed(capa);
         return closed;
     }

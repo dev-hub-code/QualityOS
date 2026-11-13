@@ -39,6 +39,7 @@ Every response uses this shape. Implemented in `ApiResponse`.
 | 405, 415 | `METHOD_NOT_ALLOWED`, `UNSUPPORTED_MEDIA_TYPE` | |
 | 409 | `CONFLICT`, `CONCURRENT_MODIFICATION` | Duplicate data; stale `version` |
 | 422 | `BUSINESS_RULE_VIOLATION` | Valid request refused by a rule, such as an illegal state transition |
+| 422 | `RECALL_HOLD` | A dispatch includes goods under an open recall. Send `recallOverrideReason` (needs `RECALL_MANAGE`) to dispatch them anyway |
 | 500 | `INTERNAL_ERROR` | Details only in logs, found with the correlation ID |
 
 Codes are stable. Clients should branch on `code`, not on `message`.
@@ -93,7 +94,7 @@ proxy refuses token-carrying endpoints, and refuses writes from another origin.
 | 4 (built) | `/inspection-templates` (plus `/{id}/versions`, `/{id}/publish`), `/inspections` (plus `/{id}/execute`, `/submit`, `/approve`, `/send-back`, `/disposition`, `/cancel`), `/material-receipts/awaiting-inspection` |
 | 5 (built) | `/auth/password-reset/{request,confirm}`, `/auth/verify-email`, `/auth/resend-verification`, `/auth/verification-status`, `/auth/invitations/{preview,accept}`, `/invitations` (plus `/{id}/resend`, `/{id}/revoke`), `/notifications` (plus `/unread-count`, `/{id}/read`, `/read-all`, `/preferences`). `POST /users` is removed: people join by invitation |
 | 6 (built) | `/ncrs` (plus `/{id}/assign`, `/containment`, `/investigation`, `/request-verification`, `/send-back`, `/close`, `/reject`, `/cancel`), `/capas` (plus `/{id}/start-analysis`, `/analysis`, `/finish-analysis`, `/actions`, `/actions/{actionId}/complete`, `/start-implementation`, `/submit-verification`, `/verify`, `/close`, `/cancel`), `/defect-categories`, `/quality/assignees` |
-| 7 (built) | `/production-batches` (plus `/{id}/consume`, `/{id}/consumptions/{consumptionId}/reverse`, `/complete`, `/serials`), `/customers`, `/dispatches` (plus `/{id}/reverse` for a dispatch that never happened, `/{id}/reversals`, `/{id}/reversal-summary`), `/dispatch-reversals`, `/material-corrections` (plus `/{id}/submit`, `/approve`, `/reject`, `/cancel`), `/batches/{id}/correction-history`, `/traceability/search`, `/traceability/batches/{batchNumber}`, `/traceability/products/{productId}`, `/material-receipts/released-lots`. `POST /inspections` now takes `productionBatchId` or `returnItemId` in place of `receiptItemId` |
+| 7 (built) | `/production-batches` (plus `/{id}/consume`, `/{id}/consumptions/{consumptionId}/reverse`, `/complete`, `/serials`), `/customers`, `/dispatches` (plus `/{id}/reverse` for a dispatch that never happened, `/{id}/reversals`, `/{id}/reversal-summary`), `/dispatch-reversals`, `/material-corrections` (plus `/{id}/submit`, `/approve`, `/reject`, `/cancel`), `/batches/{id}/correction-history`, `/traceability/search`, `/traceability/batches/{batchNumber}`, `/traceability/products/{productId}`, `/material-receipts/released-lots`. `POST /{id}/consume` takes an optional `uomId`: the quantity is converted to the lot's or batch's own unit, and what was typed is kept on the entry. `POST /inspections` now takes `productionBatchId` or `returnItemId` in place of `receiptItemId`. `templateId` is optional: without it the one fitting template is used. `GET /inspections/applicable-templates?receiptItemId=|productionBatchId=|returnItemId=` lists the fitting templates and the suggested one |
 | 8 | `/instruments`, `/calibrations`, `/audits` |
 | 9 | `/analytics/dashboard`, `/analytics/supplier-quality`, `/analytics/inspection-trends`, `/analytics/defect-analysis`, `/reports/{type}` |
 | 10 | `/subscription`, `/platform/plans` |
@@ -118,6 +119,25 @@ Settings are under `app.registration`. The `prod` profile refuses to start unles
 unverified sign-in is off. Local Docker Compose enforces it too. Integration tests turn it off, except `EmailVerificationIT`.
 
 `PUT /auth/me/email-language` takes `language` (`en`, `hi`, `mr`, or null for the organisation default) and returns `204`.
+
+## Organisation settings
+
+| Endpoint | Access | Result |
+|---|---|---|
+| `GET /organizations/current/settings` | Any member | `singlePersonReview`, `selfReviewInEffect`, `activeMembers`, `capaRequiredFrom`, `effectivenessRequiredFrom`, `version` (null until first saved) |
+| `PUT /organizations/current/settings` | `TENANT_MANAGE` | Takes every rule (`singlePersonReview`, `capaRequiredFrom`, `effectivenessRequiredFrom`) and the `version` last read. A missing rule is `400`, a stale version `409`. Audited as `TENANT_SETTINGS_UPDATED` with before and after |
+
+`selfReviewInEffect` is true while `singlePersonReview` is on and the organisation has one active member. Then that
+person may approve or send back their own inspection, close an NCR whose verification they requested, and verify or
+close a CAPA they own. Each of those needs a note, and is recorded in the audit log as `SELF_REVIEW` with the step
+(`INSPECTION_APPROVE`, `INSPECTION_SEND_BACK`, `NCR_CLOSE`, `CAPA_VERIFY`, `CAPA_CLOSE`) and the reason. Once a second
+member is active, the usual rule returns without anyone changing the setting.
+
+`capaRequiredFrom` and `effectivenessRequiredFrom` each name the least severe NCR a rule covers: `MINOR` (every NCR),
+`MAJOR` (critical and major, the default), `CRITICAL`, or `NEVER`. The first decides which NCRs need a closed CAPA
+before `request-verification`, checked at that moment. The second forces `effectivenessRequired` on when a CAPA is
+raised on an NCR it covers, and the CAPA keeps that flag. `GET /ncrs/{id}` returns `capaRequired` and
+`effectivenessRequired`, worked out for that NCR under the current rules.
 
 ## Dispatch cancellation and customer returns
 
@@ -156,9 +176,19 @@ and a second person.
 
 | Calibration | Permission |
 |---|---|
-| `GET /instruments`, `GET /instruments/{id}`, `/calibrations`, `/usage`, `/qr.svg` | `CALIBRATION_VIEW` |
-| `POST /instruments`, `PUT /instruments/{id}`, `POST /instruments/{id}/status`, `POST /instruments/{id}/calibrations` | `CALIBRATION_MANAGE` |
+| `GET /instruments`, `GET /instruments/{id}`, `/calibrations`, `/usage`, `/impact-reviews`, `/qr.svg` | `CALIBRATION_VIEW` |
+| `POST /instruments`, `PUT /instruments/{id}`, `POST /instruments/{id}/status`, `POST /instruments/{id}/calibrations`, `POST /instruments/{id}/impact-reviews/{reviewId}/decision` | `CALIBRATION_MANAGE` |
 | `GET /instruments/usable`, `POST /inspections/{id}/instruments` | `INSPECTION_EXECUTE` |
+
+A failed calibration lists each inspection that used the instrument since its last good calibration, and raises one MAJOR
+NCR (source `CALIBRATION`) for them. With nothing in doubt, no NCR is raised. `GET /instruments/{id}/impact-reviews` groups
+the reviews by failed calibration, newest first, with the NCR and the number still pending. A decision takes `decision`
+(`RESULT_STANDS` or `REINSPECT`) and a `note`, is made once (`422` after that), and is audited as
+`CALIBRATION_IMPACT_DECIDED`. `REINSPECT` holds whatever the inspection released: a lot goes back to awaiting
+inspection, and a batch (also for an accepted return) goes `ON_HOLD`, until a new inspection releases it. Stock already
+used or dispatched stays where it is. It is `422` on an inspection that is not completed. An NCR raised by a calibration
+cannot be cancelled, only rejected, and cannot close while any of its inspections has no decision. Each instrument on an
+inspection carries `impactReview`: `PENDING`, `RESULT_STANDS`, `REINSPECT` or null.
 
 | Audits | Permission |
 |---|---|
@@ -275,3 +305,201 @@ may be sent again after `POST /reauthenticate`.
 | `PUT /api/v1/platform/support/tickets/{id}/status` | `PLATFORM_CUSTOMER_MANAGE` | Change status, with `version` |
 | `GET`, `POST /api/v1/platform/support/tickets/{id}/notes` | `POST` needs `PLATFORM_CUSTOMER_MANAGE` | Read or add notes |
 | `GET /api/v1/platform/support/organisations/{tenantId}/errors` | | Failed emails in the last 30 days |
+
+## Recall hold on dispatch
+
+A batch is held while a recall that is not closed (`OPEN` or `PENDING_CLOSURE`) started from it, or from any batch it
+was made from. `POST /dispatches` with a held batch returns `422 RECALL_HOLD`, naming the batches and recalls.
+
+`recallOverrideReason` on the same request lets the goods out. The caller needs `RECALL_MANAGE`, or the answer is
+`403`. The dispatch is audited as `RECALL_HOLD_OVERRIDDEN` with the recalls and the reason, and its customer is added to
+each recall's contact list in the same transaction. Closing the recall releases the hold.
+
+
+## Manufacturing
+
+All under `/api/v1/manufacturing`. Reading needs `MANUFACTURING_VIEW`. The `MANUFACTURING` plan feature carries
+every permission below; after a downgrade only `MANUFACTURING_VIEW` stays. See [MANUFACTURING.md](MANUFACTURING.md).
+
+| Method and path | Also needs | Purpose |
+|---|---|---|
+| `GET /settings`, `PUT /settings` | `PUT`: `MANUFACTURING_MANAGE` | `manufacturingModel` (DISCRETE, PROCESS, HYBRID), `separateApprover`, and optionally `workOrderRequiresBom` (default true), `workOrderRequiresRouting`, `reserveOnRelease`, `startRequiresMaterials` and `allowOverIssue` (all default false), `operationsInSequence` (default true), `operationRequiresMachine` (default false) and `overReportPercent` (0 to 100, default 0); left out, those keep their value. A model that products still use cannot be dropped |
+| `GET /products/{productId}/settings`, `PUT ...` | `PUT`: `MANUFACTURING_MANAGE` | How one product is made. `manufacturingModel` is null while a hybrid organisation has not chosen |
+| `GET /work-centers`, `POST /work-centers` | `POST`: `MANUFACTURING_MANAGE` | Filter by `q`, `facilityId`. Limited members see their facilities only |
+| `GET /work-centers/{id}`, `PUT ...`, `DELETE ...` | `MANUFACTURING_MANAGE` to change | Detail with machines. `DELETE` archives, and is refused while a machine is not inactive |
+
+Since phase 7 a work centre also takes `capacityUnits` (1 to 1000, default 1; used only when it has no active machines) and optional `labourRate`, `machineRate` and `overheadRate` per hour, in the organisation's currency; a `PUT` without a rate clears it. Facility shifts (`POST /api/v1/facilities/{id}/shifts`) take optional `breakMinutes` (default 0) and `daysOfWeek` (Monday 1, Tuesday 2 … Sunday 64, added together; default 127, every day).
+| `GET /machines`, `POST /machines` | `POST`: `MANUFACTURING_MANAGE` | Filter by `q`, `workCenterId`, `status` |
+| `GET /machines/{id}`, `PUT ...` | `PUT`: `MANUFACTURING_MANAGE` | Detail with the last 100 status changes |
+| `POST /machines/{id}/status` | `MANUFACTURING_MANAGE` | `status` and `reason`. Only allowed transitions; a reason for maintenance, breakdown and inactive |
+| `GET /boms`, `POST /boms` | `POST`: `BOM_MANAGE` | Filter by `q` (product), `productId`, `status`. `POST` takes `productId`, `changeNote`, `baseQuantity`, and `copyFromId` or `fromProductMaterials` |
+| `GET /boms/{id}`, `PUT ...`, `DELETE ...` | `BOM_MANAGE` to change | `DELETE` discards a draft that was never submitted |
+| `POST /boms/{id}/lines`, `PUT .../lines/{lineId}`, `DELETE ...` | `BOM_MANAGE` | One of `materialId` or `componentProductId`, `quantity`, `uomId`, `scrapPercent`, `scales`, `notes`. Draft only |
+| `POST /boms/{id}/submit` | `BOM_MANAGE` | Needs at least one line |
+| `POST /boms/{id}/send-back`, `/approve`, `/retire` | `BOM_APPROVE` | `approve` takes optional `effectiveFrom` (today or later) and `note` |
+| `GET /boms/{id}/explosion?quantity=&on=` | | Every level, in each component's unit, with scrap, and leaf totals |
+| `/recipes/...` | `RECIPE_MANAGE`, `RECIPE_APPROVE` | As `/boms`, plus `POST`/`DELETE /recipes/{id}/parameters` and `GET /recipes/{id}/scaled?batchSize=` |
+| `/routings/...` | `ROUTING_MANAGE`, `ROUTING_APPROVE` | As `/boms` without lines, with `POST`/`PUT`/`DELETE /routings/{id}/operations[/{operationId}]` and `.../operations/{operationId}/parameters` |
+
+Refusals are `422` with a message: a BOM for a process product, a circular structure, a unit that does not convert, a
+change to anything that is not a draft, approval by the submitter under `separateApprover`, or an effective date before
+today or before the current revision's. A second revision in progress for the same product is `409`.
+
+### Production plans and work orders
+
+Reading needs `WORK_ORDER_VIEW`, for plans as well as work orders. Members limited to some facilities see and change
+only those facilities' plans and orders; anything else is `404`.
+
+| Method and path | Also needs | Purpose |
+|---|---|---|
+| `GET /production-plans`, `POST /production-plans` | `POST`: `PRODUCTION_PLAN_MANAGE` | Filter by `q`, `status`, `facilityId`. `POST` takes `name`, `facilityId`, `periodStart`, `periodEnd`, `notes`; the number is `PP-yyyy-nnnnn` |
+| `GET /production-plans/{id}`, `PUT ...` | `PUT`: `PRODUCTION_PLAN_MANAGE` | Detail with lines; each line has `orderedQuantity` (its work orders, cancelled ones aside), `remainingQuantity`, `overOrdered` and its work orders. `PUT` on drafts only; the facility cannot change |
+| `POST /production-plans/{id}/lines`, `PUT .../lines/{lineId}`, `DELETE ...` | `PRODUCTION_PLAN_MANAGE` | `productId`, `quantity`, `dueDate` within the period, `notes`. Draft only |
+| `POST /production-plans/{id}/approve` | `PRODUCTION_PLAN_APPROVE` | Needs a line |
+| `POST /production-plans/{id}/close` | `PRODUCTION_PLAN_APPROVE` | Optional `note`. Refused while any of its work orders is open |
+| `POST /production-plans/{id}/cancel` | `PRODUCTION_PLAN_APPROVE` | `reason`. Refused if any work order raised from it is not cancelled |
+| `GET /work-orders`, `POST /work-orders` | `POST`: `WORK_ORDER_MANAGE` | Filter by `q` (number or product), `status`, `facilityId`, `productId`, `planId`. `POST` takes `productId`, `facilityId`, `productionLineId`, `quantity` (in the product's unit), `plannedStart`, `plannedEnd`, `priority` (LOW, NORMAL, HIGH, URGENT), `notes`, `planLineId`. From a plan line: the plan must be approved, and product and facility must match it |
+| `GET /work-orders/{id}`, `PUT ...` | `PUT`: `WORK_ORDER_MANAGE` | Detail: the order, `definition` (the BOM or recipe and routing a release would use or did use, and `problems` that would stop it), `materials` and `operations` frozen at release, and the status `history`. `PUT` on drafts only |
+| `POST /work-orders/{id}/submit` | `WORK_ORDER_MANAGE` | DRAFT → SUBMITTED |
+| `POST /work-orders/{id}/send-back` | `WORK_ORDER_APPROVE` | `note`. SUBMITTED → DRAFT |
+| `POST /work-orders/{id}/approve` | `WORK_ORDER_APPROVE` | Optional `note`. SUBMITTED → APPROVED; the submitter cannot approve under `separateApprover`, except as a recorded self-review |
+| `POST /work-orders/{id}/release` | `WORK_ORDER_RELEASE` | APPROVED → RELEASED. Freezes the BOM or recipe and routing in effect on the planned start and writes the materials and operations |
+| `POST /work-orders/{id}/start` | `WORK_ORDER_RELEASE` | RELEASED → IN_PROGRESS. Opens the production batch (`productionBatchId`, `productionBatchNumber`) |
+| `POST /work-orders/{id}/hold`, `/resume` | `WORK_ORDER_RELEASE` | `hold` takes `reason`, from APPROVED, RELEASED or IN_PROGRESS; `resume` returns to that status |
+| `POST /work-orders/{id}/cancel` | `WORK_ORDER_MANAGE` before approval, `WORK_ORDER_APPROVE` after | `reason`. Never once production has started. Releases the order's reservations |
+| `GET /work-orders/{id}/materials` | | Per line: `required`, `issued`, `reserved`, `outstanding`, `available`, `shortage`, and `sources` (free lots or released batches in the facility); `reservations`, `consumptions` (what went into the batch and still stands), `movements`, and `shortages` as sentences |
+| `POST /work-orders/{id}/reservations` | `WORK_ORDER_MATERIAL_RESERVE` | `lineNumber`, `lotId`, `quantity` (in the line's unit). Released or in progress; materials only; at most what the line still needs |
+| `POST /work-orders/{id}/reservations/auto` | `WORK_ORDER_MATERIAL_RESERVE` | Reserves what every line still needs from the oldest free lots, as far as they go |
+| `POST /work-orders/{id}/reservations/{reservationId}/release` | `WORK_ORDER_MATERIAL_RESERVE` | Optional `reason`. Gives back what the reservation still holds |
+| `POST /work-orders/{id}/issues` | `WORK_ORDER_MATERIAL_ISSUE` | `lineNumber`, `lotId` or `sourceBatchId`, `quantity` (in the line's unit). In progress only; the order's reservations on the lot are used first; more than needed is refused unless `allowOverIssue` |
+| `POST /work-orders/{id}/returns` | `WORK_ORDER_MATERIAL_ISSUE` | `consumptionId`, `quantity` (in the source's unit), `reason` |
+
+A step from the wrong status is `422` naming the order's status; a concurrent change to the same order is `409`.
+An order in progress closes as COMPLETED or PARTIALLY_COMPLETED through finished-goods receipt and close, below.
+
+Reserve, automatic reserve, issue and return take an optional `Idempotency-Key` header (1 to 100 characters). A key
+already used on the same work order returns the current materials without moving stock again. With
+`startRequiresMaterials`, `start` is refused with the shortfalls; otherwise a short start is recorded in the history.
+Lots from `GET /material-receipts/released-lots` and elsewhere now carry `reservedQuantity` and `facilityId`; ordinary
+consumption takes only `remainingQuantity` less `reservedQuantity`.
+
+Work order operations now also carry `statusReason`, `operatorName`, `machineCode`, `input`, `goodQuantity`,
+`rejectedQuantity`, `scrapQuantity` and `waiting`.
+
+#### Shop floor: `/api/v1/manufacturing/operations`
+
+Reading needs `WORK_ORDER_VIEW`. Quantities are in the work order's unit. Every change returns the operation's detail.
+
+| Endpoint | Permission | Notes |
+|---|---|---|
+| `GET /operations` | | Open operations of orders in progress or on hold, running first. `status` (repeatable), `facilityId`, `workCenterId`, `mine`, `q` (order number or product), paged |
+| `GET /operations/{id}` | | `operation` (with `input`, `processed`, `goodQuantity`, `rejectedQuantity`, `scrapQuantity`, `reworkQuantity`, `waiting`), `instructions`, planned and running times, `parameters`, `reports`, `measurements`, `events`, `machines` at its work centre, `operators` who may run it, `batchStatus`, and its quality `gates` |
+| `POST /operations/{id}/start` | `PRODUCTION_EXECUTE` | Optional `machineId`. Ready operations of orders in progress |
+| `POST /operations/{id}/pause` | `PRODUCTION_EXECUTE` | `category` (stop reason), optional `reason` |
+| `POST /operations/{id}/resume` | `PRODUCTION_EXECUTE` | |
+| `POST /operations/{id}/reports` | `PRODUCTION_EXECUTE` | `quantity`, `goodQuantity`, `rejectedQuantity`, `scrapQuantity` (must add up to `quantity`), optional `reworkQuantity` (within rejected) and `comment`. Accepts `Idempotency-Key` |
+| `POST /operations/{id}/measurements` | `PRODUCTION_EXECUTE` | `parameterCode`, `value`, optional `comment`. Accepts `Idempotency-Key` |
+| `POST /operations/{id}/complete` | `PRODUCTION_EXECUTE` | Optional `setupMinutes` and `reason`; the reason is required when less was processed than came in |
+| `POST /operations/{id}/comments` | `PRODUCTION_EXECUTE` | `comment` |
+| `POST /operations/{id}/assign` | `PRODUCTION_SUPERVISE` | `operatorId`, `machineId`; either may be null to clear |
+| `POST /operations/{id}/block` | `PRODUCTION_SUPERVISE` | `category`, `reason` |
+| `POST /operations/{id}/unblock` | `PRODUCTION_SUPERVISE` | |
+| `POST /operations/{id}/skip` | `PRODUCTION_SUPERVISE` | `reason`. Only when nothing was reported on it |
+| `POST /operations/{id}/reports/{reportId}/reverse` | `PRODUCTION_SUPERVISE` | `reason`. Once per report, while the operation is open |
+
+Since phase 5, `start` is refused while a mandatory start gate of the operation has not passed, and `complete` while a
+mandatory in-process or completion gate has not. While the batch is on hold or rejected, `start`, `resume`, `reports`,
+`measurements` and `complete` are refused. All are `422` with a message naming what is missing.
+
+An operation assigned to someone else is refused with 403 unless the caller holds `PRODUCTION_SUPERVISE`. Photographs
+use `/api/v1/attachments` with `entityType=WORK_ORDER_OPERATION`: viewing needs `WORK_ORDER_VIEW`, adding needs
+`PRODUCTION_EXECUTE`.
+
+#### Quality checkpoints: `/api/v1/manufacturing/quality-checkpoints`
+
+Reading needs `MANUFACTURING_VIEW`; changes need `QUALITY_CHECKPOINT_MANAGE`.
+
+| Endpoint | Notes |
+|---|---|
+| `GET /quality-checkpoints` | All checkpoints, by stage and name. `includeArchived=true` adds archived ones. Not paged |
+| `POST /quality-checkpoints` | `name`, `stage` (`OPERATION_START`, `IN_PROCESS`, `OPERATION_COMPLETION`, `FINAL_RELEASE`), `templateId` (a published IPQC template for the operation stages, FQC for final release, not for one material), optional `productId`, `workCenterId`, `operationSequence` (not for final release), `mandatory` (default true). `201` |
+| `PUT /quality-checkpoints/{id}` | The same body; the stage cannot change. Orders already released keep their gates |
+| `DELETE /quality-checkpoints/{id}` | Archives it. `204` |
+
+#### Quality on a work order
+
+| Endpoint | Permission | Notes |
+|---|---|---|
+| `GET /work-orders/{id}/quality` | `WORK_ORDER_VIEW` | `batchId`, `batchNumber`, `batchStatus`, `onHold`; `gates` (name, stage, mandatory, operation, template, `status` of `PENDING`, `IN_INSPECTION`, `ON_HOLD`, `PASSED` or `FAILED`, and every inspection started for it); `ncrs` and `capas` on the batch (empty without `NCR_VIEW`); `reworkOrders`; `rejected` (`rejected`, `toRework`, `scrapped`, `inRework`, `reworkedAccepted`); `unresolved`, one sentence per mandatory gate not passed and rework order still open |
+| `POST /work-orders/{id}/quality-gates/{gateId}/inspections` | `INSPECTION_CREATE` | Starts an inspection of the batch with the gate's template, through the inspection engine. Pending or failed gates, while the order is in progress or on hold; a start check before the operation starts, the others while it runs. Returns the gate |
+| `POST /work-orders/{id}/quality-hold` | `INSPECTION_APPROVE` | `reason`. Puts the batch on hold and pauses running operations (`QUALITY_ISSUE`). Only while the batch is in progress; an in-process reinspection releases it. Returns the quality view |
+
+#### Completing a work order
+
+| Endpoint | Permission | Notes |
+|---|---|---|
+| `GET /work-orders/{id}/completion` | `WORK_ORDER_VIEW` | `orderedQuantity`, `expectedQuantity` (the operations' good output plus accepted rework; null without operations), `rejectedQuantity`, `scrapQuantity`, `reworkedQuantity`, `serialsRequired`, `materials` (per line: `expected`, `issued`, `difference`, `percent`, `outside`), `receiveBlockers`, `receipt`, `closeBlockers`, `closesAs`, `completedAt`, `completedByName` |
+| `POST /work-orders/{id}/receipt` | `WORK_ORDER_COMPLETE` | Optional `quantity` (required without operations; otherwise must equal the expected quantity), `shortReason` (required below the order quantity less `completionTolerancePercent`), `varianceReason` (required when a material line is off by more than `materialVariancePercent`), `serialNumbers` (up to 1000; one per unit when `serialTracking` is on and the product is discrete). Completes the batch as finished goods and releases open reservations. Optional `Idempotency-Key`: the same key returns the current view; any other second receipt is `422` |
+| `POST /work-orders/{id}/complete` | `WORK_ORDER_COMPLETE` | Optional `reason`, required when the order closes short. Needs the receipt, mandatory gates and rework settled, the batch not on hold and, with `completionRequiresFinalInspection`, its final inspection decided. → COMPLETED or PARTIALLY_COMPLETED |
+| `GET /work-orders/production-record?batchId=` | `WORK_ORDER_VIEW` | How the batch was made: work order, BOM or recipe revision, routing revision, operations with operators and machines, gates, rework orders, receipt. `data` is null for a batch no work order made, or one in another organisation |
+
+Completing a batch made by a work order through `POST /api/v1/production-batches/{id}/complete` is `422`. The
+settings gain `completionTolerancePercent`, `materialVariancePercent` (0 to 100), `completionRequiresFinalInspection`
+and `serialTracking`.
+
+#### Rework orders: `/api/v1/manufacturing/rework-orders`
+
+Reading needs `WORK_ORDER_VIEW`; members limited to some facilities see only their facilities' rework orders, anything
+else is `404`. Every change returns the detail.
+
+| Endpoint | Permission | Notes |
+|---|---|---|
+| `GET /rework-orders` | | Newest first. `status` (repeatable), `workOrderId`, `q` (rework or work order number), paged |
+| `GET /rework-orders/{id}` | | `rework` (number, work order, batch, product, operation, NCR, `quantity`, `status`, `finalDisposition`), `reason`, `instructions`, the source inspection, approval, times, `reworkedQuantity`, `scrappedQuantity`, `reinspection`, `steps`, `history` |
+| `POST /rework-orders` | `REWORK_MANAGE` | `workOrderId`, at least one of `operationId`, `inspectionId` (disposed of as REWORK, on this batch), `ncrId` (on this batch), `quantity` (at most what the operation marked for rework and is not on another rework order), `reason`, optional `instructions`, `steps` (1 to 50 of `description`, optional `workCenterId` in the order's facility). The order must be in progress or on hold; the number is `RW-…`. `201` |
+| `POST /rework-orders/{id}/approve` | `REWORK_APPROVE` | Optional `note`. OPEN → APPROVED; under `separateApprover`, not by whoever raised it, except as a recorded self-review |
+| `POST /rework-orders/{id}/start` | `PRODUCTION_EXECUTE` | APPROVED → IN_PROGRESS |
+| `POST /rework-orders/{id}/steps/{stepId}/complete` | `PRODUCTION_EXECUTE` | Optional `note`. Once per step, while in progress |
+| `POST /rework-orders/{id}/complete` | `PRODUCTION_EXECUTE` | `reworkedQuantity`, `scrappedQuantity`, adding up to the quantity; every step done. → AWAITING_INSPECTION |
+| `POST /rework-orders/{id}/reinspect` | `INSPECTION_CREATE` | Optional `templateId`. Starts the reinspection on the batch; refused while one is under way |
+| `POST /rework-orders/{id}/close` | `REWORK_MANAGE` | → CLOSED with the reinspection's disposition. Refused without a reinspection or before it has a decision other than HOLD |
+| `POST /rework-orders/{id}/cancel` | `REWORK_MANAGE` | `reason`. Only from OPEN or APPROVED |
+
+#### Downtime: `/api/v1/manufacturing/downtime`
+
+Reading needs `MANUFACTURING_VIEW`; limited members see their facilities only, anything else is `404`. Times are
+instants; `minutes` runs to now while a stop is open.
+
+| Endpoint | Permission | Notes |
+|---|---|---|
+| `GET /downtime` | | Newest first, paged. Filters `facilityId`, `workCenterId`, `machineId`, `workOrderId`, `category`, `open`, `from`, `to` (instants; stops overlapping them) |
+| `GET /downtime/{id}` | | One stop: where, `source` (`SHOP_FLOOR`, `MACHINE`, `MANUAL`), `category`, `planned`, times, `minutes`, reason, department, comments, who recorded and ended it |
+| `GET /downtime/summary` | | `from`, `to` (dates, at most 366 days), optional `facilityId`, `groupBy` (`MACHINE` default, `WORK_CENTER`, `PRODUCTION_LINE`, `FACILITY`, `CATEGORY`). Rows of `stops`, `minutes`, `plannedMinutes`, `unplannedMinutes`, and totals |
+| `POST /downtime` | `DOWNTIME_MANAGE` | `machineId` or `workCenterId`, optional `workOrderId`, `category` (not `ORDER_ON_HOLD`), `startedAt`, optional `endedAt`, `reason`, optional `responsibleDepartment`, `comments`. Only `PLANNED_MAINTENANCE` may start in the future, and then needs `endedAt`. `201` |
+| `PUT /downtime/{id}` | `DOWNTIME_MANAGE` | Any of `category`, `startedAt`, `endedAt`, `reason`, `responsibleDepartment`, `comments`. On a stop not entered by hand only the last three may change |
+| `POST /downtime/{id}/end` | `DOWNTIME_MANAGE` | Optional `endedAt` (default now). Manual stops only; the others end when the operation resumes or the machine is set back |
+
+Stops from the floor and from machine status are recorded by the existing endpoints. Evidence uses
+`/api/v1/attachments` with `entityType=DOWNTIME`.
+
+#### Scheduling
+
+| Endpoint | Permission | Notes |
+|---|---|---|
+| `GET /scheduling?facilityId&from&to` | `WORK_ORDER_VIEW` | Up to 62 days. `shiftsDefined`; `workCenters` with `units` and per day `capacityMinutes`, `plannedDowntimeMinutes`, `loadMinutes`, `overloaded`; `orders` by priority with `remainingMinutes` and `warnings`; `conflicts` (centre, day, capacity, load, order numbers) |
+| `POST /work-orders/{id}/reschedule` | `WORK_ORDER_MANAGE` | `plannedStart`, `plannedEnd`, optional `priority`, `reason`. Until the order is completed or cancelled. Returns `order`: its place on the board with warnings. Audited as `WORK_ORDER_RESCHEDULED` |
+
+#### Costing: `/api/v1/manufacturing/costing`
+
+Needs `PRODUCTION_COST_VIEW`. Money is text, two decimal places, in the organisation's `currency`; null when unknown.
+
+| Endpoint | Notes |
+|---|---|
+| `GET /costing/work-orders/{id}` | Released orders only (`422` otherwise). `materials` and `operations` with planned and actual cost; `planned` and `actual` totals (`material`, `labour`, `machine`, `overhead`, `scrap`, `rework`, `total`, `unit`); `complete`, and `missing` listing each missing price or rate |
+| `GET /costing/summary?from&to&facilityId` | Orders closed in the period with planned and actual totals and unit costs; overall totals; `complete` |
+
+#### Production analytics
+
+| Endpoint | Permission | Notes |
+|---|---|---|
+| `GET /analytics?from&to&facilityId` | `PRODUCTION_ANALYTICS_VIEW` | Up to 366 days. `production`, `plannedVersusActual`, `ordersCompleted`, `ordersPartiallyCompleted`, `ordersOnTime`, `workOrderStatus`, `quality` (quantities and rejection, scrap and rework rates), `efficiency`, `materialVariance`, `machines` and `overall` (shift, planned production, running and unplanned downtime minutes; utilisation, availability, performance, quality, OEE; `notes`), `downtimeByCategory`, and `cost` only with `PRODUCTION_COST_VIEW`. Percentages are 0 to 100; a figure without the data it needs is left out, never zero |

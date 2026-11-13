@@ -24,6 +24,7 @@ class EndpointAuthorizationIT extends AbstractIntegrationTest {
             "POST /api/v1/auth/invitations/accept",
             "POST /api/v1/auth/invitations/preview",
             "POST /api/v1/auth/login",
+            "POST /api/v1/auth/login/second-factor",
             "POST /api/v1/auth/logout",
             "POST /api/v1/auth/password-reset/confirm",
             "POST /api/v1/auth/password-reset/request",
@@ -55,6 +56,8 @@ class EndpointAuthorizationIT extends AbstractIntegrationTest {
             // The caller's own organisations.
             "GET /api/v1/organizations",
             "GET /api/v1/organizations/{id}",
+            // Any member: the organisation's working rules decide which actions their screens offer.
+            "GET /api/v1/organizations/current/settings",
             "POST /api/v1/organizations");
 
     @Autowired

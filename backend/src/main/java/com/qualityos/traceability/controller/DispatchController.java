@@ -23,6 +23,9 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.Authentication;
+import java.util.stream.Collectors;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -80,8 +83,11 @@ public class DispatchController {
     @PostMapping("/dispatches")
     @PreAuthorize(Require.TRACEABILITY_MANAGE)
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<DispatchResponse> create(@Valid @RequestBody CreateDispatchRequest request) {
-        return ApiResponse.ok(dispatches.create(request));
+    public ApiResponse<DispatchResponse> create(
+            @Valid @RequestBody CreateDispatchRequest request, Authentication caller) {
+        Set<String> permissions = caller.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority).collect(Collectors.toSet());
+        return ApiResponse.ok(dispatches.create(request, permissions));
     }
 
     @PostMapping("/dispatches/{id}/reverse")

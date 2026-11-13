@@ -14,11 +14,14 @@ import {
   useAssignees,
   useDefectCategories,
   useRefresh,
+  useUnits,
 } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { StatusHistory } from "@/components/records/status-history";
 import { Button } from "@/components/ui/button";
+import { SelfReviewNotice } from "@/components/app/review-policy";
 import { useMe, usePermission } from "@/hooks/use-me";
+import { useSelfReviewInEffect } from "@/hooks/use-organization-settings";
 import { api } from "@/lib/api";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { Capa, Ncr } from "@/lib/types";
@@ -38,12 +41,14 @@ export default function NcrPage() {
   const router = useRouter();
   const refresh = useRefresh();
   const { data: me } = useMe();
+  const selfReviewInEffect = useSelfReviewInEffect();
   const canCreate = usePermission("NCR_CREATE");
   const canAssign = usePermission("NCR_ASSIGN");
   const canClose = usePermission("NCR_CLOSE");
   const canRaiseCapa = usePermission("CAPA_MANAGE");
   const assignees = useAssignees();
   const categories = useDefectCategories();
+  const units = useUnits();
   const [step, setStep] = useState<Step | null>(null);
   const [raisingCapa, setRaisingCapa] = useState(false);
   const { data: ncr, error } = useQuery({ queryKey: [path], queryFn: () => api.get<Ncr>(path) });
@@ -80,7 +85,8 @@ export default function NcrPage() {
     steps.push({ label: "Request verification", action: "request-verification", fields: [note("Note", false)] });
   }
   const independent = me?.user.id !== ncr.verificationRequestedBy;
-  if (canClose && status === "PENDING_VERIFICATION" && independent) {
+  const selfReview = !independent && selfReviewInEffect;
+  if (canClose && status === "PENDING_VERIFICATION" && (independent || selfReview)) {
     steps.push({ label: "Close NCR", action: "close", fields: [note("Closure note")] });
     steps.push({ label: "Send back", action: "send-back", fields: [note("What is missing")], outline: true });
   }
@@ -121,15 +127,18 @@ export default function NcrPage() {
           </Button>
         ))}
       </PageHeader>
-      {status === "PENDING_VERIFICATION" && canClose && !independent && (
+      {status === "PENDING_VERIFICATION" && canClose && !independent && !selfReview && (
         <p className="text-sm text-muted-foreground">Someone other than you must close this NCR.</p>
       )}
+      {status === "PENDING_VERIFICATION" && canClose && selfReview && <SelfReviewNotice />}
       <Section title="Details">
         <Details
           items={[
             ["Description", ncr.description],
             ["Source", ncr.source === "AUDIT" && ncr.auditId ? (
               <RecordLink href={`/audits/${ncr.auditId}`}>Audit</RecordLink>
+            ) : ncr.source === "CALIBRATION" && ncr.instrumentId ? (
+              <RecordLink href={`/calibration/${ncr.instrumentId}`}>Failed calibration</RecordLink>
             ) : ncr.source === "INSPECTION" && ncr.inspectionId ? (
               <RecordLink href={`/inspections/${ncr.inspectionId}`}>Inspection</RecordLink>
             ) : "Raised by hand"],
@@ -137,7 +146,10 @@ export default function NcrPage() {
             ["Supplier", ncr.supplierName],
             ["Material", ncr.materialName],
             ["Batch", ncr.batchNumber],
-            ["Rejected quantity", ncr.rejectedQuantity && formatQuantity(ncr.rejectedQuantity)],
+            [
+              "Rejected quantity",
+              ncr.rejectedQuantity && `${formatQuantity(ncr.rejectedQuantity)} ${units.label(ncr.rejectedUomId)}`.trim(),
+            ],
             ["Defect category", ncr.defectCategoryName],
             ["Assigned to", ncr.assigneeName],
             ["Containment", ncr.containmentAction],
@@ -149,7 +161,7 @@ export default function NcrPage() {
       <Section title="Corrective actions">
         {ncr.capas.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            None yet.{ncr.severity !== "MINOR" && " This severity needs a closed CAPA before verification."}
+            None yet.{ncr.capaRequired && " This NCR needs a closed CAPA before verification."}
           </p>
         )}
         <ul className="divide-y text-sm">
@@ -176,11 +188,24 @@ export default function NcrPage() {
       {raisingCapa && (
         <RecordDialog
           title="Raise CAPA"
-          fields={capaFields}
-          record={{ title: ncr.title, problemStatement: ncr.description, ownerId: ncr.assignedTo ?? undefined }}
+          fields={
+            ncr.effectivenessRequired
+              ? capaFields
+              : [...capaFields, { name: "effectivenessRequired", label: "Requires effectiveness verification", type: "checkbox" }]
+          }
+          record={{
+            title: ncr.title,
+            problemStatement: ncr.description,
+            ownerId: ncr.assignedTo ?? undefined,
+            effectivenessRequired: true,
+          }}
           onClose={() => setRaisingCapa(false)}
           onSubmit={async (values) => {
-            const created = await api.post<Capa>("/capas", { ...values, ncrId: id, effectivenessRequired: true });
+            const created = await api.post<Capa>("/capas", {
+              ...values,
+              ncrId: id,
+              effectivenessRequired: ncr.effectivenessRequired || values.effectivenessRequired === true,
+            });
             await refresh();
             router.push(`/capas/${created.id}`);
           }}

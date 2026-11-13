@@ -19,7 +19,7 @@ import type { Invoice, OrganisationList, Plan } from "@/lib/types";
 
 const PAGE_SIZE = 25;
 const NO_FILTER = { q: "", plan: "", state: "", unpaid: "", registeredFrom: "", registeredTo: "", sort: "" };
-const SELECT_CLASS = "h-9 rounded-md border bg-background px-2 text-sm";
+const SELECT_CLASS = "h-9 rounded-xl border bg-white/70 px-2 text-sm";
 
 interface Paying {
   tenantId: string;
@@ -197,7 +197,7 @@ export default function PlatformOrganisationsPage() {
                     </Button>
                   ))}
                 </TableCell>
-                <TableCell className="space-x-2 whitespace-nowrap">
+                <TableCell className="min-w-36 whitespace-normal [&>*]:m-0.5">
                   <Button size="sm" variant="outline" disabled={pending} onClick={() => setExtending(tenantId)}>
                     Extend
                   </Button>

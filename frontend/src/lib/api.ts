@@ -33,7 +33,10 @@ async function send<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
     // The browser sets the multipart boundary itself.
-    headers: typeof init?.body === "string" ? { "content-type": "application/json" } : undefined,
+    headers:
+      typeof init?.body === "string"
+        ? { "content-type": "application/json", ...(init.headers as Record<string, string> | undefined) }
+        : undefined,
   });
   if (response.status === 204) {
     return undefined as T;
@@ -47,6 +50,10 @@ async function send<T>(url: string, init?: RequestInit): Promise<T> {
     if (payload?.error?.code === "REAUTHENTICATION_REQUIRED" && askForPassword && (await askForPassword())) {
       return send<T>(url, init);
     }
+    // An operator whose authenticator was reset: the Control Center's layout shows the set-up page.
+    if (payload?.error?.code === "SECOND_FACTOR_REQUIRED" && typeof window !== "undefined") {
+      hardNavigate("/platform/dashboard");
+    }
     throw new ApiError(
       response.status,
       payload?.error?.code ?? "REQUEST_FAILED",
@@ -59,8 +66,8 @@ async function send<T>(url: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   get: <T>(path: string) => send<T>(`/api/v1${path}`),
-  post: <T>(path: string, body?: unknown) =>
-    send<T>(`/api/v1${path}`, { method: "POST", body: JSON.stringify(body ?? {}) }),
+  post: <T>(path: string, body?: unknown, headers?: Record<string, string>) =>
+    send<T>(`/api/v1${path}`, { method: "POST", body: JSON.stringify(body ?? {}), headers }),
   put: <T>(path: string, body: unknown) =>
     send<T>(`/api/v1${path}`, { method: "PUT", body: JSON.stringify(body) }),
   delete: <T>(path: string) => send<T>(`/api/v1${path}`, { method: "DELETE" }),
@@ -68,10 +75,16 @@ export const api = {
 };
 
 /** Session endpoints handled by the web server itself. */
-/** A session comes back as cookies, so all a page ever learns is whether email confirmation is still needed. */
+/**
+ * A session comes back as cookies, so all a page ever learns is whether email confirmation, or an operator's
+ * authenticator code, is still needed.
+ */
 export const session = {
   post: (path: string, body: unknown) =>
-    send<{ verificationRequired?: boolean } | undefined>(`/api/auth/${path}`, { method: "POST", body: JSON.stringify(body) }),
+    send<{ verificationRequired?: boolean; secondFactorRequired?: boolean } | undefined>(`/api/auth/${path}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };
 
 /**

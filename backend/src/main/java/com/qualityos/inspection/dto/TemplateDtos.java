@@ -39,11 +39,21 @@ public final class TemplateDtos {
             String inspectionType,
             UUID materialId,
             UUID productId,
+            /* The material's or product's code and name, or null for a general template. */
+            String appliesTo,
             Integer publishedVersion,
             boolean hasDraft) {
     }
 
     public record TemplateDetail(TemplateSummary template, List<VersionResponse> versions) {
+    }
+
+    /**
+     * The published templates an inspection can use, the item's own before general ones.
+     *
+     * @param suggestedId the one an inspection without a template gets, or null when none or several fit
+     */
+    public record ApplicableTemplates(List<TemplateSummary> templates, UUID suggestedId) {
     }
 
     public record SaveDraftRequest(

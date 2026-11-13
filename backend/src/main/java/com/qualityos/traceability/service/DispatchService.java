@@ -11,6 +11,8 @@ import com.qualityos.organization.service.OrganizationService;
 import com.qualityos.notification.service.NotificationService;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.notification.service.NotificationType;
+import com.qualityos.common.exception.ErrorCode;
+import com.qualityos.common.exception.QualityOsException;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.traceability.dto.TraceabilityDtos.ConfirmShipmentRequest;
 import com.qualityos.traceability.dto.TraceabilityDtos.CreateDispatchRequest;
@@ -46,10 +48,13 @@ import java.util.Comparator;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.util.StringUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -76,6 +81,8 @@ public class DispatchService {
     private final DocumentNumberService numbers;
     private final AuditService audit;
     private final FacilityScope scope;
+    private final RecallHolds recallHolds;
+    private final ApplicationEventPublisher events;
 
     DispatchService(
             DispatchRecordRepository dispatches,
@@ -93,7 +100,11 @@ public class DispatchService {
             ProductionService production,
             DocumentNumberService numbers,
             AuditService audit,
-            FacilityScope scope) {
+            FacilityScope scope,
+            RecallHolds recallHolds,
+            ApplicationEventPublisher events) {
+        this.recallHolds = recallHolds;
+        this.events = events;
         this.scope = scope;
         this.dispatches = dispatches;
         this.items = items;
@@ -145,9 +156,14 @@ public class DispatchService {
         return PageResponse.from(page, responses(page.getContent())::get);
     }
 
-    /** Batches are locked in id order, so that two dispatches of the same batches cannot deadlock. */
+    /**
+     * Batches are locked in id order, so that two dispatches of the same batches cannot deadlock. Goods under an open
+     * recall stay in, unless someone who can manage recalls gives a reason, which is audited.
+     *
+     * @param permissions the caller's, to decide whether they may override a recall hold
+     */
     @Transactional
-    public DispatchResponse create(CreateDispatchRequest request) {
+    public DispatchResponse create(CreateDispatchRequest request, Set<String> permissions) {
         Customer customer = customers.findById(request.customerId())
                 .filter(found -> found.getArchivedAt() == null)
                 .orElseThrow(() -> new BusinessRuleException("This customer does not exist."));
@@ -155,6 +171,9 @@ public class DispatchService {
         if (request.dispatchedOn().isAfter(today)) {
             throw new BusinessRuleException("A dispatch cannot be dated in the future.");
         }
+        Map<UUID, List<String>> held = recallHolds.openRecalls(
+                request.items().stream().map(DispatchItemRequest::productionBatchId).collect(Collectors.toSet()));
+        String override = held.isEmpty() ? null : requireRecallOverride(held, request.recallOverrideReason(), permissions);
         DispatchRecord dispatch = dispatches.saveAndFlush(new DispatchRecord(
                 numbers.next("DSP"), customer.getId(), request.dispatchedOn(), request.reference()));
         request.items().stream()
@@ -162,6 +181,12 @@ public class DispatchService {
                 .forEach(line -> ship(dispatch, line));
         audit.record("MATERIAL_DISPATCHED", "DispatchRecord", dispatch.getId(), null,
                 Map.of("number", dispatch.getDispatchNumber(), "customer", customer.getCode()));
+        if (override != null) {
+            List<String> recalls = held.values().stream().flatMap(List::stream).distinct().sorted().toList();
+            audit.record("RECALL_HOLD_OVERRIDDEN", "DispatchRecord", dispatch.getId(), null, Map.of(
+                    "number", dispatch.getDispatchNumber(), "recalls", recalls, "reason", override));
+            events.publishEvent(new DispatchedUnderRecall(recalls));
+        }
         return responses(List.of(dispatch)).get(dispatch);
     }
 
@@ -209,6 +234,23 @@ public class DispatchService {
         corrections.saveAndFlush(TraceCorrection.ofDispatch(id, reason.trim()));
         audit.record("DISPATCH_REVERSED", "DispatchRecord", id, null, Map.of("reason", reason.trim()));
         return responses(List.of(dispatch)).get(dispatch);
+    }
+
+    /** Returns the reason for letting held goods out, or refuses the dispatch. */
+    private String requireRecallOverride(Map<UUID, List<String>> held, String reason, Set<String> permissions) {
+        if (!StringUtils.hasText(reason)) {
+            String batchNumbers = batches.findAllById(held.keySet()).stream()
+                    .map(ProductionBatch::getBatchNumber).sorted().collect(Collectors.joining(", "));
+            String recalls = held.values().stream().flatMap(List::stream).distinct().sorted()
+                    .collect(Collectors.joining(", "));
+            throw new QualityOsException(ErrorCode.RECALL_HOLD, "Batch " + batchNumbers + " is under recall " + recalls
+                    + ". Someone who can manage recalls may still dispatch it, with a reason.");
+        }
+        if (!permissions.contains(Permissions.RECALL_MANAGE)) {
+            throw new QualityOsException(ErrorCode.FORBIDDEN,
+                    "Only someone who can manage recalls may dispatch goods under recall.");
+        }
+        return reason.trim();
     }
 
     private void ship(DispatchRecord dispatch, DispatchItemRequest line) {

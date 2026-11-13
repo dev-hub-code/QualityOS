@@ -8,10 +8,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiError, type PageResponse } from "@/lib/api";
 import { formatQuantity, type FieldDef, type FieldOption } from "@/lib/record-form";
-import type { Assignee, DefectCategory, Category, Facility, Material, Product, Specification, Supplier, Unit } from "@/lib/types";
+import type {
+  Assignee,
+  DefectCategory,
+  Category,
+  Facility,
+  Machine,
+  Material,
+  Product,
+  Specification,
+  Supplier,
+  Unit,
+  WorkCenter,
+} from "@/lib/types";
 
-const NEGATIVE = new Set(["REJECTED", "REJECT", "BLOCKED", "CANCELLED", "VOIDED", "FAIL", "HOLD", "CRITICAL", "OVERDUE", "ON_HOLD", "REVERSED"]);
-const POSITIVE = new Set(["APPROVED", "RECEIVED", "CLOSED", "NOT_REQUIRED", "PASS", "ACCEPT", "PUBLISHED", "COMPLETED", "MINOR", "RELEASED", "APPLIED", "ACCEPTED", "SHIPPED"]);
+const NEGATIVE = new Set(["REJECTED", "REJECT", "BLOCKED", "CANCELLED", "VOIDED", "FAIL", "HOLD", "CRITICAL", "OVERDUE", "ON_HOLD", "REVERSED", "REINSPECT"]);
+const POSITIVE = new Set(["APPROVED", "RECEIVED", "CLOSED", "NOT_REQUIRED", "PASS", "ACCEPT", "PUBLISHED", "COMPLETED", "MINOR", "RELEASED", "APPLIED", "ACCEPTED", "SHIPPED", "PAID"]);
 
 export function StatusBadge({ status }: { status: string }) {
   const variant = NEGATIVE.has(status) ? "destructive" : POSITIVE.has(status) ? "default" : "secondary";
@@ -22,8 +34,8 @@ export function PageHeader({ title, subtitle, children }: { title: string; subti
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        {subtitle && <div className="mt-1 text-sm text-muted-foreground">{subtitle}</div>}
+        <h1 className="text-2xl font-bold tracking-tight text-[#1b2a55] sm:text-3xl">{title}</h1>
+        {subtitle && <div className="mt-1.5 text-sm text-muted-foreground">{subtitle}</div>}
       </div>
       {children && <div className="flex flex-wrap gap-2">{children}</div>}
     </div>
@@ -154,6 +166,8 @@ export function useDefectCategories() {
 export const useFacilities = () => useLookup<Facility>("/facilities");
 export const useMaterials = () => useLookup<Material>("/materials");
 export const useProducts = () => useLookup<Product>("/products");
+export const useWorkCenters = () => useLookup<WorkCenter>("/manufacturing/work-centers");
+export const useMachines = () => useLookup<Machine>("/manufacturing/machines");
 
 export function SpecificationTable({
   specifications,

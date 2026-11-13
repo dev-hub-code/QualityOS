@@ -3,7 +3,7 @@ import type { Flow } from "@/lib/doc-flows";
 
 export function FlowChart({ flow }: { flow: Flow }) {
   return (
-    <figure aria-label={flow.title} className="rounded-lg border p-4 sm:p-5">
+    <figure aria-label={flow.title} className="glass rounded-2xl p-4 sm:p-5">
       <figcaption className="font-semibold">{flow.title}</figcaption>
       <ol className="mt-4">
         {flow.steps.map((step, index) => (

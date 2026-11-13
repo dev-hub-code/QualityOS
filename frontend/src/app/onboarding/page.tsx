@@ -15,9 +15,9 @@ export default function OnboardingPage() {
   });
 
   return (
-    <main className="mx-auto w-full max-w-lg space-y-6 px-4 py-12">
+    <main className="glass mx-auto my-12 w-full max-w-lg space-y-6 rounded-3xl px-6 py-8 sm:px-8">
       <header className="space-y-1">
-        <p className="font-heading text-2xl font-semibold tracking-tight text-primary">QualityOS</p>
+        <p className="font-heading text-2xl font-semibold tracking-tight text-primary">ProductionOS</p>
         <h1 className="text-lg font-medium">Tell us about your organisation</h1>
         <p className="text-sm text-muted-foreground">
           These details appear on inspection reports. You can change them later.

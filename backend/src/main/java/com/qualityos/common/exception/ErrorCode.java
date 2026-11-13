@@ -14,12 +14,17 @@ public enum ErrorCode {
     EMAIL_NOT_VERIFIED(HttpStatus.FORBIDDEN),
     REAUTHENTICATION_REQUIRED(HttpStatus.FORBIDDEN),
     REAUTHENTICATION_FAILED(HttpStatus.FORBIDDEN),
+    /** An operator who has not set up an authenticator app yet. */
+    SECOND_FACTOR_REQUIRED(HttpStatus.FORBIDDEN),
+    SECOND_FACTOR_FAILED(HttpStatus.FORBIDDEN),
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
     CONFLICT(HttpStatus.CONFLICT),
     CONCURRENT_MODIFICATION(HttpStatus.CONFLICT),
     BUSINESS_RULE_VIOLATION(HttpStatus.UNPROCESSABLE_CONTENT),
+    /** Goods under an open recall. Someone who can manage recalls may still dispatch them, with a reason. */
+    RECALL_HOLD(HttpStatus.UNPROCESSABLE_CONTENT),
     TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS),
     REQUEST_FAILED(HttpStatus.BAD_REQUEST),
     PAYMENT_GATEWAY_UNAVAILABLE(HttpStatus.BAD_GATEWAY),

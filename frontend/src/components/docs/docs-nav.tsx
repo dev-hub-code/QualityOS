@@ -21,7 +21,7 @@ function Topics() {
 export function DocsNav() {
   return (
     <>
-      <details className="rounded-lg border px-3 py-2 lg:hidden">
+      <details className="glass rounded-2xl px-3 py-2 lg:hidden">
         <summary className="cursor-pointer text-sm font-medium">All topics</summary>
         <nav aria-label="Topics, compact" className="mt-3">
           <Topics />

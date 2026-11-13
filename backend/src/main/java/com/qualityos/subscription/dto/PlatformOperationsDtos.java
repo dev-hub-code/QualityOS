@@ -3,6 +3,7 @@ package com.qualityos.subscription.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -34,7 +35,32 @@ public final class PlatformOperationsDtos {
 
     public record Operator(
             UUID userId, String email, String fullName, String role, Instant addedAt, Instant deactivatedAt,
-            String addedBy, Instant lastActivity) {
+            String addedBy, Instant lastActivity, String secondFactor) {
+    }
+
+    public record ResetSecondFactorRequest(@NotBlank @Size(max = 500) String reason) {
+    }
+
+    /** NONE, PENDING or ENROLLED. */
+    public record SecondFactorState(String state) {
+    }
+
+    /** Shown once. The secret is what an authenticator app needs, by scanning the URI or typing it. */
+    public record SecondFactorEnrolment(String secret, String otpauthUri) {
+
+        @Override
+        public String toString() {
+            return "SecondFactorEnrolment[]";
+        }
+    }
+
+    public record ConfirmSecondFactorRequest(
+            @NotBlank @Pattern(regexp = "[0-9]{6}", message = "Enter the six-digit code.") String code) {
+
+        @Override
+        public String toString() {
+            return "ConfirmSecondFactorRequest[]";
+        }
     }
 
     public record AuditFilter(String q, String action, String entityType, LocalDate from, LocalDate to) {

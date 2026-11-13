@@ -43,7 +43,7 @@ export const DOC_PAGES: DocPage[] = [
     plan: EVERY_PLAN,
     sections: [
       {
-        title: "How QualityOS fits together",
+        title: "How ProductionOS fits together",
         text: "Every record links to the one before it. A purchase order leads to a receipt, a receipt creates lots, and each lot is inspected before it can be used. Failures raise NCRs, and NCRs lead to CAPAs. Released lots go into production batches, and batches go out on dispatches. That chain is what makes a trace possible.",
       },
       {
@@ -347,7 +347,7 @@ export const DOC_PAGES: DocPage[] = [
       {
         title: "Good to know",
         list: [
-          "The reviewer must be someone other than the inspector.",
+          "The reviewer must be someone other than the inspector. An organisation with one member can allow self-review under Settings, with a reason each time.",
           "A changed result leaves an audit event.",
           "Failed material always gets an NCR, however it is disposed of.",
           "An instrument that is overdue or out of service cannot be recorded on an inspection.",
@@ -398,7 +398,7 @@ export const DOC_PAGES: DocPage[] = [
         title: "Closing rules",
         list: [
           "The person who closes an NCR must differ from the person who requested verification.",
-          "A critical or major NCR needs a closed CAPA.",
+          "By default, a critical or major NCR needs a closed CAPA. An administrator can change which NCRs need one under Settings.",
           "Every linked CAPA must be closed or cancelled first.",
           "A reviewer can send an NCR back if the work is not good enough.",
         ],
@@ -440,8 +440,8 @@ export const DOC_PAGES: DocPage[] = [
         list: [
           "Record the root cause before moving on, and add at least one action.",
           "Every action must be complete before verification.",
-          "Someone other than the CAPA owner must verify it.",
-          "A CAPA on a critical or major NCR always needs an effectiveness check.",
+          "Someone other than the CAPA owner must verify it. An organisation with one member can allow self-review under Settings, with a reason each time.",
+          "By default, a CAPA on a critical or major NCR needs an effectiveness check. An administrator can change this under Settings.",
           "Reminders go out 3 days before the target date, and again once it is overdue.",
           "Completing an action needs the CAPA manage permission.",
           "Evidence is attached to the CAPA, not to each action.",
@@ -611,7 +611,7 @@ export const DOC_PAGES: DocPage[] = [
           "Goods left with customers must be confirmed and explained in the notes.",
           "A linked CAPA must be closed.",
           "Someone other than the requester must approve the closure.",
-          "A dispatch made after a recall starts is not blocked, but its customer joins the recall at closure.",
+          "While a recall is open, its batches, and anything made from them, cannot be dispatched. Someone who manages recalls can override this with a reason, and the customer joins the recall at once.",
         ],
       },
       {
@@ -706,7 +706,9 @@ export const DOC_PAGES: DocPage[] = [
           "Each instrument has a calibration frequency, and a QR label you can print.",
           "A reminder goes out 14 days before the due date, and again once overdue.",
           "An overdue instrument cannot be used on an inspection.",
-          "After a failed calibration, inspections that used the instrument are flagged and people are told. No NCR is raised automatically, so review them yourself.",
+          "After a failed calibration, an NCR is raised for the inspections that used the instrument since its last good calibration. Each one needs a decision: the result stands, or the goods are inspected again.",
+          "A decision to reinspect puts the goods on hold until a new inspection releases them. Goods already used or dispatched are not recalled for you.",
+          "The NCR cannot close until every inspection in doubt has a decision.",
           "Recording an instrument on an inspection is optional, and applies to the whole inspection.",
         ],
       },
@@ -716,7 +718,8 @@ export const DOC_PAGES: DocPage[] = [
       steps: [
         { who: "Dev, Quality Engineer", action: "Registers caliper VC-9 with a 180-day frequency, and prints its QR label.", result: "VC-9 is Active, with a due date." },
         { who: "Ravi, Inspector", action: "Records VC-9 on an inspection.", result: "The inspection shows which instrument was used." },
-        { who: "Dev, Quality Engineer", action: "Records a calibration on VC-9 with result Fail.", result: "VC-9 goes out of service, and the inspections it was used on are flagged." },
+        { who: "Dev, Quality Engineer", action: "Records a calibration on VC-9 with result Fail.", result: "VC-9 goes out of service, and an NCR is raised for the inspections it was used on." },
+        { who: "Dev, Quality Engineer", action: "Opens Inspections in doubt on VC-9, and decides each one with a reason.", result: "Each inspection shows Result stands or Reinspect." },
       ],
     },
   },
@@ -958,7 +961,7 @@ export const DOC_PAGES: DocPage[] = [
       },
       {
         title: "Certification",
-        text: "QualityOS helps you run a quality system and keep its records. It does not certify your organisation or confer regulatory approval. Whether your use of it meets a particular standard is for you and your certifier to decide.",
+        text: "ProductionOS helps you run a quality system and keep its records. It does not certify your organisation or confer regulatory approval. Whether your use of it meets a particular standard is for you and your certifier to decide.",
       },
     ],
     example: {
@@ -973,7 +976,7 @@ export const DOC_PAGES: DocPage[] = [
     slug: "platform",
     group: "Account",
     title: "Platform administration",
-    summary: "For the people who run QualityOS itself, not for customer organisations.",
+    summary: "For the people who run ProductionOS itself, not for customer organisations.",
     menu: "Control Center",
     roles: "Platform administrators",
     plan: "Not part of a plan",
@@ -995,6 +998,7 @@ export const DOC_PAGES: DocPage[] = [
           "The Control Center link only appears for platform administrators.",
           "Each operator has a role: Super Admin, Billing Admin, Support Admin or Read-only Auditor.",
           "Critical actions ask for your password again, then allow 10 minutes.",
+          "Operators sign in with a code from an authenticator app as well as their password, and set the app up on their first visit. A Super Admin can reset it for a lost phone.",
           "Support sees account and billing facts only, and support notes are never shown to customers.",
           "Maintenance mode lets customers read their records but pauses changes.",
           "Suspending an organisation stops its members signing in, but changes none of its records. Every action there needs a reason.",

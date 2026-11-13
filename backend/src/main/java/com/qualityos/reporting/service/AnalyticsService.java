@@ -79,11 +79,21 @@ public class AnalyticsService {
                 FROM inspections i WHERE %s%s
                 """.formatted(DECIDED, scope.facility("i.facility_id")), params);
         Map<String, Object> lots = jdbc.queryForMap("""
-                SELECT count(*) AS lots,
-                       count(*) FILTER (WHERE i.disposition = 'REJECT') AS rejected,
-                       sum(i.quantity) AS quantity,
-                       sum(i.quantity) FILTER (WHERE i.disposition = 'REJECT') AS rejected_quantity
+                SELECT count(*) AS lots, count(*) FILTER (WHERE i.disposition = 'REJECT') AS rejected
                 FROM inspections i WHERE %s%s
+                """.formatted(LOTS, scope.facility("i.facility_id")), params);
+        // Quantities in the base unit of their kind, so grams and kilograms add up. Kilograms and pieces never
+        // add up, so each kind has its own rate, and the rates are weighed by the lots behind them.
+        List<Map<String, Object>> byKind = jdbc.queryForList("""
+                SELECT count(*) AS lots,
+                       sum(i.quantity * COALESCE(u.to_base, 1)) AS quantity,
+                       sum(i.quantity * COALESCE(u.to_base, 1)) FILTER (WHERE i.disposition = 'REJECT')
+                           AS rejected_quantity
+                FROM inspections i
+                JOIN material_receipt_items r ON r.tenant_id = i.tenant_id AND r.id = i.receipt_item_id
+                JOIN units_of_measure u ON u.id = r.uom_id
+                WHERE %s%s
+                GROUP BY CASE WHEN u.to_base IS NULL THEN u.id::text ELSE lower(u.dimension) END
                 """.formatted(LOTS, scope.facility("i.facility_id")), params);
         Map<String, Object> results = jdbc.queryForMap("""
                 SELECT count(*) FILTER (WHERE r.evaluation = 'FAIL') AS failed,
@@ -122,7 +132,7 @@ public class AnalyticsService {
                 count(capas, "open"),
                 count(capas, "overdue"),
                 rate(count(lots, "rejected"), count(lots, "lots")),
-                rate((BigDecimal) lots.get("rejected_quantity"), (BigDecimal) lots.get("quantity")),
+                quantityRate(byKind),
                 rate(count(results, "failed"), count(results, "measured")),
                 rate(count(firstPass, "passed"), count(firstPass, "batches")),
                 inspections.get("hours") == null ? null : round(((Number) inspections.get("hours")).doubleValue()));
@@ -288,12 +298,23 @@ public class AnalyticsService {
         return whole == 0 ? null : round(100.0 * part / whole);
     }
 
-    private static Double rate(BigDecimal part, BigDecimal whole) {
-        if (whole == null || whole.signum() == 0) {
-            return null;
+    /** The rejected share of each kind of quantity, weighed by the lots of that kind. */
+    private static Double quantityRate(List<Map<String, Object>> byKind) {
+        BigDecimal weighted = BigDecimal.ZERO;
+        long lots = 0;
+        for (Map<String, Object> kind : byKind) {
+            BigDecimal whole = (BigDecimal) kind.get("quantity");
+            if (whole == null || whole.signum() == 0) {
+                continue;
+            }
+            BigDecimal part = kind.get("rejected_quantity") == null ? BigDecimal.ZERO
+                    : (BigDecimal) kind.get("rejected_quantity");
+            long count = count(kind, "lots");
+            weighted = weighted.add(part.divide(whole, 12, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(count)));
+            lots += count;
         }
-        BigDecimal rejected = part == null ? BigDecimal.ZERO : part;
-        return rejected.multiply(BigDecimal.valueOf(100)).divide(whole, 1, RoundingMode.HALF_UP).doubleValue();
+        return lots == 0 ? null : weighted.multiply(BigDecimal.valueOf(100))
+                .divide(BigDecimal.valueOf(lots), 1, RoundingMode.HALF_UP).doubleValue();
     }
 
     private static double round(double value) {

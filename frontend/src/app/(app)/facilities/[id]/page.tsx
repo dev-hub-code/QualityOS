@@ -9,6 +9,7 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
+import { daysToMask, describeDays, WEEKDAYS } from "@/lib/manufacturing";
 import { FACILITY_FIELDS } from "@/lib/record-fields";
 import type { FieldDef } from "@/lib/record-form";
 import type { FacilityDetail } from "@/lib/types";
@@ -21,7 +22,17 @@ const SHIFT_FIELDS: FieldDef[] = [
   { name: "name", label: "Name", required: true },
   { name: "startsAt", label: "Starts at", type: "time", required: true },
   { name: "endsAt", label: "Ends at", type: "time", required: true },
+  { name: "breakMinutes", label: "Break, in minutes", type: "decimal" },
+  ...WEEKDAYS.map((day) => ({ name: `day${day}`, label: `Works on ${day}`, type: "checkbox" as const })),
 ];
+
+/** The form's day boxes as the API's days of the week. */
+function shiftRequest(values: Record<string, unknown>) {
+  const { name, startsAt, endsAt, breakMinutes } = values;
+  return { name, startsAt, endsAt, breakMinutes: breakMinutes ?? 0, daysOfWeek: daysToMask(WEEKDAYS.map((day) => values[`day${day}`] === true)) };
+}
+
+const SHIFT_DEFAULTS = { breakMinutes: "0", ...Object.fromEntries(WEEKDAYS.map((day) => [`day${day}`, true])) };
 
 type Dialog = "edit" | "department" | "line" | "shift" | null;
 
@@ -116,7 +127,7 @@ export default function FacilityPage() {
           <UnitList
             items={shifts.map((shift) => ({
               id: shift.id,
-              label: `${shift.name} (${shift.startsAt.slice(0, 5)}–${shift.endsAt.slice(0, 5)})`,
+              label: `${shift.name} (${shift.startsAt.slice(0, 5)}–${shift.endsAt.slice(0, 5)}, ${describeDays(shift.daysOfWeek)}${shift.breakMinutes > 0 ? `, ${shift.breakMinutes} min break` : ""})`,
             }))}
             onRemove={remover("shifts")}
           />
@@ -147,8 +158,9 @@ export default function FacilityPage() {
         <RecordDialog
           title="Add shift"
           fields={SHIFT_FIELDS}
+          record={SHIFT_DEFAULTS}
           onClose={() => setDialog(null)}
-          onSubmit={(values) => api.post(`${path}/shifts`, values).then(refresh)}
+          onSubmit={(values) => api.post(`${path}/shifts`, shiftRequest(values)).then(refresh)}
         />
       )}
     </div>

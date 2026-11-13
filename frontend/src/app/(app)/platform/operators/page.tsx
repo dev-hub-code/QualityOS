@@ -33,7 +33,13 @@ const ROLE_NAME: Record<string, string> = {
   READ_ONLY_AUDITOR: "Read-only Auditor",
 };
 
-type Change = { operator: PlatformOperator; active: boolean; role?: boolean };
+type Change = { operator: PlatformOperator; active: boolean; role?: boolean; authenticator?: boolean };
+
+const AUTHENTICATOR: Record<PlatformOperator["secondFactor"], string> = {
+  NONE: "Not set up",
+  PENDING: "Being set up",
+  ENROLLED: "Set up",
+};
 
 export default function PlatformOperatorsPage() {
   const refresh = useRefresh();
@@ -63,6 +69,7 @@ export default function PlatformOperatorsPage() {
                 <TableHead>Operator</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>State</TableHead>
+                <TableHead>Authenticator</TableHead>
                 <TableHead>Added</TableHead>
                 <TableHead>Last action</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -73,18 +80,21 @@ export default function PlatformOperatorsPage() {
                 <TableRow key={operator.userId}>
                   <TableCell>
                     <div className="font-medium">{operator.fullName}</div>
-                    <div className="text-sm text-muted-foreground">{operator.email}</div>
+                    <div className="text-sm [overflow-wrap:anywhere] text-muted-foreground">{operator.email}</div>
                   </TableCell>
                   <TableCell>{ROLE_NAME[operator.role] ?? operator.role}</TableCell>
                   <TableCell>
                     <StatusBadge status={operator.deactivatedAt ? "DEACTIVATED" : "ACTIVE"} />
                   </TableCell>
+                  <TableCell className="whitespace-nowrap">{AUTHENTICATOR[operator.secondFactor]}</TableCell>
                   <TableCell>
-                    {formatDate(operator.addedAt)}
-                    {operator.addedBy ? ` by ${operator.addedBy}` : ""}
+                    <div className="whitespace-nowrap">{formatDate(operator.addedAt)}</div>
+                    {operator.addedBy && (
+                      <div className="text-sm [overflow-wrap:anywhere] text-muted-foreground">by {operator.addedBy}</div>
+                    )}
                   </TableCell>
-                  <TableCell>{operator.lastActivity ? formatDate(operator.lastActivity) : "None"}</TableCell>
-                  <TableCell className="space-x-2 text-right whitespace-nowrap">
+                  <TableCell className="whitespace-nowrap">{operator.lastActivity ? formatDate(operator.lastActivity) : "None"}</TableCell>
+                  <TableCell className="text-right min-w-36 whitespace-normal [&>*]:m-0.5">
                     <RecordLink href={`/platform/audit-logs?q=${encodeURIComponent(operator.email)}`}>Activity</RecordLink>
                     {manage && (
                       <>
@@ -98,6 +108,15 @@ export default function PlatformOperatorsPage() {
                         >
                           {operator.deactivatedAt ? "Reactivate" : "Deactivate"}
                         </Button>
+                        {operator.secondFactor !== "NONE" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setChange({ operator, active: true, authenticator: true })}
+                          >
+                            Reset authenticator
+                          </Button>
+                        )}
                       </>
                     )}
                   </TableCell>
@@ -122,14 +141,29 @@ export default function PlatformOperatorsPage() {
       {change && (
         <RecordDialog
           title={
-            change.role
-              ? `Change role of ${change.operator.email}`
-              : `${change.active ? "Reactivate" : "Deactivate"} ${change.operator.email}`
+            change.authenticator
+              ? `Reset the authenticator of ${change.operator.email}`
+              : change.role
+                ? `Change role of ${change.operator.email}`
+                : `${change.active ? "Reactivate" : "Deactivate"} ${change.operator.email}`
           }
           fields={change.role ? CHANGE_FIELDS : [REASON_FIELD]}
           record={{ role: change.operator.role }}
+          extra={
+            change.authenticator ? (
+              <p className="text-sm text-muted-foreground">
+                For a lost phone. They are told by email, and set up a new authenticator app the next time they open
+                the Control Center.
+              </p>
+            ) : undefined
+          }
           onClose={() => setChange(null)}
           onSubmit={async ({ reason, role }) => {
+            if (change.authenticator) {
+              await api.post(`/platform/operators/${change.operator.userId}/second-factor/reset`, { reason });
+              await refresh();
+              return;
+            }
             await api.put(`/platform/operators/${change.operator.userId}`, {
               reason,
               role: role ?? change.operator.role,

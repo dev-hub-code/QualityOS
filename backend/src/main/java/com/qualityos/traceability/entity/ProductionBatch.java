@@ -58,6 +58,16 @@ public class ProductionBatch extends TenantOwnedEntity {
         status = Status.COMPLETED;
     }
 
+    /** The inspection this batch is ready for at its stage, if any: in-process on the line, final once complete. */
+    public java.util.Optional<String> dueInspection() {
+        return switch (status) {
+            case IN_PROGRESS -> java.util.Optional.of(IN_PROCESS);
+            case COMPLETED -> java.util.Optional.of(FINAL);
+            case ON_HOLD -> java.util.Optional.of(producedQuantity == null ? IN_PROCESS : FINAL);
+            case RELEASED, REJECTED -> java.util.Optional.empty();
+        };
+    }
+
     public void requireInspectable(String inspectionType) {
         if (IN_PROCESS.equals(inspectionType)) {
             // A batch held for rework is re-inspected, which is the only way it gets back on the line.
@@ -91,6 +101,20 @@ public class ProductionBatch extends TenantOwnedEntity {
             case "REJECT" -> status = Status.REJECTED;
             default -> status = Status.ON_HOLD;
         }
+    }
+
+    /**
+     * A measurement behind it is in doubt. It waits for a new inspection: in-process while it is still being made,
+     * final once it is. What already left stays out. A rejected or held batch has nothing more to hold.
+     *
+     * @return whether the batch was put on hold
+     */
+    public boolean holdForReinspection() {
+        if (status == Status.REJECTED || status == Status.ON_HOLD) {
+            return false;
+        }
+        status = Status.ON_HOLD;
+        return true;
     }
 
     private void resume() {

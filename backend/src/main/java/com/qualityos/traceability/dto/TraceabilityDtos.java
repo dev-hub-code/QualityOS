@@ -54,7 +54,9 @@ public final class TraceabilityDtos {
     public record ConsumeRequest(
             UUID receiptItemId,
             UUID parentBatchId,
-            @NotNull @Positive @Digits(integer = 12, fraction = 6) BigDecimal quantity) {
+            @NotNull @Positive @Digits(integer = 12, fraction = 6) BigDecimal quantity,
+            /* The unit the quantity is in. Left out, it is the lot's or batch's own unit. */
+            UUID uomId) {
     }
 
     public record CompleteBatchRequest(
@@ -133,6 +135,7 @@ public final class TraceabilityDtos {
             UUID productId,
             String productCode,
             String productName,
+            UUID uomId,
             UUID facilityId,
             String status,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal plannedQuantity,
@@ -150,7 +153,12 @@ public final class TraceabilityDtos {
             UUID id,
             String sourceBatch,
             String description,
+            /* In the source's unit, which is what was taken from it. */
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
+            UUID uomId,
+            /* As typed, when it was typed in another unit or named one. */
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal enteredQuantity,
+            UUID enteredUomId,
             Instant at,
             String reversalReason) {
     }
@@ -164,11 +172,16 @@ public final class TraceabilityDtos {
             @Size(max = 1000) List<@NotBlank @Size(max = 100) String> serialNumbers) {
     }
 
+    /**
+     * @param recallOverrideReason why goods under an open recall must still go out. Only someone who can manage recalls
+     *     may give one, and it is ignored when nothing in the dispatch is under recall
+     */
     public record CreateDispatchRequest(
             @NotNull UUID customerId,
             @NotNull LocalDate dispatchedOn,
             @Size(max = 200) String reference,
-            @NotEmpty List<@Valid DispatchItemRequest> items) {
+            @NotEmpty List<@Valid DispatchItemRequest> items,
+            @Size(max = 1000) String recallOverrideReason) {
     }
 
     public record DispatchLine(
@@ -280,6 +293,7 @@ public final class TraceabilityDtos {
             String code,
             String name,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
+            UUID uomId,
             String status,
             String supplierName,
             String supplierBatch,

@@ -1,0 +1,9 @@
+Subject: Your ProductionOS authenticator was reset
+
+Your authenticator was reset
+
+Hello {{recipientName}},
+A Super Admin removed the authenticator app from your ProductionOS account. The next time you open the Control Center, you will be asked to set up a new one.
+If you did not ask for this, tell a Super Admin.
+
+Sign in: {{actionUrl}}

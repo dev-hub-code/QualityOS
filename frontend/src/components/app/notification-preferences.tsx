@@ -43,7 +43,7 @@ export function NotificationPreferences() {
   });
   return (
     <section className="space-y-3">
-      <h2 className="font-medium">Email me when</h2>
+      <h2 className="text-base font-semibold text-[#1b2a55]">Email me when</h2>
       <p className="text-sm text-muted-foreground">These always appear under Notifications in the app.</p>
       <FormError message={update.error?.message} />
       {data?.map(({ type, emailEnabled }) => (

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
+import { ProductManufacturing } from "@/components/manufacturing/product-manufacturing";
 import { AttachmentPanel } from "@/components/records/attachment-panel";
 import {
   Details,
@@ -36,6 +37,7 @@ export default function ProductPage() {
   const { id } = useParams<{ id: string }>();
   const path = `/products/${id}`;
   const canManage = usePermission("PRODUCT_MANAGE");
+  const canSeeManufacturing = usePermission("MANUFACTURING_VIEW");
   const units = useUnits();
   const categories = useProductCategories();
   const materials = useMaterials();
@@ -113,6 +115,7 @@ export default function ProductPage() {
           ))}
         </ul>
       </Section>
+      {canSeeManufacturing && <ProductManufacturing productId={id} />}
       <AttachmentPanel entityType="PRODUCT" entityId={id} canManage={canManage} />
       {dialog === "edit" && (
         <RecordDialog

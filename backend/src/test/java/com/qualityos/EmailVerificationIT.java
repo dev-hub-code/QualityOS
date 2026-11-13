@@ -78,7 +78,7 @@ class EmailVerificationIT extends AbstractIntegrationTest {
         verify(mail.awaitToken(email, "Confirm")).andExpect(status().isNoContent());
         Thread.sleep(200);
         assertThat(mail.to(email)).extracting(message -> message.subject())
-                .containsExactly("Confirm your QualityOS email address", "Welcome to QualityOS");
+                .containsExactly("Confirm your ProductionOS email address", "Welcome to ProductionOS");
     }
 
     private String pendingToken(String email) throws Exception {

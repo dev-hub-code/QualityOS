@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jayway.jsonpath.JsonPath;
 import com.qualityos.calibration.service.QrCodes;
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -59,6 +60,41 @@ class CalibrationIT extends TraceabilityFixture {
                 Map.of("instrumentIds", List.of(instrument))));
     }
 
+    /** Inspects and accepts the goods, measured with {@code instrument} when there is one. */
+    private String accepted(String subjectKey, String subject, String type, String instrument) throws Exception {
+        String inspection = idOf(body(inspect(subjectKey, subject, type).andExpect(status().isCreated())));
+        String path = "/api/v1/inspections/" + inspection;
+        if (instrument != null) {
+            use(inspection, instrument).andExpect(status().isOk());
+        }
+        as(owner, postJson(path + "/execute", Map.of("results", List.of(
+                        Map.of("parameterCode", "DIA", "sampleNumber", 1, "valueNumeric", "20.0")))))
+                .andExpect(status().isOk());
+        as(owner, postJson(path + "/submit", Map.of())).andExpect(status().isOk());
+        as(manager, postJson(path + "/approve", Map.of())).andExpect(status().isOk());
+        as(manager, postJson(path + "/disposition", Map.of("disposition", "ACCEPT"))).andExpect(status().isOk());
+        return inspection;
+    }
+
+    private record Inspected(String batch, String inspection) {
+    }
+
+    private Inspected acceptedBatch(String instrument) throws Exception {
+        String batch = startBatch(product());
+        Lot lot = releasedLot("10");
+        consumeLot(batch, lot.id(), "10").andExpect(status().isOk());
+        complete(batch, "10").andExpect(status().isOk());
+        return new Inspected(batch, accepted("productionBatchId", batch, "FQC", instrument));
+    }
+
+    private ResultActions decide(String instrument, String inspection, String decision) throws Exception {
+        String path = INSTRUMENTS + "/" + instrument + "/impact-reviews";
+        List<String> ids = JsonPath.read(body(as(owner, get(path))),
+                "$.data[0].reviews[?(@.inspectionId == '" + inspection + "')].id");
+        return as(owner, postJson(path + "/" + ids.getFirst() + "/decision",
+                Map.of("decision", decision, "note", "Checked against the reference gauge")));
+    }
+
     private static String days(int offset) {
         return LocalDate.now().plusDays(offset).toString();
     }
@@ -108,6 +144,143 @@ class CalibrationIT extends TraceabilityFixture {
         calibrate(id, days(0), "ADJUSTED").andExpect(status().isCreated());
         as(owner, get(INSTRUMENTS + "/" + id)).andExpect(jsonPath("$.data.status").value("ACTIVE"));
         as(owner, get(INSTRUMENTS + "/" + id + "/usage")).andExpect(jsonPath("$.data[0].suspect").value(false));
+    }
+
+    @Test
+    void aFailureRaisesAnNcrAndAsksForADecisionOnEachInspectionInDoubt() throws Exception {
+        String id = instrument(days(30));
+        calibrate(id, days(-10), "PASS").andExpect(status().isCreated());
+        String inspection = inspection();
+        use(inspection, id).andExpect(status().isOk());
+
+        String failed = idOf(body(calibrate(id, days(0), "FAIL").andExpect(status().isCreated())));
+
+        String path = INSTRUMENTS + "/" + id + "/impact-reviews";
+        String groups = body(as(owner, get(path))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].calibrationId").value(failed))
+                .andExpect(jsonPath("$.data[0].pending").value(1))
+                .andExpect(jsonPath("$.data[0].ncrStatus").value("OPEN"))
+                .andExpect(jsonPath("$.data[0].reviews[0].inspectionId").value(inspection))
+                .andExpect(jsonPath("$.data[0].reviews[0].decision").doesNotExist()));
+        String ncr = JsonPath.read(groups, "$.data[0].ncrId");
+        String review = JsonPath.read(groups, "$.data[0].reviews[0].id");
+        as(owner, get("/api/v1/ncrs/" + ncr))
+                .andExpect(jsonPath("$.data.source").value("CALIBRATION"))
+                .andExpect(jsonPath("$.data.instrumentId").value(id))
+                .andExpect(jsonPath("$.data.severity").value("MAJOR"));
+        as(owner, postJson("/api/v1/ncrs/" + ncr + "/cancel", Map.of("note", "Not needed")))
+                .andExpect(status().isUnprocessableEntity());
+        as(owner, get("/api/v1/inspections/" + inspection))
+                .andExpect(jsonPath("$.data.instruments[0].impactReview").value("PENDING"));
+
+        calibrate(id, days(0), "ADJUSTED").andExpect(status().isCreated());
+        as(owner, get(path)).andExpect(jsonPath("$.data[0].pending").value(1));
+
+        Session viewer = addMember(owner, "VIEWER");
+        as(viewer, postJson(path + "/" + review + "/decision", Map.of("decision", "REINSPECT", "note", "Re-measure")))
+                .andExpect(status().isForbidden());
+        as(owner, postJson(path + "/" + review + "/decision", Map.of("decision", "REINSPECT")))
+                .andExpect(status().isBadRequest());
+        // Still open, it has released nothing to hold.
+        as(owner, postJson(path + "/" + review + "/decision",
+                        Map.of("decision", "REINSPECT", "note", "Drift exceeds the DIA tolerance")))
+                .andExpect(status().isUnprocessableEntity());
+        as(owner, postJson(path + "/" + review + "/decision",
+                        Map.of("decision", "RESULT_STANDS", "note", "Drift is well inside the DIA tolerance")))
+                .andExpect(jsonPath("$.data.decision").value("RESULT_STANDS"))
+                .andExpect(jsonPath("$.data.decidedByName").isNotEmpty());
+        as(owner, postJson(path + "/" + review + "/decision", Map.of("decision", "REINSPECT", "note", "Changed mind")))
+                .andExpect(status().isUnprocessableEntity());
+        as(owner, get(path)).andExpect(jsonPath("$.data[0].pending").value(0));
+        as(owner, get("/api/v1/inspections/" + inspection))
+                .andExpect(jsonPath("$.data.instruments[0].impactReview").value("RESULT_STANDS"));
+        assertThatThrownBy(() -> asAppRole(owner.tenantId(), sql -> sql.update(
+                "UPDATE calibration_impact_reviews SET decision = 'REINSPECT' WHERE id = ?", UUID.fromString(review))))
+                .isInstanceOf(DataAccessException.class);
+    }
+
+    @Test
+    void reinspectHoldsTheBatchAndTheNcrClosesOnlyOnceEveryInspectionIsDecided() throws Exception {
+        updateSettings(owner, Map.of("capaRequiredFrom", "NEVER"));
+        String id = instrument(days(30));
+        calibrate(id, days(-10), "PASS").andExpect(status().isCreated());
+        Inspected doubtedBatch = acceptedBatch(id);
+        Inspected trustedBatch = acceptedBatch(id);
+        String doubted = doubtedBatch.batch();
+        String trusted = trustedBatch.batch();
+        String customer = customer();
+        dispatch(customer, doubted, "2", List.of()).andExpect(status().isCreated());
+        calibrate(id, days(0), "FAIL").andExpect(status().isCreated());
+
+        String groups = body(as(owner, get(INSTRUMENTS + "/" + id + "/impact-reviews"))
+                .andExpect(jsonPath("$.data[0].pending").value(2)));
+        String ncr = "/api/v1/ncrs/" + JsonPath.read(groups, "$.data[0].ncrId");
+        as(owner, postJson(ncr + "/assign", Map.of("assigneeId", manager.userId()))).andExpect(status().isOk());
+        as(owner, postJson(ncr + "/containment", Map.of("containmentAction", "Instrument withdrawn")))
+                .andExpect(status().isOk());
+        String category = idOf(body(as(owner, postJson("/api/v1/defect-categories",
+                Map.of("code", "M" + code(), "name", "Measurement"))).andExpect(status().isCreated())));
+        as(owner, postJson(ncr + "/investigation", Map.of("rootCause", "Dropped caliper", "defectCategoryId", category)))
+                .andExpect(status().isOk());
+        as(owner, postJson(ncr + "/request-verification", Map.of("note", "Reviewed"))).andExpect(status().isOk());
+        as(manager, postJson(ncr + "/close", Map.of("note", "Done")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("2 still waiting")));
+
+        decide(id, doubtedBatch.inspection(), "REINSPECT").andExpect(status().isOk());
+        assertThat(statusOf(doubted)).isEqualTo("ON_HOLD");
+        dispatch(customer, doubted, "1", List.of()).andExpect(status().isUnprocessableEntity());
+        as(manager, postJson(ncr + "/close", Map.of("note", "Done")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("1 still waiting")));
+
+        decide(id, trustedBatch.inspection(), "RESULT_STANDS").andExpect(status().isOk());
+        assertThat(statusOf(trusted)).isEqualTo("RELEASED");
+        as(manager, postJson(ncr + "/close", Map.of("note", "Done")))
+                .andExpect(jsonPath("$.data.status").value("CLOSED"));
+
+        accepted("productionBatchId", doubted, "FQC", null);
+        assertThat(statusOf(doubted)).isEqualTo("RELEASED");
+        dispatch(customer, doubted, "1", List.of()).andExpect(status().isCreated());
+    }
+
+    @Test
+    void reinspectSendsAReleasedLotBackForInspection() throws Exception {
+        String id = instrument(days(30));
+        calibrate(id, days(-10), "PASS").andExpect(status().isCreated());
+        Lot lot = lot(material(owner, true), "10");
+        String inspection = accepted("receiptItemId", lot.id(), "IQC", id);
+        String batch = startBatch(product());
+        consumeLot(batch, lot.id(), "4").andExpect(status().isOk());
+        calibrate(id, days(0), "FAIL").andExpect(status().isCreated());
+
+        decide(id, inspection, "REINSPECT").andExpect(status().isOk());
+        consumeLot(batch, lot.id(), "1").andExpect(status().isUnprocessableEntity());
+
+        accepted("receiptItemId", lot.id(), "IQC", null);
+        consumeLot(batch, lot.id(), "1").andExpect(status().isOk());
+    }
+
+    @Test
+    void aFailureWithNothingInDoubtRaisesNoNcr() throws Exception {
+        String id = instrument(days(30));
+        calibrate(id, days(0), "FAIL").andExpect(status().isCreated());
+        as(owner, get(INSTRUMENTS + "/" + id + "/impact-reviews")).andExpect(jsonPath("$.data.length()").value(0));
+        as(owner, get("/api/v1/ncrs?size=100")).andExpect(jsonPath("$.data.totalItems").value(0));
+    }
+
+    @Test
+    void anotherOrganisationCannotDecideAReview() throws Exception {
+        String id = instrument(days(30));
+        calibrate(id, days(-10), "PASS").andExpect(status().isCreated());
+        use(inspection(), id).andExpect(status().isOk());
+        calibrate(id, days(0), "FAIL").andExpect(status().isCreated());
+        String review = JsonPath.read(body(as(owner, get(INSTRUMENTS + "/" + id + "/impact-reviews"))),
+                "$.data[0].reviews[0].id");
+        Session stranger = register();
+        as(stranger, postJson(INSTRUMENTS + "/" + id + "/impact-reviews/" + review + "/decision",
+                        Map.of("decision", "RESULT_STANDS", "note", "x")))
+                .andExpect(status().isNotFound());
     }
 
     @Test

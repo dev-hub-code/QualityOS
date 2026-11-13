@@ -1,21 +1,20 @@
 "use client";
 
-import { QualityDashboard } from "@/components/analytics/quality-dashboard";
+import { QualityDashboard, Welcome } from "@/components/analytics/quality-dashboard";
+import { DashboardFrame } from "@/components/app/showcase";
 import { useMe, usePermission } from "@/hooks/use-me";
 
 export default function DashboardPage() {
   const { data: me } = useMe();
   const canSeeQuality = usePermission("REPORT_VIEW");
+  const name = me?.user.fullName;
 
+  if (canSeeQuality) return <QualityDashboard name={name} />;
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Welcome, {me?.user.fullName}</h1>
-        {!canSeeQuality && (
-          <p className="text-muted-foreground">Use the menu to reach the work assigned to you.</p>
-        )}
-      </div>
-      {canSeeQuality && <QualityDashboard />}
-    </div>
+    <DashboardFrame>
+      <Welcome name={name}>
+        <p className="max-w-lg text-base text-slate-600 sm:text-lg">Use the menu to reach the work assigned to you.</p>
+      </Welcome>
+    </DashboardFrame>
   );
 }

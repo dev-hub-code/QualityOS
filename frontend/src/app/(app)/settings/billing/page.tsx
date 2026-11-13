@@ -43,7 +43,7 @@ function PlanCard({
 }) {
   const price = cycle === "ANNUAL" ? plan.annualPrice : plan.monthlyPrice;
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-4">
+    <div className="flex flex-col gap-2 glass rounded-2xl p-4">
       <h3 className="font-medium">{plan.name}</h3>
       <p className="text-sm text-muted-foreground">{plan.description}</p>
       <p className="text-xl font-semibold">

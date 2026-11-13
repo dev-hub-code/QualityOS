@@ -23,14 +23,14 @@ export function EmailLanguage() {
   if (!me) return null;
   return (
     <section className="space-y-3">
-      <h2 className="font-medium">Email language</h2>
+      <h2 className="text-base font-semibold text-[#1b2a55]">Email language</h2>
       <FormError message={update.error?.message} />
       <Label htmlFor="email-language" className="font-normal">
         Send my emails in
       </Label>
       <select
         id="email-language"
-        className="h-9 w-full rounded-md border bg-background px-3 text-sm sm:w-72"
+        className="h-9 w-full rounded-xl border bg-white/70 px-3 text-sm sm:w-72"
         value={me.user.language ?? ""}
         disabled={update.isPending}
         onChange={(event) => update.mutate(event.target.value)}

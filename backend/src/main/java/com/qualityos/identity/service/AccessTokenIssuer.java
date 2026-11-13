@@ -2,6 +2,7 @@ package com.qualityos.identity.service;
 
 import com.qualityos.common.security.JwtProperties;
 import com.qualityos.common.security.TenantJwtAuthenticationConverter;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -23,16 +24,28 @@ class AccessTokenIssuer {
         this.properties = properties;
     }
 
+    /** How long an operator has to enter the code from their authenticator app after the password. */
+    static final Duration SECOND_FACTOR_TTL = Duration.ofMinutes(5);
+
     String issue(UUID userId, UUID tenantId) {
-        return encode(claims(userId).claim(TenantJwtAuthenticationConverter.TENANT_CLAIM, tenantId.toString()));
+        return encode(claims(userId, properties.accessTokenTtl())
+                .claim(TenantJwtAuthenticationConverter.TENANT_CLAIM, tenantId.toString()));
     }
 
     /** Has no tenant, and security allows it nothing beyond asking about its own verification. */
     String issuePendingVerification(UUID userId) {
-        return encode(claims(userId).claim(TenantJwtAuthenticationConverter.PENDING_VERIFICATION_CLAIM, true));
+        return encode(claims(userId, properties.accessTokenTtl())
+                .claim(TenantJwtAuthenticationConverter.PENDING_VERIFICATION_CLAIM, true));
     }
 
-    private JwtClaimsSet.Builder claims(UUID userId) {
+    /** Proves the password for an operator who still has to enter a code. No endpoint accepts it as a session. */
+    String issueSecondFactorChallenge(UUID userId, UUID tenantId) {
+        return encode(claims(userId, SECOND_FACTOR_TTL)
+                .claim(TenantJwtAuthenticationConverter.TENANT_CLAIM, tenantId.toString())
+                .claim(TenantJwtAuthenticationConverter.SECOND_FACTOR_CLAIM, true));
+    }
+
+    private JwtClaimsSet.Builder claims(UUID userId, Duration ttl) {
         Instant now = Instant.now();
         return JwtClaimsSet.builder()
                 .id(UUID.randomUUID().toString())
@@ -40,7 +53,7 @@ class AccessTokenIssuer {
                 .audience(List.of(properties.audience()))
                 .subject(userId.toString())
                 .issuedAt(now)
-                .expiresAt(now.plus(properties.accessTokenTtl()));
+                .expiresAt(now.plus(ttl));
     }
 
     private String encode(JwtClaimsSet.Builder claims) {

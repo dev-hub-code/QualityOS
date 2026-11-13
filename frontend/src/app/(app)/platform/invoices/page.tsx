@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { formatDate, formatMoney } from "@/components/billing/subscription-banner";
 import { RecordPaymentDialog } from "@/components/platform/billing-dialogs";
-import { Details, PageHeader, QueryState } from "@/components/records/parts";
+import { Details, PageHeader, QueryState, StatusBadge } from "@/components/records/parts";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ import type { Invoice, InvoiceList, PlatformInvoice } from "@/lib/types";
 
 const PAGE_SIZE = 25;
 const NO_FILTER = { q: "", status: "", overdue: "", from: "", to: "", min: "", max: "" };
-const SELECT_CLASS = "h-9 rounded-md border bg-background px-2 text-sm";
+const SELECT_CLASS = "h-9 rounded-xl border bg-white/70 px-2 text-sm";
 
 const period = ({ periodStartsAt, periodEndsAt }: PlatformInvoice) =>
   periodStartsAt && periodEndsAt ? `${formatDate(periodStartsAt)} to ${formatDate(periodEndsAt)}` : "Starts on payment";
@@ -171,8 +171,11 @@ export default function PlatformInvoicesPage() {
                     <TableCell className="text-right">{formatMoney(row.paid)}</TableCell>
                     <TableCell className="text-right">{formatMoney(row.outstanding)}</TableCell>
                     <TableCell>{formatDate(row.dueOn)}</TableCell>
-                    <TableCell>{row.status.toLowerCase()}</TableCell>
-                    <TableCell className="space-x-2 whitespace-nowrap">
+                    <TableCell>
+                      <StatusBadge status={row.status} />
+                    </TableCell>
+                    <TableCell className="min-w-56 whitespace-normal">
+                      <div className="flex flex-wrap justify-end gap-1.5">
                       <Button size="sm" variant="outline" onClick={() => setViewing(row)}>
                         View
                       </Button>
@@ -187,6 +190,7 @@ export default function PlatformInvoicesPage() {
                       >
                         PDF
                       </a>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

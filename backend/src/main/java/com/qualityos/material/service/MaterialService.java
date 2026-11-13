@@ -27,6 +27,7 @@ import com.qualityos.material.repository.MaterialRepository;
 import com.qualityos.material.repository.MaterialSpecificationRepository;
 import com.qualityos.material.repository.ProductCategoryRepository;
 import com.qualityos.material.repository.UnitOfMeasureRepository;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
@@ -156,16 +157,40 @@ public class MaterialService implements AttachmentPolicy {
             throw new ConflictException("This unit already exists.");
         }
         return mapper.toResponse(units.save(
-                new UnitOfMeasure(tenantId, code, request.name().trim(), request.dimension().trim())));
+                new UnitOfMeasure(tenantId, code, request.name().trim(), request.dimension().trim(), request.toBase())));
+    }
+
+    /**
+     * A quantity entered in one unit, in another unit of the same kind.
+     *
+     * @throws BusinessRuleException when the units measure different things, or the result is too small to keep
+     */
+    @Transactional(readOnly = true)
+    public BigDecimal convert(BigDecimal quantity, UUID from, UUID to) {
+        if (from.equals(to)) {
+            return quantity;
+        }
+        UnitOfMeasure source = visibleUnit(from);
+        UnitOfMeasure target = visibleUnit(to);
+        BigDecimal converted = source.convert(quantity, target).orElseThrow(() -> new BusinessRuleException(
+                "A quantity in %s cannot be converted to %s.".formatted(source.getCode(), target.getCode())));
+        if (converted.signum() <= 0) {
+            throw new BusinessRuleException(
+                    "That is less than 0.000001 %s, too little to record.".formatted(target.getCode()));
+        }
+        return converted;
     }
 
     @Transactional(readOnly = true)
     public void requireUnit(UUID id) {
-        boolean visible = units.findVisible(TenantContext.getCurrentTenantId()).stream()
-                .anyMatch(unit -> unit.getId().equals(id));
-        if (!visible) {
-            throw new BusinessRuleException("This unit of measure does not exist.");
-        }
+        visibleUnit(id);
+    }
+
+    private UnitOfMeasure visibleUnit(UUID id) {
+        return units.findVisible(TenantContext.getCurrentTenantId()).stream()
+                .filter(unit -> unit.getId().equals(id))
+                .findFirst()
+                .orElseThrow(() -> new BusinessRuleException("This unit of measure does not exist."));
     }
 
     @Transactional(readOnly = true)

@@ -1,17 +1,23 @@
 # Platform administration
 
-The Control Center is where the people who run QualityOS manage plans and customers. It lives in the main app at
-`/platform`, with its own navigation. It is built in phases, and this page describes what works today.
+The Control Center is where the people who run ProductionOS manage plans and customers. It lives in the main app at
+`/platform`, with its own navigation. It was built in five phases, all now built, and this page describes what works today.
 
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Dashboard, plans, organisation search and detail | Built |
-| 2 | Subscriptions, trials, invoices, payments | Not started |
-| 3 | Feature catalogue, usage limits, analytics | Not started |
-| 4 | Operators and roles, audit log, email log, jobs | Not started |
-| 5 | Support console, announcements, settings | Not started |
+| 2 | Subscriptions, trials, invoices, payments | Built |
+| 3 | Feature catalogue, usage limits, analytics | Built |
+| 4 | Operators and roles, audit log, email log, jobs | Built |
+| 5 | Support console, announcements, settings | Built |
 
 A page joins the navigation only once it works.
+
+Not built yet:
+
+- Refunds. A refund is made in Cashfree or the bank, and nothing in ProductionOS records it.
+- Partial payments and automatic renewal. Each invoice is paid in full, and each renewal is a new invoice.
+- Tickets raised by customers. Operators open support tickets on a customer's behalf.
 
 ## Online payment
 
@@ -19,13 +25,27 @@ Cashfree checkout appears on a customer's billing page once `CASHFREE_APP_ID` an
 them customers see no pay button, and invoices are recorded by hand as before. Set `CASHFREE_ENVIRONMENT=production` only
 with live keys, and point the Cashfree webhook at `<APP_URL>/api/webhooks/cashfree`.
 
-The amount comes from the invoice, and a payment counts only after QualityOS has asked Cashfree about it. Neither the
+The amount comes from the invoice, and a payment counts only after ProductionOS has asked Cashfree about it. Neither the
 customer's return nor a webhook's contents settle anything alone. Payments appear under Payments with provider `CASHFREE`.
 
 Search the audit log for `PAYMENT_NEEDS_REVIEW`. It means money was taken but could not be applied, usually because the
 invoice was replaced or already paid. Refund it in Cashfree, or record it by hand against the right invoice.
 
 ## Signing in
+
+An operator signs in with their password and then a six-digit code from an authenticator app on their phone. The
+first time an operator opens the Control Center, it shows nothing else until the app is set up: they scan a code
+(or type a key) and enter the code the app shows. From then on every sign-in asks for a code. A wrong code counts
+towards the same lockout as a wrong password, and a code works once. Anyone who is not an operator signs in with
+their password alone.
+
+The secret behind the codes is sealed in the database with `SECOND_FACTOR_KEY`, 32 random bytes in base64
+(`openssl rand -base64 32`). The local profile has a fixed key so that enrolments survive a restart; production
+does not start without one. Losing the key ends every enrolment: each operator sets up their app again.
+
+For a lost phone, a Super Admin opens Operators and resets that operator's authenticator, with a reason. The
+operator is told by email, and sets up a new app on their next visit. Setting up and resetting are both in the
+audit log, and the operator is emailed each time, so an app set up by somebody else does not go unnoticed.
 
 Every sign-in goes through `/start`. An operator lands on the Control Center and anyone else on their organisation's
 dashboard. This only picks the page; the backend refuses platform requests on its own. **Back to workspace** still takes
@@ -50,9 +70,13 @@ DELETE FROM subscriptions WHERE tenant_id = (
     SELECT m.tenant_id FROM tenant_memberships m JOIN users u ON u.id = m.user_id WHERE u.email = 'someone@example.com');
 ```
 
+The first operator is asked to set up an authenticator app the first time they open the Control Center.
+
 The same statement is the recovery process if no Super Admin can sign in. The application refuses to remove or demote
 the last active Super Admin, so this only arises when that account is lost. For a deactivated row, run
-`UPDATE platform_admins SET deactivated_at = NULL, role = 'SUPER_ADMIN' WHERE user_id = ...` instead.
+`UPDATE platform_admins SET deactivated_at = NULL, role = 'SUPER_ADMIN' WHERE user_id = ...` instead. If the last
+Super Admin has lost their phone, `DELETE FROM platform_second_factors WHERE user_id = ...` lets them set up a new
+app on their next visit.
 
 ## Operator roles
 
@@ -91,7 +115,9 @@ or bank details are replaced with `[hidden]` when shown or exported, and each ex
   cannot make them answer for an ordinary member.
 - Anything about one organisation is read under that organisation's own tenant context. Row-level security stays on.
 - The organisation page shows counts and event names, not the content of quality records.
-- Not yet built: re-authentication for sensitive actions, and separate operator roles. Both are Phase 4.
+- Sensitive actions need the password again, and each operator has a role. See Re-authentication and Operator roles.
+- Operators sign in with an authenticator code as well as their password, and the Control Center is closed to an
+  operator who has not set one up. See Signing in.
 
 ## Plans
 
@@ -107,8 +133,8 @@ Each saved state is kept in `subscription_plan_versions`, which the application 
 | Archive | Refused while anyone is on the plan, and for the trial plan. Cannot be undone |
 | Website visibility | Hides a plan from the public price list. It can still be chosen in the app while offered |
 
-Storage, monthly inspection, attachment and API limits are not offered yet, because nothing would enforce them. They
-come with Phase 3. All amounts are in INR. The database refuses another currency until conversion exists.
+Limits on users, facilities, storage, attachments and monthly inspections are described under Usage limits. API
+requests are not limited. All amounts are in INR. The database refuses another currency until conversion exists.
 
 ## States
 
@@ -120,7 +146,8 @@ come with Phase 3. All amounts are in INR. The database refuses another currency
 | Read-only | Grace has ended. Records can be read and exported, not changed |
 
 A cancelled subscription keeps its state until its period ends. There is no separate stored `EXPIRED` or `CANCELLED`
-state. Suspension does not exist yet (Phase 2).
+state. Suspension is separate again: it is set on the organisation, not the subscription, and stops members whatever
+the subscription's state (see Subscription lifecycle).
 
 ## Dashboard figures
 
@@ -170,15 +197,15 @@ Every action writes an audit row in that organisation's trail, with its reason.
 
 ### Payments
 
-Payments are recorded by hand against one invoice, and the amount must equal the invoice total, because partial payments are not part of the financial model. Failed attempts are kept and listed under the Failed filter. These are what needs following up.
+Payments are recorded by hand or arrive through Cashfree (see Online payment). Each pays one invoice, and the amount must equal the invoice total, because partial payments are not part of the financial model. Failed attempts are kept and listed under the Failed filter. These are what needs following up.
 
-A reference pays one invoice across the whole platform, ignoring case. Repeating it on the same invoice returns the first payment. The check reads existing payments, so two identical references saved at the same moment for different organisations could both pass it.
+A reference pays one invoice across the whole platform, ignoring case and provider. Repeating it on the same invoice returns the first payment, so a gateway callback can safely arrive twice. A unique index in the database enforces this, so two payments with the same reference arriving at the same moment for different organisations cannot both be saved: the second is refused as already used.
 
-There is no gateway. `SubscriptionService.settle` already takes a provider name and treats a repeated reference as a retry, so a gateway's webhook can call it. It needs its own signature check when one is chosen.
+Every payment, by hand or through Cashfree, goes through `SubscriptionService.settle`.
 
 ### GST on invoices
 
-**This is not reviewed by an accountant, and QualityOS does not claim GST compliance.**
+**This is not reviewed by an accountant, and ProductionOS does not claim GST compliance.**
 
 From this release, an invoice stores its tax treatment when issued, by comparing the state codes opening the seller's and buyer's GSTINs:
 
@@ -196,7 +223,7 @@ A feature is something a plan can include. Keep this apart from roles: a plan de
 
 Plans keep their `features` list, and any value sits beside it in `feature_values`. A value is a number, text or structured JSON. A blank number means unlimited.
 
-**A feature only restricts anything once the product enforces it.** Enforcement is code, in `PlanAccess`, and today covers `NCR_CAPA`, `REPORTS` and `ADVANCED`. The Features page marks anything else "Listed only, not enforced": it appears on plans and the website, but leaving it out takes nothing away.
+**A feature only restricts anything once the product enforces it.** Enforcement is code, in `PlanAccess`, and today covers `NCR_CAPA`, `REPORTS` and `ADVANCED`. The Features page shows these as "Restricted by the app". Every other feature is "Delivered by your team": it appears on plans and the website, but leaving it out of a plan takes nothing away in the product. Creating one needs the operator to confirm that, so a feature that looks like a paid module but unlocks nothing cannot be added by mistake. `PlatformEntitlementsIT` checks that an organisation without each enforced feature loses every permission it covers.
 
 An inactive feature cannot be added to another plan. Plans that have it keep it, and an enforced feature stays enforced. On a plan with subscribers, a change needs a reason, reaches them at once, and joins the plan's history.
 

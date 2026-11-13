@@ -59,8 +59,12 @@ export async function prepare(page: Page) {
   await call("POST", `/inspection-templates/${template}/publish`, { effectiveFrom: today });
 }
 
-/** A released batch of 10, dispatched in full but not yet confirmed as shipped. */
-export async function dispatchedBatch(page: Page, browser: Browser, serialNumbers: string[] = []) {
+/**
+ * A released batch of 10, dispatched in full but not yet confirmed as shipped.
+ *
+ * @param split ship it as two lines of 5 rather than one of 10
+ */
+export async function dispatchedBatch(page: Page, browser: Browser, serialNumbers: string[] = [], split = false) {
   await signUp(page);
   await prepare(page);
   const managerEmail = `manager-${unique()}@example.com`;
@@ -93,7 +97,12 @@ export async function dispatchedBatch(page: Page, browser: Browser, serialNumber
   await owner("POST", "/dispatches", {
     customerId: customers[0].id,
     dispatchedOn: new Date().toISOString().slice(0, 10),
-    items: [{ productionBatchId: batchId, quantity: String(serialNumbers.length || 10), serialNumbers }],
+    items: split
+      ? [
+          { productionBatchId: batchId, quantity: "5", serialNumbers: [] },
+          { productionBatchId: batchId, quantity: "5", serialNumbers: [] },
+        ]
+      : [{ productionBatchId: batchId, quantity: String(serialNumbers.length || 10), serialNumbers }],
   });
 
   return { batchId, batchNumber: made.batch.batchNumber as string, manager, facilityId: facilities.items[0].id };

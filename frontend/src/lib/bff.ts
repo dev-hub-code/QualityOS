@@ -4,6 +4,8 @@ import type { NextRequest, NextResponse } from "next/server";
 
 export const ACCESS_COOKIE = "qos_access";
 export const REFRESH_COOKIE = "qos_refresh";
+/** Proves an operator's password while their authenticator code is still to come. Never a session. */
+export const CHALLENGE_COOKIE = "qos_challenge";
 
 const REFRESH_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
 
@@ -16,6 +18,11 @@ export interface TokenResponse {
 
 export interface PendingVerificationSession {
   accessToken: string;
+  expiresInSeconds: number;
+}
+
+export interface SecondFactorChallenge {
+  challengeToken: string;
   expiresInSeconds: number;
 }
 
@@ -53,10 +60,21 @@ export function clearSessionCookies(response: NextResponse) {
   response.cookies.delete(REFRESH_COOKIE);
 }
 
+export function setChallengeCookie(response: NextResponse, challenge: SecondFactorChallenge) {
+  response.cookies.set(CHALLENGE_COOKIE, challenge.challengeToken, {
+    ...cookieOptions(),
+    maxAge: challenge.expiresInSeconds,
+  });
+}
+
+export function clearChallengeCookie(response: NextResponse) {
+  response.cookies.delete(CHALLENGE_COOKIE);
+}
+
 /** Headers carried from the browser request to the backend. */
 export function forwardedHeaders(request: NextRequest): Headers {
   const headers = new Headers();
-  for (const name of ["content-type", "accept", "x-correlation-id"]) {
+  for (const name of ["content-type", "accept", "x-correlation-id", "idempotency-key"]) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }

@@ -24,7 +24,11 @@ public final class InspectionDtos {
 
     /** Names one subject: a received lot, a production batch, or goods a customer returned. */
     public record CreateInspectionRequest(
-            UUID receiptItemId, UUID productionBatchId, UUID returnItemId, @NotNull UUID templateId) {
+            UUID receiptItemId,
+            UUID productionBatchId,
+            UUID returnItemId,
+            /* Left out, the one template that fits is used. */
+            UUID templateId) {
     }
 
     public record ExecuteRequest(@NotEmpty List<@Valid ResultRequest> results) {

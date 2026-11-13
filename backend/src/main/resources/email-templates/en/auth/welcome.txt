@@ -1,6 +1,6 @@
-Subject: Welcome to QualityOS
+Subject: Welcome to ProductionOS
 
-Welcome to QualityOS
+Welcome to ProductionOS
 
 Hello {{recipientName}},
 Your email address is confirmed and your account is ready. Sign in to finish setting up your organisation.

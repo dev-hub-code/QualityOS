@@ -8,3 +8,9 @@ logging:
   structured:
     format:
       console: ecs
+
+qualityos:
+  security:
+    second-factor:
+      # No default: production cannot start without the key that seals operators' authenticator secrets.
+      key: ${SECOND_FACTOR_KEY}

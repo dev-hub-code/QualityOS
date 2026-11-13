@@ -1,4 +1,4 @@
-Subject: आपकी QualityOS सदस्यता {{dueDate}} को समाप्त होगी
+Subject: आपकी ProductionOS सदस्यता {{dueDate}} को समाप्त होगी
 
 आपकी सदस्यता समाप्त होने वाली है
 

@@ -12,7 +12,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** One organisation using QualityOS. */
+/** One organisation using ProductionOS. */
 @Getter
 @Setter
 @Entity

@@ -392,6 +392,14 @@ public class DispatchReturnService {
         return reversal;
     }
 
+    /** Returned goods as they stand, without starting anything. */
+    @Transactional(readOnly = true)
+    public ReturnedGoods returnedGoods(UUID itemId) {
+        DispatchReversalItem item = reversalItems.findById(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Returned goods", itemId));
+        return new ReturnedGoods(item.getId(), item.getProductionBatchId(), item.getQuantity());
+    }
+
     private DispatchReversalItem lockItem(UUID id) {
         return reversalItems.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Returned goods", id));
     }

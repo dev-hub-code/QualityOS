@@ -1,4 +1,4 @@
-# QualityOS
+# ProductionOS
 
 Multi-tenant manufacturing quality management and product traceability platform.
 A modular monolith: Spring Boot API, Next.js web app, PostgreSQL.

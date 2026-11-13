@@ -31,7 +31,7 @@ export function KpiTiles({ kpis, all = false }: { kpis: Kpis; all?: boolean }) {
   return (
     <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {tiles.map(([label, value]) => (
-        <div key={label} className="rounded-lg border p-3">
+        <div key={label} className="glass rounded-2xl p-3">
           <dt className="text-xs text-muted-foreground">{label}</dt>
           <dd className="text-xl font-semibold">{value}</dd>
         </div>

@@ -1,0 +1,783 @@
+# Manufacturing Management Engine
+
+ProductionOS is being extended from quality and traceability into manufacturing management for discrete, process
+and hybrid production. This document holds the repository analysis, the gap analysis against the
+manufacturing specification, the design, and the progress of each phase. It is the source of truth for what is built.
+
+## 1. Repository analysis
+
+The application is a Spring Boot 4 modular monolith (`com.qualityos.<module>`) behind a Next.js 16 BFF, on
+PostgreSQL 18 with row-level security. `ModuleBoundariesTest` keeps each module's repositories and entities private,
+so modules call each other through services only. Flyway migrations V1–V21 define the schema.
+
+What already exists and is reused rather than rebuilt:
+
+| Need | Existing piece | How manufacturing uses it |
+|---|---|---|
+| Items made | `product` – `Product` (FINISHED, SEMI_FINISHED), revisions, specifications, a flat material list (`product_materials`) | BOMs, recipes and routings belong to a product. A new BOM can start from the product's material list |
+| Items consumed | `material` – `Material`, `UnitOfMeasure` with `to_base`, `MaterialService.convert` | BOM and recipe lines name a material or a product, in any unit that converts to the item's own |
+| Where work happens | `organization` – facilities, production lines | A work centre belongs to a facility and can sit on a production line |
+| Who may see what | `FacilityScope`, `ReviewPolicy`, `@PreAuthorize(Require.X)`, `PlanAccess` | Work centres and machines follow facility scope. Approvals use the organisation's review rule. A new `MANUFACTURING` plan feature narrows the new permissions |
+| Inventory | `materialreceipt` lot stock (`quantity`, `consumedQuantity`), released lots | Phase 3 reserves and issues against these lots through `MaterialReceiptService`. Balances are never changed directly |
+| Production record | `traceability` – `ProductionBatch`, consumption with unit conversion, completion, serials, genealogy | Phase 2/6 work orders create and complete production batches through `ProductionService`, so traceability, recall and analytics keep working unchanged |
+| Quality | `inspection` (IPQC, FQC templates, `applicableTemplates`), `quality` (NCR, CAPA) | Phase 5 quality checkpoints start inspections on the work order's batch; failures raise NCRs as today |
+| Audit, numbering, files | `AuditService`, `DocumentNumberService`, `AttachmentPolicy` | Every state change is audited. Work orders get document numbers |
+| Reporting | `reporting` (plain SQL under RLS, `ReportScope`) | Phase 7 adds manufacturing figures the same way |
+
+## 2. Gap analysis
+
+Status: **Built** (in this branch, tested), **Phase n** (planned), **Reused** (already in the product).
+
+| Area | Requirement | Status |
+|---|---|---|
+| Configuration | Organisation manufacturing model: DISCRETE, PROCESS or HYBRID | Built (Phase 1) |
+| Configuration | Approval rule for BOMs, recipes and routings (separate approver or not) | Built (Phase 1) |
+| Configuration | Product-level manufacturing model, within what the organisation allows | Built (Phase 1) |
+| BOM | Multi-level BOM per product, components are materials or products | Built (Phase 1) |
+| BOM | Revisions, DRAFT → SUBMITTED → APPROVED → OBSOLETE, sent back to draft with a note | Built (Phase 1) |
+| BOM | Effective dates; a newer approved revision ends the previous one | Built (Phase 1) |
+| BOM | Circular reference prevention across BOMs and recipes | Built (Phase 1) |
+| BOM | Snapshot frozen on approval; approved lines immutable (service and database trigger) | Built (Phase 1) |
+| BOM | Multi-level explosion for a quantity, with unit conversion and scrap | Built (Phase 1) |
+| Recipe | Ingredients with base batch size, proportional or fixed quantities | Built (Phase 1) |
+| Recipe | Scaling to a batch size | Built (Phase 1) |
+| Recipe | Process parameters with target and limits | Built (Phase 1) |
+| Routing | Routings with revisions and the same lifecycle | Built (Phase 1) |
+| Routing | Operations: sequence, work centre, setup and run time, instructions, parameters | Built (Phase 1) |
+| Resources | Work centres on facilities and production lines | Built (Phase 1) |
+| Resources | Machines with statuses AVAILABLE, RUNNING, IDLE, MAINTENANCE, BREAKDOWN, INACTIVE, enforced transitions and history | Built (Phase 1) |
+| Security | MANUFACTURING_VIEW/MANAGE, BOM_MANAGE/APPROVE, RECIPE_MANAGE/APPROVE, ROUTING_MANAGE/APPROVE in roles and the `MANUFACTURING` plan feature | Built (Phase 1) |
+| UI | Manufacturing navigation group shown by permission and model | Built (Phase 1) |
+| Configuration | Whether releasing a work order needs a BOM or recipe, and a routing | Built (Phase 2) |
+| Planning | Production plans per facility and period, with lines, approval, close and cancel; ordered quantity against each line | Built (Phase 2) |
+| Work orders | DRAFT → SUBMITTED → APPROVED → RELEASED → IN_PROGRESS, ON_HOLD, CANCELLED, enforced in the entity and audited with an append-only history | Built (Phase 2) |
+| Work orders | BOM or recipe and routing frozen on release; materials and operations worked out from them | Built (Phase 2) |
+| Work orders | Starting opens the existing production batch, so traceability and inspections follow it | Built (Phase 2) |
+| Work orders | COMPLETED and PARTIALLY_COMPLETED, both final and frozen by the database | Built (Phase 6) |
+| Inventory | Material availability per work order line, from free stock in the order's facility | Built (Phase 3) |
+| Inventory | Concurrency-safe reservation on lots, by hand or oldest-first, and release of reservations | Built (Phase 3) |
+| Inventory | Issue to the order's batch (reserved stock first), partial return, consumption counted from the genealogy | Built (Phase 3) |
+| Inventory | Shortages shown per line and on start; start blocked or recorded as short, as configured; over-issue refused unless allowed | Built (Phase 3) |
+| Inventory | Idempotency keys on reserve, issue and return | Built (Phase 3) |
+| Shop floor | Operations PENDING → READY → IN_PROGRESS → PAUSED → COMPLETED, BLOCKED, CANCELLED; quantity reconciliation | Built (Phase 4) |
+| Shop floor | Operator and machine assignment, running time, setup time, good/rejected/scrap/rework, partial reporting, WIP | Built (Phase 4) |
+| Shop floor | Measurements against frozen process parameters, comments, photographs, stop reasons | Built (Phase 4) |
+| Quality | Configurable quality checkpoints (before an operation, while it runs, before it completes, final release) naming existing inspection templates | Built (Phase 5) |
+| Quality | Gates frozen on the work order at release; inspected through the existing inspection engine on the order's batch; mandatory gates stop the operation | Built (Phase 5) |
+| Quality | Quality hold of the batch, pausing the floor; released only by an in-process reinspection | Built (Phase 5) |
+| Quality | NCRs and CAPAs on the batch shown on the work order (existing NCR engine, raised automatically on failure) | Built (Phase 5) |
+| Quality | Rejected production summary: rejected, to rework, in rework, reworked and accepted, scrapped | Built (Phase 5) |
+| Rework | Rework orders from an operation's rejects, an inspection disposed of as rework, or an NCR; approved by an authorised person (separately, when configured); steps; reinspection; closed on its decision | Built (Phase 5) |
+| Quality | Completion blocked by open mandatory gates and open rework, and by a batch on hold or awaiting final inspection | Built (Phase 6) |
+| Completion | Finished-goods receipt into existing inventory: the order's production batch completed through traceability, never a separate balance | Built (Phase 6) |
+| Completion | Quantity reconciliation (operations' good output plus accepted rework), short and excess output, material variance per line, serial numbers | Built (Phase 6) |
+| Completion | Production record of a batch: work order, definition revisions, operations with operators and machines, gates, rework, receipt | Built (Phase 6) |
+| Downtime | One record per stop: from the shop floor (pause, block, hold, quality hold), from machine status (breakdown, maintenance) and by hand; categories, reason, responsible department, comments, evidence; summaries by machine, work centre, line, facility and category | Built (Phase 7) |
+| Scheduling | Capacity from facility shifts (days, break) × active machines (or the centre's own capacity), less planned maintenance; load from routings' standard times; conflicts and warnings; manual reschedule with priority. No optimisation engine | Built (Phase 7) |
+| Costing | Planned and actual material, labour, machine, overhead, scrap and rework cost; total and unit; planned against actual; organisation's currency; missing prices and rates reported, never guessed | Built (Phase 7) |
+| Analytics | OEE (availability, performance, quality) by machine and overall; production, planned against actual, status, efficiency, rejection, scrap and rework rates, material variance, utilisation, downtime, cost. Missing data shown as not known | Built (Phase 7) |
+| Shifts | Facility shifts (existing), now with working days and break | Reused and extended |
+| Traceability | Batch genealogy, recalls, serials | Reused |
+| Inventory ledger | Lot balances | Reused: lots gain a reserved quantity beside the consumed one; work-order movements are kept in their own append-only ledger |
+
+## 3. Design
+
+### Module
+
+A new `production` module (`com.qualityos.production`) holds all of it, added to `ModuleBoundariesTest.MODULES`.
+APIs sit under `/api/v1/manufacturing/...`. It calls `ProductService`, `MaterialService`, `FacilityService`,
+`FacilityScope`, `ReviewPolicy` and `AuditService`, and never their repositories.
+
+### Revisioned definitions
+
+BOMs, recipes and routings share one lifecycle, in `RevisionedDefinition`:
+
+```
+DRAFT ──submit──> SUBMITTED ──approve──> APPROVED ──obsolete──> OBSOLETE
+  ^                  │
+  └────send back─────┘
+```
+
+- One draft or submitted revision per product and kind at a time. A draft can be discarded; nothing else is deleted.
+- Revisions are numbered 1, 2, 3 per product and kind.
+- Approval freezes a JSON snapshot of the lines, records who approved, and sets the effective date (today unless
+  given). The previous approved revision that would still be in effect ends the day before. An approval dated
+  before the current revision began is refused.
+- With the organisation's `separateApprover` rule on (the default), the person who submitted cannot approve, except
+  under the organisation's existing single-person review rule, which records it as `SELF_REVIEW`.
+- A database trigger refuses changes to the lines of anything that is not a draft, and any deletion of a
+  non-draft revision.
+
+BOMs and recipes share tables (`boms`, `bom_lines`, with `kind` BOM or RECIPE) because a recipe is a BOM with a base
+batch size, fixed or proportional lines, and process parameters. They have separate APIs, screens and permissions.
+
+### Circular references
+
+A product's BOM or recipe may use another product (a sub-assembly or intermediate). Adding such a line, and approving,
+is refused when the component already uses the parent anywhere below it, through any revision that is not obsolete.
+The check is one recursive query.
+
+### Explosion and scaling
+
+`GET /boms/{id}/explosion?quantity=` walks the tree. Each product component is exploded through its own revision in
+effect on the date, or listed as a leaf if it has none. Quantities are converted into each item's own unit, with scrap
+added. Recipe scaling multiplies proportional lines by `batchSize / baseQuantity` and leaves fixed lines as they are.
+
+### Machines
+
+Allowed status changes:
+
+| From | To |
+|---|---|
+| AVAILABLE | RUNNING, IDLE, MAINTENANCE, BREAKDOWN, INACTIVE |
+| RUNNING | AVAILABLE, IDLE, MAINTENANCE, BREAKDOWN |
+| IDLE | AVAILABLE, RUNNING, MAINTENANCE, BREAKDOWN, INACTIVE |
+| MAINTENANCE | AVAILABLE, BREAKDOWN, INACTIVE |
+| BREAKDOWN | MAINTENANCE, AVAILABLE, INACTIVE |
+| INACTIVE | AVAILABLE |
+
+MAINTENANCE, BREAKDOWN and INACTIVE need a reason. Each change writes an append-only `machine_status_events` row,
+which Phase 7 uses for downtime and OEE.
+
+### Facility scope
+
+Work centres and machines belong to a facility, so a member limited to some facilities sees and changes only theirs.
+BOMs, recipes and routings are product master data and are visible to every member with `MANUFACTURING_VIEW`, as
+products are. Choosing a work centre for a routing operation requires access to that work centre's facility.
+Production plans and work orders belong to a facility in the same way.
+
+### Permissions
+
+| Permission | Owner, Admin, Plant Manager | Production Manager (new) | Quality Manager | Others with views |
+|---|---|---|---|---|
+| MANUFACTURING_VIEW | ✓ | ✓ | ✓ | Quality Engineer, Inspector, Auditor, Viewer |
+| MANUFACTURING_MANAGE (settings, work centres, machines) | ✓ | ✓ | | |
+| BOM_MANAGE, RECIPE_MANAGE, ROUTING_MANAGE | ✓ | ✓ | | |
+| BOM_APPROVE, RECIPE_APPROVE, ROUTING_APPROVE | ✓ | ✓ | ✓ | |
+| WORK_ORDER_VIEW (plans and work orders) | ✓ | ✓ | ✓ | Production Planner (new), Quality Engineer, Inspector, Auditor, Viewer |
+| WORK_ORDER_MANAGE, PRODUCTION_PLAN_MANAGE | ✓ | ✓ | | Production Planner |
+| WORK_ORDER_APPROVE, WORK_ORDER_RELEASE, PRODUCTION_PLAN_APPROVE | ✓ | ✓ | | |
+| WORK_ORDER_MATERIAL_RESERVE | ✓ | ✓ | | Production Planner |
+| WORK_ORDER_MATERIAL_ISSUE | ✓ | ✓ | | Production Operator |
+| PRODUCTION_EXECUTE (run operations, report, measure, comment, photographs) | ✓ | ✓ | | Production Operator (new) |
+| PRODUCTION_SUPERVISE (assign, block, unblock, skip, reverse reports, run anyone's operation) | ✓ | ✓ | | |
+| QUALITY_CHECKPOINT_MANAGE (quality checkpoints) | ✓ | | ✓ | |
+| REWORK_MANAGE (raise, cancel and close rework orders) | ✓ | ✓ | | Quality Engineer |
+| REWORK_APPROVE (authorise rework) | ✓ | ✓ | ✓ | |
+| WORK_ORDER_COMPLETE (receive finished goods, close work orders) | ✓ | ✓ | | |
+| DOWNTIME_MANAGE (record, correct and end downtime by hand) | ✓ | ✓ | | |
+| PRODUCTION_COST_VIEW (work order cost, cost summaries) | ✓ | ✓ | | Production Planner |
+| PRODUCTION_ANALYTICS_VIEW (production analytics, OEE) | ✓ | ✓ | ✓ | Production Planner |
+
+Inspecting a gate and reinspecting rework need the existing INSPECTION_CREATE; a quality hold needs INSPECTION_APPROVE;
+working rework steps needs PRODUCTION_EXECUTE. NCRs and CAPAs appear on the work order only for people with NCR_VIEW.
+
+The Production Planner also gets MANUFACTURING_VIEW and the views of facilities, products, purchasing, traceability
+and reports. The Production Operator gets WORK_ORDER_VIEW and the views of facilities, products and traceability.
+
+All of them belong to the `MANUFACTURING` plan feature, on Professional and Enterprise. As with other features, the
+`_VIEW` permission stays after a downgrade so existing records remain readable.
+
+### Production plans
+
+A plan belongs to one facility and a period, and lists products with quantities and due dates within it. Lines change
+only while the plan is a draft. Work orders are raised from the lines of an approved plan, for the line's product in
+the plan's facility. Ordering more than a line planned is allowed and shown, not refused. A plan is closed once none
+of its work orders is open, and cancelled only while none of them stands.
+
+### Work order lifecycle
+
+| From | To | Who | Notes |
+|---|---|---|---|
+| DRAFT | SUBMITTED | WORK_ORDER_MANAGE | The only status in which the order can be edited |
+| SUBMITTED | DRAFT | WORK_ORDER_APPROVE | Sent back with a note |
+| SUBMITTED | APPROVED | WORK_ORDER_APPROVE | Someone other than the submitter, under the separate-approver rule |
+| APPROVED | RELEASED | WORK_ORDER_RELEASE | See release below |
+| RELEASED | IN_PROGRESS | WORK_ORDER_RELEASE | Opens the production batch |
+| APPROVED, RELEASED, IN_PROGRESS | ON_HOLD | WORK_ORDER_RELEASE | With a reason; resume returns to the status it was held from |
+| DRAFT, SUBMITTED | CANCELLED | WORK_ORDER_MANAGE | With a reason |
+| APPROVED, RELEASED, ON_HOLD | CANCELLED | WORK_ORDER_APPROVE | With a reason; not when held from IN_PROGRESS |
+| IN_PROGRESS | COMPLETED, PARTIALLY_COMPLETED | WORK_ORDER_COMPLETE | After finished-goods receipt; see Completion. Both are final |
+
+The allowed moves are in `WorkOrder.TRANSITIONS`. Each move is checked against the current status and the row's
+version, so two people releasing or starting the same order cannot both succeed; the loser gets `409` or `422`. Every
+move writes a row to `work_order_status_history`, which the database keeps append-only, and an audit entry.
+
+**Release** uses the revisions in effect on the planned start. For a discrete product that is its BOM, for a process
+product its recipe, as the product's model says. Whether a BOM or recipe, and a routing, must exist is the
+organisation's choice (`workOrderRequiresBom`, default on; `workOrderRequiresRouting`, default off). A routing in
+effect is used even when not required, and each of its work centres must be in the order's facility and not archived.
+Release stores the approved snapshots on the order and writes:
+
+- one material line per BOM or recipe line, one level deep: the quantity scaled to the order (fixed lines stay as they
+  are), plus scrap, converted to the component's own unit. A sub-assembly is listed as needed; it is made on its own
+  work order.
+- one operation per routing operation, with setup time as it is and run time multiplied by the order quantity, since
+  routing run time is per unit, with the operation's process parameters and the recipe's as approved. Each starts
+  PENDING; the shop floor moves them.
+
+The detail page shows before release which revisions would be used and what would stop the release.
+
+**Start** creates the production batch through the existing `ProductionService`, for the order's product, facility and
+quantity. Consumption, inspections, genealogy and recall then work on it as on any batch.
+
+**Protection in the database.** Work orders are never deleted. Once released, the product, quantity, revisions and
+snapshots cannot change, and the batch, once set, stays. Completed and cancelled orders cannot change at all. Released
+material lines cannot be rewritten or deleted, and operations keep their order.
+
+### Work order materials
+
+Stock stays with the inventory module. A lot (a received material line) keeps its quantity, what was consumed, and
+now what is **reserved** for work orders. Ordinary consumption takes only free stock (remaining less reserved), and the
+database refuses consumed plus reserved beyond the quantity. Nothing in the production module writes a balance: it
+calls `MaterialReceiptService` to reserve, release and take, and `ProductionService` to consume into or return from a
+batch.
+
+- **Availability.** For each material line of a released order: needed, issued, reserved, still to find, and what is
+  free in the order's facility (released lots for materials, released batches for sub-assemblies). Anything still to
+  find beyond what is free is a **shortage**, listed by line. Lines naming the same component share what is free.
+- **Reservation.** By hand (a lot and a quantity) or "reserve what is free", which takes the oldest lots first. Only
+  released lots of the line's material in the order's facility, and never more than the line still needs. Allowed while
+  the order is released or in progress. Each reservation can be released; cancelling the order releases them all.
+  Sub-assemblies are not reserved: they are issued from their batches.
+- **Issue** needs the order in progress. From a lot, the order's own reservations on it are used first and any rest
+  comes from free stock. Each part becomes a consumption entry on the order's production batch, so genealogy, recall
+  and traceability see it at once. More than the line needs is refused unless the organisation allows it.
+- **Issued** is counted from the batch's consumption entries that still stand, however they were recorded, so
+  consumption entered on the batch page counts too. Entries for components not on the list are shown separately.
+- **Return** gives back part or all of one consumption entry to its lot or batch, with a reason. The entry is closed
+  and, for a part, a new one keeps what stayed used.
+- **Start.** If some line is not issued or reserved in full (or a sub-assembly is not in stock), the order is short.
+  With `startRequiresMaterials` start is refused and the shortfalls named; otherwise it starts and the history and
+  audit record "Started short" with them. `reserveOnRelease` reserves what is free when the order is released.
+
+**Concurrency.** Every change locks the work order row, so requests for one order are applied one after another, and
+each lot row, re-read once locked, so two orders cannot set aside or take the same stock. Automatic reservation takes
+what a lot has free at that moment and never fails because another order got there first.
+
+**Idempotency.** Reserve, automatic reserve, issue and return accept an `Idempotency-Key` header. A key already used
+on the order returns the current state without moving stock again. The web app sends a fresh key per dialog.
+
+**Record.** Every reservation, release, issue and return is a row in `work_order_material_movements`, which the
+database keeps append-only, and an audit entry. Reservations are never deleted, and their open quantity only falls.
+
+### Shop-floor execution
+
+An operation of a released order moves only along these changes; the database refuses any change to a completed or
+skipped one, and to what was released (sequence, work centre, planned times, parameters).
+
+| From | To |
+|---|---|
+| PENDING | READY (its turn has come), BLOCKED, CANCELLED (skipped) |
+| READY | IN_PROGRESS (started), BLOCKED, CANCELLED |
+| IN_PROGRESS | PAUSED, COMPLETED, BLOCKED |
+| PAUSED | IN_PROGRESS (resumed), COMPLETED, BLOCKED |
+| BLOCKED | back where it was (a running one comes back paused), CANCELLED |
+
+- **Ready.** When the order starts, the first operation becomes ready, and each later one once every operation before
+  it is complete or skipped. With `operationsInSequence` off, all become ready together.
+- **Running.** Operations run only while the order is in progress. Starting one takes it for the person starting it
+  when nobody has it; one assigned to someone is run by them or by a supervisor. The running clock counts only time in
+  progress; setup time is stated on completion and cannot exceed it. Putting the order on hold pauses whatever is
+  running, with the reason "Work order on hold".
+- **Machines.** An operation runs on a machine at its own work centre, chosen when it starts or assigned beforehand.
+  With `operationRequiresMachine`, one must be chosen where the work centre has any. The machine must be available,
+  idle or running nothing else (a partial unique index allows one running operation per machine); starting sets it
+  running and stopping frees it. Pausing or blocking for a machine breakdown or planned maintenance puts the machine
+  into that state, kept in its history like a change by hand. A machine someone has already moved is left alone.
+- **Reports.** Each report gives the quantity processed and its split into good, rejected and scrap, which must add up
+  to it; rework is the part of the rejected that goes to rework. Quantities are in the order's unit, and whole numbers
+  when that unit counts (dimension `Count`). Reports add up, so an operation is reported in parts as it goes.
+- **Reconciliation.** The first operation (not counting skipped ones) can process the order quantity plus
+  `overReportPercent`. Each later one can process only what came through good from the one before it. Completing with
+  less processed than came in needs a reason, which stays on the operation and its timeline.
+- **WIP.** For every operation: what can come in, what was processed, and what is waiting in front of it. The work
+  order page shows these per operation.
+- **Corrections.** Reports are never edited. A supervisor reverses one with a reason: a reversal row with the
+  quantities negated, once per report, and only while the operation is open and the next operation has not already
+  used that output.
+- **Measurements** are taken against the parameters frozen on the operation at release: the routing operation's own,
+  then the recipe's. A value outside the limits is kept and flagged. Phase 5 turns this into quality gates.
+- **Timeline, comments and photographs.** Every change of status, assignment and comment is a row in
+  `operation_events`, with the reason category when it stopped. Photographs and other files use the existing
+  attachments (entity type `WORK_ORDER_OPERATION`), with access following the work order.
+- **Concurrency and repeats.** Every change locks the work order row first, then reads its operations, so checks across
+  operations hold; the machine row is locked when it is taken or freed. Reports and measurements accept an
+  `Idempotency-Key`; status changes are safe to repeat through the status check.
+
+Stop reasons (`MACHINE_BREAKDOWN`, `MATERIAL_SHORTAGE`, `POWER_FAILURE`, `QUALITY_ISSUE`, `OPERATOR_UNAVAILABLE`,
+`PLANNED_MAINTENANCE`, `CHANGEOVER`, `OTHER`, and `ORDER_ON_HOLD` set by the system) are the spec's downtime
+categories, so phase 7 can summarise downtime from the timeline.
+
+### Quality gates and rework
+
+Quality in production reuses the inspection, NCR and CAPA engines. Nothing about inspections is duplicated: a gate is
+a pointer from a work order to inspections that the existing engine carries out on the order's production batch.
+
+- **Checkpoints** (`quality_checkpoints`) say where production needs an inspection: before an operation starts, while
+  it runs, before it completes, or at final release. Each names a published inspection template, in-process (IPQC) for
+  the stages of an operation and final (FQC) for release, and may be limited to a product, a work centre and an
+  operation number. Each is mandatory or not. Checkpoints are archived, never deleted.
+- **Gates** (`work_order_quality_gates`, append-only). Release turns each active checkpoint that applies into a gate:
+  one per matching operation, or one for the order at final release. The gate keeps the checkpoint's name, template
+  and whether it is mandatory, so changing or archiving a checkpoint never reaches orders already released.
+- **Gate state** is read from the gate's latest inspection, never stored: none, or the latest cancelled, is *pending*;
+  without a disposition, *in inspection*; ACCEPT or CONDITIONAL_ACCEPTANCE, *passed*; HOLD, *on hold*; REJECT or
+  REWORK, *failed*. Earlier inspections stay listed as evidence.
+- **Inspecting a gate** starts an inspection with the gate's template on the batch, through `InspectionService.create`,
+  while the order is in progress or on hold. A start check is made before the operation starts; the others while it
+  is in progress, paused or blocked. A gate can be inspected while pending, or again after it failed. Final release is
+  checked once the batch is complete, which the inspection engine enforces.
+- **Enforcement on the floor.** An operation cannot start while a mandatory start gate has not passed, or complete
+  while a mandatory in-process or completion gate has not. While the batch is on hold or rejected, operations cannot
+  be started, resumed, reported on, measured or completed.
+- **Dispositions** are the inspection engine's own: REWORK and HOLD put the batch on hold, REJECT rejects it, and the
+  engine raises the NCR when an inspection fails or is disposed of as reject or rework.
+- **Quality hold.** Someone with INSPECTION_APPROVE can put the batch of an order in production on hold. Whatever is
+  running is paused with the reason category `QUALITY_ISSUE` and its machine freed. Only an in-process reinspection of
+  the batch releases it, as for any batch held for rework.
+- **Rework orders** (`rework_orders`, numbered `RW-`) rework goods on the batch they came from, so genealogy is
+  unchanged. Each is raised from at least one of: an operation's rejected goods (at most what the operation marked for
+  rework and is not already on another rework order), an inspection of the batch disposed of as REWORK, or an NCR on
+  the batch. It has numbered steps, optionally at work centres of the order's facility.
+
+  | From | To |
+  |---|---|
+  | OPEN | APPROVED (REWORK_APPROVE; another person when `separateApprover` is on), CANCELLED |
+  | APPROVED | IN_PROGRESS, CANCELLED |
+  | IN_PROGRESS | AWAITING_INSPECTION, once every step is done and reworked plus scrapped equals the quantity |
+  | AWAITING_INSPECTION | CLOSED, with the reinspection's disposition as the outcome; a hold is not a decision |
+
+  The reinspection is a new inspection of the batch (template chosen, or the one that fits). One under way cannot be
+  replaced; a cancelled one can. A closed or cancelled rework order is frozen by a database trigger, a done step
+  cannot change, and its status history is append-only.
+- **On the work order.** The quality view shows the gates, NCRs and CAPAs on the batch, rework orders, the rejected
+  summary (rejected, to rework, in rework, reworked and accepted, and scrapped on operations and in rework), and one
+  sentence for each mandatory gate not passed and each rework order still open: the list completion checks.
+- **Concurrency.** Inspecting a gate, a quality hold and every rework change lock the work order row first; rework
+  changes then lock the rework order. Status changes are safe to repeat through their status checks.
+
+### Completion
+
+Finished goods are not kept in a stock of their own. A work order's output goes into the production batch it opened
+when it started, which is what the existing inventory, inspections, dispatches and recalls already work on. Finishing
+an order takes two steps, both needing WORK_ORDER_COMPLETE.
+
+- **Receiving finished goods** completes the batch through `ProductionService.completeGuarded`, with the quantity made.
+  It needs the order in progress and the batch in progress; every operation completed or cancelled; every mandatory
+  gate other than final release passed and no rework order open; and material issued to the batch, so that it can be
+  traced.
+  - *Quantity.* With operations, the quantity is the last running operation's good output plus what rework orders from
+    an operation reworked and reinspection accepted; a different quantity is refused. Without operations it must be
+    given. It cannot pass the order quantity plus `overReportPercent` (excess output within that allowance is
+    accepted). Counted units take whole numbers.
+  - *Short output.* Below the order quantity less `completionTolerancePercent`, a `shortReason` is required.
+  - *Material.* For each material line, what the received quantity needed (scaled from the order's requirement) is
+    compared with what was issued, net of returns. A line off by more than `materialVariancePercent` needs a
+    `varianceReason`. The comparison is stored with the receipt.
+  - *Serials.* With `serialTracking` on, a discrete product (made from a BOM) is received with one distinct serial
+    number per unit, registered through `ProductionService.addSerials`.
+  - Open reservations are released. A receipt (`finished_goods_receipts`, append-only, one per order and per batch)
+    records the quantities, reasons, variances and serial count.
+  - Completing a work order's batch from the batch page is refused (`BatchCompletionGuard`); traceability does not
+    depend on manufacturing for this, manufacturing registers the guard.
+- **Closing** completes the order. It needs the receipt; no mandatory gate unresolved other than a final inspection
+  decided as REJECT; no rework open; the batch not on hold; and, with `completionRequiresFinalInspection` (default on),
+  the batch's final inspection decided, so the batch is released or rejected. The order becomes COMPLETED, or
+  PARTIALLY_COMPLETED with a reason when it was short beyond the tolerance or the batch was rejected.
+- **Corrections.** A completed or partially completed order is frozen by the `protect_work_order` trigger, and the
+  receipt by the append-only trigger. Quantities on a completed batch are corrected through the existing material
+  correction and dispatch return workflows; there is no reopen.
+- **Idempotency and concurrency.** Both steps lock the work order first. A receipt repeated with the same
+  `Idempotency-Key` returns the current state; any other second receipt is refused, and the unique constraints on the
+  order and batch back that up. A repeated close is refused by the status check.
+- **Production record.** `GET /work-orders/production-record?batchId=` gives the batch page how the batch was made:
+  the order, its BOM or recipe revision and routing revision, each operation with its operators (from events and
+  reports) and machines, gates with their latest inspection, rework orders and the receipt. With the existing trace
+  (suppliers and lots, inspections, NCRs, CAPAs, dispatches and customers) this covers the batch end to end.
+
+### Downtime
+
+A stop is a `downtime_records` row with its facility, work centre, and the machine, work order and operation where
+known; a category (the spec's eight plus ORDER_ON_HOLD), start and end, reason, responsible department, comments and
+attachments (entity type `DOWNTIME`). Planned maintenance is marked `planned`; every other category is unplanned.
+
+- **From the shop floor** (source SHOP_FLOOR). Pausing or blocking an operation with a loss category, putting the order
+  on hold (ORDER_ON_HOLD) and a quality hold (QUALITY_ISSUE) open a stop on the operation and its machine; resuming,
+  unblocking or completing ends it. One open stop per operation, enforced by a unique index.
+- **From machine status** (source MACHINE). Setting a machine to BREAKDOWN or MAINTENANCE by hand opens a stop; setting
+  it back ends it. One open stop of this kind per machine. A breakdown reported from the floor moves the machine
+  without opening a second stop, so time is never counted twice.
+- **By hand** (source MANUAL, DOWNTIME_MANAGE): on a machine or at a work centre in the caller's facilities. Only
+  planned maintenance may be entered ahead of time, and then with an end. Manual stops can be corrected and ended.
+  Stops recorded as they happened keep their times and category; only the reason, department and comments change.
+- **Protection.** `protect_downtime_record` refuses deletes, changes to where the stop was, and retiming or
+  recategorising an ended stop that was not entered by hand. Every change is audited.
+- **Summaries** (`GET /downtime/summary`): minutes within a period of up to 366 days, by machine, work centre,
+  production line, facility or category, split into planned and unplanned; open stops count to now. Days are in the
+  organisation's time zone.
+
+### Scheduling
+
+Basic capacity checking, not an optimiser: the board shows load against capacity and warns; the planner decides.
+
+- **Capacity** of a work centre on a day = the facility's shift minutes on that weekday (end past start, past midnight
+  allowed, less the break) × units, less planned maintenance on its machines. Units are its active machines, or the
+  centre's `capacityUnits` (default 1) when it has none. Shifts gained working days and a break for this.
+- **Load.** For approved, released, in-progress and on-hold orders: each operation's planned setup plus run time not
+  yet worked (released orders: from the order's operations less running time; approved orders: from the routing in
+  effect, setup + run × quantity), spread evenly over the working days left in the order's planned dates. A late order
+  is loaded on today, with a warning.
+- **Warnings** on each order: no shifts, no routing, operations at centres outside the facility, not enough hours in its
+  window, days over capacity. **Conflicts**: each centre-day over capacity, with the orders on it. Orders are listed by
+  priority, then planned start.
+- **Reschedule** (`POST /work-orders/{id}/reschedule`, WORK_ORDER_MANAGE): new planned dates and optionally priority,
+  with a reason; refused once the order is closed. It locks the order, is audited, and returns the order's place on
+  the board with any warnings. A board covers up to 62 days.
+
+### Costing
+
+Costs come from what the product already records, in the organisation's currency, rounded to two places. Nothing is
+guessed: a missing price or rate is listed and the cost marked incomplete.
+
+- **Material.** Planned: each line's required quantity × the average purchase price of the material (issued and later
+  purchase orders, weighted by quantity), converted to the line's unit. Actual: issued less returned, × the price on
+  the purchase order line each lot was received against.
+- **Labour, machine, overhead.** Hours × the work centre's rate per hour (three optional rates on the work centre).
+  Planned hours: setup + run; actual hours: the operation's running time.
+- **Scrap** = total × scrapped / made; **rework** = labour, machine and overhead × reworked / made. They are shares of
+  the total, shown separately, not added again. **Unit cost** = total / quantity received (actual) or ordered (planned).
+- `GET /costing/work-orders/{id}` for a released order; `GET /costing/summary` for orders closed in a period
+  (PRODUCTION_COST_VIEW).
+
+### OEE and analytics
+
+`GET /analytics?from&to&facilityId` (PRODUCTION_ANALYTICS_VIEW), up to 366 days:
+
+- **Per machine.** Shift time from the facility's shifts; planned production time = shift time less planned downtime;
+  running time from the operation timeline (in progress on that machine), clipped to the period.
+  Availability = running / planned production time (capped at 100%, with a note when work ran outside shifts);
+  Performance = Σ(ideal cycle × units reported) / running, the ideal cycle being the routing's run time per unit;
+  Quality = good / reported; OEE = A × P × Q; Utilisation = running / shift time. An overall row uses the same sums.
+- **Production.** Finished goods received by product; orders closed with ordered against received; completed, closed
+  short and on time; every order by status.
+- **Rates.** Rejection, scrap and rework rates from operation reports (reversals netted out); efficiency = planned
+  minutes / running minutes of operations completed in the period; material variance from receipts.
+- **Missing data.** A figure that cannot be worked out (no shifts, no running time, nothing reported) is null with a
+  note, shown as "Not known" — never zero. Cost appears only for callers with PRODUCTION_COST_VIEW.
+
+## 4. Phase plan and progress
+
+| Phase | Scope | Status |
+|---|---|---|
+| 1 Foundation | Settings, product settings, BOMs, recipes, routings, work centres, machines, permissions, navigation | **Built** |
+| 2 Planning and work orders | Production plans, work orders and their lifecycle, snapshots on release | **Built** |
+| 3 Inventory integration | Availability, reservation, issue, consumption, return | **Built** |
+| 4 Shop floor | Operation execution, quantity reconciliation, machine use | **Built** |
+| 5 Quality and rework | Quality gates on operations, NCR/CAPA links, rework | **Built** |
+| 6 Completion | Finished-goods receipt, batch completion, closing work orders | **Built** |
+| 7 Advanced | Downtime, scheduling, costing, OEE, analytics | **Built** |
+
+## 5. Limitations
+
+Phase 1:
+
+- The product's flat material list stays as it was. A BOM can be started from it, but the two are not kept in step.
+- Routing operations record standard times, which scheduling, costing and OEE use (Phase 7).
+
+Phase 2:
+
+- A plan line's due date is shown, not enforced against the work order's planned dates.
+- Status changes are made safe to repeat by the status check and the row version, not by an idempotency key: a
+  repeated release or start is refused, never applied twice.
+
+Phase 3:
+
+- Sub-assemblies are issued from released batches but not reserved: batches have no reserved quantity yet.
+- There is no expiry on lots, so automatic reservation goes by receipt date (first in, first out), not first expiry.
+- Requirements are one level deep. A sub-assembly's own materials belong to its own work order.
+- Consumption recorded straight on the batch page is not checked against the order's lines or the over-issue rule; it
+  still counts as issued, and cannot take reserved stock.
+- Material is issued in the line's unit. A lot in another unit is converted, which may leave a remainder below six
+  decimal places.
+- Material substitution (issuing another material against a line) is not built. Scrapped material is recorded as
+  scrap on the operation that lost it (phase 4), not as a separate stock movement.
+
+Phase 4:
+
+- Shop-floor execution needs a routing. An order released without one has no operations to run; turn on
+  `workOrderRequiresRouting` to make sure every order has them.
+- Material issue stays at order level: it is not tied to an operation.
+- Rejected quantities are recorded on the operation. Phase 5 adds rework orders, quality holds and the inspections an
+  operation needs.
+- A machine runs one operation at a time. Machines that run several are not modelled.
+- Stop reasons are recorded on the timeline; phase 7 turns them into downtime records and summaries.
+
+Phase 5:
+
+- Material used in rework is issued through the work order's materials while the order is in progress; a rework order
+  has no material lines of its own.
+- A batch put on hold by an inspection's disposition (rather than by a quality hold) does not pause operations already
+  running, but nothing more can be reported, measured or completed on them until it is released.
+- Inspection dispositions apply to the whole batch, as the inspection engine works today. Rework quantities are tracked
+  on the rework order, not as separate stock.
+- Rework steps are entered one per line on the screen, with one work centre for all of them; the API takes a work
+  centre per step.
+- Raw-material checks on receipt stay with the existing incoming inspection (IQC); checkpoints cover production.
+
+Phase 6:
+
+- One receipt per work order: the batch is completed once, as traceability works today. Output made after the receipt
+  needs another work order.
+- There is no reopen of a closed order. Corrections go through the existing material correction and dispatch return
+  workflows.
+- Material variance is worked out from issued quantities against the order's frozen requirement; scrap of material is
+  not a separate stock movement.
+- Serial numbers are entered at receipt, not captured per unit as each operation runs.
+- Batches recorded by hand on the batch page are completed there as before; the guard applies only to batches a work
+  order opened.
+
+Phase 7:
+
+- Scheduling checks capacity and warns; it does not sequence operations or move orders itself. Load is spread evenly
+  over an order's working days, and operation dependencies are reflected only through the order's dates.
+- Shifts are per facility, not per work centre, and there is no holiday calendar.
+- Purchase prices are taken as they are on the purchase order, in the organisation's currency; there is no exchange
+  rate handling or standard cost. Material without a priced purchase order is listed as missing.
+- Rates are per work centre, not per operator or machine. Labour time is running time; setup is not split out.
+- OEE uses units reported on the machine's operations in the period; work reported on another day than it ran shifts
+  performance between days.
+- Downtime before phase 7 was not recorded as stops, so summaries start from this release.
+
+## 6. Phase 1 delivery
+
+**Migration.** `V22__manufacturing_foundation.sql`: ten tenant tables with row-level security, foreign keys within the
+tenant, checks and indexes; triggers that freeze approved revisions and their content and keep machine history
+append-only; eight permissions; the Production Manager role; the `MANUFACTURING` feature on Professional and
+Enterprise, recorded in each plan's history.
+
+**Backend.** `com.qualityos.production`: entities, repositories, `ManufacturingSettingsService`, `WorkCenterService`,
+`BomService` (BOMs and recipes), `RoutingService`, `RevisionSupport` (approval, dates, loop check), and six controllers.
+Small additions elsewhere: `FacilityService.requireActiveLine` and `codes`, `ProductService.requireActive`,
+`PlanAccess.FEATURES`, `Permissions`. APIs are listed in [API_CONTRACTS.md](API_CONTRACTS.md#manufacturing).
+
+**Screens.** A Manufacturing group in the menu (work centres, machines, BOMs or recipes by model, routings,
+configuration); list and detail pages for each, with the draft → submit → approve → retire actions, line and operation
+editing, parameters, BOM explosion and recipe scaling; a Manufacturing section on each product page.
+
+**Tests.**
+- `ManufacturingIT`: 13 tests. They cover the model rules, work centre placement and facility scope, machine
+  transitions and append-only history, the revision lifecycle and separate approver, effective dating, loops at any
+  depth, explosion arithmetic, recipe scaling and parameters, routings, copying, roles, plan entitlement and
+  isolation between organisations.
+- `ModuleBoundariesTest` includes `production`.
+- Vitest: `manufacturing.test.ts` and navigation tests.
+- Playwright: `manufacturing.spec.ts`, which drafts, approves and explodes a two-level BOM and changes a machine's
+  status, all from the pages.
+
+## 7. Phase 2 delivery
+
+**Migration.** `V23__production_plans_and_work_orders.sql`: two settings columns; six tenant tables with row-level
+security (plans, plan lines, work orders, work-order materials, work-order operations, status history); triggers that
+keep work orders and released requirements from being deleted or rewritten and the history append-only; six
+permissions; the Production Planner role.
+
+**Backend.** In `com.qualityos.production`: `ProductionPlan`, `ProductionPlanLine`, `WorkOrder` (with its transition
+table), `WorkOrderMaterial`, `WorkOrderOperation`, `WorkOrderStatusChange`, their repositories,
+`ProductionPlanService`, `WorkOrderService`, and two controllers. `ManufacturingSettingsService` gains the two release
+rules and `definitionKind`. Reused: `ProductionService.create` for the batch, `ReviewPolicy` for the separate approver,
+`DocumentNumberService` for PP- and WO- numbers, `FacilityScope`, `AuditService`, `MaterialService.convert`.
+
+**Screens.** Production plans and Work orders in the Manufacturing menu: lists, a plan page with lines, ordered
+quantities and "Raise work order", and a work order page with each allowed step, what release would use and what stops
+it, the frozen materials and operations, the batch link and the status history. The configuration page has the two
+release rules.
+
+**Tests.**
+- `WorkOrderIT`: 6 tests. They cover the full lifecycle into a production batch, invalid steps, the separate approver,
+  release arithmetic and snapshots, double start, hold and resume, cancel rules by permission and stage, the
+  configurable release rules, routing work centres in another facility, plans (period, approval, ordering, over-ordering,
+  close and cancel), facility scope and isolation between organisations, and the database protections.
+- Vitest: `workOrderActions`, `planActions` and the navigation entries.
+- Playwright: `work-orders.spec.ts`, from a plan through approval, release, start, hold and resume, from the pages.
+
+## 8. Phase 3 delivery
+
+**Migration.** `V24__work_order_materials.sql`: `reserved_quantity` on lots with a check that consumed plus reserved
+never exceeds the quantity; three settings; `material_reservations` and the append-only
+`work_order_material_movements`, both with row-level security, triggers that keep them from being deleted or rewritten;
+two permissions.
+
+**Backend.**
+- Inventory module (`materialreceipt`): lots reserve, release and take reserved stock under a row lock; free lots by
+  material and facility; voiding a receipt or correcting a lot below what is reserved is refused.
+- Traceability: `ProductionService.consumeReserved`, `consumeEntry`, `returnConsumption` (partial return),
+  `activeConsumptions` and `availableBatches`.
+- Production: `MaterialReservation`, `MaterialMovement`, `WorkOrderMaterialService`, and the materials endpoints on
+  `WorkOrderController`. Release, start and cancel use it.
+- The web server's proxy forwards `Idempotency-Key`.
+
+**Screens.** On a released work order: materials with needed, issued, reserved, still to find, free and shortage;
+reserve and issue per line; "Reserve what is free"; reservations with release; what went into the batch with return;
+and the stock movements. The batch page shows each lot's free stock. Configuration has the three new rules.
+
+**Tests.**
+- `WorkOrderMaterialIT`: 4 tests. They cover oldest-first reservation, the lot's reserved balance, reserved stock kept
+  from ordinary consumption, issue before start refused, reserved-first issue, over-issue refused, a repeated
+  idempotency key, partial return and genealogy, the movement ledger, database protections, shortages, both start
+  rules, reserve on release, three orders racing for one lot, cancel releasing reservations, voiding a reserved receipt,
+  releasing a reservation, permissions, facility scope and isolation.
+- Vitest: `freeQuantity` and the idempotency header in the proxy.
+- Playwright: `work-orders.spec.ts` now reserves, starts short, issues and returns from the pages.
+
+## 9. Phase 4 delivery
+
+**Migration.** `V25__shop_floor_execution.sql`: three settings (`operations_in_sequence`, `over_report_percent`,
+`operation_requires_machine`); execution columns on `work_order_operations` with checks (quantities not negative,
+rework within rejected, running exactly while in progress, blocked exactly while it has somewhere to go back to), a
+partial unique index for one running operation per machine, and the release trigger widened to protect what was
+released and closed operations; the append-only `operation_reports`, `operation_measurements` and `operation_events`
+with row-level security; two permissions and the Production Operator role.
+
+**Backend.** `ShopFloorService` (also the attachment policy for `WORK_ORDER_OPERATION`), `OperationController` at
+`/api/v1/manufacturing/operations`, the entities `OperationReport`, `OperationMeasurement` and `OperationEvent`, and the
+execution methods on `WorkOrderOperation`. Work order start makes operations ready and hold pauses them; release
+freezes parameters on each operation. `WorkCenterService` locks and moves machines for the floor, keeping their
+history.
+
+**Screens.** Shop floor (Manufacturing → Shop floor): open operations of orders in production as cards, running first,
+with All/Mine, search, facility and work centre filters, refreshed every 30 seconds. The operation screen: large
+buttons to start, resume, report quantities, pause, measure and complete; quantities and WIP; operator, machine,
+running and planned times; instructions; parameters and measurements; reports with reversal; the timeline with
+comments; photographs and documents; supervisor actions to assign, block, unblock and skip. The work order page shows
+each operation's progress and links to it. Configuration has the three new rules.
+
+**Tests.**
+- `ShopFloorIT`: 3 tests. They cover the lifecycle in sequence, start before the order, machine taken and freed,
+  someone else's operation refused, reconciliation (sum, whole pieces, rework within rejected, ceilings from the order
+  and from the operation before), an idempotent report, measurements in and out of limits, a breakdown moving the
+  machine, setup time, completion short with and without a reason, readiness of the next operation, append-only and
+  closed-row protection in the database, audit; operations side by side, the machine rule, assignment and its checks,
+  one running operation per machine, reversal and its limits, a hold pausing the floor, block, unblock and skip,
+  comments, photographs and their permission, the floor list, facility scope and isolation; and five reports racing
+  on one operation.
+- Vitest: `operationActions`, `formatDuration` and `reportMismatch`.
+- Playwright: `shop-floor.spec.ts` starts an operation on a machine, reports, measures out of limits, pauses for a
+  breakdown, is refused until the machine is fixed, resumes, completes, comments, and checks the work order page.
+
+## 10. Phase 5 delivery
+
+**Migration.** `V26__production_quality_and_rework.sql`: `quality_checkpoints`; the append-only
+`work_order_quality_gates` (one per checkpoint and operation, final-release gates on no operation) and
+`quality_gate_inspections`; `rework_orders` with checks (reworked plus scrapped equals the quantity, closed exactly when
+there is an outcome), `rework_order_steps` and the append-only `rework_order_history`, all with row-level security and
+foreign keys within the tenant; a trigger that refuses deleting rework records, changing a closed or cancelled rework
+order or what it reworks, and changing a done step; three permissions.
+
+**Backend.** `QualityCheckpointService`, `QualityGateService` (gates at release, state, inspection, enforcement, the
+quality view), `ReworkService`, `QualityCheckpointController` at `/api/v1/manufacturing/quality-checkpoints`,
+`ReworkOrderController` at `/api/v1/manufacturing/rework-orders`, and on `WorkOrderController` the quality view, gate
+inspection and quality hold. `ShopFloorService` enforces gates and the batch status, holds the floor, and returns each
+operation's gates and batch status. Reused: `InspectionService.create` and `history`, `InspectionTemplateService`,
+`NcrService.history`, `capaHistory` and `outcomes`, `ProductionService.batch` and `holdForReinspection`,
+`ReviewPolicy`, `DocumentNumberService`, `FacilityScope`, `AuditService`.
+
+**Screens.** Manufacturing → Quality checkpoints: list, add, edit, archive. The work order page has a Quality section:
+the batch-hold notice, what completion waits for, each gate with its latest inspection and Inspect / Inspect again,
+the rejected summary, rework orders, NCRs with their CAPAs, and the Quality hold and Raise rework order actions.
+Manufacturing → Rework orders: a list with a status filter, and a rework page with approve, start, mark steps done,
+complete, reinspect, close and cancel, its details, steps and history. The operation screen shows its quality checks
+with Inspect, and a notice when the batch is on hold or rejected.
+
+**Tests.**
+- `ProductionQualityIT`: 2 tests. They cover checkpoint template rules and permission; gates at release, frozen against
+  later archiving; a start gate stopping the operation, inspection timing, a second inspection refused while one is
+  under way, passing; a completion stopped by an in-process gate; a failed gate putting the batch on hold with an NCR
+  (shown only with NCR_VIEW) and stopping reports; rework capped by the operation, the separate approver, steps,
+  quantities, reinspection rules and closing on its decision; the gate passing on a second inspection; the rejected
+  summary and the unresolved list; database protections and audit; a quality hold before production refused, by
+  permission, pausing the floor with `QUALITY_ISSUE`, refused twice, stopping resume, released by an in-process
+  reinspection; rework while held, cancelled rework not counting, a rework order with no source refused, the list
+  filter; facility scope and isolation between organisations.
+- Vitest: `gateInspectable`, `reworkActions`, `reinspectionState`, `parseSteps` and the navigation entry.
+- Playwright: `production-quality.spec.ts` adds a checkpoint from its page, inspects the gate from the work order,
+  raises a rework order from the failed gate, approves, works, completes, reinspects and closes it, inspects the gate
+  again, starts the operation from the floor, and puts the batch on quality hold.
+
+## 11. Phase 6 delivery
+
+**Migration.** `V27__production_completion.sql`: four settings (`completion_tolerance_percent`, default 0;
+`material_variance_percent`, default 5; `completion_requires_final_inspection`, default on; `serial_tracking`, default
+off); `completed_by` and `completed_at` on work orders, with a check that they are set exactly when the order is
+completed or partially completed; `protect_work_order` freezing partially completed orders too; the append-only
+`finished_goods_receipts` with row-level security, one per order and per batch, foreign keys within the tenant; the
+WORK_ORDER_COMPLETE permission for Owner, Admin, Plant Manager and Production Manager.
+
+**Backend.** `CompletionService` (completion view, receipt, close, production record); on `WorkOrderController`
+`GET /{id}/completion`, `POST /{id}/receipt`, `POST /{id}/complete` and `GET /production-record`; `WorkOrderBatchGuard`
+implementing traceability's new `BatchCompletionGuard`; `ProductionService.completeGuarded`;
+`WorkOrderMaterialService.variances` and refusing reservations after receipt; `QualityGateService.receiveBlockers`
+and `closeBlockers`; `WorkOrder.complete`; `completedAt` on the work order response. PARTIALLY_COMPLETED is now a
+closed status, so a plan whose orders closed short can be closed. Reused: `ProductionService` batch completion and
+serial registration, `WorkOrderMaterialService.releaseAll`, `FacilityScope`, `AuditService`.
+
+**Screens.** The work order page has a Completion section: what receiving and closing wait for, the quantities so far,
+material use against need, Receive finished goods (quantity when there are no operations, short and variance reasons,
+serial numbers) and Complete order / Close short, then the receipt. A short close shows its reason above the details.
+Manufacturing settings show and edit the four new rules. The batch page shows the production record for a batch a work
+order made, and no longer offers Complete batch for it.
+
+**Tests.**
+- `ProductionCompletionIT`: 2 tests. They cover receipt blockers (operations, no material) and permission; direct
+  batch completion refused; the quantity fixed by the operations; short reason; material variance reason; serial
+  count and duplicates; receipt with an idempotency key repeated and a second receipt refused; one receipt and nine
+  serials in the database; the batch completed with the received quantity; reservations refused after receipt; close
+  waiting for the final inspection, then needing a reason when short, then partially completed with history and
+  audit; a second close and a hold refused; the order and receipt frozen in the database; the production record, and
+  none for a batch recorded by hand; excess output within the allowance closing completed without a reason; facility
+  scope and isolation between organisations; two receipts at once, one succeeding.
+- Vitest: `completionActions`.
+- Playwright: `production-completion.spec.ts` sets the rules on the settings page, receives finished goods with
+  reasons and serial numbers from the work order page, closes the order short, and checks the batch's serials and
+  production record.
+
+
+## 12. Phase 7 delivery
+
+**Migration.** `V28__advanced_manufacturing.sql`: `break_minutes` and `days_of_week` on the existing `shifts`;
+`capacity_units` and labour, machine and overhead rates on `work_centers`; `downtime_records` with row-level security,
+foreign keys within the tenant, a check tying shop-floor stops to an operation, unique open stops per operation and per
+machine, and the `protect_downtime_record` trigger; DOWNTIME_MANAGE, PRODUCTION_COST_VIEW and PRODUCTION_ANALYTICS_VIEW
+for Owner, Admin, Plant Manager and Production Manager, cost and analytics for the Production Planner, analytics for
+the Quality Manager; the `MANUFACTURING` feature description updated.
+
+**Backend.** `DowntimeService` and `DowntimeController` (`/api/v1/manufacturing/downtime`); `SchedulingService`,
+`SchedulingController` (`/scheduling`) and `POST /work-orders/{id}/reschedule`; `CostingService` and
+`CostingController` (`/costing`); `ProductionAnalyticsService` and `ProductionAnalyticsController` (`/analytics`);
+`ProductionCalendar` (time zone, currency, shifts). `ShopFloorService` and `WorkCenterService` record stops as they
+happen. Reused: facility shifts (`FacilityService.shiftsOf`), purchase order prices (`PurchaseOrderService.linePrices`,
+`averagePrices`), lot prices (`MaterialReceiptService.lotPrices`), unit conversion, the operation timeline and reports,
+finished-goods receipts, `FacilityScope`, `AuditService`, `AttachmentPolicy`.
+
+**Screens.** Downtime page (summary by machine, centre, line, facility or category; list with filters; record, correct
+and end stops). Scheduling page (load against capacity per centre and day, conflicts, orders with warnings,
+reschedule). Production analytics page (headline figures, output, planned against actual, status, quality and
+material, OEE by machine with notes, downtime by category, cost). On the work order page: Cost (planned against
+actual, with what is missing) and Reschedule with its warnings. Facility shifts take working days and a break; work
+centres take capacity and rates.
+
+**Tests.**
+- `AdvancedManufacturingIT`: 2 tests. They cover stops from a floor breakdown (opened, refused to end by hand, ended on
+  resume), corrections limited to notes on recorded stops, database refusal of retiming and deleting, maintenance from
+  machine status, manual stops with permission, the ahead-of-time and end rules, ORDER_ON_HOLD and missing location
+  refused, corrections, summaries by category and machine, audit, facility scope and isolation between organisations;
+  capacity from a shift with a break, an overloaded day and its conflict and warnings, reschedule with permission
+  clearing it, planned maintenance reducing capacity; planned and actual material, labour and overhead cost, a missing
+  machine rate, scrap share, unknown actual unit cost, cost permission and an unreleased order refused; analytics
+  quality rates, machine quality and shift time, efficiency, status counts, cost only with PRODUCTION_COST_VIEW,
+  permission and the period limit.
+- Vitest: shift days, local dates and instants, minutes, percentages and money never shown as zero when unknown,
+  load share, reschedulable statuses, navigation.
+- Playwright: `production-advanced.spec.ts` adds a shift and work centre rates on their pages, sees an overloaded day
+  on the scheduling board and clears it by rescheduling, records and summarises a power failure, checks a work order's
+  cost and its missing machine rate, and reads OEE on the analytics page.

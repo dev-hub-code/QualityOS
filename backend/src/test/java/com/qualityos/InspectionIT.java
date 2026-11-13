@@ -209,6 +209,41 @@ class InspectionIT extends MasterDataFixture {
     }
 
     @Test
+    void aSoleMemberMayReviewTheirOwnInspectionWithAReasonUnderThePolicy() throws Exception {
+        Session owner = register();
+        String id = submittedInspection(owner, shaftTemplate(owner), "20", "20");
+        allowSinglePersonReview(owner);
+
+        as(owner, postJson("/api/v1/inspections/" + id + "/approve", Map.of()))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value("You are reviewing your own work. Add a note saying why."));
+        as(owner, postJson("/api/v1/inspections/" + id + "/approve", Map.of("note", "Only person on site")))
+                .andExpect(jsonPath("$.data.status").value("APPROVED"));
+        assertThat(selfReviews(owner.tenantId(), "INSPECTION_APPROVE")).isEqualTo(1);
+    }
+
+    @Test
+    void thePolicyStopsApplyingWhileASecondMemberIsActive() throws Exception {
+        Session owner = register();
+        String id = submittedInspection(owner, shaftTemplate(owner), "20", "20");
+        allowSinglePersonReview(owner);
+        Session colleague = addMember(owner, "QUALITY_MANAGER");
+
+        as(owner, get("/api/v1/organizations/current/settings"))
+                .andExpect(jsonPath("$.data.singlePersonReview").value(true))
+                .andExpect(jsonPath("$.data.selfReviewInEffect").value(false))
+                .andExpect(jsonPath("$.data.activeMembers").value(2));
+        as(owner, postJson("/api/v1/inspections/" + id + "/approve", Map.of("note", "Only person on site")))
+                .andExpect(status().isUnprocessableContent());
+
+        as(owner, postJson("/api/v1/users/" + membershipId(owner, colleague.userId()) + "/deactivate", Map.of()))
+                .andExpect(status().is2xxSuccessful());
+        as(owner, postJson("/api/v1/inspections/" + id + "/send-back", Map.of("note", "Recheck sample 2")))
+                .andExpect(jsonPath("$.data.status").value("IN_PROGRESS"));
+        assertThat(selfReviews(owner.tenantId(), "INSPECTION_SEND_BACK")).isEqualTo(1);
+    }
+
+    @Test
     void anInspectorCannotReviewTheirOwnWork() throws Exception {
         Session owner = register();
         String id = submittedInspection(owner, shaftTemplate(owner), "20", "20");

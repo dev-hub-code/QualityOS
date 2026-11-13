@@ -6,6 +6,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import com.qualityos.common.tenant.TenantContext;
 import java.util.Map;
+import com.qualityos.common.security.SecretBox;
+import com.qualityos.common.security.Totp;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,6 +55,7 @@ public abstract class AbstractIntegrationTest {
         registry.add("MAIL_RETRY_DELAY", () -> "1ms");
         registry.add("REGISTRATION_EMAIL_VERIFICATION_REQUIRED", () -> "false");
         registry.add("AUTH_RATE_LIMIT_PER_MINUTE", () -> "1000000");
+        registry.add("SECOND_FACTOR_KEY", () -> java.util.Base64.getEncoder().encodeToString(new byte[32]));
     }
 
     @Autowired
@@ -68,11 +73,38 @@ public abstract class AbstractIntegrationTest {
     @Autowired
     protected RecordingMailGateway mail;
 
+    @Autowired
+    private SecretBox secretBox;
+
+    /** Every operator the tests make shares this authenticator secret, so that any test can produce a code. */
+    protected static final byte[] SECOND_FACTOR_SECRET = "integration-test-seed".getBytes(StandardCharsets.US_ASCII);
+
     protected record Session(String email, UUID userId, UUID tenantId, String accessToken, String refreshToken) {
 
         String bearer() {
             return "Bearer " + accessToken;
         }
+    }
+
+    /** An operator with an authenticator already set up, as every Control Center test needs. */
+    protected void makeOperator(Session session, String role) {
+        asDatabaseSuperuser().update("""
+                INSERT INTO platform_admins (user_id, role, reauthenticated_until)
+                VALUES (?, ?, now() + INTERVAL '1 hour')
+                """, session.userId(), role);
+        enrolSecondFactor(session.userId());
+    }
+
+    protected void enrolSecondFactor(UUID userId) {
+        asDatabaseSuperuser().update("""
+                INSERT INTO platform_second_factors (user_id, secret, confirmed_at) VALUES (?, ?, now())
+                ON CONFLICT (user_id) DO UPDATE SET secret = EXCLUDED.secret, confirmed_at = now(), last_used_step = NULL
+                """, userId, secretBox.seal(SECOND_FACTOR_SECRET));
+    }
+
+    /** The code an enrolled test operator's app would show now. */
+    protected static String secondFactorCode() {
+        return Totp.code(SECOND_FACTOR_SECRET, Totp.step(Instant.now()));
     }
 
     protected static String uniqueEmail() {
@@ -159,6 +191,35 @@ public abstract class AbstractIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         java.util.List<String> ids = JsonPath.read(body, "$.data.items[?(@.userId == '" + userId + "')].membershipId");
         return ids.getFirst();
+    }
+
+    /** Lets a sole member review their own work. */
+    protected void allowSinglePersonReview(Session admin) throws Exception {
+        updateSettings(admin, Map.of("singlePersonReview", true));
+    }
+
+    /** Saves the organisation's settings with {@code changes}, keeping every other rule as it is. */
+    protected void updateSettings(Session admin, Map<String, Object> changes) throws Exception {
+        String path = "/api/v1/organizations/current/settings";
+        Map<String, Object> current = JsonPath.read(as(admin, org.springframework.test.web.servlet.request
+                        .MockMvcRequestBuilders.get(path)).andReturn().getResponse().getContentAsString(), "$.data");
+        Map<String, Object> body = new java.util.HashMap<>();
+        for (String key : java.util.List.of(
+                "singlePersonReview", "capaRequiredFrom", "effectivenessRequiredFrom", "version")) {
+            body.put(key, current.get(key));
+        }
+        body.putAll(changes);
+        as(admin, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(body)))
+                .andExpect(status().isOk());
+    }
+
+    protected int selfReviews(UUID tenantId, String step) {
+        return asDatabaseSuperuser().queryForObject("""
+                SELECT count(*) FROM audit_logs
+                WHERE tenant_id = ? AND action = 'SELF_REVIEW' AND new_state ->> 'step' = ?
+                """, Integer.class, tenantId, step);
     }
 
     /** Direct SQL under one tenant's row-level security, or none when {@code tenantId} is null. */

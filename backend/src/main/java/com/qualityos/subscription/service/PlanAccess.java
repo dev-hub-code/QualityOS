@@ -23,7 +23,10 @@ public class PlanAccess {
             "NCR_CAPA", List.of("NCR_", "CAPA_"),
             "REPORTS", List.of("REPORT_"),
             "ADVANCED", List.of("TRACEABILITY_", "RECALL_", "CALIBRATION_", "AUDIT_VIEW", "AUDIT_MANAGE", "AUDIT_CLOSE",
-                    "MATERIAL_CORRECTION_"));
+                    "MATERIAL_CORRECTION_"),
+            "MANUFACTURING", List.of("MANUFACTURING_", "BOM_", "RECIPE_", "ROUTING_", "WORK_ORDER_",
+                    "PRODUCTION_PLAN_", "PRODUCTION_EXECUTE", "PRODUCTION_SUPERVISE",
+                    "QUALITY_CHECKPOINT_", "REWORK_", "DOWNTIME_", "PRODUCTION_COST_", "PRODUCTION_ANALYTICS_"));
 
     private static final String CURRENT = """
             SELECT s.current_period_ends_at, p.grace_days, array_to_string(p.features, ',') AS features

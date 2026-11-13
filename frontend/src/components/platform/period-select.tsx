@@ -16,7 +16,7 @@ export function usePeriod() {
         <Label htmlFor="platform-period">Period</Label>
         <select
           id="platform-period"
-          className="h-9 rounded-md border bg-background px-2 text-sm"
+          className="h-9 rounded-xl border bg-white/70 px-2 text-sm"
           value={preset}
           onChange={(event) => setPreset(event.target.value as PeriodName | "CUSTOM")}
         >

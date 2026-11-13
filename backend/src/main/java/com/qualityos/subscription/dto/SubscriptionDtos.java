@@ -155,7 +155,9 @@ public final class SubscriptionDtos {
             @NotBlank @Size(max = 100) String name,
             @Size(max = 300) String description,
             @NotNull FeatureDefinition.ValueType valueType,
-            boolean defaultEnabled) {
+            boolean defaultEnabled,
+            /** Must be true for any feature the app cannot restrict: the operator confirms people deliver it. */
+            Boolean deliveredByTeam) {
     }
 
     public record UpdateFeatureRequest(
@@ -177,8 +179,11 @@ public final class SubscriptionDtos {
     /** {@code enforced} says whether leaving this out of a plan actually restricts anything. */
     public record FeatureResponse(
             String code, String name, String description, FeatureDefinition.ValueType valueType, boolean active,
-            boolean defaultEnabled, boolean enforced, long organisations, long version) {
+            boolean defaultEnabled, boolean enforced, FeatureDelivery delivery, long organisations, long version) {
     }
+
+    /** Who makes a feature real. Only {@code APP} features are taken away from a plan without them. */
+    public enum FeatureDelivery { APP, TEAM }
 
     public record FeatureOrganisation(UUID tenantId, String name, String planName) {
     }

@@ -44,10 +44,23 @@ public final class QualityDtos {
             UUID materialId,
             @Size(max = 100) String batchNumber,
             @PositiveOrZero @Digits(integer = 12, fraction = 6) BigDecimal rejectedQuantity,
-            UUID facilityId) {
+            UUID facilityId,
+            /* The rejected quantity's unit. Left out, it is the material's. */
+            UUID rejectedUomId) {
     }
 
     /** What an audit hands over when a finding raises an NCR. */
+    /** A failed calibration whose instrument measured these inspections since its last good calibration. */
+    public record CalibrationFailure(
+            UUID calibrationRecordId,
+            UUID instrumentId,
+            String instrumentCode,
+            String instrumentName,
+            java.time.LocalDate calibratedOn,
+            List<String> inspectionNumbers,
+            UUID facilityId) {
+    }
+
     public record AuditFailure(
             UUID auditId,
             UUID findingId,
@@ -73,6 +86,7 @@ public final class QualityDtos {
             boolean critical,
             String description,
             BigDecimal rejectedQuantity,
+            UUID rejectedUomId,
             UUID facilityId) {
     }
 
@@ -111,6 +125,10 @@ public final class QualityDtos {
     public record LinkedCapa(UUID id, String capaNumber, String title, String status) {
     }
 
+    /**
+     * @param capaRequired the organisation's rule needs a closed CAPA before verification can be requested
+     * @param effectivenessRequired a CAPA raised on this NCR must have its fix verified, under the current rule
+     */
     public record NcrDetail(
             UUID id,
             String ncrNumber,
@@ -121,6 +139,7 @@ public final class QualityDtos {
             String source,
             UUID inspectionId,
             UUID auditId,
+            UUID instrumentId,
             UUID supplierId,
             String supplierName,
             UUID materialId,
@@ -129,6 +148,7 @@ public final class QualityDtos {
             UUID defectCategoryId,
             String defectCategoryName,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal rejectedQuantity,
+            UUID rejectedUomId,
             UUID assignedTo,
             String assigneeName,
             String containmentAction,
@@ -138,11 +158,13 @@ public final class QualityDtos {
             UUID verificationRequestedBy,
             Instant createdAt,
             Instant closedAt,
+            boolean capaRequired,
+            boolean effectivenessRequired,
             List<LinkedCapa> capas,
             List<StatusChange> history) {
     }
 
-    /** @param effectivenessRequired ignored for a critical or major NCR, whose fix must always be verified */
+    /** @param effectivenessRequired forced on when the organisation's rule requires it for the NCR's severity */
     public record CreateCapaRequest(
             UUID ncrId,
             @NotBlank @Size(max = 200) String title,

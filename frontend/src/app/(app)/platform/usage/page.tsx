@@ -101,7 +101,7 @@ export default function PlatformUsagePage() {
           <Label htmlFor="usage-alert">Alert</Label>
           <select
             id="usage-alert"
-            className="h-9 rounded-md border bg-background px-2 text-sm"
+            className="h-9 rounded-xl border bg-white/70 px-2 text-sm"
             value={alert}
             onChange={(event) => {
               setAlert(event.target.value);

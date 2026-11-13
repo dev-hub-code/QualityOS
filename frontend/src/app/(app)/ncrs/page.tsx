@@ -13,6 +13,7 @@ import {
   useDefectCategories,
   useMaterials,
   useRefresh,
+  useUnits,
 } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ export default function NcrsPage() {
   const materials = useMaterials();
   const categories = useDefectCategories();
   const facilities = useFacilities();
+  const units = useUnits();
   const [adding, setAdding] = useState(false);
   const fields: FieldDef[] = [
     { name: "title", label: "Title", required: true },
@@ -63,6 +65,7 @@ export default function NcrsPage() {
     { name: "materialId", label: "Material", type: "select", options: materials },
     { name: "batchNumber", label: "Batch" },
     { name: "rejectedQuantity", label: "Rejected quantity", type: "decimal" },
+    { name: "rejectedUomId", label: "Unit, if not the material's own", type: "select", options: units.options },
   ];
   return (
     <div className="space-y-6">

@@ -49,7 +49,7 @@ function TicketDialog({ ticket, onClose }: { ticket: SupportTicket; onClose: () 
             <Label htmlFor="ticket-status">Status</Label>
             <select
               id="ticket-status"
-              className="h-9 rounded-md border bg-background px-2 text-sm"
+              className="h-9 rounded-xl border bg-white/70 px-2 text-sm"
               defaultValue={ticket.status}
               onChange={async (event) => {
                 setFailure("");
@@ -244,7 +244,7 @@ export default function PlatformSupportPage() {
             <Label htmlFor="ticket-filter">Status</Label>
             <select
               id="ticket-filter"
-              className="h-9 rounded-md border bg-background px-2 text-sm"
+              className="h-9 rounded-xl border bg-white/70 px-2 text-sm"
               value={status}
               onChange={(event) => setStatus(event.target.value)}
             >

@@ -26,4 +26,7 @@ public interface ProductionBatchRepository
     List<ProductionBatch> findByBatchNumberContainingIgnoreCaseOrderByBatchNumber(String term, Pageable pageable);
 
     List<ProductionBatch> findByStatusOrderByBatchNumber(ProductionBatch.Status status);
+
+    List<ProductionBatch> findByProductIdInAndFacilityIdAndStatusOrderByCompletedAt(
+            Collection<UUID> productIds, UUID facilityId, ProductionBatch.Status status);
 }

@@ -154,6 +154,40 @@ class QualityIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void theOrganisationDecidesWhichNcrsNeedACapa() throws Exception {
+        updateSettings(owner, Map.of("capaRequiredFrom", "CRITICAL"));
+        String major = ncrAwaitingAction("MAJOR");
+        as(owner, get("/api/v1/ncrs/" + major)).andExpect(jsonPath("$.data.capaRequired").value(false));
+        act(owner, "/ncrs/" + major + "/request-verification", Map.of())
+                .andExpect(jsonPath("$.data.status").value("PENDING_VERIFICATION"));
+        String critical = ncrAwaitingAction("CRITICAL");
+        act(owner, "/ncrs/" + critical + "/request-verification", Map.of())
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value("A critical NCR needs a closed CAPA."));
+
+        updateSettings(owner, Map.of("capaRequiredFrom", "MINOR"));
+        String minor = ncrAwaitingAction("MINOR");
+        as(owner, get("/api/v1/ncrs/" + minor)).andExpect(jsonPath("$.data.capaRequired").value(true));
+        act(owner, "/ncrs/" + minor + "/request-verification", Map.of()).andExpect(status().isUnprocessableContent());
+
+        updateSettings(owner, Map.of("capaRequiredFrom", "NEVER"));
+        act(owner, "/ncrs/" + critical + "/request-verification", Map.of()).andExpect(status().isOk());
+    }
+
+    @Test
+    void theOrganisationDecidesWhichFixesMustBeVerified() throws Exception {
+        updateSettings(owner, Map.of("effectivenessRequiredFrom", "NEVER"));
+        String major = ncrAwaitingAction("MAJOR");
+        as(owner, get("/api/v1/ncrs/" + major)).andExpect(jsonPath("$.data.effectivenessRequired").value(false));
+        act(owner, "/capas", capaRequest(major, owner, FUTURE))
+                .andExpect(jsonPath("$.data.effectivenessRequired").value(false));
+
+        updateSettings(owner, Map.of("effectivenessRequiredFrom", "MINOR"));
+        act(owner, "/capas", capaRequest(ncrAwaitingAction("MINOR"), owner, FUTURE))
+                .andExpect(jsonPath("$.data.effectivenessRequired").value(true));
+    }
+
+    @Test
     void aMinorNcrCanCloseWithoutACapaButNotPastAnOpenOne() throws Exception {
         String ncr = ncrAwaitingAction("MINOR");
         String capa = capa(ncr, owner);
@@ -188,6 +222,29 @@ class QualityIT extends AbstractIntegrationTest {
                 .andExpect(status().isUnprocessableContent());
         act(owner, "/ncrs/" + ncr + "/investigation", Map.of("rootCause", "X", "defectCategoryId", category(owner)))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void aSolePersonCanTakeAnNcrToClosureUnderThePolicy() throws Exception {
+        String ncr = ncrAwaitingAction("MAJOR");
+        String capa = capa(ncr, owner);
+        analyse(capa);
+        implement(capa, addAction(capa, "CORRECTIVE"));
+        allowSinglePersonReview(owner);
+        as(owner, postJson("/api/v1/users/" + membershipId(owner, manager.userId()) + "/deactivate", Map.of()))
+                .andExpect(status().is2xxSuccessful());
+
+        verify(owner, capa, true).andExpect(status().isOk());
+        act(owner, "/capas/" + capa + "/close", Map.of("note", "Effective, checked alone"))
+                .andExpect(jsonPath("$.data.status").value("CLOSED"));
+        act(owner, "/ncrs/" + ncr + "/request-verification", Map.of("note", "Fixed"))
+                .andExpect(jsonPath("$.data.status").value("PENDING_VERIFICATION"));
+        act(owner, "/ncrs/" + ncr + "/close", Map.of("note", "Verified on the floor"))
+                .andExpect(jsonPath("$.data.status").value("CLOSED"));
+
+        assertThat(selfReviews(owner.tenantId(), "CAPA_VERIFY")).isEqualTo(1);
+        assertThat(selfReviews(owner.tenantId(), "CAPA_CLOSE")).isEqualTo(1);
+        assertThat(selfReviews(owner.tenantId(), "NCR_CLOSE")).isEqualTo(1);
     }
 
     @Test
@@ -341,6 +398,40 @@ class QualityIT extends AbstractIntegrationTest {
         mvc.perform(multipart("/api/v1/attachments").file(file).param("entityType", "NCR").param("entityId", ncr)
                         .header(HttpHeaders.AUTHORIZATION, owner.bearer()))
                 .andExpect(status().isUnprocessableContent());
+    }
+
+    private ResultActions uploadEvidence(Session session, String action) throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "control-plan.pdf", "application/pdf", "%PDF-1.4 plan".getBytes(StandardCharsets.UTF_8));
+        return mvc.perform(multipart("/api/v1/attachments").file(file)
+                .param("entityType", "CAPA_ACTION").param("entityId", action)
+                .header(HttpHeaders.AUTHORIZATION, session.bearer()));
+    }
+
+    @Test
+    void eachActionKeepsItsOwnEvidenceUntilTheCapaIsFinished() throws Exception {
+        String capa = capa(null, owner);
+        analyse(capa);
+        String first = addAction(capa, "CORRECTIVE");
+        String second = addAction(capa, "PREVENTIVE");
+
+        uploadEvidence(owner, first).andExpect(status().isCreated());
+        as(owner, get("/api/v1/attachments").param("entityType", "CAPA_ACTION").param("entityId", first))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].fileName").value("control-plan.pdf"));
+        as(owner, get("/api/v1/attachments").param("entityType", "CAPA_ACTION").param("entityId", second))
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        Session viewer = addMember(owner, "VIEWER");
+        uploadEvidence(viewer, second).andExpect(status().isForbidden());
+        Session stranger = register();
+        uploadEvidence(stranger, second).andExpect(status().isNotFound());
+        uploadEvidence(owner, UUID.randomUUID().toString()).andExpect(status().isNotFound());
+
+        act(owner, "/capas/" + capa + "/cancel", Map.of("note", "Superseded")).andExpect(status().isOk());
+        uploadEvidence(owner, second)
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value("This record is closed, so its files cannot change."));
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.List;
@@ -68,10 +69,17 @@ public final class MaterialDtos {
     public record SaveUnitRequest(
             @NotBlank @Size(max = 10) String code,
             @NotBlank @Size(max = 100) String name,
-            @NotBlank @Size(max = 50) String dimension) {
+            @NotBlank @Size(max = 50) String dimension,
+            @Positive @Digits(integer = 12, fraction = 12) BigDecimal toBase) {
     }
 
-    public record UnitResponse(UUID id, String code, String name, String dimension, boolean system) {
+    public record UnitResponse(
+            UUID id,
+            String code,
+            String name,
+            String dimension,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal toBase,
+            boolean system) {
     }
 
     public record SaveCategoryRequest(@NotBlank @Size(max = 100) String name) {

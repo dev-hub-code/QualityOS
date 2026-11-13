@@ -12,6 +12,7 @@ describe("isProxyablePath", () => {
     expect(isProxyablePath(["auth", "invitations", "preview"])).toBe(true);
     expect(isProxyablePath(["auth", "invitations", "accept"])).toBe(false);
     expect(isProxyablePath(["auth", "login"])).toBe(false);
+    expect(isProxyablePath(["auth", "login", "second-factor"])).toBe(false);
   });
 
   it("allows business endpoints", () => {
@@ -44,6 +45,12 @@ describe("forwardedHeaders", () => {
   it("keeps only the address added by the proxy", () => {
     const headers = forwardedHeaders(request("POST", { "x-forwarded-for": "198.51.100.7, 203.0.113.9" }));
     expect(headers.get("x-forwarded-for")).toBe("203.0.113.9");
+  });
+
+  it("carries an idempotency key, so a repeated stock movement is not applied twice", () => {
+    const headers = forwardedHeaders(request("POST", { "idempotency-key": "issue-1", cookie: "secret" }));
+    expect(headers.get("idempotency-key")).toBe("issue-1");
+    expect(headers.get("cookie")).toBeNull();
   });
 });
 

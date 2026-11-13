@@ -1,30 +1,43 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import {
+  Building2,
+  CalendarRange,
+  FileText,
+  Hourglass,
+  Percent,
+  TrendingDown,
+  TrendingUp,
+  UserMinus,
+  UserPlus,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
+import { Tile } from "@/components/app/showcase";
 import { MonthBars, RankBars } from "@/components/analytics/charts";
 import { rate } from "@/components/analytics/kpi-tiles";
 import { formatMoney } from "@/components/billing/subscription-banner";
 import { usePeriod } from "@/components/platform/period-select";
 import { PageHeader, QueryState, Section } from "@/components/records/parts";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { api } from "@/lib/api";
 import type { PlatformAnalytics } from "@/lib/types";
 
 const orNone = (value: number | null) => (value === null ? "None yet" : formatMoney(value));
 
-function tiles(data: PlatformAnalytics): [string, string | number][] {
+function tiles(data: PlatformAnalytics): [string, string | number, LucideIcon][] {
   return [
-    ["MRR", formatMoney(data.mrr)],
-    ["ARR", formatMoney(data.arr)],
-    ["New customers", data.newCustomers],
-    ["Average revenue per organisation", orNone(data.averageRevenue)],
-    ["Customer churn", `${rate(data.customerChurn)} (${data.lostCustomers} of ${data.openingCustomers})`],
-    ["Revenue churn", `${rate(data.revenueChurn)} (${formatMoney(data.revenueLost)} a month)`],
-    ["Trial conversion", `${rate(data.trialConversion)} (${data.converted} of ${data.registered})`],
-    ["Outstanding receivables", formatMoney(data.outstanding)],
-    ["Collected in period", formatMoney(data.collected)],
-    ["Payment collection rate", rate(data.collectionRate)],
+    ["MRR", formatMoney(data.mrr), TrendingUp],
+    ["ARR", formatMoney(data.arr), CalendarRange],
+    ["New customers", data.newCustomers, UserPlus],
+    ["Average revenue per organisation", orNone(data.averageRevenue), Building2],
+    ["Customer churn", `${rate(data.customerChurn)} (${data.lostCustomers} of ${data.openingCustomers})`, UserMinus],
+    ["Revenue churn", `${rate(data.revenueChurn)} (${formatMoney(data.revenueLost)} a month)`, TrendingDown],
+    ["Trial conversion", `${rate(data.trialConversion)} (${data.converted} of ${data.registered})`, Hourglass],
+    ["Outstanding receivables", formatMoney(data.outstanding), FileText],
+    ["Collected in period", formatMoney(data.collected), Wallet],
+    ["Payment collection rate", rate(data.collectionRate), Percent],
   ];
 }
 
@@ -51,13 +64,8 @@ export default function PlatformAnalyticsPage() {
       ) : (
         <>
           <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {tiles(data).map(([label, value]) => (
-              <Card key={label}>
-                <CardContent>
-                  <dt className="text-sm text-muted-foreground">{label}</dt>
-                  <dd className="text-xl font-semibold tabular-nums">{value}</dd>
-                </CardContent>
-              </Card>
+            {tiles(data).map(([label, value, icon]) => (
+              <Tile key={label} icon={icon} label={label} value={value} />
             ))}
           </dl>
           <div className="grid gap-4 xl:grid-cols-2">

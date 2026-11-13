@@ -42,6 +42,20 @@ export interface Organization {
   version: number;
 }
 
+/** The least severe NCR a rule covers: MINOR covers every NCR, NEVER none. */
+export type SeverityThreshold = "CRITICAL" | "MAJOR" | "MINOR" | "NEVER";
+
+/** The organisation's working rules. `version` is null until they are first saved. */
+export interface OrganizationSettings {
+  singlePersonReview: boolean;
+  /** On, and the organisation has one active member, so it applies now. */
+  selfReviewInEffect: boolean;
+  activeMembers: number;
+  capaRequiredFrom: SeverityThreshold;
+  effectivenessRequiredFrom: SeverityThreshold;
+  version: number | null;
+}
+
 export interface Role {
   id: string;
   code: string;
@@ -99,6 +113,9 @@ export interface Shift {
   name: string;
   startsAt: string;
   endsAt: string;
+  breakMinutes: number;
+  /** Monday is 1, Tuesday 2, Wednesday 4 … Sunday 64. */
+  daysOfWeek: number;
 }
 
 export interface FacilityDetail {
@@ -150,6 +167,8 @@ export interface Unit {
   code: string;
   name: string;
   dimension: string;
+  /** How many of the dimension's base unit one of this holds. Null when it converts only to itself. */
+  toBase: string | null;
   system: boolean;
 }
 
@@ -308,8 +327,17 @@ export interface TemplateSummary {
   name: string;
   inspectionType: string;
   materialId: string | null;
+  productId: string | null;
+  /** The material's or product's code and name, or null for a general template. */
+  appliesTo: string | null;
   publishedVersion: number | null;
   hasDraft: boolean;
+}
+
+/** The published templates an inspection can use, and the one already chosen when only one fits. */
+export interface ApplicableTemplates {
+  templates: TemplateSummary[];
+  suggestedId: string | null;
 }
 
 export interface TemplateVersion {
@@ -470,9 +498,12 @@ export interface Ncr extends NcrSummary {
   description: string;
   inspectionId: string | null;
   auditId: string | null;
+  /** Set when a failed calibration raised the NCR. */
+  instrumentId: string | null;
   defectCategoryId: string | null;
   defectCategoryName: string | null;
   rejectedQuantity: string | null;
+  rejectedUomId: string | null;
   assignedTo: string | null;
   containmentAction: string | null;
   rootCause: string | null;
@@ -480,6 +511,10 @@ export interface Ncr extends NcrSummary {
   raisedByName: string;
   verificationRequestedBy: string | null;
   closedAt: string | null;
+  /** The organisation's rule needs a closed CAPA before verification. */
+  capaRequired: boolean;
+  /** A CAPA raised on this NCR must have its fix verified. */
+  effectivenessRequired: boolean;
   capas: { id: string; capaNumber: string; title: string; status: string }[];
   history: StatusChange[];
 }
@@ -537,6 +572,9 @@ export interface ReleasedLot {
   materialName: string;
   internalBatch: string;
   remainingQuantity: string;
+  /** Set aside for work orders, out of what remains. */
+  reservedQuantity: string;
+  uomId: string;
 }
 
 export interface ProductionBatch {
@@ -545,6 +583,7 @@ export interface ProductionBatch {
   productId: string;
   productCode: string;
   productName: string;
+  uomId: string;
   status: string;
   plannedQuantity: string;
   producedQuantity: string | null;
@@ -557,7 +596,12 @@ export interface BatchDetail {
     id: string;
     sourceBatch: string;
     description: string;
+    /** In the source's unit, {@link uomId}. */
     quantity: string;
+    uomId: string;
+    /** As typed, when a unit was named. */
+    enteredQuantity: string | null;
+    enteredUomId: string | null;
     at: string;
     reversalReason: string | null;
   }[];
@@ -599,6 +643,7 @@ export interface TraceNode {
   code: string;
   name: string;
   quantity: string;
+  uomId: string;
   status: string;
   supplierName: string | null;
   supplierBatch: string | null;
@@ -857,6 +902,30 @@ export interface UsedInstrument {
   instrumentCode: string;
   name: string;
   nextDueOn: string;
+  /** Where the inspection stands if the instrument later failed calibration. Null when it was never in doubt. */
+  impactReview: "PENDING" | "RESULT_STANDS" | "REINSPECT" | null;
+}
+
+export interface ImpactReview {
+  id: string;
+  inspectionId: string;
+  inspectionNumber: string;
+  usedOn: string;
+  decision: "RESULT_STANDS" | "REINSPECT" | null;
+  note: string | null;
+  decidedByName: string | null;
+  decidedAt: string | null;
+}
+
+/** The inspections in doubt after one failed calibration, and the NCR it raised. */
+export interface ImpactReviewGroup {
+  calibrationId: string;
+  calibratedOn: string;
+  ncrId: string | null;
+  ncrNumber: string | null;
+  ncrStatus: string | null;
+  pending: number;
+  reviews: ImpactReview[];
 }
 
 export interface Instrument {
@@ -1267,6 +1336,8 @@ export interface Feature {
   active: boolean;
   defaultEnabled: boolean;
   enforced: boolean;
+  /** APP: the product takes it away from a plan without it. TEAM: people deliver it, and the product cannot. */
+  delivery: "APP" | "TEAM";
   organisations: number;
   version: number;
 }
@@ -1343,6 +1414,17 @@ export interface PlatformOperator {
   deactivatedAt: string | null;
   addedBy: string | null;
   lastActivity: string | null;
+  /** Whether the operator has an authenticator app: without one, the Control Center is closed to them. */
+  secondFactor: "NONE" | "PENDING" | "ENROLLED";
+}
+
+export interface SecondFactorState {
+  state: "NONE" | "PENDING" | "ENROLLED";
+}
+
+export interface SecondFactorEnrolment {
+  secret: string;
+  otpauthUri: string;
 }
 
 export interface PlatformAuditEntry {
@@ -1476,4 +1558,918 @@ export interface SupportError {
   occurredAt: string;
   template: string;
   errorType: string | null;
+}
+
+export type ManufacturingModel = "DISCRETE" | "PROCESS" | "HYBRID";
+
+export interface ManufacturingSettings {
+  manufacturingModel: ManufacturingModel;
+  separateApprover: boolean;
+  /** Releasing a work order needs an approved BOM or recipe in effect. */
+  workOrderRequiresBom: boolean;
+  /** Releasing a work order needs an approved routing in effect. */
+  workOrderRequiresRouting: boolean;
+  /** Release reserves what the order needs from the oldest free lots. */
+  reserveOnRelease: boolean;
+  /** Production starts only once all material is reserved and sub-assemblies are in stock. */
+  startRequiresMaterials: boolean;
+  /** More than an order needs may be issued. */
+  allowOverIssue: boolean;
+  /** An operation becomes ready only once the one before it is complete. */
+  operationsInSequence: boolean;
+  /** How far past the order quantity the first operation may report, in percent. */
+  overReportPercent: string;
+  /** Starting an operation at a work centre with machines needs one of them. */
+  operationRequiresMachine: boolean;
+  /** A receipt this far below the order quantity, in percent, still closes the order as completed. */
+  completionTolerancePercent: string;
+  /** Material use further off than this, in percent, needs a reason at receipt. */
+  materialVariancePercent: string;
+  /** Closing waits until the batch's final inspection has decided. */
+  completionRequiresFinalInspection: boolean;
+  /** Discrete products are received with one serial number for each unit. */
+  serialTracking: boolean;
+}
+
+export interface ProductManufacturingSettings {
+  productId: string;
+  /** Null when a hybrid organisation has not chosen for this product. */
+  manufacturingModel: Exclude<ManufacturingModel, "HYBRID"> | null;
+  chosen: boolean;
+}
+
+export interface WorkCenter {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  facilityId: string;
+  facilityCode: string | null;
+  productionLineId: string | null;
+  productionLineCode: string | null;
+  archived: boolean;
+  capacityUnits: number;
+  labourRate: string | null;
+  machineRate: string | null;
+  overheadRate: string | null;
+}
+
+export type MachineStatus = "AVAILABLE" | "RUNNING" | "IDLE" | "MAINTENANCE" | "BREAKDOWN" | "INACTIVE";
+
+export interface Machine {
+  id: string;
+  code: string;
+  name: string;
+  manufacturer: string | null;
+  model: string | null;
+  serialNumber: string | null;
+  workCenterId: string;
+  workCenterCode: string | null;
+  facilityId: string | null;
+  status: MachineStatus;
+  statusReason: string | null;
+  statusChangedAt: string;
+  nextStatuses: MachineStatus[];
+}
+
+export interface MachineStatusEvent {
+  fromStatus: MachineStatus | null;
+  toStatus: MachineStatus;
+  reason: string | null;
+  changedBy: string | null;
+  changedByName: string | null;
+  changedAt: string;
+}
+
+export type RevisionStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "OBSOLETE";
+
+export interface Revision {
+  id: string;
+  kind: "BOM" | "RECIPE" | "ROUTING";
+  productId: string;
+  productCode: string | null;
+  productName: string | null;
+  productUomId: string | null;
+  revision: number;
+  status: RevisionStatus;
+  /** Null for a routing. */
+  baseQuantity: string | null;
+  changeNote: string | null;
+  reviewNote: string | null;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+  inEffect: boolean;
+  submittedBy: string | null;
+  submittedByName: string | null;
+  submittedAt: string | null;
+  approvedBy: string | null;
+  approvedByName: string | null;
+  approvedAt: string | null;
+  obsoletedAt: string | null;
+  createdAt: string;
+}
+
+export interface BomLine {
+  id: string;
+  lineNumber: number;
+  componentType: "MATERIAL" | "PRODUCT";
+  componentId: string;
+  componentCode: string;
+  componentName: string;
+  quantity: string;
+  uomId: string;
+  scrapPercent: string;
+  scales: boolean;
+  notes: string | null;
+}
+
+export interface ProcessParameter {
+  id: string;
+  code: string;
+  name: string;
+  unit: string | null;
+  target: string | null;
+  minimum: string | null;
+  maximum: string | null;
+}
+
+export interface BomDetail {
+  revision: Revision;
+  lines: BomLine[];
+  parameters: ProcessParameter[];
+}
+
+export interface ExplosionRow {
+  level: number;
+  componentType: "MATERIAL" | "PRODUCT";
+  componentId: string;
+  componentCode: string;
+  componentName: string;
+  quantity: string;
+  uomId: string;
+  exploded: boolean;
+}
+
+export interface Explosion {
+  quantity: string;
+  uomId: string;
+  on: string;
+  rows: ExplosionRow[];
+  totals: Omit<ExplosionRow, "level" | "exploded">[];
+}
+
+export interface ScaledRecipe {
+  batchSize: string;
+  uomId: string;
+  factor: string;
+  lines: (Omit<BomLine, "id" | "scrapPercent" | "notes">)[];
+  parameters: ProcessParameter[];
+}
+
+export interface RoutingOperation {
+  id: string;
+  sequence: number;
+  name: string;
+  workCenterId: string;
+  workCenterCode: string;
+  workCenterName: string;
+  setupMinutes: string;
+  runMinutes: string;
+  instructions: string | null;
+  parameters: ProcessParameter[];
+}
+
+export interface RoutingDetail {
+  revision: Revision;
+  operations: RoutingOperation[];
+}
+
+export type PlanStatus = "DRAFT" | "APPROVED" | "CLOSED" | "CANCELLED";
+
+export interface ProductionPlan {
+  id: string;
+  planNumber: string;
+  name: string;
+  facilityId: string;
+  facilityCode: string;
+  periodStart: string;
+  periodEnd: string;
+  status: PlanStatus;
+  statusReason: string | null;
+  notes: string | null;
+  approvedBy: string | null;
+  approvedByName: string | null;
+  approvedAt: string | null;
+  createdAt: string;
+}
+
+export interface PlanLine {
+  id: string;
+  productId: string;
+  productCode: string;
+  productName: string;
+  uomId: string;
+  quantity: string;
+  dueDate: string;
+  notes: string | null;
+  /** What its work orders, cancelled ones aside, add up to. */
+  orderedQuantity: string;
+  remainingQuantity: string;
+  overOrdered: boolean;
+  workOrders: { id: string; workOrderNumber: string; status: WorkOrderStatus; quantity: string }[];
+}
+
+export interface PlanDetail {
+  plan: ProductionPlan;
+  lines: PlanLine[];
+}
+
+export type WorkOrderStatus =
+  | "DRAFT"
+  | "SUBMITTED"
+  | "APPROVED"
+  | "RELEASED"
+  | "IN_PROGRESS"
+  | "ON_HOLD"
+  | "PARTIALLY_COMPLETED"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export type WorkOrderPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
+
+export interface WorkOrder {
+  id: string;
+  workOrderNumber: string;
+  productId: string;
+  productCode: string;
+  productName: string;
+  facilityId: string;
+  facilityCode: string;
+  productionLineId: string | null;
+  productionLineCode: string | null;
+  quantity: string;
+  uomId: string;
+  plannedStart: string;
+  plannedEnd: string;
+  priority: WorkOrderPriority;
+  status: WorkOrderStatus;
+  heldFrom: WorkOrderStatus | null;
+  statusReason: string | null;
+  notes: string | null;
+  planId: string | null;
+  planNumber: string | null;
+  planLineId: string | null;
+  productionBatchId: string | null;
+  productionBatchNumber: string | null;
+  submittedBy: string | null;
+  submittedByName: string | null;
+  submittedAt: string | null;
+  approvedBy: string | null;
+  approvedByName: string | null;
+  approvedAt: string | null;
+  releasedBy: string | null;
+  releasedByName: string | null;
+  releasedAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface WorkOrderDetail {
+  workOrder: WorkOrder;
+  /** What a release would use, or did use, and what would stop it. */
+  definition: {
+    definitionKind: "BOM" | "RECIPE" | null;
+    definitionId: string | null;
+    definitionRevision: number | null;
+    routingId: string | null;
+    routingRevision: number | null;
+    problems: string[];
+  };
+  materials: {
+    lineNumber: number;
+    componentType: "MATERIAL" | "PRODUCT";
+    componentId: string;
+    componentCode: string;
+    componentName: string;
+    requiredQuantity: string;
+    uomId: string;
+  }[];
+  operations: {
+    id: string;
+    sequence: number;
+    name: string;
+    workCenterId: string;
+    workCenterCode: string;
+    workCenterName: string;
+    plannedSetupMinutes: string;
+    plannedRunMinutes: string;
+    instructions: string | null;
+    status: OperationStatus;
+    statusReason: string | null;
+    operatorName: string | null;
+    machineCode: string | null;
+    /** What can come into it: the order quantity first, then the good output of the operation before. */
+    input: string;
+    goodQuantity: string;
+    rejectedQuantity: string;
+    scrapQuantity: string;
+    /** Input not yet processed: work in progress in front of it. */
+    waiting: string;
+  }[];
+  history: {
+    fromStatus: WorkOrderStatus | null;
+    toStatus: WorkOrderStatus;
+    reason: string | null;
+    changedBy: string | null;
+    changedByName: string | null;
+    changedAt: string;
+  }[];
+}
+
+export interface WorkOrderMaterials {
+  lines: {
+    lineNumber: number;
+    componentType: "MATERIAL" | "PRODUCT";
+    componentId: string;
+    componentCode: string;
+    componentName: string;
+    uomId: string;
+    required: string;
+    issued: string;
+    reserved: string;
+    /** Needed and neither issued nor reserved. */
+    outstanding: string;
+    available: string;
+    shortage: string;
+    sources: { sourceType: "LOT" | "BATCH"; id: string; number: string; receivedOn: string | null; freeQuantity: string; uomId: string }[];
+  }[];
+  reservations: {
+    id: string;
+    lineNumber: number;
+    lotId: string;
+    lotNumber: string;
+    quantity: string;
+    openQuantity: string;
+    uomId: string;
+    createdAt: string;
+  }[];
+  consumptions: {
+    id: string;
+    lineNumber: number | null;
+    sourceType: "LOT" | "BATCH";
+    sourceId: string;
+    sourceNumber: string;
+    componentCode: string;
+    componentName: string;
+    quantity: string;
+    uomId: string;
+  }[];
+  movements: {
+    id: string;
+    movementType: "RESERVED" | "UNRESERVED" | "ISSUED" | "RETURNED";
+    lineNumber: number | null;
+    sourceNumber: string;
+    quantity: string;
+    uomId: string;
+    reason: string | null;
+    movedBy: string | null;
+    movedByName: string | null;
+    movedAt: string;
+  }[];
+  shortages: string[];
+}
+
+export type OperationStatus = "PENDING" | "READY" | "IN_PROGRESS" | "PAUSED" | "COMPLETED" | "BLOCKED" | "CANCELLED";
+
+export type LossCategory =
+  | "MACHINE_BREAKDOWN"
+  | "MATERIAL_SHORTAGE"
+  | "POWER_FAILURE"
+  | "QUALITY_ISSUE"
+  | "OPERATOR_UNAVAILABLE"
+  | "PLANNED_MAINTENANCE"
+  | "CHANGEOVER"
+  | "ORDER_ON_HOLD"
+  | "OTHER";
+
+/** A work order operation on the shop floor. Quantities are in the work order's unit. */
+export interface OperationSummary {
+  id: string;
+  workOrderId: string;
+  workOrderNumber: string;
+  workOrderStatus: WorkOrderStatus;
+  priority: WorkOrder["priority"];
+  plannedEnd: string;
+  productId: string;
+  productCode: string;
+  productName: string;
+  facilityId: string;
+  facilityCode: string;
+  sequence: number;
+  name: string;
+  workCenterId: string;
+  workCenterCode: string;
+  workCenterName: string;
+  status: OperationStatus;
+  statusReason: string | null;
+  operatorId: string | null;
+  operatorName: string | null;
+  machineId: string | null;
+  machineCode: string | null;
+  uomId: string;
+  orderQuantity: string;
+  input: string;
+  processed: string;
+  goodQuantity: string;
+  rejectedQuantity: string;
+  scrapQuantity: string;
+  reworkQuantity: string;
+  waiting: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface OperationDetail {
+  operation: OperationSummary;
+  instructions: string | null;
+  plannedSetupMinutes: string;
+  plannedRunMinutes: string;
+  runningSeconds: number;
+  actualSetupMinutes: string | null;
+  blockedFrom: OperationStatus | null;
+  /** An earlier operation is still open, so this one cannot be completed. */
+  previousOpen: boolean;
+  parameters: {
+    code: string;
+    name: string;
+    unit: string | null;
+    target: string | null;
+    minimum: string | null;
+    maximum: string | null;
+    source: "OPERATION" | "RECIPE";
+  }[];
+  reports: {
+    id: string;
+    goodQuantity: string;
+    rejectedQuantity: string;
+    scrapQuantity: string;
+    reworkQuantity: string;
+    reversesReportId: string | null;
+    reversed: boolean;
+    comment: string | null;
+    reportedBy: string | null;
+    reportedByName: string | null;
+    reportedAt: string;
+  }[];
+  measurements: {
+    id: string;
+    parameterCode: string;
+    parameterName: string;
+    unit: string | null;
+    target: string | null;
+    minimum: string | null;
+    maximum: string | null;
+    value: string;
+    withinLimits: boolean;
+    comment: string | null;
+    measuredBy: string | null;
+    measuredByName: string | null;
+    measuredAt: string;
+  }[];
+  events: {
+    id: string;
+    eventType: "READY" | "STARTED" | "PAUSED" | "RESUMED" | "COMPLETED" | "BLOCKED" | "UNBLOCKED" | "CANCELLED" | "ASSIGNED" | "COMMENT";
+    fromStatus: OperationStatus | null;
+    toStatus: OperationStatus | null;
+    lossCategory: LossCategory | null;
+    operatorName: string | null;
+    machineCode: string | null;
+    comment: string | null;
+    by: string | null;
+    byName: string | null;
+    at: string;
+  }[];
+  machines: { id: string; code: string; name: string; status: string; busy: boolean }[];
+  operators: { id: string; name: string }[];
+  /** The production batch's status: on hold or rejected, nothing more is made on it. */
+  batchStatus: string | null;
+  gates: QualityGate[];
+}
+
+export type CheckpointStage = "OPERATION_START" | "IN_PROCESS" | "OPERATION_COMPLETION" | "FINAL_RELEASE";
+
+export interface QualityCheckpoint {
+  id: string;
+  name: string;
+  stage: CheckpointStage;
+  templateId: string;
+  templateCode: string;
+  templateName: string;
+  inspectionType: string;
+  productId: string | null;
+  productCode: string | null;
+  workCenterId: string | null;
+  workCenterCode: string | null;
+  operationSequence: number | null;
+  mandatory: boolean;
+  archived: boolean;
+}
+
+export type GateStatus = "PENDING" | "IN_INSPECTION" | "ON_HOLD" | "PASSED" | "FAILED";
+
+export interface GateInspection {
+  id: string;
+  inspectionNumber: string;
+  status: string;
+  finalResult: string | null;
+  disposition: string | null;
+  createdAt: string;
+}
+
+export interface QualityGate {
+  id: string;
+  name: string;
+  stage: CheckpointStage;
+  mandatory: boolean;
+  operationId: string | null;
+  operationSequence: number | null;
+  operationName: string | null;
+  templateId: string;
+  templateCode: string;
+  templateName: string;
+  /** Read from the latest inspection. */
+  status: GateStatus;
+  inspections: GateInspection[];
+}
+
+export type ReworkStatus = "OPEN" | "APPROVED" | "IN_PROGRESS" | "AWAITING_INSPECTION" | "CLOSED" | "CANCELLED";
+
+export interface ReworkSummary {
+  id: string;
+  reworkNumber: string;
+  workOrderId: string;
+  workOrderNumber: string;
+  productionBatchId: string;
+  batchNumber: string | null;
+  productCode: string | null;
+  productName: string | null;
+  operationId: string | null;
+  operationSequence: number | null;
+  ncrId: string | null;
+  ncrNumber: string | null;
+  quantity: string;
+  uomId: string;
+  status: ReworkStatus;
+  finalDisposition: string | null;
+  createdAt: string;
+}
+
+export interface ReworkDetail {
+  rework: ReworkSummary;
+  reason: string;
+  instructions: string | null;
+  statusReason: string | null;
+  sourceInspectionId: string | null;
+  sourceInspectionNumber: string | null;
+  approvedBy: string | null;
+  approvedByName: string | null;
+  approvedAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  reworkedQuantity: string | null;
+  scrappedQuantity: string | null;
+  reinspection: GateInspection | null;
+  closedAt: string | null;
+  steps: {
+    id: string;
+    sequence: number;
+    description: string;
+    workCenterId: string | null;
+    workCenterCode: string | null;
+    completedBy: string | null;
+    completedByName: string | null;
+    completedAt: string | null;
+    note: string | null;
+  }[];
+  history: {
+    fromStatus: ReworkStatus | null;
+    toStatus: ReworkStatus;
+    reason: string | null;
+    changedBy: string | null;
+    changedByName: string | null;
+    changedAt: string;
+  }[];
+}
+
+export interface WorkOrderQuality {
+  batchId: string | null;
+  batchNumber: string | null;
+  batchStatus: string | null;
+  onHold: boolean;
+  gates: QualityGate[];
+  /** Empty without permission to see NCRs. */
+  ncrs: { id: string; ncrNumber: string; title: string; status: string; severity: string }[];
+  capas: { id: string; capaNumber: string; title: string; status: string; ncrId: string }[];
+  reworkOrders: ReworkSummary[];
+  rejected: { rejected: string; toRework: string; scrapped: string; inRework: string; reworkedAccepted: string };
+  /** What completion waits for. */
+  unresolved: string[];
+}
+
+/** A material line at receipt: what the received quantity needed against what was issued. */
+export interface MaterialVariance {
+  lineNumber: number;
+  componentCode: string;
+  componentName: string;
+  uomId: string;
+  expected: string;
+  issued: string;
+  difference: string;
+  percent: string | null;
+  /** Further off than the organisation's material variance tolerance. */
+  outside: boolean;
+}
+
+export interface FinishedGoodsReceipt {
+  id: string;
+  quantity: string;
+  orderedQuantity: string;
+  expectedQuantity: string | null;
+  rejectedQuantity: string;
+  scrapQuantity: string;
+  reworkedQuantity: string;
+  shortReason: string | null;
+  varianceReason: string | null;
+  materials: MaterialVariance[];
+  serialCount: number;
+  receivedBy: string | null;
+  receivedByName: string | null;
+  receivedAt: string;
+}
+
+/** Receiving a work order's finished goods and closing it. */
+export interface WorkOrderCompletion {
+  orderedQuantity: string;
+  /** What the operations turned out good, with accepted rework; null without operations. */
+  expectedQuantity: string | null;
+  rejectedQuantity: string;
+  scrapQuantity: string;
+  reworkedQuantity: string;
+  serialsRequired: boolean;
+  materials: MaterialVariance[];
+  receiveBlockers: string[];
+  receipt: FinishedGoodsReceipt | null;
+  closeBlockers: string[];
+  /** How the order closes, or closed, once received. */
+  closesAs: "COMPLETED" | "PARTIALLY_COMPLETED" | null;
+  completedAt: string | null;
+  completedByName: string | null;
+}
+
+/** How a batch was made, when a work order made it. */
+export interface ProductionRecord {
+  workOrderId: string;
+  workOrderNumber: string;
+  status: WorkOrderStatus;
+  definitionKind: "BOM" | "RECIPE" | null;
+  definitionRevision: number | null;
+  routingRevision: number | null;
+  operations: {
+    sequence: number;
+    name: string;
+    workCenterCode: string | null;
+    status: string;
+    operators: string[];
+    machines: string[];
+    startedAt: string | null;
+    completedAt: string | null;
+    goodQuantity: string;
+    rejectedQuantity: string;
+    scrapQuantity: string;
+  }[];
+  gates: string[];
+  reworkOrders: string[];
+  receipt: FinishedGoodsReceipt | null;
+}
+
+export type DowntimeSource = "SHOP_FLOOR" | "MACHINE" | "MANUAL";
+
+export interface DowntimeRecord {
+  id: string;
+  facilityId: string;
+  facilityCode: string | null;
+  workCenterId: string;
+  workCenterCode: string | null;
+  machineId: string | null;
+  machineCode: string | null;
+  workOrderId: string | null;
+  workOrderNumber: string | null;
+  operationId: string | null;
+  operationSequence: number | null;
+  source: DowntimeSource;
+  category: LossCategory;
+  planned: boolean;
+  startedAt: string;
+  endedAt: string | null;
+  minutes: string;
+  reason: string;
+  responsibleDepartment: string | null;
+  comments: string | null;
+  recordedByName: string | null;
+  endedByName: string | null;
+}
+
+export type DowntimeGroupBy = "MACHINE" | "WORK_CENTER" | "PRODUCTION_LINE" | "FACILITY" | "CATEGORY";
+
+export interface DowntimeSummaryRow {
+  key: string;
+  label: string;
+  stops: number;
+  minutes: string;
+  plannedMinutes: string;
+  unplannedMinutes: string;
+}
+
+export interface DowntimeSummary {
+  from: string;
+  to: string;
+  timezone: string;
+  groupBy: DowntimeGroupBy;
+  rows: DowntimeSummaryRow[];
+  totalMinutes: string;
+  plannedMinutes: string;
+  unplannedMinutes: string;
+}
+
+export interface DayLoad {
+  date: string;
+  capacityMinutes: string;
+  plannedDowntimeMinutes: string;
+  loadMinutes: string;
+  overloaded: boolean;
+}
+
+export interface CentreLoad {
+  id: string;
+  code: string;
+  name: string;
+  units: number;
+  days: DayLoad[];
+}
+
+export interface ScheduledOrder {
+  id: string;
+  workOrderNumber: string;
+  productCode: string;
+  status: WorkOrderStatus;
+  priority: WorkOrderPriority;
+  plannedStart: string;
+  plannedEnd: string;
+  remainingMinutes: string;
+  warnings: string[];
+}
+
+export interface SchedulingConflict {
+  workCenterId: string;
+  workCenterCode: string;
+  date: string;
+  capacityMinutes: string;
+  loadMinutes: string;
+  workOrderNumbers: string[];
+}
+
+export interface SchedulingBoard {
+  facilityId: string;
+  from: string;
+  to: string;
+  timezone: string;
+  shiftsDefined: boolean;
+  workCenters: CentreLoad[];
+  orders: ScheduledOrder[];
+  conflicts: SchedulingConflict[];
+}
+
+/** Money as text, in the organisation's currency; null when it is not known. */
+export interface CostTotals {
+  material: string | null;
+  labour: string | null;
+  machine: string | null;
+  overhead: string | null;
+  scrap: string | null;
+  rework: string | null;
+  total: string | null;
+  unit: string | null;
+}
+
+export interface WorkOrderCost {
+  workOrderId: string;
+  workOrderNumber: string;
+  status: WorkOrderStatus;
+  currency: string;
+  orderedQuantity: string;
+  receivedQuantity: string;
+  materials: {
+    lineNumber: number;
+    componentCode: string;
+    componentName: string;
+    uomId: string;
+    plannedQuantity: string;
+    plannedCost: string | null;
+    issuedQuantity: string;
+    actualCost: string | null;
+  }[];
+  operations: {
+    sequence: number;
+    name: string;
+    workCenterCode: string;
+    plannedHours: string;
+    actualHours: string;
+    plannedCost: string | null;
+    actualCost: string | null;
+  }[];
+  planned: CostTotals;
+  actual: CostTotals;
+  complete: boolean;
+  missing: string[];
+}
+
+export interface CostSummary {
+  from: string;
+  to: string;
+  currency: string;
+  orders: {
+    workOrderId: string;
+    workOrderNumber: string;
+    productCode: string;
+    status: WorkOrderStatus;
+    completedAt: string | null;
+    orderedQuantity: string;
+    receivedQuantity: string;
+    plannedTotal: string | null;
+    actualTotal: string | null;
+    plannedUnit: string | null;
+    actualUnit: string | null;
+    complete: boolean;
+  }[];
+  plannedTotal: string | null;
+  actualTotal: string | null;
+  complete: boolean;
+}
+
+export interface ProductOutput {
+  productId: string;
+  productCode: string;
+  productName: string;
+  uomId: string;
+  ordered: string | null;
+  received: string | null;
+  orders: number;
+}
+
+export interface MachineOee {
+  machineId: string | null;
+  machineCode: string | null;
+  workCenterCode: string | null;
+  shiftMinutes: string | null;
+  plannedDowntimeMinutes: string | null;
+  plannedProductionMinutes: string | null;
+  runningMinutes: string | null;
+  unplannedDowntimeMinutes: string | null;
+  utilisation: string | null;
+  availability: string | null;
+  performance: string | null;
+  quality: string | null;
+  oee: string | null;
+  notes: string[];
+}
+
+export interface ProductionAnalytics {
+  from: string;
+  to: string;
+  timezone: string;
+  facilityId: string | null;
+  production: ProductOutput[];
+  plannedVersusActual: ProductOutput[];
+  ordersCompleted: number;
+  ordersPartiallyCompleted: number;
+  ordersOnTime: number;
+  workOrderStatus: { status: WorkOrderStatus; count: number }[];
+  quality: {
+    processed: string;
+    good: string;
+    rejected: string;
+    scrap: string;
+    rework: string;
+    rejectionRate: string | null;
+    scrapRate: string | null;
+    reworkRate: string | null;
+  };
+  efficiency: { operations: number; plannedMinutes: string; actualMinutes: string; percent: string | null };
+  materialVariance: { receipts: number; lines: number; linesOutside: number; averageAbsolutePercent: string | null };
+  machines: MachineOee[];
+  overall: MachineOee;
+  downtimeByCategory: DowntimeSummaryRow[];
+  /** Absent for those who may not see production cost. */
+  cost?: CostSummary | null;
 }

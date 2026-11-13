@@ -172,6 +172,17 @@ public class AccountEmailService {
         mail(user, EmailTemplate.SECURITY_ALERT, "/forgot-password", Map.of("lockMinutes", lock.toMinutes()));
     }
 
+    /** Told to the account itself, so that an authenticator somebody else set up does not go unnoticed. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void sendSecondFactorEnrolled(UUID userId) {
+        users.findById(userId).ifPresent(user -> mail(user, EmailTemplate.SECOND_FACTOR_ENROLLED, "/login", Map.of()));
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void sendSecondFactorReset(UUID userId) {
+        users.findById(userId).ifPresent(user -> mail(user, EmailTemplate.SECOND_FACTOR_RESET, "/login", Map.of()));
+    }
+
     private void mail(User user, EmailTemplate template, String path, Map<String, Object> details) {
         Map<String, Object> variables = new HashMap<>(details);
         variables.put("recipientName", user.getFullName());

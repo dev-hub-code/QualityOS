@@ -11,6 +11,7 @@ import {
   StatusBadge,
   useApprovedSuppliers,
   useMaterials,
+  useUnits,
 } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { CorrectionDetail, TimelineEvent, TraceNode, TraceReport } from "@/lib/types";
 
 function Node({ node }: { node: TraceNode }) {
+  const unit = useUnits().label(node.uomId);
   return (
     <li className="py-2 text-sm">
       <span className="flex flex-wrap items-center gap-2">
@@ -28,6 +30,7 @@ function Node({ node }: { node: TraceNode }) {
       </span>
       <p>
         {node.code} – {node.name} · {formatQuantity(node.quantity)}
+        {unit && ` ${unit}`}
       </p>
       {node.supplierName && (
         <p className="text-muted-foreground">
@@ -114,13 +117,13 @@ export default function TraceReportPage() {
       </PageHeader>
       {correcting && <CorrectLotDialog lot={subject} onClose={() => setCorrecting(false)} />}
       {affectedCustomers.length > 0 && (
-        <p className="rounded-lg border p-3 text-sm">
+        <p className="glass rounded-2xl p-3 text-sm">
           <span className="font-medium">Customers who received this:</span> {affectedCustomers.join(", ")}.{" "}
           <RecordLink href={`/traceability/${encodeURIComponent(subject.batchNumber)}/recall`}>Recall report</RecordLink>
         </p>
       )}
       {unconfirmedCustomers.length > 0 && (
-        <p className="rounded-lg border p-3 text-sm">
+        <p className="glass rounded-2xl p-3 text-sm">
           <span className="font-medium">Shipment not confirmed for:</span> {unconfirmedCustomers.join(", ")}. These goods
           may not have left yet.
         </p>

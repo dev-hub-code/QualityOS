@@ -82,7 +82,7 @@ export function OrganizationForm({ organization, submitLabel, readOnly, onSaved 
           <Label htmlFor="organization-language">Default email language</Label>
           <select
             id="organization-language"
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            className="h-9 w-full rounded-xl border bg-white/70 px-3 text-sm"
             value={language}
             onChange={(event) => setLanguage(event.target.value)}
           >

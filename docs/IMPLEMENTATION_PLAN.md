@@ -16,6 +16,7 @@ account emails a real customer needs.
 | 9 Analytics | Dashboard, scorecards, Pareto, PDF and Excel exports | Reports honour tenant and facility scope | **Done** |
 | 10 Subscription | Plans, trials, limits, invoices | Limits enforced, prices editable by admin | **Done** |
 | 12 Control Center | Platform dashboard, plans, organisations, then billing, entitlements, operators and support. See [PLATFORM_ADMIN.md](PLATFORM_ADMIN.md) | Every acceptance item in the owner's brief | **All 5 phases built** |
+| 13 Manufacturing | BOMs, recipes, routings, work centres and machines, then work orders, inventory, shop floor, quality gates, completion and advanced analytics. See [MANUFACTURING.md](MANUFACTURING.md) | Each of its seven phases tested and documented | **All 7 phases built** |
 | 11 Production | Terraform, ECS, RDS, S3, Secrets Manager, CI/CD, monitoring, backups | Deployed and restore-tested | Deferred |
 
 Later: Module 12 (AI) after Phase 9, because it depends on accumulated data. SMS and WhatsApp stay behind
@@ -42,19 +43,22 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Organisation branding in email is the organisation name only. There is no logo upload | When a user needs it |
 | With verification switched off for private use, registration reveals that an email has an account | Private use only |
 | Sampling is fixed, percentage or every unit; AQL tables (such as ISO 2859-1) are not built | When a customer needs them |
-| A one-person organisation cannot finish an inspection, close an NCR or verify its own CAPA, because each needs a second person | With `tenant_settings` |
-| NCR and CAPA workflows are fixed: a critical or major NCR always needs a closed CAPA and a verified fix. There are no per-tenant settings | With `tenant_settings` |
+| A one-person organisation can review its own inspections, NCR closures and CAPA verifications once an administrator turns this on under Settings. It applies only while there is one active member, and each use needs a reason, recorded as `SELF_REVIEW`. An administrator could deactivate everyone else to use it, but both steps are in the audit log | Review after real use |
+| Recalls, audits and material corrections still need a second person, even in a one-person organisation | When a user needs it |
+| Each organisation chooses which NCR severities need a closed CAPA and which need a verified fix (default: critical and major). The NCR statuses and their order are fixed | When a user needs it |
+| A change to the CAPA rule applies to open NCRs at once. A CAPA keeps the verification rule it was raised under | By design |
 | An NCR raised on a held lot has no rejected quantity, and a later reject does not fill it in | Review after real use |
 | Completing a CAPA action needs `CAPA_MANAGE`, so an action owner without it must ask someone who has it | Review after real use |
 | Overdue reminders cover the CAPA as a whole, not each action | When a user needs it |
-| Only inspection failures raise NCRs automatically. Evidence is attached to the CAPA, not to each action | When a user needs it |
+| Only inspection failures raise NCRs automatically. Evidence can be attached to the CAPA as a whole or to each action (`CAPA_ACTION`); both follow the CAPA's permissions and lock when it is finished. Evidence is not required to complete an action | When a user needs it |
 | A single inspection's report is a printable page, not a generated PDF. The inspection report across a period is one | When a user needs it |
-| A template can only be chosen by hand; none is picked automatically for a material | When a user needs it |
+| An inspection takes the one published template that fits when none is chosen: the material's or product's own before a general one, of IQC for a lot, the type due at a batch's stage, or FQC/OQC for returns. When several or none fit, the person chooses, and the start dialogs list only fitting templates with that one preselected | Review after real use |
 | Production batches take IPQC and FQC inspections only. OQC and the other template types have no production flow | When a user needs it |
-| A template cannot yet be limited to a product in the UI, and quantities consumed are not converted between units | When a user needs it |
+| A template's material or product is set when it is created and cannot be changed afterwards | When a user needs it |
+| Material used can be entered in any unit of the same kind as its lot or batch, and is converted to that unit. The dialog lists every unit and the server refuses one that does not convert. A correction of material used is still entered in the source's own unit. Units are added through the API alone, as before | When a user needs it |
 | A customer who returned everything still shows as having received the batch. This is deliberate: a recall should reach them | By design |
-| The return screen takes one line at a time, though the API takes several. Credit notes and refunds are separate and not built | When a user needs it |
-| Search covers lots, batches, products and serial numbers, not NCRs, CAPAs or suppliers. Serial search reports where a unit is now; earlier customers are on its detail page | When a user needs it |
+| A return covers any lines of one dispatch at once. A return across several dispatches is recorded once per dispatch. Credit notes and refunds are separate and not built | When a user needs it |
+| Global search covers lots, batches, products and serial numbers, and NCRs (number, title, batch), CAPAs (number, title) and suppliers (code, name, GSTIN). Each kind shows only to people allowed to view it, and stops at 10 matches. Serial search reports where a unit is now; earlier customers are on its detail page | When a user needs it |
 | A lot's internal batch number cannot be corrected, because other records refer to it by number. It is generated, so it cannot be mistyped | By design |
 | A corrected lot keeps its original purchase order line, and a finished NCR keeps its original supplier and material | By design: history is preserved |
 | A correction of an inspected lot does not trigger reinspection. It needs two approvers, who decide whether to act | Review after real use |
@@ -65,17 +69,19 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A lot from another plant cannot be consumed by a member limited elsewhere. An unlimited member must record a transfer like that | Review after real use |
 | A batch trace can still show inspections and NCRs of a lot from another plant, because lineage must stay whole | By design |
 | The recall PDF does not shape Devanagari: names stay readable, but conjuncts do not form correctly | Before Hindi or Marathi customer names matter |
-| A dispatch after a recall starts is not blocked. Its customer joins the recall when closure is requested or approved | Review after real use |
-| Recalls start from one batch in the UI, though the API takes several. Linking a CAPA is API only | When a user needs it |
+| A dispatch of a batch under an open recall, or of anything made from it, is refused. Someone with `RECALL_MANAGE` can override with a reason, which is audited, and the customer joins the recall at once. Every built-in role that can dispatch can also manage recalls, so in practice the override is a reason, not a second person | Review after real use |
+| A dispatch recorded before a recall started can still have its shipment confirmed. The recall already covers its customer | Review after real use |
+| A recall starts from the traced batch, and other batch numbers can be typed in to join it. Batches cannot be added after the recall starts. A CAPA can be linked when it starts, from the first 100 CAPAs | When a user needs it |
 | Recording an instrument on an inspection is optional, and applies to the whole inspection, not each measurement | Review after real use |
-| A failed calibration flags the inspections in doubt and notifies people, but does not raise an NCR or reopen them | Review after real use |
+| A decision to reinspect after a failed calibration holds the goods that are left, but does not recall what was already used or dispatched, nor start the new inspection | Review after real use |
 | Audits are planned one at a time, with no recurring schedule or reminder before the date. A missed audit shows as overdue in the list | When a user needs it |
 | A recorded audit finding cannot be edited. A wrong one is handled by cancelling its NCR, and it stays on the report | Review after real use |
-| `tenant_settings` is not built | When a user needs it |
+| `tenant_settings` holds the review rule and the two NCR and CAPA rules so far | Grows as rules are added |
 | Dashboard figures are kept for 60 seconds per organisation, period and facility scope. Anything written to the audit log clears them at once on the same instance. Other changes, and changes on another instance, show within 60 seconds | With production work: use a shared cache if the figures must agree across instances |
 | A report stops at 5,000 rows and says so, so a larger period must be split | When a user needs it |
 | Key figures and charts show to anyone with `REPORT_VIEW`, as totals, even without the view permission for each kind of record. Lists and reports need that permission too | Review after real use |
-| Material rejection adds quantities as recorded, without converting units | When a user needs it |
+| The material rejection rate converts quantities to the base unit of their kind. Kinds that cannot be added together, such as kilograms and pieces, each get a rate, and the figure weighs those rates by their lots. The material rejection report shows each material in its own unit | Review after real use |
+| NCRs raised before unit conversion keep their rejected quantity without a unit | By design |
 | Cashfree checkout is built but has not been run against Cashfree's sandbox. Its calls were tested against a local stand-in | Before enabling live keys |
 | No refund flow exists. A refund is made in the Cashfree dashboard and is not recorded here | When a user needs it |
 | A payment that cannot be applied, such as one for a replaced invoice, shows only in the audit log as `PAYMENT_NEEDS_REVIEW`. A person must refund it or apply it by hand | Before customer launch |
@@ -98,6 +104,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | Lists show only active records, with no way to restore an archived one | When a user needs it |
 | Facility, supplier, material and product pickers load the first 100 records | Add search when a tenant exceeds this |
+| Manufacturing has its foundation, production plans, work orders up to started production, material reservation, issue and return, shop-floor execution of operations, quality gates and rework: no completion or finished-goods receipt yet. See [MANUFACTURING.md](MANUFACTURING.md) for what each later phase adds | Manufacturing phases 6 and 7 |
 | Facility sub-records (departments, lines, shifts), supplier contacts, material-to-product mappings, and new units are not audited individually | Review after real use |
 
 ## Definition of done for each phase

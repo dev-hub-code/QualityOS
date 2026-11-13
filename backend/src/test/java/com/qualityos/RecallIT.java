@@ -284,19 +284,77 @@ class RecallIT extends TraceabilityFixture {
         return request;
     }
 
+    private ResultActions dispatchWithOverride(Session session, String to, String from, String reason)
+            throws Exception {
+        return as(session, postJson("/api/v1/dispatches", Map.of(
+                "customerId", to, "dispatchedOn", TODAY, "recallOverrideReason", reason,
+                "items", List.of(Map.of("productionBatchId", from, "quantity", "1", "serialNumbers", List.of())))));
+    }
+
     @Test
-    void someoneWhoReceivesTheBatchAfterTheRecallStartsMustBeContactedToo() throws Exception {
+    void goodsUnderRecallStayInUnlessSomeoneOverridesWithAReason() throws Exception {
         String partly = releasedBatch(releasedLot("10").id(), "10", "10");
         dispatch(customer, partly, "1", List.of()).andExpect(status().isCreated());
         batch = partly;
         String recall = resolved();
+        String recallNumber = JsonPath.read(body(as(owner, get("/api/v1/recalls/" + recall))), "$.data.recallNumber");
         String late = idOf(body(as(owner, postJson("/api/v1/customers", Map.of("code", code(), "name", "Bajaj Auto")))
                 .andExpect(status().isCreated())));
-        dispatch(late, partly, "1", List.of()).andExpect(status().isCreated());
+
+        dispatch(late, partly, "1", List.of())
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.code").value("RECALL_HOLD"))
+                .andExpect(jsonPath("$.error.message").value("Batch " + numberOf(partly) + " is under recall "
+                        + recallNumber + ". Someone who can manage recalls may still dispatch it, with a reason."));
+        dispatchWithOverride(owner, late, partly, "  ").andExpect(jsonPath("$.error.code").value("RECALL_HOLD"));
+
+        String shipped = idOf(body(dispatchWithOverride(owner, late, partly, "Replacement units, checked by QA")
+                .andExpect(status().isCreated())));
+        assertThat(asDatabaseSuperuser().queryForList(
+                "SELECT new_state ->> 'reason' FROM audit_logs WHERE action = 'RECALL_HOLD_OVERRIDDEN' AND entity_id = ?",
+                String.class, shipped)).containsExactly("Replacement units, checked by QA");
 
         requestClosure(owner, recall, true).andExpect(status().isUnprocessableContent());
+        as(owner, get("/api/v1/recalls/" + recall + "/customers")).andExpect(jsonPath("$.data.length()").value(2));
+    }
 
-        as(owner, get("/api/v1/recalls/" + recall + "/customers")).andExpect(jsonPath("$.data.length()").value(1));
+    @Test
+    void whatIsMadeFromARecalledBatchIsHeldUntilTheRecallCloses() throws Exception {
+        String component = releasedBatch(releasedLot("60").id(), "60", "30");
+        String assembly = startBatch(product());
+        as(owner, postJson("/api/v1/production-batches/" + assembly + "/consume",
+                        Map.of("parentBatchId", component, "quantity", "20")))
+                .andExpect(status().isOk());
+        complete(assembly, "20").andExpect(status().isOk());
+        inspectBatch(assembly, "FQC", "20.0", "ACCEPT");
+        batch = component;
+        String recall = start();
+
+        dispatch(customer, assembly, "1", List.of()).andExpect(jsonPath("$.error.code").value("RECALL_HOLD"));
+
+        requestClosure(owner, recall, false).andExpect(status().isOk());
+        dispatch(customer, assembly, "1", List.of()).andExpect(jsonPath("$.error.code").value("RECALL_HOLD"));
+        as(manager, postJson("/api/v1/recalls/" + recall + "/close", Map.of())).andExpect(status().isOk());
+        dispatch(customer, assembly, "1", List.of()).andExpect(status().isCreated());
+    }
+
+    @Test
+    void onlySomeoneWhoCanManageRecallsMayOverride() throws Exception {
+        String partly = releasedBatch(releasedLot("10").id(), "10", "10");
+        batch = partly;
+        start();
+        String role = idOf(body(as(owner, postJson("/api/v1/roles", Map.of(
+                        "name", "Dispatch only " + code(), "permissions", List.of("TRACEABILITY_VIEW", "TRACEABILITY_MANAGE"))))
+                .andExpect(status().isCreated())));
+        Session clerk = addMember(owner, "VIEWER");
+        as(owner, put("/api/v1/users/" + membershipId(owner, clerk.userId()) + "/roles").contentType("application/json")
+                        .content(json.writeValueAsString(Map.of("roleIds", List.of(role)))))
+                .andExpect(status().isOk());
+
+        dispatchWithOverride(clerk, customer, partly, "Customer insists")
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.message").value(
+                        "Only someone who can manage recalls may dispatch goods under recall."));
     }
 
     @Test

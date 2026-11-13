@@ -30,7 +30,7 @@ public class NonConformance extends TenantOwnedEntity {
         }
     }
 
-    public enum Source { INSPECTION, MANUAL, AUDIT }
+    public enum Source { INSPECTION, MANUAL, AUDIT, CALIBRATION }
 
     public enum Severity { CRITICAL, MAJOR, MINOR }
 
@@ -48,6 +48,8 @@ public class NonConformance extends TenantOwnedEntity {
     private UUID inspectionId;
     private UUID auditId;
     private UUID auditFindingId;
+    private UUID calibrationRecordId;
+    private UUID instrumentId;
     private UUID supplierId;
     private UUID materialId;
     private String batchNumber;
@@ -59,6 +61,7 @@ public class NonConformance extends TenantOwnedEntity {
     private String title;
     private String description;
     private BigDecimal rejectedQuantity;
+    private UUID rejectedUomId;
     private UUID assignedTo;
     private String containmentAction;
     private String rootCause;
@@ -77,6 +80,16 @@ public class NonConformance extends TenantOwnedEntity {
         return ncr;
     }
 
+    /** An NCR for measurements in doubt after an instrument failed calibration. */
+    public static NonConformance fromCalibration(String ncrNumber, UUID calibrationRecordId, UUID instrumentId,
+            String title, String description) {
+        NonConformance ncr = new NonConformance(ncrNumber, Source.CALIBRATION, null, null, null, null, null,
+                Severity.MAJOR, title, description, null);
+        ncr.calibrationRecordId = calibrationRecordId;
+        ncr.instrumentId = instrumentId;
+        return ncr;
+    }
+
     public NonConformance(String ncrNumber, Source source, UUID inspectionId, UUID supplierId, UUID materialId,
             String batchNumber, UUID defectCategoryId, Severity severity, String title, String description,
             BigDecimal rejectedQuantity) {
@@ -91,6 +104,12 @@ public class NonConformance extends TenantOwnedEntity {
         this.title = title;
         this.description = description;
         this.rejectedQuantity = rejectedQuantity;
+    }
+
+    /** Names the unit of the rejected quantity. Without a quantity there is nothing to measure. */
+    public NonConformance rejectedIn(UUID uomId) {
+        this.rejectedUomId = rejectedQuantity == null ? null : uomId;
+        return this;
     }
 
     /** Moves a new NCR into investigation. Reassigning later does not change the status. */
@@ -134,9 +153,10 @@ public class NonConformance extends TenantOwnedEntity {
         status = Status.ACTION_REQUIRED;
     }
 
-    public void close(UUID actor, String note, Instant now) {
+    /** @param selfReviewAllowed the organisation's review policy lets the requester close it themselves */
+    public void close(UUID actor, String note, Instant now, boolean selfReviewAllowed) {
         require(Set.of(Status.PENDING_VERIFICATION), "closed");
-        if (actor.equals(verificationRequestedBy)) {
+        if (actor.equals(verificationRequestedBy) && !selfReviewAllowed) {
             throw new BusinessRuleException("Someone other than the person who requested verification must close this.");
         }
         closedBy = actor;
@@ -152,11 +172,12 @@ public class NonConformance extends TenantOwnedEntity {
         status = Status.REJECTED;
     }
 
-    /** An inspection's NCR cannot be cancelled: the failure it records did happen. */
+    /** An inspection's or a calibration's NCR cannot be cancelled: the failure it records did happen. */
     public void cancel(String reason) {
         require(Set.of(Status.OPEN), "cancelled");
-        if (source == Source.INSPECTION) {
-            throw new BusinessRuleException("An NCR raised by an inspection cannot be cancelled. A reviewer can reject it.");
+        if (source == Source.INSPECTION || source == Source.CALIBRATION) {
+            throw new BusinessRuleException("An NCR raised by an inspection or a calibration cannot be cancelled. "
+                    + "A reviewer can reject it.");
         }
         outcomeNote = reason;
         status = Status.CANCELLED;

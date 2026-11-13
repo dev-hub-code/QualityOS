@@ -20,7 +20,7 @@ const STATE_DISPLAY = {
   },
   unreachable: {
     label: "API unreachable",
-    detail: "The QualityOS API did not respond.",
+    detail: "The ProductionOS API did not respond.",
     icon: CircleX,
     className: "text-destructive",
   },

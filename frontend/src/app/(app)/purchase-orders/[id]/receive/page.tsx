@@ -15,7 +15,7 @@ import { formatQuantity } from "@/lib/record-form";
 import { receiptSchema, type ReceiptValues } from "@/lib/schemas";
 import type { PurchaseOrder, PurchaseOrderItem, Receipt } from "@/lib/types";
 
-const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm";
+const SELECT_CLASS = "h-9 w-full rounded-xl border border-input bg-white/70 px-2 text-sm";
 
 function remaining(item: PurchaseOrderItem) {
   return Number(item.orderedQuantity) - Number(item.receivedQuantity);

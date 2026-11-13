@@ -11,11 +11,13 @@ import com.qualityos.common.security.Permissions;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.FacilityScope;
+import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.material.service.MaterialService;
 import com.qualityos.organization.service.FacilityService;
 import com.qualityos.quality.dto.QualityDtos.Assignee;
 import com.qualityos.quality.dto.QualityDtos.AuditFailure;
+import com.qualityos.quality.dto.QualityDtos.CalibrationFailure;
 import com.qualityos.quality.dto.QualityDtos.CapaHistory;
 import com.qualityos.quality.dto.QualityDtos.NcrHistory;
 import com.qualityos.quality.dto.QualityDtos.NcrOutcome;
@@ -73,6 +75,9 @@ public class NcrService implements AttachmentPolicy {
     private final QualityAlerts alerts;
     private final FacilityScope scope;
     private final FacilityService facilities;
+    private final ReviewPolicy reviewPolicy;
+    private final QualityRules rules;
+    private final CalibrationDecisions calibrationDecisions;
 
     NcrService(
             NonConformanceRepository ncrs,
@@ -86,7 +91,13 @@ public class NcrService implements AttachmentPolicy {
             AuditService audit,
             QualityAlerts alerts,
             FacilityScope scope,
-            FacilityService facilities) {
+            FacilityService facilities,
+            ReviewPolicy reviewPolicy,
+            QualityRules rules,
+            CalibrationDecisions calibrationDecisions) {
+        this.rules = rules;
+        this.calibrationDecisions = calibrationDecisions;
+        this.reviewPolicy = reviewPolicy;
         this.facilities = facilities;
         this.scope = scope;
         this.ncrs = ncrs;
@@ -187,7 +198,7 @@ public class NcrService implements AttachmentPolicy {
                 request.severity(),
                 request.title().trim(),
                 request.description().trim(),
-                request.rejectedQuantity())));
+                request.rejectedQuantity()).rejectedIn(rejectedUnit(request))));
     }
 
     /** Joins the disposition's transaction, so a failure cannot be recorded without its NCR. Repeats do nothing. */
@@ -207,7 +218,7 @@ public class NcrService implements AttachmentPolicy {
                 failure.critical() ? NonConformance.Severity.CRITICAL : NonConformance.Severity.MAJOR,
                 "Inspection " + failure.inspectionNumber() + " failed",
                 failure.description(),
-                failure.rejectedQuantity()));
+                failure.rejectedQuantity()).rejectedIn(failure.rejectedUomId()));
     }
 
     /** Joins the finding's transaction, so a finding cannot exist without its NCR. Repeats return the same NCR. */
@@ -223,6 +234,36 @@ public class NcrService implements AttachmentPolicy {
                         title(failure),
                         failure.description())))
                 .getId();
+    }
+
+    /**
+     * Joins the calibration's transaction, so a failure cannot be recorded without its NCR. Repeats return the same
+     * NCR. The goods themselves are decided inspection by inspection in the calibration's impact review.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public NcrOutcome raiseFromCalibration(CalibrationFailure failure) {
+        NonConformance ncr = ncrs.findByCalibrationRecordId(failure.calibrationRecordId())
+                .orElseGet(() -> raise(failure.facilityId(), NonConformance.fromCalibration(
+                        numbers.next(NUMBER_PREFIX),
+                        failure.calibrationRecordId(),
+                        failure.instrumentId(),
+                        failure.instrumentCode() + " " + failure.instrumentName() + " failed calibration",
+                        "Failed calibration on %s. Measurements since its last good calibration are in doubt: %s."
+                                .formatted(failure.calibratedOn(), String.join(", ", failure.inspectionNumbers())))));
+        return new NcrOutcome(ncr.getId(), ncr.getNcrNumber(), ncr.getStatus().name(), ncr.getStatus().isFinished(),
+                List.of());
+    }
+
+    /** The NCR each failed calibration raised, by calibration. Like {@link #outcomes}, for a caller who sees the instrument. */
+    @Transactional(readOnly = true)
+    public Map<UUID, NcrOutcome> forCalibrations(Collection<UUID> calibrationRecordIds) {
+        if (calibrationRecordIds.isEmpty()) {
+            return Map.of();
+        }
+        return ncrs.findByCalibrationRecordIdIn(calibrationRecordIds).stream().collect(Collectors.toMap(
+                NonConformance::getCalibrationRecordId,
+                ncr -> new NcrOutcome(ncr.getId(), ncr.getNcrNumber(), ncr.getStatus().name(),
+                        ncr.getStatus().isFinished(), List.of())));
     }
 
     /** Runs without a permission check of its own: the caller may see the audit, and this is how it stands. */
@@ -265,7 +306,7 @@ public class NcrService implements AttachmentPolicy {
         return transition(id, null, ncr -> ncr.recordInvestigation(cause, request.defectCategoryId()));
     }
 
-    /** A critical or major NCR needs a closed CAPA behind it, and no NCR may leave a CAPA unfinished. */
+    /** The organisation's rule decides which NCRs need a closed CAPA behind them. None may leave a CAPA unfinished. */
     @Transactional
     public NcrDetail requestVerification(UUID id, String note) {
         NonConformance ncr = lock(id);
@@ -275,8 +316,9 @@ public class NcrService implements AttachmentPolicy {
             throw new BusinessRuleException("Every linked CAPA must be closed or cancelled first.");
         }
         boolean closedCapa = linked.stream().anyMatch(capa -> capa.getStatus() == CorrectiveAction.Status.CLOSED);
-        if (ncr.getSeverity() != NonConformance.Severity.MINOR && !closedCapa) {
-            throw new BusinessRuleException("A critical or major NCR needs a closed CAPA.");
+        if (rules.capaRequired(ncr.getSeverity()) && !closedCapa) {
+            throw new BusinessRuleException(
+                    "A " + ncr.getSeverity().name().toLowerCase(java.util.Locale.ROOT) + " NCR needs a closed CAPA.");
         }
         NonConformance.Status previous = ncr.getStatus();
         ncr.requestVerification(TenantContext.getCurrentUserId());
@@ -292,7 +334,24 @@ public class NcrService implements AttachmentPolicy {
 
     @Transactional
     public NcrDetail close(UUID id, String note) {
-        return transition(id, note, ncr -> ncr.close(TenantContext.getCurrentUserId(), note, Instant.now()));
+        UUID actor = TenantContext.getCurrentUserId();
+        return transition(id, note, ncr -> {
+            requireCalibrationDecided(ncr);
+            ncr.close(actor, note, Instant.now(), reviewPolicy.permits(
+                    actor, ncr.getVerificationRequestedBy(), ENTITY, id, "NCR_CLOSE", note));
+        });
+    }
+
+    /** A failed calibration's NCR stays open until every inspection it put in doubt has a decision. */
+    private void requireCalibrationDecided(NonConformance ncr) {
+        if (ncr.getCalibrationRecordId() == null) {
+            return;
+        }
+        long pending = calibrationDecisions.pending(ncr.getCalibrationRecordId());
+        if (pending > 0) {
+            throw new BusinessRuleException("Decide each inspection in doubt on the instrument's page first: "
+                    + pending + " still waiting.");
+        }
     }
 
     @Transactional
@@ -400,6 +459,18 @@ public class NcrService implements AttachmentPolicy {
         }
     }
 
+    private UUID rejectedUnit(CreateNcrRequest request) {
+        if (request.rejectedQuantity() == null) {
+            return null;
+        }
+        if (request.rejectedUomId() != null) {
+            materials.requireUnit(request.rejectedUomId());
+            return request.rejectedUomId();
+        }
+        return request.materialId() == null ? null
+                : materials.references(Set.of(request.materialId())).get(request.materialId()).uomId();
+    }
+
     private void requireCategory(UUID id) {
         categories.findById(id)
                 .filter(category -> category.getArchivedAt() == null)
@@ -456,6 +527,7 @@ public class NcrService implements AttachmentPolicy {
                 ncr.getSource().name(),
                 ncr.getInspectionId(),
                 ncr.getAuditId(),
+                ncr.getInstrumentId(),
                 ncr.getSupplierId(),
                 ncr.getSupplierId() == null ? null : supplierNames(Set.of(ncr.getSupplierId())).get(ncr.getSupplierId()),
                 ncr.getMaterialId(),
@@ -464,6 +536,7 @@ public class NcrService implements AttachmentPolicy {
                 ncr.getDefectCategoryId(),
                 category.map(DefectCategory::getName).orElse(null),
                 ncr.getRejectedQuantity(),
+                ncr.getRejectedUomId(),
                 ncr.getAssignedTo(),
                 members.get(ncr.getAssignedTo()),
                 ncr.getContainmentAction(),
@@ -473,6 +546,8 @@ public class NcrService implements AttachmentPolicy {
                 ncr.getVerificationRequestedBy(),
                 ncr.getCreatedAt(),
                 ncr.getClosedAt(),
+                rules.capaRequired(ncr.getSeverity()),
+                rules.effectivenessRequired(ncr.getSeverity()),
                 linked,
                 changes);
     }

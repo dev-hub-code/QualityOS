@@ -42,7 +42,7 @@ export function PlatformNotices() {
     <>
       {data.maintenance && (
         <p className="mb-4 rounded-md border border-amber-500 bg-amber-50 px-3 py-2 text-sm dark:bg-amber-950">
-          QualityOS is under maintenance. You can read your records, but changes are paused.
+          ProductionOS is under maintenance. You can read your records, but changes are paused.
           {data.supportEmail ? ` Questions? ${data.supportEmail}` : ""}
         </p>
       )}

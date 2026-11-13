@@ -2,14 +2,19 @@ package com.qualityos.calibration.service;
 
 import com.qualityos.calibration.dto.CalibrationDtos.CalibrationResponse;
 import com.qualityos.calibration.dto.CalibrationDtos.ChangeStatusRequest;
+import com.qualityos.calibration.dto.CalibrationDtos.DecideImpactRequest;
+import com.qualityos.calibration.dto.CalibrationDtos.ImpactReviewGroup;
+import com.qualityos.calibration.dto.CalibrationDtos.ImpactReviewResponse;
 import com.qualityos.calibration.dto.CalibrationDtos.InstrumentResponse;
 import com.qualityos.calibration.dto.CalibrationDtos.RecordCalibrationRequest;
 import com.qualityos.calibration.dto.CalibrationDtos.SaveInstrumentRequest;
 import com.qualityos.calibration.dto.CalibrationDtos.UsageResponse;
 import com.qualityos.calibration.dto.CalibrationDtos.UsedInstrument;
+import com.qualityos.calibration.entity.CalibrationImpactReview;
 import com.qualityos.calibration.entity.CalibrationRecord;
 import com.qualityos.calibration.entity.Instrument;
 import com.qualityos.calibration.entity.InstrumentUsage;
+import com.qualityos.calibration.repository.CalibrationImpactReviewRepository;
 import com.qualityos.calibration.repository.CalibrationRecordRepository;
 import com.qualityos.calibration.repository.InstrumentRepository;
 import com.qualityos.calibration.repository.InstrumentUsageRepository;
@@ -23,22 +28,29 @@ import com.qualityos.common.mail.EmailTemplate;
 import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
+import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.notification.service.NotificationService;
 import com.qualityos.notification.service.NotificationType;
 import com.qualityos.organization.service.FacilityService;
 import com.qualityos.organization.service.OrganizationService;
+import com.qualityos.quality.dto.QualityDtos.CalibrationFailure;
+import com.qualityos.quality.dto.QualityDtos.NcrOutcome;
+import com.qualityos.quality.service.NcrService;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -63,6 +75,9 @@ public class InstrumentService implements AttachmentPolicy {
     private final OrganizationService organizations;
     private final NotificationService notifications;
     private final AuditService audit;
+    private final CalibrationImpactReviewRepository reviews;
+    private final NcrService ncrs;
+    private final ApplicationEventPublisher events;
 
     InstrumentService(
             InstrumentRepository instruments,
@@ -73,7 +88,13 @@ public class InstrumentService implements AttachmentPolicy {
             TenantAccessService access,
             OrganizationService organizations,
             NotificationService notifications,
-            AuditService audit) {
+            AuditService audit,
+            CalibrationImpactReviewRepository reviews,
+            NcrService ncrs,
+            ApplicationEventPublisher events) {
+        this.events = events;
+        this.reviews = reviews;
+        this.ncrs = ncrs;
         this.instruments = instruments;
         this.records = records;
         this.usages = usages;
@@ -172,30 +193,115 @@ public class InstrumentService implements AttachmentPolicy {
         instrument.calibrated(record);
         audit.record("CALIBRATION_RECORDED", ENTITY, id, null, Map.of("result", request.result().name()));
         if (failed) {
-            long suspect = usage(id).stream().filter(UsageResponse::suspect).count();
+            String raised = openImpactReview(instrument, record);
             notifications.notify(recipients(instrument, Permissions.CALIBRATION_MANAGE, Permissions.NCR_ASSIGN),
                     NotificationType.CALIBRATION_FAILED,
                     instrument.getName() + " failed calibration",
-                    "%d inspection(s) used it since its last good calibration.".formatted(suspect),
+                    raised,
                     "/calibration/" + id);
         }
         return toResponse(record);
+    }
+
+    /**
+     * Keeps the inspections in doubt, each to be decided, and raises one NCR for them. Nothing in doubt raises no NCR:
+     * the instrument is already out of service. Returns the notification text.
+     */
+    private String openImpactReview(Instrument instrument, CalibrationRecord record) {
+        List<InstrumentUsage> inDoubt = inDoubt(instrument.getId());
+        if (inDoubt.isEmpty()) {
+            return "No inspection used it since its last good calibration.";
+        }
+        inDoubt.forEach(use -> reviews.save(new CalibrationImpactReview(record.getId(), use)));
+        NcrOutcome ncr = ncrs.raiseFromCalibration(new CalibrationFailure(
+                record.getId(),
+                instrument.getId(),
+                instrument.getInstrumentCode(),
+                instrument.getName(),
+                record.getCalibratedOn(),
+                inDoubt.stream().map(InstrumentUsage::getInspectionNumber).sorted().toList(),
+                instrument.getFacilityId()));
+        return "%d inspection(s) used it since its last good calibration. %s was raised, and each inspection needs a decision."
+                .formatted(inDoubt.size(), ncr.ncrNumber());
+    }
+
+    /** Every failed calibration with inspections in doubt, newest first, and the decisions so far. */
+    @Transactional(readOnly = true)
+    public List<ImpactReviewGroup> impactReviews(UUID id) {
+        load(id);
+        List<CalibrationImpactReview> all = reviews.findByInstrumentIdOrderByCreatedAtDescInspectionNumber(id);
+        Map<UUID, List<CalibrationImpactReview>> byCalibration = all.stream().collect(Collectors.groupingBy(
+                CalibrationImpactReview::getCalibrationRecordId, LinkedHashMap::new, Collectors.toList()));
+        Map<UUID, NcrOutcome> raised = ncrs.forCalibrations(byCalibration.keySet());
+        Map<UUID, CalibrationRecord> calibrations = records.findAllById(byCalibration.keySet()).stream()
+                .collect(Collectors.toMap(CalibrationRecord::getId, record -> record));
+        Map<UUID, String> members = access.activeMembers();
+        return byCalibration.entrySet().stream().map(entry -> {
+            NcrOutcome ncr = raised.get(entry.getKey());
+            List<ImpactReviewResponse> items = entry.getValue().stream().map(review -> toResponse(review, members)).toList();
+            return new ImpactReviewGroup(
+                    entry.getKey(),
+                    calibrations.get(entry.getKey()).getCalibratedOn(),
+                    ncr == null ? null : ncr.id(),
+                    ncr == null ? null : ncr.ncrNumber(),
+                    ncr == null ? null : ncr.status(),
+                    items.stream().filter(item -> item.decision() == null).count(),
+                    items);
+        }).toList();
+    }
+
+    @Transactional
+    public ImpactReviewResponse decideImpact(UUID id, UUID reviewId, DecideImpactRequest request) {
+        Instrument instrument = load(id);
+        CalibrationImpactReview review = reviews.findById(reviewId)
+                .filter(found -> found.getInstrumentId().equals(id))
+                .orElseThrow(() -> new ResourceNotFoundException("Impact review", reviewId.toString()));
+        review.decide(request.decision(), request.note().trim(), TenantContext.getCurrentUserId(), Instant.now());
+        reviews.saveAndFlush(review);
+        audit.record("CALIBRATION_IMPACT_DECIDED", ENTITY, id, null, Map.of(
+                "inspection", review.getInspectionNumber(), "decision", request.decision().name(),
+                "note", review.getNote()));
+        if (review.getDecision() == CalibrationImpactReview.Decision.REINSPECT) {
+            events.publishEvent(new ReinspectionRequired(review.getInspectionId(), instrument.getInstrumentCode()));
+        }
+        return toResponse(review, access.activeMembers());
+    }
+
+    private static ImpactReviewResponse toResponse(CalibrationImpactReview review, Map<UUID, String> members) {
+        return new ImpactReviewResponse(
+                review.getId(),
+                review.getInspectionId(),
+                review.getInspectionNumber(),
+                review.getUsedOn(),
+                review.getDecision() == null ? null : review.getDecision().name(),
+                review.getNote(),
+                review.getDecidedBy() == null ? null : members.getOrDefault(review.getDecidedBy(), "Former member"),
+                review.getDecidedAt());
     }
 
     /** With a failure as the latest result, whatever was measured since the last good calibration is in doubt. */
     @Transactional(readOnly = true)
     public List<UsageResponse> usage(UUID id) {
         load(id);
+        Set<UUID> doubtful = inDoubt(id).stream().map(InstrumentUsage::getId).collect(Collectors.toSet());
+        return usages.findByInstrumentIdOrderByUsedOnDesc(id).stream()
+                .map(use -> new UsageResponse(use.getInspectionId(), use.getInspectionNumber(), use.getUsedOn(),
+                        doubtful.contains(use.getId())))
+                .toList();
+    }
+
+    private List<InstrumentUsage> inDoubt(UUID id) {
         List<CalibrationRecord> history = records.findByInstrumentIdOrderByCalibratedOnDescCreatedAtDesc(id);
-        boolean failed = !history.isEmpty() && history.getFirst().getResult() == CalibrationRecord.Result.FAIL;
+        if (history.isEmpty() || history.getFirst().getResult() != CalibrationRecord.Result.FAIL) {
+            return List.of();
+        }
         LocalDate lastGood = history.stream()
                 .filter(record -> record.getResult() != CalibrationRecord.Result.FAIL)
                 .map(CalibrationRecord::getCalibratedOn)
                 .findFirst()
                 .orElse(LocalDate.MIN);
         return usages.findByInstrumentIdOrderByUsedOnDesc(id).stream()
-                .map(use -> new UsageResponse(use.getInspectionId(), use.getInspectionNumber(), use.getUsedOn(),
-                        failed && !use.getUsedOn().isBefore(lastGood)))
+                .filter(use -> !use.getUsedOn().isBefore(lastGood))
                 .toList();
     }
 
@@ -221,12 +327,30 @@ public class InstrumentService implements AttachmentPolicy {
         }
     }
 
+    /** Each instrument on the inspection, and where the inspection stands if that instrument later failed. */
     @Transactional(readOnly = true)
     public List<UsedInstrument> usedBy(UUID inspectionId) {
-        return usages.findByInspectionId(inspectionId).stream()
+        List<Instrument> used = usages.findByInspectionId(inspectionId).stream()
                 .flatMap(use -> instruments.findById(use.getInstrumentId()).stream())
-                .map(i -> new UsedInstrument(i.getId(), i.getInstrumentCode(), i.getName(), i.getNextDueOn()))
                 .toList();
+        Map<UUID, List<CalibrationImpactReview>> reviewed = reviews.findByInspectionIdAndInstrumentIdIn(
+                        inspectionId, used.stream().map(Instrument::getId).toList()).stream()
+                .collect(Collectors.groupingBy(CalibrationImpactReview::getInstrumentId));
+        return used.stream()
+                .map(i -> new UsedInstrument(i.getId(), i.getInstrumentCode(), i.getName(), i.getNextDueOn(),
+                        reviewState(reviewed.getOrDefault(i.getId(), List.of()))))
+                .toList();
+    }
+
+    /** The most demanding answer wins: one reinspection outweighs any number of results that stand. */
+    private static String reviewState(List<CalibrationImpactReview> found) {
+        if (found.isEmpty()) {
+            return null;
+        }
+        if (found.stream().anyMatch(review -> review.getDecision() == CalibrationImpactReview.Decision.REINSPECT)) {
+            return "REINSPECT";
+        }
+        return found.stream().anyMatch(review -> review.getDecision() == null) ? "PENDING" : "RESULT_STANDS";
     }
 
     /** Runs under the current tenant, and tells each instrument's people once a week until it is calibrated. */

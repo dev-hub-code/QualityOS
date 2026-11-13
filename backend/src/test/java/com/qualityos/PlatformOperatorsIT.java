@@ -51,10 +51,7 @@ class PlatformOperatorsIT extends MasterDataFixture {
     }
 
     private void operator(Session session, String role) {
-        asDatabaseSuperuser().update("""
-                INSERT INTO platform_admins (user_id, role, reauthenticated_until)
-                VALUES (?, ?, now() + INTERVAL '1 hour')
-                """, session.userId(), role);
+        makeOperator(session, role);
     }
 
     private ResultActions change(Session by, UUID user, String role, boolean active) throws Exception {

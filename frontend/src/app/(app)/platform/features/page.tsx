@@ -37,7 +37,10 @@ const NEW_FEATURE: FieldDef[] = [
       { value: "STRUCTURED", label: "Structured (JSON)" },
     ],
   },
+  { name: "deliveredByTeam", label: "My team delivers this feature. ProductionOS cannot restrict it.", type: "checkbox" },
 ];
+
+const DELIVERY = { APP: "Restricted by the app", TEAM: "Delivered by your team" };
 
 const VALUE_HELP = { BOOLEAN: "", NUMBER: "Number (blank for unlimited)", TEXT: "Text", STRUCTURED: "JSON" };
 
@@ -128,7 +131,7 @@ export default function PlatformFeaturesPage() {
               <TableHead>Feature</TableHead>
               <TableHead>Value</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Enforcement</TableHead>
+              <TableHead>Delivery</TableHead>
               <TableHead>Organisations</TableHead>
               <TableHead />
             </TableRow>
@@ -145,9 +148,9 @@ export default function PlatformFeaturesPage() {
                 </TableCell>
                 <TableCell>{feature.valueType.toLowerCase()}</TableCell>
                 <TableCell>{feature.active ? "Active" : "Inactive"}</TableCell>
-                <TableCell>{feature.enforced ? "Enforced" : "Listed only, not enforced"}</TableCell>
+                <TableCell>{DELIVERY[feature.delivery]}</TableCell>
                 <TableCell>{feature.organisations}</TableCell>
-                <TableCell className="space-x-2 whitespace-nowrap">
+                <TableCell className="min-w-36 whitespace-normal [&>*]:m-0.5">
                   {billing && (
                     <>
                       <Button size="sm" variant="outline" onClick={() => setEditing(feature)}>
@@ -215,7 +218,8 @@ export default function PlatformFeaturesPage() {
           record={{ valueType: "BOOLEAN" }}
           extra={
             <p className="text-sm text-muted-foreground">
-              A new feature is listed on plans but restricts nothing until the product enforces it.
+              Only features the product enforces are taken away from a customer without them. A new feature is
+              something your team delivers, such as support or onboarding, and is refused unless you confirm that.
             </p>
           }
           onClose={() => setAdding(false)}

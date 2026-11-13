@@ -1,14 +1,49 @@
 import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { apiCaller, PASSWORD, signUp, unique } from "./helpers";
+import { fromBase32, sealedForSql, TEST_SECRET, totp } from "./second-factor";
 
-/** Being a platform administrator can only be granted in the database, on purpose. */
-function makePlatformAdmin(email: string, recentlyConfirmed = true) {
-  execFileSync("docker", [
-    "compose", "exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "qualityos", "-c",
+/**
+ * Being a platform administrator can only be granted in the database, on purpose. The operator gets an
+ * authenticator app already set up, unless a test wants to watch that happen.
+ */
+function makePlatformAdmin(email: string, recentlyConfirmed = true, enrolled = true) {
+  const statements = [
     `INSERT INTO platform_admins (user_id, reauthenticated_until) SELECT id, ${recentlyConfirmed ? "now() + INTERVAL '1 hour'" : "NULL"} FROM users WHERE email = '${email}'`,
+  ];
+  if (enrolled) {
+    statements.push(
+      `INSERT INTO platform_second_factors (user_id, secret, confirmed_at) SELECT id, ${sealedForSql(TEST_SECRET)}, now() FROM users WHERE email = '${email}'`,
+    );
+  }
+  execFileSync("docker", [
+    "compose", "exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "qualityos", "-c", statements.join("; "),
   ]);
+}
+
+/** The second step of an operator's sign-in, with the code the test's authenticator would show. */
+async function enterSecondFactor(page: Page, secret = TEST_SECRET) {
+  await page.getByLabel("Six-digit code").fill(totp(secret));
+  await page.getByRole("button", { name: "Continue" }).click();
+}
+
+/**
+ * A plan of the test's own. Plans are shared by every organisation and test, so a test that edits the seeded ones
+ * races any other run editing them: the second save is refused as a concurrent change.
+ */
+async function ownPlan(page: Page): Promise<{ id: string; name: string }> {
+  const code = `E2E_${unique().replaceAll("-", "_").toUpperCase()}`.slice(0, 28);
+  const plan = await apiCaller(page)("POST", "/platform/plans", { code, name: code });
+  return { id: plan.id, name: code };
+}
+
+/** Archived plans drop out of the lists, so test plans do not pile up across runs. */
+async function archive(page: Page, id: string) {
+  const call = apiCaller(page);
+  const plans: { id: string; version: number }[] = await call("GET", "/platform/plans");
+  const plan = plans.find((found) => found.id === id)!;
+  await call("POST", `/platform/plans/${id}/archive`, { version: plan.version, reason: "Test finished" });
 }
 
 test("an owner chooses a plan, a platform admin records the payment, and the plan starts", async ({ page, browser }) => {
@@ -34,6 +69,9 @@ test("an owner chooses a plan, a platform admin records the payment, and the pla
   await signUp(admin, adminEmail);
   makePlatformAdmin(adminEmail);
   await admin.goto("/platform/organisations");
+  // The list is paged, and organisations left by earlier runs can push this one off the first page.
+  await admin.getByLabel("Search name, email or GSTIN").fill(organization);
+  await expect(admin.getByRole("status")).toHaveText("1 organisation, page 1");
   await admin.getByRole("row", { name: organization }).getByRole("button", { name: "Record ₹7,078.82" }).click();
   await admin.getByLabel("Bank or UTR reference").fill(`UTR-${Date.now()}`);
   await admin.getByRole("button", { name: "Save" }).click();
@@ -49,17 +87,22 @@ test("a platform admin changes a price without a release", async ({ page }) => {
   const email = `admin-${unique()}@example.com`;
   await signUp(page, email);
   makePlatformAdmin(email);
+  const plan = await ownPlan(page);
   await page.goto("/platform/plans");
-  await page.getByRole("button", { name: "Edit Starter" }).click();
+  const row = page.getByRole("row", { name: plan.name }).first();
+  await page.getByRole("button", { name: `Edit ${plan.name}` }).click();
+  // A new plan has no description yet, and the form needs one.
+  await page.getByLabel("Description").fill("For testing price changes");
   await page.getByLabel("Monthly price (blank for custom)").fill("3111");
   await page.getByLabel("Reason").fill("Price review");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("cell", { name: "₹3,111.00" }).first()).toBeVisible();
-  await page.getByRole("button", { name: "Edit Starter" }).click();
+  await expect(row.getByRole("cell", { name: "₹3,111.00" })).toBeVisible();
+  await page.getByRole("button", { name: `Edit ${plan.name}` }).click();
   await page.getByLabel("Monthly price (blank for custom)").fill("2999");
   await page.getByLabel("Reason").fill("Back to the list price");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("cell", { name: "₹2,999.00" }).first()).toBeVisible();
+  await expect(row.getByRole("cell", { name: "₹2,999.00" })).toBeVisible();
+  await archive(page, plan.id);
 });
 
 test("signing in opens the Control Center for an operator and the organisation for everyone else", async ({ page, browser }) => {
@@ -72,6 +115,12 @@ test("signing in opens the Control Center for an operator and the organisation f
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
+  // The password alone opens nothing for an operator: the authenticator code comes next.
+  await expect(page.getByRole("heading", { name: "Enter your authenticator code" })).toBeVisible();
+  await page.getByLabel("Six-digit code").fill("000000");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "code is not right" })).toBeVisible();
+  await enterSecondFactor(page);
   await expect(page).toHaveURL(/\/platform\/dashboard/);
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 
@@ -90,6 +139,31 @@ test("signing in opens the Control Center for an operator and the organisation f
   await owner.getByRole("button", { name: "Sign in" }).click();
   await expect(owner).toHaveURL(/\/dashboard$/);
   await context.close();
+});
+
+test("a new operator sets up an authenticator before the Control Center opens, and can be reset", async ({ page }) => {
+  const email = `admin-${unique()}@example.com`;
+  await signUp(page, email);
+  makePlatformAdmin(email, true, false);
+
+  await page.goto("/platform/dashboard");
+  await expect(page.getByRole("heading", { name: "Set up your authenticator app" })).toBeVisible();
+  await page.getByRole("button", { name: "Show the code to scan" }).click();
+  await expect(page.getByRole("img", { name: "Code for your authenticator app" })).toBeVisible();
+  const key = (await page.getByTestId("second-factor-secret").textContent()) ?? "";
+  await page.getByLabel("Six-digit code from the app").fill("000000");
+  await page.getByRole("button", { name: "Confirm" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "code is not right" })).toBeVisible();
+  await page.getByLabel("Six-digit code from the app").fill(totp(fromBase32(key)));
+  await page.getByRole("button", { name: "Confirm" }).click();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+
+  await page.goto("/platform/operators");
+  await expect(page.getByRole("row", { name: email })).toContainText("Set up");
+  await page.getByRole("row", { name: email }).getByRole("button", { name: "Reset authenticator" }).click();
+  await page.getByLabel("Reason").fill("Lost phone");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("heading", { name: "Set up your authenticator app" })).toBeVisible();
 });
 
 test("an open invoice offers online payment only when a gateway is set up", async ({ page }) => {
@@ -156,7 +230,7 @@ test("a platform admin runs a plan and finds a customer from the Control Center"
   await expect(page.getByRole("navigation", { name: "Control Center" })).toBeVisible();
 
   const code = `E2E_${unique().replaceAll("-", "_").toUpperCase()}`.slice(0, 28);
-  await page.getByRole("link", { name: "Plans" }).click();
+  await page.getByRole("link", { name: "Plans", exact: true }).click();
   await page.getByRole("button", { name: "New plan" }).click();
   await page.getByLabel("Code, such as GROWTH_PLUS").fill(code);
   await page.getByLabel("Name").fill(code);
@@ -248,27 +322,32 @@ test("a platform admin defines a feature, puts it on a plan, and reads usage and
   await signUp(page, email);
   makePlatformAdmin(email);
   const code = `E2E_${Date.now()}`;
+  const plan = await ownPlan(page);
 
   await page.goto("/platform/features");
-  await expect(page.getByRole("row", { name: /Dashboards and reports/ }).first()).toContainText("Enforced");
+  await expect(page.getByRole("row", { name: /Dashboards and reports/ }).first()).toContainText("Restricted by the app");
   await page.getByRole("button", { name: "New feature" }).click();
   await page.getByLabel("Code, such as PRIORITY_SUPPORT").fill(code);
   await page.getByLabel("Name").fill(`Support ${code}`);
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("row", { name: code }).first()).toContainText("Listed only, not enforced");
+  await expect(page.getByText(/cannot restrict this feature/)).toBeVisible();
+  await page.getByLabel(/My team delivers this feature/).check();
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("row", { name: code }).first()).toContainText("Delivered by your team");
 
-  await page.getByRole("button", { name: `Support ${code} on Starter: not included` }).click();
+  await page.getByRole("button", { name: `Support ${code} on ${plan.name}: not included` }).click();
   await page.getByLabel(/Reason/).fill("Testing the catalogue");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("button", { name: `Support ${code} on Starter: included` })).toBeVisible();
+  await expect(page.getByRole("button", { name: `Support ${code} on ${plan.name}: included` })).toBeVisible();
 
-  await page.getByRole("button", { name: `Support ${code} on Starter: included` }).click();
+  await page.getByRole("button", { name: `Support ${code} on ${plan.name}: included` }).click();
   await page.getByLabel(/Reason/).fill("Finished testing");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("button", { name: `Support ${code} on Starter: not included` })).toBeVisible();
+  await expect(page.getByRole("button", { name: `Support ${code} on ${plan.name}: not included` })).toBeVisible();
   await page.getByRole("row", { name: code }).first().getByRole("button", { name: "Deactivate" }).click();
   await page.getByLabel("Reason").fill("Finished testing");
   await page.getByRole("button", { name: "Save" }).click();
+  await archive(page, plan.id);
 
   await page.goto("/platform/usage");
   await expect(page.getByRole("status")).toContainText("page 1");

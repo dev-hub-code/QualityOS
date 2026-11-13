@@ -42,6 +42,7 @@ import com.qualityos.traceability.dto.TraceabilityDtos.ProductionBatchView;
 import com.qualityos.traceability.dto.TraceabilityDtos.RecallLine;
 import com.qualityos.traceability.dto.TraceabilityDtos.RecallScope;
 import com.qualityos.traceability.service.DispatchService;
+import com.qualityos.traceability.service.DispatchedUnderRecall;
 import com.qualityos.traceability.service.ProductionService;
 import com.qualityos.traceability.service.TraceabilityService;
 import java.math.BigDecimal;
@@ -64,6 +65,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.springframework.data.domain.Pageable;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -344,13 +346,20 @@ public class RecallService implements AttachmentPolicy {
                 .toList();
     }
 
+    /** Runs in the dispatch's transaction, so its customer is on the recall as soon as the goods are recorded. */
+    @EventListener
+    void onDispatchedUnderRecall(DispatchedUnderRecall event) {
+        recalls.findByRecallNumberIn(event.recallNumbers()).forEach(recall ->
+                addMissingCustomers(recall, traceability.recallScope(batchIds(recall.getId()), Set.of())));
+    }
+
     private RecallScope syncedScope(Recall recall, Set<String> permissions) {
         RecallScope covered = traceability.recallScope(batchIds(recall.getId()), permissions);
         addMissingCustomers(recall, covered);
         return covered;
     }
 
-    /** A batch can be dispatched after its recall starts. Whoever received it must be contacted too. */
+    /** A batch under recall can still be dispatched, by an audited override. Whoever received it must be contacted too. */
     private void addMissingCustomers(Recall recall, RecallScope covered) {
         Set<UUID> present = contacts.findByRecallId(recall.getId()).stream()
                 .map(RecallContact::getCustomerId).collect(Collectors.toSet());

@@ -11,7 +11,7 @@ export interface Flow {
 }
 
 export const OVERVIEW_FLOW: Flow = {
-  title: "How material moves through QualityOS",
+  title: "How material moves through ProductionOS",
   steps: [
     { label: "Purchase order", note: "Raised on an approved supplier." },
     { label: "Receipt", note: "Each line creates a lot with its own number." },
@@ -163,7 +163,7 @@ export const DOC_FLOWS: Record<string, Flow> = {
       },
       { label: "Record containment: Containment" },
       { label: "Record the root cause: Action required" },
-      { label: "Critical or major? Raise a CAPA and close it", note: "A minor NCR does not need one." },
+      { label: "Critical or major? Raise a CAPA and close it", note: "The default rule. An administrator can change it under Settings." },
       { label: "Request verification: Pending verification" },
       {
         label: "A different person reviews",

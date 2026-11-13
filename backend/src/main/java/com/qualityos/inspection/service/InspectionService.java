@@ -11,6 +11,7 @@ import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.FacilityScope;
+import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.inspection.dto.InspectionDtos.ApproveRequest;
 import com.qualityos.inspection.dto.InspectionDtos.CreateInspectionRequest;
 import com.qualityos.inspection.dto.InspectionDtos.DecisionResponse;
@@ -22,6 +23,7 @@ import com.qualityos.inspection.dto.InspectionDtos.InspectionDetail;
 import com.qualityos.inspection.dto.InspectionDtos.InspectionSummary;
 import com.qualityos.inspection.dto.InspectionDtos.ResultRequest;
 import com.qualityos.inspection.dto.InspectionDtos.ResultResponse;
+import com.qualityos.inspection.dto.TemplateDtos.ApplicableTemplates;
 import com.qualityos.inspection.dto.TemplateDtos.ParameterSpec;
 import com.qualityos.inspection.dto.TemplateDtos.SpecSnapshot;
 import com.qualityos.inspection.entity.Inspection;
@@ -39,10 +41,12 @@ import com.qualityos.inspection.service.EvaluationEngine.Value;
 import com.qualityos.material.dto.MaterialDtos.MaterialReference;
 import com.qualityos.material.service.MaterialService;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.ReceivedBatch;
+import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.LotView;
 import com.qualityos.materialreceipt.service.MaterialReceiptService;
 import com.qualityos.supplier.dto.SupplierDtos.SupplierReference;
 import com.qualityos.supplier.service.SupplierService;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,12 +65,15 @@ import com.qualityos.traceability.service.ProductionService;
 import com.qualityos.inspection.dto.InspectionDtos.InspectionHistory;
 import java.math.BigDecimal;
 import java.util.Collection;
+import com.qualityos.calibration.service.ReinspectionRequired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import com.qualityos.subscription.service.PlanLimits;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -94,6 +101,7 @@ public class InspectionService implements AttachmentPolicy {
     private final DispatchReturnService returns;
     private final JsonMapper json;
     private final FacilityScope scope;
+    private final ReviewPolicy reviewPolicy;
 
     /** Lazy because the attachment service collects every policy, and this class is one. */
     InspectionService(
@@ -114,8 +122,10 @@ public class InspectionService implements AttachmentPolicy {
             ProductionService production,
             DispatchReturnService returns,
             JsonMapper json,
-            FacilityScope scope) {
+            FacilityScope scope,
+            ReviewPolicy reviewPolicy) {
         this.limits = limits;
+        this.reviewPolicy = reviewPolicy;
         this.scope = scope;
         this.instruments = instruments;
         this.inspections = inspections;
@@ -185,17 +195,60 @@ public class InspectionService implements AttachmentPolicy {
 
     /** Freezes the specification in force today. Later template changes never reach this inspection. */
     @Transactional
-    public InspectionDetail create(CreateInspectionRequest request) {
-        long subjects = Stream.of(request.receiptItemId(), request.productionBatchId(), request.returnItemId())
-                .filter(Objects::nonNull)
-                .count();
-        if (subjects != 1) {
-            throw new BusinessRuleException("Choose one received batch, production batch or return to inspect.");
-        }
+    public InspectionDetail create(CreateInspectionRequest given) {
+        requireOneSubject(given.receiptItemId(), given.productionBatchId(), given.returnItemId());
+        CreateInspectionRequest request = given.templateId() != null ? given : new CreateInspectionRequest(
+                given.receiptItemId(), given.productionBatchId(), given.returnItemId(), chooseTemplate(given));
         if (request.receiptItemId() != null) {
             return toDetail(inspectLot(request));
         }
         return toDetail(request.returnItemId() != null ? inspectReturn(request) : inspectProductionBatch(request));
+    }
+
+    /**
+     * The published templates that fit an inspection, and the one it gets when none is chosen. A lot takes any type,
+     * preferring IQC. A production batch takes the type due at its stage. Returned goods take FQC or OQC.
+     */
+    @Transactional(readOnly = true)
+    public ApplicableTemplates applicableTemplates(UUID receiptItemId, UUID productionBatchId, UUID returnItemId) {
+        requireOneSubject(receiptItemId, productionBatchId, returnItemId);
+        if (receiptItemId != null) {
+            return templates.applicable(receipts.batch(receiptItemId).materialId(), null,
+                    EnumSet.allOf(InspectionTemplate.Type.class), Set.of(InspectionTemplate.Type.IQC));
+        }
+        if (productionBatchId != null) {
+            ProductionBatchView batch = reachable(production.batch(productionBatchId));
+            Set<InspectionTemplate.Type> due = production.dueInspection(productionBatchId)
+                    .map(type -> Set.of(InspectionTemplate.Type.valueOf(type)))
+                    .orElse(Set.of());
+            return templates.applicable(null, batch.productId(), due, due);
+        }
+        ProductionBatchView batch = reachable(production.batch(returns.returnedGoods(returnItemId).productionBatchId()));
+        Set<InspectionTemplate.Type> outgoing = Set.of(InspectionTemplate.Type.FQC, InspectionTemplate.Type.OQC);
+        return templates.applicable(null, batch.productId(), outgoing, outgoing);
+    }
+
+    /** A batch outside the person's facilities is as good as missing, so nothing about it shows. */
+    private ProductionBatchView reachable(ProductionBatchView batch) {
+        scope.requireAllowed(batch.facilityId(), "Batch", batch.id().toString());
+        return batch;
+    }
+
+    private UUID chooseTemplate(CreateInspectionRequest request) {
+        ApplicableTemplates fit =
+                applicableTemplates(request.receiptItemId(), request.productionBatchId(), request.returnItemId());
+        if (fit.suggestedId() != null) {
+            return fit.suggestedId();
+        }
+        throw new BusinessRuleException(fit.templates().isEmpty()
+                ? "No published template fits this inspection. Publish one first."
+                : "More than one template fits this inspection. Choose one.");
+    }
+
+    private static void requireOneSubject(UUID receiptItemId, UUID productionBatchId, UUID returnItemId) {
+        if (Stream.of(receiptItemId, productionBatchId, returnItemId).filter(Objects::nonNull).count() != 1) {
+            throw new BusinessRuleException("Choose one received batch, production batch or return to inspect.");
+        }
     }
 
     private Inspection inspectReturn(CreateInspectionRequest request) {
@@ -310,6 +363,34 @@ public class InspectionService implements AttachmentPolicy {
         return ids.isEmpty() ? List.of(new UUID(0, 0)) : ids;
     }
 
+    /**
+     * Holds the goods an inspection released, once a failed calibration puts its measurements in doubt. A new
+     * inspection is the only way to release them again. Goods it did not release have nothing to hold.
+     */
+    @EventListener
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void holdForReinspection(ReinspectionRequired event) {
+        Inspection inspection = inspections.findForUpdate(event.inspectionId())
+                .orElseThrow(() -> new ResourceNotFoundException(ENTITY, event.inspectionId()));
+        String number = inspection.getInspectionNumber();
+        if (inspection.getStatus() == Inspection.Status.CANCELLED) {
+            throw new BusinessRuleException(number + " was cancelled and released nothing. Decide that its result stands.");
+        }
+        if (inspection.getStatus() != Inspection.Status.COMPLETED) {
+            throw new BusinessRuleException(number + " is not finished yet. Decide once it is.");
+        }
+        Disposition disposition = inspection.getDisposition();
+        if (disposition != Disposition.ACCEPT && disposition != Disposition.CONDITIONAL_ACCEPTANCE) {
+            return;
+        }
+        String reason = event.instrumentCode() + " failed calibration, so " + number + " is in doubt.";
+        if (inspection.getReceiptItemId() != null) {
+            receipts.holdForReinspection(inspection.getReceiptItemId(), reason);
+        } else {
+            production.holdForReinspection(inspection.getProductionBatchId(), reason);
+        }
+    }
+
     private void recordOutcome(Inspection inspection, String disposition, boolean finalDecision) {
         if (inspection.getReturnItemId() != null) {
             returns.recordInspectionOutcome(inspection.getReturnItemId(), disposition, finalDecision);
@@ -417,7 +498,10 @@ public class InspectionService implements AttachmentPolicy {
     @Transactional
     public InspectionDetail approve(UUID id, ApproveRequest request) {
         Inspection inspection = lock(id);
-        inspection.approve(request.result(), TenantContext.getCurrentUserId());
+        UUID actor = TenantContext.getCurrentUserId();
+        boolean selfReview = reviewPolicy.permits(
+                actor, inspection.getSubmittedBy(), ENTITY, id, "INSPECTION_APPROVE", request.note());
+        inspection.approve(request.result(), actor, selfReview);
         inspections.saveAndFlush(inspection);
         decide(id, "APPROVED", request.note());
         audit.record("INSPECTION_APPROVED", ENTITY, id, null, Map.of("result", inspection.getFinalResult()));
@@ -429,7 +513,8 @@ public class InspectionService implements AttachmentPolicy {
     public InspectionDetail sendBack(UUID id, String note) {
         Inspection inspection = lock(id);
         UUID inspector = inspection.getSubmittedBy();
-        inspection.sendBack(TenantContext.getCurrentUserId());
+        UUID actor = TenantContext.getCurrentUserId();
+        inspection.sendBack(actor, reviewPolicy.permits(actor, inspector, ENTITY, id, "INSPECTION_SEND_BACK", note));
         inspections.saveAndFlush(inspection);
         recordOutcome(inspection, null, false);
         decide(id, "SENT_BACK", note);
@@ -522,7 +607,18 @@ public class InspectionService implements AttachmentPolicy {
                 failed.stream().anyMatch(code -> criticality.getOrDefault(code, false)),
                 description,
                 rejected ? inspection.getQuantity() : null,
+                rejected ? unitOf(inspection) : null,
                 inspection.getFacilityId()));
+    }
+
+    /** What the inspected quantity is counted in: the lot's unit, or the unit of the batch's product. */
+    private UUID unitOf(Inspection inspection) {
+        if (inspection.getReceiptItemId() != null) {
+            return receipts.lots(List.of(inspection.getReceiptItemId())).stream()
+                    .findFirst().map(LotView::uomId).orElse(null);
+        }
+        return inspection.getProductionBatchId() == null ? null
+                : production.batch(inspection.getProductionBatchId()).uomId();
     }
 
     private SpecSnapshot specificationOf(Inspection inspection) {

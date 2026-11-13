@@ -5,7 +5,7 @@ import { signUp } from "./helpers";
 test("a category can be added from the form when the list is empty", async ({ page }) => {
   await signUp(page);
   await page.getByRole("link", { name: "Suppliers" }).click();
-  await page.getByRole("button", { name: "Add supplier" }).click();
+  await page.getByRole("button", { name: "Add supplier", exact: true }).click();
   const category = page.getByLabel("Category", { exact: true });
   await expect(category.locator("option")).toHaveCount(1);
 
@@ -47,7 +47,7 @@ test("categories are managed in one place, and one in use cannot be deleted", as
   await expect(suppliers.getByText("Castings")).toBeVisible();
 
   await page.getByRole("link", { name: "Suppliers" }).click();
-  await page.getByRole("button", { name: "Add supplier" }).click();
+  await page.getByRole("button", { name: "Add supplier", exact: true }).click();
   await page.getByLabel("Code", { exact: true }).fill("SUP-USE");
   await page.getByLabel("Name", { exact: true }).fill("Used Category Supplier");
   await page.getByLabel("Category", { exact: true }).selectOption({ label: "Castings" });
@@ -79,7 +79,7 @@ test("a supplier is approved, ordered from, and delivers in two batches", async 
   await expect(page.getByRole("link", { name: "EN8" })).toBeVisible();
 
   await page.getByRole("link", { name: "Suppliers" }).click();
-  await page.getByRole("button", { name: "Add supplier" }).click();
+  await page.getByRole("button", { name: "Add supplier", exact: true }).click();
   await page.getByLabel("Code", { exact: true }).fill("SUP-1");
   await page.getByLabel("Name", { exact: true }).fill("Bharat Steels");
   await page.getByRole("button", { name: "Save" }).click();

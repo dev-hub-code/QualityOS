@@ -8,9 +8,9 @@ import { PageHeader, StatusBadge, useRefresh } from "@/components/records/parts"
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
-import { api, type PageResponse } from "@/lib/api";
+import { api, ApiError, type PageResponse } from "@/lib/api";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
-import { parseSerials, toDispatchItems } from "@/lib/traceability";
+import { toDispatchItems, toReturnItems } from "@/lib/traceability";
 import type { Customer, Dispatch, ProductionBatch } from "@/lib/types";
 
 const RELEASED = "/production-batches?status=RELEASED&size=100";
@@ -34,19 +34,18 @@ function Row({ dispatch }: { dispatch: Dispatch }) {
     { name: "shippedOn", label: "Shipped on", type: "date", required: true },
     { name: "carrierReference", label: "Carrier or vehicle reference" },
   ];
+  // One quantity per line that can still come back. A batch shipped on two lines is told apart by its line number.
   const returnFields: FieldDef[] = [
-    {
-      name: "dispatchItemId",
-      label: "Line",
-      type: "select",
-      required: true,
-      options: returnable.map((line) => ({
-        value: line.id,
-        label: `${line.batchNumber} (${formatQuantity(line.quantity)} shipped, ${formatQuantity(line.returnedQuantity)} returned)`,
-      })),
-    },
-    { name: "quantity", label: "Returned quantity", type: "decimal", required: true },
-    { name: "serials", label: "Serial numbers, if tracked (one per line)", type: "textarea" },
+    ...returnable.flatMap((line, index): FieldDef[] => {
+      const twice = returnable.filter((other) => other.batchNumber === line.batchNumber).length > 1;
+      const name = twice ? `${line.batchNumber}, line ${index + 1}` : line.batchNumber;
+      const left = Number(line.quantity) - Number(line.returnedQuantity) - Number(line.expectedQuantity);
+      const upTo = formatQuantity(String(Number(left.toFixed(6))));
+      return [
+        { name: `quantity${index + 1}`, label: `Returned from ${name} (up to ${upTo})`, type: "decimal" },
+        { name: `serials${index + 1}`, label: `Serial numbers from ${name}, if tracked (one per line)`, type: "textarea" },
+      ];
+    }),
     { name: "returnReference", label: "Return reference", required: true },
     { name: "reversalDate", label: "Date received or expected", type: "date", required: true },
     { name: "expected", label: "Not here yet: the goods are on their way", type: "checkbox" },
@@ -83,14 +82,23 @@ function Row({ dispatch }: { dispatch: Dispatch }) {
           title={`Record return against ${dispatch.dispatchNumber}`}
           fields={returnFields}
           onClose={() => setReturning(false)}
-          onSubmit={({ dispatchItemId, quantity, serials, ...values }) =>
-            api
-              .post(`/dispatches/${dispatch.id}/reversals`, {
-                ...values,
-                items: [{ dispatchItemId, quantity, serialNumbers: parseSerials(String(serials ?? "")) }],
-              })
-              .then(refresh)
-          }
+          onSubmit={async (values) => {
+            const items = toReturnItems(
+              values,
+              returnable.map((line) => line.id),
+            );
+            if (items.length === 0) {
+              throw new ApiError(400, "VALIDATION_ERROR", "Enter the quantity returned from at least one batch.");
+            }
+            await api.post(`/dispatches/${dispatch.id}/reversals`, {
+              returnReference: values.returnReference,
+              reversalDate: values.reversalDate,
+              expected: values.expected,
+              reason: values.reason,
+              items,
+            });
+            await refresh();
+          }}
         />
       )}
       {reversing && (
@@ -136,6 +144,9 @@ function DispatchDialog({ onClose }: { onClose: () => void }) {
     queryFn: () => api.get<PageResponse<ProductionBatch>>(RELEASED),
   });
   const [lines, setLines] = useState(1);
+  const canOverrideRecall = usePermission("RECALL_MANAGE");
+  // Set once the server refuses goods under an open recall, so that someone allowed to may give a reason.
+  const [heldByRecall, setHeldByRecall] = useState(false);
   const options = (batches?.items ?? [])
     .filter((batch) => Number(batch.availableQuantity) > 0)
     .map((batch) => ({
@@ -160,6 +171,9 @@ function DispatchDialog({ onClose }: { onClose: () => void }) {
         { name: `serials${line}`, label: `Serial numbers ${line}, if tracked (one per line)`, type: "textarea" },
       ];
     }).flat(),
+    ...(heldByRecall && canOverrideRecall
+      ? [{ name: "recallOverrideReason", label: "Reason to dispatch despite the recall", type: "textarea", required: true } as FieldDef]
+      : []),
   ];
   return (
     <RecordDialog
@@ -178,8 +192,13 @@ function DispatchDialog({ onClose }: { onClose: () => void }) {
             dispatchedOn: values.dispatchedOn,
             reference: values.reference,
             items: toDispatchItems(values, lines),
+            recallOverrideReason: values.recallOverrideReason || null,
           })
           .then(refresh)
+          .catch((error: unknown) => {
+            if (error instanceof ApiError && error.code === "RECALL_HOLD") setHeldByRecall(true);
+            throw error;
+          })
       }
     />
   );

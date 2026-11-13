@@ -11,6 +11,7 @@ import com.qualityos.organization.dto.FacilityDtos.FacilityResponse;
 import com.qualityos.organization.dto.FacilityDtos.SaveFacilityRequest;
 import com.qualityos.organization.dto.FacilityDtos.SaveShiftRequest;
 import com.qualityos.organization.dto.FacilityDtos.SaveUnitRequest;
+import com.qualityos.organization.dto.FacilityDtos.ShiftCalendar;
 import com.qualityos.organization.dto.FacilityDtos.ShiftResponse;
 import com.qualityos.organization.dto.FacilityDtos.UnitResponse;
 import com.qualityos.organization.entity.Department;
@@ -23,6 +24,10 @@ import com.qualityos.organization.repository.FacilityRepository;
 import com.qualityos.organization.repository.ProductionLineRepository;
 import com.qualityos.organization.repository.ShiftRepository;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -136,7 +141,9 @@ public class FacilityService {
         if (shifts.existsByFacilityIdAndName(facilityId, name)) {
             throw new ConflictException("This facility already has a shift with this name.");
         }
-        return mapper.toResponse(shifts.save(new Shift(facilityId, name, request.startsAt(), request.endsAt())));
+        return mapper.toResponse(shifts.save(new Shift(facilityId, name, request.startsAt(), request.endsAt(),
+                request.breakMinutes() == null ? 0 : request.breakMinutes(),
+                request.daysOfWeek() == null ? Shift.EVERY_DAY : request.daysOfWeek())));
     }
 
     @Transactional
@@ -163,12 +170,48 @@ public class FacilityService {
         shift.setArchivedAt(Instant.now());
     }
 
+    /** Every facility of the organisation, archived ones included, for reports over history. */
+    @Transactional(readOnly = true)
+    public List<UUID> allIds() {
+        return facilities.findAll().stream().map(Facility::getId).toList();
+    }
+
+    /** The active shifts of these facilities, for capacity and availability. */
+    @Transactional(readOnly = true)
+    public List<ShiftCalendar> shiftsOf(Collection<UUID> facilityIds) {
+        return shifts.findAll().stream()
+                .filter(shift -> shift.getArchivedAt() == null && facilityIds.contains(shift.getFacilityId()))
+                .map(shift -> new ShiftCalendar(shift.getFacilityId(), shift.getName(), shift.getStartsAt(),
+                        shift.getEndsAt(), shift.getBreakMinutes(), shift.getDaysOfWeek()))
+                .toList();
+    }
+
     /** For other modules recording new activity at a facility. */
     @Transactional(readOnly = true)
     public void requireActive(UUID id) {
         if (load(id).getArchivedAt() != null) {
             throw new BusinessRuleException("This facility is archived.");
         }
+    }
+
+    /** For other modules placing work on a line: it must be active and belong to the facility. */
+    @Transactional(readOnly = true)
+    public void requireActiveLine(UUID facilityId, UUID lineId) {
+        ProductionLine line = lines.findById(lineId)
+                .filter(found -> found.getFacilityId().equals(facilityId))
+                .orElseThrow(() -> new BusinessRuleException("This production line is not part of the facility."));
+        if (line.getArchivedAt() != null) {
+            throw new BusinessRuleException("This production line is archived.");
+        }
+    }
+
+    /** Codes of facilities and production lines, by id, for other modules to show. */
+    @Transactional(readOnly = true)
+    public Map<UUID, String> codes(Collection<UUID> ids) {
+        Map<UUID, String> codes = new HashMap<>();
+        facilities.findAllById(ids).forEach(facility -> codes.put(facility.getId(), facility.getCode()));
+        lines.findAllById(ids).forEach(line -> codes.put(line.getId(), line.getCode()));
+        return codes;
     }
 
     private Facility load(UUID id) {

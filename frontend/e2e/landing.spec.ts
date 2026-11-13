@@ -28,7 +28,7 @@ test("the page fits a phone", async ({ page }) => {
 
 test("a visitor reaches the documentation and every topic has an example", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "Docs" }).click();
+  await page.getByRole("navigation", { name: "Page" }).getByRole("link", { name: "Docs" }).click();
   await expect(page).toHaveURL(/\/docs$/);
   await expect(page.getByRole("heading", { level: 1, name: "Documentation" })).toBeVisible();
   const links = page.locator('main a[href^="/docs/"]');

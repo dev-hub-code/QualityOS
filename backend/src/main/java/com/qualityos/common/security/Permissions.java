@@ -127,6 +127,8 @@ public final class Permissions {
         public static final String WORK_ORDER_APPROVE = "hasAuthority('WORK_ORDER_APPROVE')";
         public static final String WORK_ORDER_RELEASE = "hasAuthority('WORK_ORDER_RELEASE')";
         public static final String WORK_ORDER_CANCEL = "hasAnyAuthority('WORK_ORDER_MANAGE', 'WORK_ORDER_APPROVE')";
+        public static final String WORK_ORDER_MATERIAL_RESERVE = "hasAuthority('WORK_ORDER_MATERIAL_RESERVE')";
+        public static final String WORK_ORDER_MATERIAL_ISSUE = "hasAuthority('WORK_ORDER_MATERIAL_ISSUE')";
         public static final String PRODUCTION_PLAN_MANAGE = "hasAuthority('PRODUCTION_PLAN_MANAGE')";
         public static final String PRODUCTION_PLAN_APPROVE = "hasAuthority('PRODUCTION_PLAN_APPROVE')";
 

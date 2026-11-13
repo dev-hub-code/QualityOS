@@ -26,4 +26,13 @@ public class ManufacturingSettings extends TenantOwnedEntity {
 
     /** Releasing a work order needs an approved routing in effect. */
     private boolean workOrderRequiresRouting;
+
+    /** Release reserves what the order needs from the oldest free lots. */
+    private boolean reserveOnRelease;
+
+    /** Production starts only once every material is reserved and every sub-assembly is in stock. */
+    private boolean startRequiresMaterials;
+
+    /** More than the order needs may be issued. */
+    private boolean allowOverIssue;
 }

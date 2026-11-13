@@ -323,7 +323,7 @@ every permission below; after a downgrade only `MANUFACTURING_VIEW` stays. See [
 
 | Method and path | Also needs | Purpose |
 |---|---|---|
-| `GET /settings`, `PUT /settings` | `PUT`: `MANUFACTURING_MANAGE` | `manufacturingModel` (DISCRETE, PROCESS, HYBRID), `separateApprover`, and optionally `workOrderRequiresBom` (default true) and `workOrderRequiresRouting` (default false); left out, those two keep their value. A model that products still use cannot be dropped |
+| `GET /settings`, `PUT /settings` | `PUT`: `MANUFACTURING_MANAGE` | `manufacturingModel` (DISCRETE, PROCESS, HYBRID), `separateApprover`, and optionally `workOrderRequiresBom` (default true), `workOrderRequiresRouting`, `reserveOnRelease`, `startRequiresMaterials` and `allowOverIssue` (all default false); left out, those keep their value. A model that products still use cannot be dropped |
 | `GET /products/{productId}/settings`, `PUT ...` | `PUT`: `MANUFACTURING_MANAGE` | How one product is made. `manufacturingModel` is null while a hybrid organisation has not chosen |
 | `GET /work-centers`, `POST /work-centers` | `POST`: `MANUFACTURING_MANAGE` | Filter by `q`, `facilityId`. Limited members see their facilities only |
 | `GET /work-centers/{id}`, `PUT ...`, `DELETE ...` | `MANUFACTURING_MANAGE` to change | Detail with machines. `DELETE` archives, and is refused while a machine is not inactive |
@@ -364,7 +364,19 @@ only those facilities' plans and orders; anything else is `404`.
 | `POST /work-orders/{id}/release` | `WORK_ORDER_RELEASE` | APPROVED → RELEASED. Freezes the BOM or recipe and routing in effect on the planned start and writes the materials and operations |
 | `POST /work-orders/{id}/start` | `WORK_ORDER_RELEASE` | RELEASED → IN_PROGRESS. Opens the production batch (`productionBatchId`, `productionBatchNumber`) |
 | `POST /work-orders/{id}/hold`, `/resume` | `WORK_ORDER_RELEASE` | `hold` takes `reason`, from APPROVED, RELEASED or IN_PROGRESS; `resume` returns to that status |
-| `POST /work-orders/{id}/cancel` | `WORK_ORDER_MANAGE` before approval, `WORK_ORDER_APPROVE` after | `reason`. Never once production has started |
+| `POST /work-orders/{id}/cancel` | `WORK_ORDER_MANAGE` before approval, `WORK_ORDER_APPROVE` after | `reason`. Never once production has started. Releases the order's reservations |
+| `GET /work-orders/{id}/materials` | | Per line: `required`, `issued`, `reserved`, `outstanding`, `available`, `shortage`, and `sources` (free lots or released batches in the facility); `reservations`, `consumptions` (what went into the batch and still stands), `movements`, and `shortages` as sentences |
+| `POST /work-orders/{id}/reservations` | `WORK_ORDER_MATERIAL_RESERVE` | `lineNumber`, `lotId`, `quantity` (in the line's unit). Released or in progress; materials only; at most what the line still needs |
+| `POST /work-orders/{id}/reservations/auto` | `WORK_ORDER_MATERIAL_RESERVE` | Reserves what every line still needs from the oldest free lots, as far as they go |
+| `POST /work-orders/{id}/reservations/{reservationId}/release` | `WORK_ORDER_MATERIAL_RESERVE` | Optional `reason`. Gives back what the reservation still holds |
+| `POST /work-orders/{id}/issues` | `WORK_ORDER_MATERIAL_ISSUE` | `lineNumber`, `lotId` or `sourceBatchId`, `quantity` (in the line's unit). In progress only; the order's reservations on the lot are used first; more than needed is refused unless `allowOverIssue` |
+| `POST /work-orders/{id}/returns` | `WORK_ORDER_MATERIAL_ISSUE` | `consumptionId`, `quantity` (in the source's unit), `reason` |
 
 A step from the wrong status is `422` naming the order's status; a concurrent change to the same order is `409`.
 Nothing reaches COMPLETED or PARTIALLY_COMPLETED yet: that comes with finished-goods receipt in phase 6.
+
+Reserve, automatic reserve, issue and return take an optional `Idempotency-Key` header (1 to 100 characters). A key
+already used on the same work order returns the current materials without moving stock again. With
+`startRequiresMaterials`, `start` is refused with the shortfalls; otherwise a short start is recorded in the history.
+Lots from `GET /material-receipts/released-lots` and elsewhere now carry `reservedQuantity` and `facilityId`; ordinary
+consumption takes only `remainingQuantity` less `reservedQuantity`.

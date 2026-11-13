@@ -12,6 +12,12 @@ import com.qualityos.production.dto.WorkOrderDtos.SendBackWorkOrderRequest;
 import com.qualityos.production.dto.WorkOrderDtos.WorkOrderDetail;
 import com.qualityos.production.dto.WorkOrderDtos.WorkOrderResponse;
 import com.qualityos.production.entity.WorkOrder;
+import com.qualityos.production.dto.WorkOrderMaterialDtos.IssueRequest;
+import com.qualityos.production.dto.WorkOrderMaterialDtos.MaterialsResponse;
+import com.qualityos.production.dto.WorkOrderMaterialDtos.ReserveRequest;
+import com.qualityos.production.dto.WorkOrderMaterialDtos.ReturnRequest;
+import com.qualityos.production.dto.WorkOrderMaterialDtos.UnreserveRequest;
+import com.qualityos.production.service.WorkOrderMaterialService;
 import com.qualityos.production.service.WorkOrderService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -25,6 +31,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -39,10 +46,14 @@ public class WorkOrderController {
     private static final Set<String> SORT = Set.of("workOrderNumber", "plannedStart", "plannedEnd", "status",
             "priority", "createdAt");
 
-    private final WorkOrderService workOrders;
+    private static final String IDEMPOTENCY_KEY = "Idempotency-Key";
 
-    WorkOrderController(WorkOrderService workOrders) {
+    private final WorkOrderService workOrders;
+    private final WorkOrderMaterialService orderMaterials;
+
+    WorkOrderController(WorkOrderService workOrders, WorkOrderMaterialService orderMaterials) {
         this.workOrders = workOrders;
+        this.orderMaterials = orderMaterials;
     }
 
     @GetMapping
@@ -129,6 +140,55 @@ public class WorkOrderController {
         boolean canManage = holds(caller, Permissions.WORK_ORDER_MANAGE);
         boolean canApprove = holds(caller, Permissions.WORK_ORDER_APPROVE);
         return ApiResponse.ok(workOrders.cancel(id, request, canManage, canApprove));
+    }
+
+    @GetMapping("/{id}/materials")
+    public ApiResponse<MaterialsResponse> materials(@PathVariable UUID id) {
+        return ApiResponse.ok(orderMaterials.get(id));
+    }
+
+    @PostMapping("/{id}/reservations")
+    @PreAuthorize(Require.WORK_ORDER_MATERIAL_RESERVE)
+    public ApiResponse<MaterialsResponse> reserve(
+            @PathVariable UUID id,
+            @Valid @RequestBody ReserveRequest request,
+            @RequestHeader(name = IDEMPOTENCY_KEY, required = false) String key) {
+        return ApiResponse.ok(orderMaterials.reserve(id, request, key));
+    }
+
+    /** Reserves what every material line still needs from the oldest free lots, as far as they go. */
+    @PostMapping("/{id}/reservations/auto")
+    @PreAuthorize(Require.WORK_ORDER_MATERIAL_RESERVE)
+    public ApiResponse<MaterialsResponse> reserveAvailable(
+            @PathVariable UUID id, @RequestHeader(name = IDEMPOTENCY_KEY, required = false) String key) {
+        return ApiResponse.ok(orderMaterials.reserveAvailable(id, key));
+    }
+
+    @PostMapping("/{id}/reservations/{reservationId}/release")
+    @PreAuthorize(Require.WORK_ORDER_MATERIAL_RESERVE)
+    public ApiResponse<MaterialsResponse> unreserve(
+            @PathVariable UUID id,
+            @PathVariable UUID reservationId,
+            @Valid @RequestBody(required = false) UnreserveRequest request) {
+        return ApiResponse.ok(orderMaterials.unreserve(id, reservationId, request == null ? null : request.reason()));
+    }
+
+    @PostMapping("/{id}/issues")
+    @PreAuthorize(Require.WORK_ORDER_MATERIAL_ISSUE)
+    public ApiResponse<MaterialsResponse> issue(
+            @PathVariable UUID id,
+            @Valid @RequestBody IssueRequest request,
+            @RequestHeader(name = IDEMPOTENCY_KEY, required = false) String key) {
+        return ApiResponse.ok(orderMaterials.issue(id, request, key));
+    }
+
+    @PostMapping("/{id}/returns")
+    @PreAuthorize(Require.WORK_ORDER_MATERIAL_ISSUE)
+    public ApiResponse<MaterialsResponse> returnMaterial(
+            @PathVariable UUID id,
+            @Valid @RequestBody ReturnRequest request,
+            @RequestHeader(name = IDEMPOTENCY_KEY, required = false) String key) {
+        return ApiResponse.ok(orderMaterials.returnMaterial(id, request, key));
     }
 
     private static boolean holds(Authentication caller, String permission) {

@@ -112,7 +112,15 @@ public final class MaterialReceiptDtos {
             UUID uomId,
             String inspectionStatus,
             String disposition,
-            boolean released) {
+            boolean released,
+            /* Set aside for work orders, out of what remains. */
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal reservedQuantity,
+            UUID facilityId) {
+
+        /** What ordinary consumption can still take. */
+        public BigDecimal freeQuantity() {
+            return remainingQuantity.subtract(reservedQuantity);
+        }
     }
 
     /** The approved values for a lot. A null leaves that field as it is. */

@@ -47,6 +47,14 @@ public interface MaterialReceiptItemRepository extends JpaRepository<MaterialRec
 
     @Query("""
             select i from MaterialReceiptItem i join fetch i.receipt r
+            where r.status <> com.qualityos.materialreceipt.entity.MaterialReceipt.Status.VOIDED
+              and i.materialId in :materialIds and r.facilityId = :facilityId
+            order by r.receivedOn, i.internalBatch
+            """)
+    List<MaterialReceiptItem> findLotsOf(Collection<UUID> materialIds, UUID facilityId);
+
+    @Query("""
+            select i from MaterialReceiptItem i join fetch i.receipt r
             where lower(i.supplierBatch) like :pattern or lower(i.internalBatch) like :pattern
                or lower(r.grnNumber) like :pattern or i.materialId in :materialIds
             order by i.internalBatch

@@ -33,7 +33,10 @@ async function send<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     ...init,
     // The browser sets the multipart boundary itself.
-    headers: typeof init?.body === "string" ? { "content-type": "application/json" } : undefined,
+    headers:
+      typeof init?.body === "string"
+        ? { "content-type": "application/json", ...(init.headers as Record<string, string> | undefined) }
+        : undefined,
   });
   if (response.status === 204) {
     return undefined as T;
@@ -63,8 +66,8 @@ async function send<T>(url: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   get: <T>(path: string) => send<T>(`/api/v1${path}`),
-  post: <T>(path: string, body?: unknown) =>
-    send<T>(`/api/v1${path}`, { method: "POST", body: JSON.stringify(body ?? {}) }),
+  post: <T>(path: string, body?: unknown, headers?: Record<string, string>) =>
+    send<T>(`/api/v1${path}`, { method: "POST", body: JSON.stringify(body ?? {}), headers }),
   put: <T>(path: string, body: unknown) =>
     send<T>(`/api/v1${path}`, { method: "PUT", body: JSON.stringify(body) }),
   delete: <T>(path: string) => send<T>(`/api/v1${path}`, { method: "DELETE" }),

@@ -29,7 +29,10 @@ public final class ManufacturingDtos {
             ManufacturingModel manufacturingModel,
             boolean separateApprover,
             boolean workOrderRequiresBom,
-            boolean workOrderRequiresRouting) {
+            boolean workOrderRequiresRouting,
+            boolean reserveOnRelease,
+            boolean startRequiresMaterials,
+            boolean allowOverIssue) {
     }
 
     /** The work-order rules are optional: left out, they stay as they are. */
@@ -37,7 +40,10 @@ public final class ManufacturingDtos {
             @NotNull ManufacturingModel manufacturingModel,
             @NotNull Boolean separateApprover,
             Boolean workOrderRequiresBom,
-            Boolean workOrderRequiresRouting) {
+            Boolean workOrderRequiresRouting,
+            Boolean reserveOnRelease,
+            Boolean startRequiresMaterials,
+            Boolean allowOverIssue) {
     }
 
     /**

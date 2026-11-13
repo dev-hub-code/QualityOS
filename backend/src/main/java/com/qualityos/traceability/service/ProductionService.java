@@ -166,6 +166,13 @@ public class ProductionService {
      */
     @Transactional
     public BatchDetail consume(UUID id, ConsumeRequest request) {
+        consumeEntry(id, request);
+        return detail(id);
+    }
+
+    /** As {@link #consume}, for a caller that needs the entry it made. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public UUID consumeEntry(UUID id, ConsumeRequest request) {
         if ((request.receiptItemId() == null) == (request.parentBatchId() == null)) {
             throw new BusinessRuleException("Choose one lot or batch to consume.");
         }
@@ -182,15 +189,88 @@ public class ProductionService {
             quantity = inUnit(request, unitOf(parent));
             parent.use(quantity);
         }
-        relationships.save(new BatchRelationship(request.receiptItemId(), request.parentBatchId(), id, quantity,
-                request.uomId() == null ? null : request.quantity(), request.uomId()));
+        BatchRelationship edge = relationships.save(new BatchRelationship(request.receiptItemId(),
+                request.parentBatchId(), id, quantity, request.uomId() == null ? null : request.quantity(),
+                request.uomId()));
         Map<String, Object> details = new HashMap<>(Map.of("quantity", quantity));
         if (request.uomId() != null) {
             details.put("enteredQuantity", request.quantity());
             details.put("enteredUomId", request.uomId());
         }
         audit.record("BATCH_CONSUMED", ENTITY, id, null, details);
-        return detail(id);
+        return edge.getId();
+    }
+
+    /**
+     * Takes stock that was reserved for this batch's work order from a lot, in the lot's unit. The lot and batch are
+     * locked while it does.
+     *
+     * @return the consumption entry
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public UUID consumeReserved(UUID id, UUID lotId, BigDecimal quantity) {
+        lock(id).requireInProgress();
+        receipts.consumeReserved(lotId, quantity);
+        BatchRelationship edge = relationships.save(new BatchRelationship(lotId, null, id, quantity));
+        audit.record("BATCH_CONSUMED", ENTITY, id, null, Map.of("quantity", quantity, "reserved", true));
+        return edge.getId();
+    }
+
+    /** What still stands as having gone into the batch, oldest first. */
+    @Transactional(readOnly = true)
+    public List<ConsumptionRef> activeConsumptions(UUID id) {
+        return relationships.findActiveByChildBatchIdIn(List.of(id)).stream()
+                .map(edge -> new ConsumptionRef(edge.getId(), edge.getChildBatchId(), edge.getParentLotId(),
+                        edge.getParentBatchId(), edge.getQuantity()))
+                .toList();
+    }
+
+    /**
+     * Gives back part or all of what one entry took, to the lot or batch it came from, while the batch is in
+     * progress. The entry is closed with the reason and, for a part, a new entry keeps the rest, so the genealogy
+     * still shows what was used.
+     *
+     * @param quantity in the source's unit
+     * @return the entry for what stays used, or null when everything went back
+     */
+    @Transactional
+    public UUID returnConsumption(UUID id, UUID relationshipId, BigDecimal quantity, String reason) {
+        lock(id).requireInProgress();
+        BatchRelationship edge = relationships.findById(relationshipId)
+                .filter(found -> found.getChildBatchId().equals(id))
+                .orElseThrow(() -> new ResourceNotFoundException("Consumption", relationshipId));
+        if (corrections.existsByBatchRelationshipId(relationshipId)) {
+            throw new BusinessRuleException("This entry was already reversed.");
+        }
+        if (quantity.signum() <= 0 || quantity.compareTo(edge.getQuantity()) > 0) {
+            throw new BusinessRuleException("Return between 0 and %s.".formatted(
+                    edge.getQuantity().stripTrailingZeros().toPlainString()));
+        }
+        if (edge.getParentLotId() != null) {
+            receipts.restore(edge.getParentLotId(), quantity);
+        } else {
+            lock(edge.getParentBatchId()).returnUsed(quantity);
+        }
+        corrections.save(TraceCorrection.ofConsumption(relationshipId, reason));
+        BigDecimal kept = edge.getQuantity().subtract(quantity);
+        UUID remainder = kept.signum() == 0 ? null : relationships.save(new BatchRelationship(
+                edge.getParentLotId(), edge.getParentBatchId(), id, kept)).getId();
+        audit.record("BATCH_MATERIAL_RETURNED", ENTITY, id, null, Map.of("quantity", quantity, "reason", reason));
+        return remainder;
+    }
+
+    /** Released batches of the products, in the facility, with stock left to use. */
+    @Transactional(readOnly = true)
+    public List<ProductionBatchView> availableBatches(Collection<UUID> productIds, UUID facilityId) {
+        if (productIds.isEmpty()) {
+            return List.of();
+        }
+        List<ProductionBatch> found = batches.findByProductIdInAndFacilityIdAndStatusOrderByCompletedAt(
+                        productIds, facilityId, ProductionBatch.Status.RELEASED).stream()
+                .filter(batch -> batch.availableQuantity().signum() > 0)
+                .toList();
+        Map<UUID, ProductReference> referenced = products.references(productIds);
+        return found.stream().map(batch -> toView(batch, referenced.get(batch.getProductId()))).toList();
     }
 
     private BigDecimal inUnit(ConsumeRequest request, UUID sourceUnit) {

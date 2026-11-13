@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
 import { workOrderFields } from "@/components/manufacturing/work-order-fields";
+import { WorkOrderMaterialsPanel } from "@/components/manufacturing/work-order-materials";
 import {
   Details,
   PageHeader,
@@ -188,35 +189,14 @@ export default function WorkOrderPage() {
           </ul>
         )}
       </Section>
-      {released && (
-        <Section title="Materials needed">
-          {materials.length === 0 ? (
+      {released &&
+        (materials.length === 0 ? (
+          <Section title="Materials">
             <p className="text-sm text-muted-foreground">No BOM or recipe was in effect, so nothing was worked out.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="text-left text-muted-foreground">
-                <tr>
-                  <th className="py-1 font-medium">Component</th>
-                  <th className="py-1 text-right font-medium">Needed, scrap included</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {materials.map((row) => (
-                  <tr key={row.lineNumber}>
-                    <td className="py-2">
-                      {row.componentCode} – {row.componentName}
-                      {row.componentType === "PRODUCT" && <span className="text-muted-foreground"> (sub-assembly)</span>}
-                    </td>
-                    <td className="py-2 text-right">
-                      {formatQuantity(row.requiredQuantity)} {units.label(row.uomId)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </Section>
-      )}
+          </Section>
+        ) : (
+          <WorkOrderMaterialsPanel orderId={order.id} status={order.status} />
+        ))}
       {released && operations.length > 0 && (
         <Section title="Operations">
           <ul className="divide-y text-sm">

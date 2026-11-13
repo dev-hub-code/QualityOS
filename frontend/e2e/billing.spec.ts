@@ -204,7 +204,7 @@ test("a platform admin runs a plan and finds a customer from the Control Center"
   await expect(page.getByRole("navigation", { name: "Control Center" })).toBeVisible();
 
   const code = `E2E_${unique().replaceAll("-", "_").toUpperCase()}`.slice(0, 28);
-  await page.getByRole("link", { name: "Plans" }).click();
+  await page.getByRole("link", { name: "Plans", exact: true }).click();
   await page.getByRole("button", { name: "New plan" }).click();
   await page.getByLabel("Code, such as GROWTH_PLUS").fill(code);
   await page.getByLabel("Name").fill(code);

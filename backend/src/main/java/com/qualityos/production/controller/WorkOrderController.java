@@ -1,0 +1,137 @@
+package com.qualityos.production.controller;
+
+import com.qualityos.common.response.ApiResponse;
+import com.qualityos.common.response.PageResponse;
+import com.qualityos.common.response.Pages;
+import com.qualityos.common.security.Permissions;
+import com.qualityos.common.security.Permissions.Require;
+import com.qualityos.production.dto.WorkOrderDtos.NoteRequest;
+import com.qualityos.production.dto.WorkOrderDtos.ReasonRequest;
+import com.qualityos.production.dto.WorkOrderDtos.SaveWorkOrderRequest;
+import com.qualityos.production.dto.WorkOrderDtos.SendBackWorkOrderRequest;
+import com.qualityos.production.dto.WorkOrderDtos.WorkOrderDetail;
+import com.qualityos.production.dto.WorkOrderDtos.WorkOrderResponse;
+import com.qualityos.production.entity.WorkOrder;
+import com.qualityos.production.service.WorkOrderService;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.util.Set;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/v1/manufacturing/work-orders")
+@Tag(name = "Manufacturing")
+@PreAuthorize(Require.WORK_ORDER_VIEW)
+public class WorkOrderController {
+
+    private static final Set<String> SORT = Set.of("workOrderNumber", "plannedStart", "plannedEnd", "status",
+            "priority", "createdAt");
+
+    private final WorkOrderService workOrders;
+
+    WorkOrderController(WorkOrderService workOrders) {
+        this.workOrders = workOrders;
+    }
+
+    @GetMapping
+    public ApiResponse<PageResponse<WorkOrderResponse>> list(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) WorkOrder.Status status,
+            @RequestParam(required = false) UUID facilityId,
+            @RequestParam(required = false) UUID productId,
+            @RequestParam(required = false) UUID planId) {
+        return ApiResponse.ok(workOrders.list(q, status, facilityId, productId, planId,
+                Pages.of(page, size, sort, SORT, "workOrderNumber")));
+    }
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize(Require.WORK_ORDER_MANAGE)
+    public ApiResponse<WorkOrderDetail> create(@Valid @RequestBody SaveWorkOrderRequest request) {
+        return ApiResponse.ok(workOrders.create(request));
+    }
+
+    @GetMapping("/{id}")
+    public ApiResponse<WorkOrderDetail> get(@PathVariable UUID id) {
+        return ApiResponse.ok(workOrders.get(id));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize(Require.WORK_ORDER_MANAGE)
+    public ApiResponse<WorkOrderDetail> update(@PathVariable UUID id, @Valid @RequestBody SaveWorkOrderRequest request) {
+        return ApiResponse.ok(workOrders.update(id, request));
+    }
+
+    @PostMapping("/{id}/submit")
+    @PreAuthorize(Require.WORK_ORDER_MANAGE)
+    public ApiResponse<WorkOrderDetail> submit(@PathVariable UUID id) {
+        return ApiResponse.ok(workOrders.submit(id));
+    }
+
+    @PostMapping("/{id}/send-back")
+    @PreAuthorize(Require.WORK_ORDER_APPROVE)
+    public ApiResponse<WorkOrderDetail> sendBack(
+            @PathVariable UUID id, @Valid @RequestBody SendBackWorkOrderRequest request) {
+        return ApiResponse.ok(workOrders.sendBack(id, request));
+    }
+
+    @PostMapping("/{id}/approve")
+    @PreAuthorize(Require.WORK_ORDER_APPROVE)
+    public ApiResponse<WorkOrderDetail> approve(
+            @PathVariable UUID id, @Valid @RequestBody(required = false) NoteRequest request) {
+        return ApiResponse.ok(workOrders.approve(id, request));
+    }
+
+    @PostMapping("/{id}/release")
+    @PreAuthorize(Require.WORK_ORDER_RELEASE)
+    public ApiResponse<WorkOrderDetail> release(@PathVariable UUID id) {
+        return ApiResponse.ok(workOrders.release(id));
+    }
+
+    @PostMapping("/{id}/start")
+    @PreAuthorize(Require.WORK_ORDER_RELEASE)
+    public ApiResponse<WorkOrderDetail> start(@PathVariable UUID id) {
+        return ApiResponse.ok(workOrders.start(id));
+    }
+
+    @PostMapping("/{id}/hold")
+    @PreAuthorize(Require.WORK_ORDER_RELEASE)
+    public ApiResponse<WorkOrderDetail> hold(@PathVariable UUID id, @Valid @RequestBody ReasonRequest request) {
+        return ApiResponse.ok(workOrders.hold(id, request));
+    }
+
+    @PostMapping("/{id}/resume")
+    @PreAuthorize(Require.WORK_ORDER_RELEASE)
+    public ApiResponse<WorkOrderDetail> resume(@PathVariable UUID id) {
+        return ApiResponse.ok(workOrders.resume(id));
+    }
+
+    /** Before approval, managing work orders is enough; after it, cancelling needs an approver. */
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize(Require.WORK_ORDER_CANCEL)
+    public ApiResponse<WorkOrderDetail> cancel(
+            @PathVariable UUID id, @Valid @RequestBody ReasonRequest request, Authentication caller) {
+        boolean canManage = holds(caller, Permissions.WORK_ORDER_MANAGE);
+        boolean canApprove = holds(caller, Permissions.WORK_ORDER_APPROVE);
+        return ApiResponse.ok(workOrders.cancel(id, request, canManage, canApprove));
+    }
+
+    private static boolean holds(Authentication caller, String permission) {
+        return caller.getAuthorities().stream().anyMatch(held -> permission.equals(held.getAuthority()));
+    }
+}

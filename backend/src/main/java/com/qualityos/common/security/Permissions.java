@@ -57,6 +57,8 @@ public final class Permissions {
     public static final String INSPECTION_EXECUTE = "INSPECTION_EXECUTE";
     public static final String MANUFACTURING_VIEW = "MANUFACTURING_VIEW";
     public static final String MANUFACTURING_MANAGE = "MANUFACTURING_MANAGE";
+    public static final String WORK_ORDER_MANAGE = "WORK_ORDER_MANAGE";
+    public static final String WORK_ORDER_APPROVE = "WORK_ORDER_APPROVE";
 
     private Permissions() {
     }
@@ -120,6 +122,13 @@ public final class Permissions {
         public static final String RECIPE_APPROVE = "hasAuthority('RECIPE_APPROVE')";
         public static final String ROUTING_MANAGE = "hasAuthority('ROUTING_MANAGE')";
         public static final String ROUTING_APPROVE = "hasAuthority('ROUTING_APPROVE')";
+        public static final String WORK_ORDER_VIEW = "hasAuthority('WORK_ORDER_VIEW')";
+        public static final String WORK_ORDER_MANAGE = "hasAuthority('WORK_ORDER_MANAGE')";
+        public static final String WORK_ORDER_APPROVE = "hasAuthority('WORK_ORDER_APPROVE')";
+        public static final String WORK_ORDER_RELEASE = "hasAuthority('WORK_ORDER_RELEASE')";
+        public static final String WORK_ORDER_CANCEL = "hasAnyAuthority('WORK_ORDER_MANAGE', 'WORK_ORDER_APPROVE')";
+        public static final String PRODUCTION_PLAN_MANAGE = "hasAuthority('PRODUCTION_PLAN_MANAGE')";
+        public static final String PRODUCTION_PLAN_APPROVE = "hasAuthority('PRODUCTION_PLAN_APPROVE')";
 
         private Require() {
         }

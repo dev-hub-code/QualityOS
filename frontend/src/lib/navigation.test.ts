@@ -109,4 +109,10 @@ describe("forManufacturingModel", () => {
     expect(indexes.at(-1)! - indexes[0]).toBe(indexes.length - 1);
     expect(visibleNavItems(["NCR_VIEW"]).some((item) => item.group === "Manufacturing")).toBe(false);
   });
+
+  it("shows plans and work orders to whoever can see work orders, in every model", () => {
+    const labels = forManufacturingModel(visibleNavItems(["WORK_ORDER_VIEW"]), "PROCESS").map((item) => item.label);
+    expect(labels).toEqual(expect.arrayContaining(["Production plans", "Work orders"]));
+    expect(labels).not.toContain("Machines");
+  });
 });

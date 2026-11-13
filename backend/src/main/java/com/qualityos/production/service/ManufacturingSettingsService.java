@@ -53,7 +53,8 @@ public class ManufacturingSettingsService {
         ManufacturingSettings current = current();
         return new SettingsResponse(current.getManufacturingModel(), current.isSeparateApprover(),
                 current.isWorkOrderRequiresBom(), current.isWorkOrderRequiresRouting(), current.isReserveOnRelease(),
-                current.isStartRequiresMaterials(), current.isAllowOverIssue());
+                current.isStartRequiresMaterials(), current.isAllowOverIssue(), current.isOperationsInSequence(),
+                current.getOverReportPercent(), current.isOperationRequiresMachine());
     }
 
     /**
@@ -94,6 +95,15 @@ public class ManufacturingSettingsService {
         }
         if (request.allowOverIssue() != null) {
             current.setAllowOverIssue(request.allowOverIssue());
+        }
+        if (request.operationsInSequence() != null) {
+            current.setOperationsInSequence(request.operationsInSequence());
+        }
+        if (request.overReportPercent() != null) {
+            current.setOverReportPercent(request.overReportPercent());
+        }
+        if (request.operationRequiresMachine() != null) {
+            current.setOperationRequiresMachine(request.operationRequiresMachine());
         }
         settings.save(current);
         audit.record("MANUFACTURING_SETTINGS_CHANGED", ENTITY, current.getId(), before, snapshot(current));
@@ -177,13 +187,16 @@ public class ManufacturingSettingsService {
     }
 
     private static Map<String, Object> snapshot(ManufacturingSettings current) {
-        return Map.of("manufacturingModel", current.getManufacturingModel().name(),
-                "separateApprover", current.isSeparateApprover(),
-                "workOrderRequiresBom", current.isWorkOrderRequiresBom(),
-                "workOrderRequiresRouting", current.isWorkOrderRequiresRouting(),
-                "reserveOnRelease", current.isReserveOnRelease(),
-                "startRequiresMaterials", current.isStartRequiresMaterials(),
-                "allowOverIssue", current.isAllowOverIssue());
+        return Map.ofEntries(Map.entry("manufacturingModel", current.getManufacturingModel().name()),
+                Map.entry("separateApprover", current.isSeparateApprover()),
+                Map.entry("workOrderRequiresBom", current.isWorkOrderRequiresBom()),
+                Map.entry("workOrderRequiresRouting", current.isWorkOrderRequiresRouting()),
+                Map.entry("reserveOnRelease", current.isReserveOnRelease()),
+                Map.entry("startRequiresMaterials", current.isStartRequiresMaterials()),
+                Map.entry("allowOverIssue", current.isAllowOverIssue()),
+                Map.entry("operationsInSequence", current.isOperationsInSequence()),
+                Map.entry("overReportPercent", current.getOverReportPercent().toPlainString()),
+                Map.entry("operationRequiresMachine", current.isOperationRequiresMachine()));
     }
 
     private ManufacturingModel productModel(UUID productId) {

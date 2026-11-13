@@ -1,4 +1,4 @@
-import type { ManufacturingModel, PlanStatus, RevisionStatus, WorkOrderStatus } from "@/lib/types";
+import type { LossCategory, ManufacturingModel, OperationStatus, PlanStatus, RevisionStatus, WorkOrderStatus } from "@/lib/types";
 
 export type DefinitionKind = "BOM" | "RECIPE" | "ROUTING";
 
@@ -133,4 +133,74 @@ export function freeQuantity(lot: { remainingQuantity: string; reservedQuantity?
 /** A fresh key for one stock movement, so that sending it twice moves stock once. */
 export function newRequestKey(): string {
   return crypto.randomUUID();
+}
+
+export type OperationAction =
+  | "start"
+  | "pause"
+  | "resume"
+  | "report"
+  | "measure"
+  | "complete"
+  | "assign"
+  | "block"
+  | "unblock"
+  | "skip";
+
+/**
+ * What a person may do with an operation, as the server allows it. Operations run only while their order is in
+ * progress; one given to someone else is theirs unless the person supervises.
+ */
+export function operationActions(
+  operation: { status: OperationStatus; workOrderStatus: WorkOrderStatus; processed: string; operatorId: string | null },
+  me: { id: string | undefined; execute: boolean; supervise: boolean },
+): OperationAction[] {
+  const actions: OperationAction[] = [];
+  const running = operation.workOrderStatus === "IN_PROGRESS";
+  const onFloor = running || operation.workOrderStatus === "ON_HOLD";
+  const mine = operation.operatorId === null || operation.operatorId === me.id || me.supervise;
+  if (me.execute && running && mine) {
+    if (operation.status === "READY") actions.push("start");
+    if (operation.status === "IN_PROGRESS") actions.push("pause");
+    if (operation.status === "PAUSED") actions.push("resume");
+    if (operation.status === "IN_PROGRESS" || operation.status === "PAUSED") actions.push("report", "measure", "complete");
+  }
+  if (me.supervise) {
+    const open = operation.status !== "COMPLETED" && operation.status !== "CANCELLED";
+    const released = onFloor || operation.workOrderStatus === "RELEASED";
+    if (released && open) actions.push("assign");
+    if (onFloor && open && operation.status !== "BLOCKED") actions.push("block");
+    if (onFloor && operation.status === "BLOCKED") actions.push("unblock");
+    if (released && ["PENDING", "READY", "BLOCKED"].includes(operation.status) && Number(operation.processed) === 0) {
+      actions.push("skip");
+    }
+  }
+  return actions;
+}
+
+export const LOSS_CATEGORY_LABELS: Record<LossCategory, string> = {
+  MACHINE_BREAKDOWN: "Machine breakdown",
+  MATERIAL_SHORTAGE: "Material shortage",
+  POWER_FAILURE: "Power failure",
+  QUALITY_ISSUE: "Quality issue",
+  OPERATOR_UNAVAILABLE: "Operator unavailable",
+  PLANNED_MAINTENANCE: "Planned maintenance",
+  CHANGEOVER: "Changeover",
+  ORDER_ON_HOLD: "Work order on hold",
+  OTHER: "Other",
+};
+
+/** Running time as hours and minutes, for the floor. */
+export function formatDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  if (hours === 0) return `${minutes} min`;
+  return `${hours} h ${minutes % 60} min`;
+}
+
+/** Good, rejected and scrap add up to the quantity reported, as the server checks. */
+export function reportMismatch(values: { quantity: string; goodQuantity: string; rejectedQuantity: string; scrapQuantity: string }): string | null {
+  const parts = [values.goodQuantity, values.rejectedQuantity, values.scrapQuantity].map((value) => Number(value || 0));
+  const total = Number(parts.reduce((sum, part) => sum + part, 0).toFixed(6));
+  return total === Number(values.quantity) ? null : `Good, rejected and scrap make ${total}, not ${Number(values.quantity)}.`;
 }

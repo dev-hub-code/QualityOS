@@ -1572,6 +1572,12 @@ export interface ManufacturingSettings {
   startRequiresMaterials: boolean;
   /** More than an order needs may be issued. */
   allowOverIssue: boolean;
+  /** An operation becomes ready only once the one before it is complete. */
+  operationsInSequence: boolean;
+  /** How far past the order quantity the first operation may report, in percent. */
+  overReportPercent: string;
+  /** Starting an operation at a work centre with machines needs one of them. */
+  operationRequiresMachine: boolean;
 }
 
 export interface ProductManufacturingSettings {
@@ -1843,7 +1849,17 @@ export interface WorkOrderDetail {
     plannedSetupMinutes: string;
     plannedRunMinutes: string;
     instructions: string | null;
-    status: string;
+    status: OperationStatus;
+    statusReason: string | null;
+    operatorName: string | null;
+    machineCode: string | null;
+    /** What can come into it: the order quantity first, then the good output of the operation before. */
+    input: string;
+    goodQuantity: string;
+    rejectedQuantity: string;
+    scrapQuantity: string;
+    /** Input not yet processed: work in progress in front of it. */
+    waiting: string;
   }[];
   history: {
     fromStatus: WorkOrderStatus | null;
@@ -1906,4 +1922,118 @@ export interface WorkOrderMaterials {
     movedAt: string;
   }[];
   shortages: string[];
+}
+
+export type OperationStatus = "PENDING" | "READY" | "IN_PROGRESS" | "PAUSED" | "COMPLETED" | "BLOCKED" | "CANCELLED";
+
+export type LossCategory =
+  | "MACHINE_BREAKDOWN"
+  | "MATERIAL_SHORTAGE"
+  | "POWER_FAILURE"
+  | "QUALITY_ISSUE"
+  | "OPERATOR_UNAVAILABLE"
+  | "PLANNED_MAINTENANCE"
+  | "CHANGEOVER"
+  | "ORDER_ON_HOLD"
+  | "OTHER";
+
+/** A work order operation on the shop floor. Quantities are in the work order's unit. */
+export interface OperationSummary {
+  id: string;
+  workOrderId: string;
+  workOrderNumber: string;
+  workOrderStatus: WorkOrderStatus;
+  priority: WorkOrder["priority"];
+  plannedEnd: string;
+  productId: string;
+  productCode: string;
+  productName: string;
+  facilityId: string;
+  facilityCode: string;
+  sequence: number;
+  name: string;
+  workCenterId: string;
+  workCenterCode: string;
+  workCenterName: string;
+  status: OperationStatus;
+  statusReason: string | null;
+  operatorId: string | null;
+  operatorName: string | null;
+  machineId: string | null;
+  machineCode: string | null;
+  uomId: string;
+  orderQuantity: string;
+  input: string;
+  processed: string;
+  goodQuantity: string;
+  rejectedQuantity: string;
+  scrapQuantity: string;
+  reworkQuantity: string;
+  waiting: string;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface OperationDetail {
+  operation: OperationSummary;
+  instructions: string | null;
+  plannedSetupMinutes: string;
+  plannedRunMinutes: string;
+  runningSeconds: number;
+  actualSetupMinutes: string | null;
+  blockedFrom: OperationStatus | null;
+  /** An earlier operation is still open, so this one cannot be completed. */
+  previousOpen: boolean;
+  parameters: {
+    code: string;
+    name: string;
+    unit: string | null;
+    target: string | null;
+    minimum: string | null;
+    maximum: string | null;
+    source: "OPERATION" | "RECIPE";
+  }[];
+  reports: {
+    id: string;
+    goodQuantity: string;
+    rejectedQuantity: string;
+    scrapQuantity: string;
+    reworkQuantity: string;
+    reversesReportId: string | null;
+    reversed: boolean;
+    comment: string | null;
+    reportedBy: string | null;
+    reportedByName: string | null;
+    reportedAt: string;
+  }[];
+  measurements: {
+    id: string;
+    parameterCode: string;
+    parameterName: string;
+    unit: string | null;
+    target: string | null;
+    minimum: string | null;
+    maximum: string | null;
+    value: string;
+    withinLimits: boolean;
+    comment: string | null;
+    measuredBy: string | null;
+    measuredByName: string | null;
+    measuredAt: string;
+  }[];
+  events: {
+    id: string;
+    eventType: "READY" | "STARTED" | "PAUSED" | "RESUMED" | "COMPLETED" | "BLOCKED" | "UNBLOCKED" | "CANCELLED" | "ASSIGNED" | "COMMENT";
+    fromStatus: OperationStatus | null;
+    toStatus: OperationStatus | null;
+    lossCategory: LossCategory | null;
+    operatorName: string | null;
+    machineCode: string | null;
+    comment: string | null;
+    by: string | null;
+    byName: string | null;
+    at: string;
+  }[];
+  machines: { id: string; code: string; name: string; status: string; busy: boolean }[];
+  operators: { id: string; name: string }[];
 }

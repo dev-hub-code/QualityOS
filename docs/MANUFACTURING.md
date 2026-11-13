@@ -59,7 +59,9 @@ Status: **Built** (in this branch, tested), **Phase n** (planned), **Reused** (a
 | Inventory | Issue to the order's batch (reserved stock first), partial return, consumption counted from the genealogy | Built (Phase 3) |
 | Inventory | Shortages shown per line and on start; start blocked or recorded as short, as configured; over-issue refused unless allowed | Built (Phase 3) |
 | Inventory | Idempotency keys on reserve, issue and return | Built (Phase 3) |
-| Shop floor | Operations PENDING → READY → IN_PROGRESS → PAUSED → COMPLETED, BLOCKED, CANCELLED; quantity reconciliation | Phase 4 |
+| Shop floor | Operations PENDING → READY → IN_PROGRESS → PAUSED → COMPLETED, BLOCKED, CANCELLED; quantity reconciliation | Built (Phase 4) |
+| Shop floor | Operator and machine assignment, running time, setup time, good/rejected/scrap/rework, partial reporting, WIP | Built (Phase 4) |
+| Shop floor | Measurements against frozen process parameters, comments, photographs, stop reasons | Built (Phase 4) |
 | Quality | Quality checkpoints on operations reusing inspections, NCR and CAPA; completion blocked by open mandatory gates | Phase 5 |
 | Rework | Rework orders and their traceability | Phase 5 |
 | Completion | Finished-goods receipt into existing inventory; production batch completed through traceability | Phase 6 |
@@ -144,9 +146,13 @@ Production plans and work orders belong to a facility in the same way.
 | WORK_ORDER_VIEW (plans and work orders) | ✓ | ✓ | ✓ | Production Planner (new), Quality Engineer, Inspector, Auditor, Viewer |
 | WORK_ORDER_MANAGE, PRODUCTION_PLAN_MANAGE | ✓ | ✓ | | Production Planner |
 | WORK_ORDER_APPROVE, WORK_ORDER_RELEASE, PRODUCTION_PLAN_APPROVE | ✓ | ✓ | | |
+| WORK_ORDER_MATERIAL_RESERVE | ✓ | ✓ | | Production Planner |
+| WORK_ORDER_MATERIAL_ISSUE | ✓ | ✓ | | Production Operator |
+| PRODUCTION_EXECUTE (run operations, report, measure, comment, photographs) | ✓ | ✓ | | Production Operator (new) |
+| PRODUCTION_SUPERVISE (assign, block, unblock, skip, reverse reports, run anyone's operation) | ✓ | ✓ | | |
 
 The Production Planner also gets MANUFACTURING_VIEW and the views of facilities, products, purchasing, traceability
-and reports.
+and reports. The Production Operator gets WORK_ORDER_VIEW and the views of facilities, products and traceability.
 
 All of them belong to the `MANUFACTURING` plan feature, on Professional and Enterprise. As with other features, the
 `_VIEW` permission stays after a downgrade so existing records remain readable.
@@ -185,7 +191,8 @@ Release stores the approved snapshots on the order and writes:
   are), plus scrap, converted to the component's own unit. A sub-assembly is listed as needed; it is made on its own
   work order.
 - one operation per routing operation, with setup time as it is and run time multiplied by the order quantity, since
-  routing run time is per unit. Each starts PENDING; phase 4 moves them.
+  routing run time is per unit, with the operation's process parameters and the recipe's as approved. Each starts
+  PENDING; the shop floor moves them.
 
 The detail page shows before release which revisions would be used and what would stop the release.
 
@@ -232,6 +239,54 @@ on the order returns the current state without moving stock again. The web app s
 **Record.** Every reservation, release, issue and return is a row in `work_order_material_movements`, which the
 database keeps append-only, and an audit entry. Reservations are never deleted, and their open quantity only falls.
 
+### Shop-floor execution
+
+An operation of a released order moves only along these changes; the database refuses any change to a completed or
+skipped one, and to what was released (sequence, work centre, planned times, parameters).
+
+| From | To |
+|---|---|
+| PENDING | READY (its turn has come), BLOCKED, CANCELLED (skipped) |
+| READY | IN_PROGRESS (started), BLOCKED, CANCELLED |
+| IN_PROGRESS | PAUSED, COMPLETED, BLOCKED |
+| PAUSED | IN_PROGRESS (resumed), COMPLETED, BLOCKED |
+| BLOCKED | back where it was (a running one comes back paused), CANCELLED |
+
+- **Ready.** When the order starts, the first operation becomes ready, and each later one once every operation before
+  it is complete or skipped. With `operationsInSequence` off, all become ready together.
+- **Running.** Operations run only while the order is in progress. Starting one takes it for the person starting it
+  when nobody has it; one assigned to someone is run by them or by a supervisor. The running clock counts only time in
+  progress; setup time is stated on completion and cannot exceed it. Putting the order on hold pauses whatever is
+  running, with the reason "Work order on hold".
+- **Machines.** An operation runs on a machine at its own work centre, chosen when it starts or assigned beforehand.
+  With `operationRequiresMachine`, one must be chosen where the work centre has any. The machine must be available,
+  idle or running nothing else (a partial unique index allows one running operation per machine); starting sets it
+  running and stopping frees it. Pausing or blocking for a machine breakdown or planned maintenance puts the machine
+  into that state, kept in its history like a change by hand. A machine someone has already moved is left alone.
+- **Reports.** Each report gives the quantity processed and its split into good, rejected and scrap, which must add up
+  to it; rework is the part of the rejected that goes to rework. Quantities are in the order's unit, and whole numbers
+  when that unit counts (dimension `Count`). Reports add up, so an operation is reported in parts as it goes.
+- **Reconciliation.** The first operation (not counting skipped ones) can process the order quantity plus
+  `overReportPercent`. Each later one can process only what came through good from the one before it. Completing with
+  less processed than came in needs a reason, which stays on the operation and its timeline.
+- **WIP.** For every operation: what can come in, what was processed, and what is waiting in front of it. The work
+  order page shows these per operation.
+- **Corrections.** Reports are never edited. A supervisor reverses one with a reason: a reversal row with the
+  quantities negated, once per report, and only while the operation is open and the next operation has not already
+  used that output.
+- **Measurements** are taken against the parameters frozen on the operation at release: the routing operation's own,
+  then the recipe's. A value outside the limits is kept and flagged. Phase 5 turns this into quality gates.
+- **Timeline, comments and photographs.** Every change of status, assignment and comment is a row in
+  `operation_events`, with the reason category when it stopped. Photographs and other files use the existing
+  attachments (entity type `WORK_ORDER_OPERATION`), with access following the work order.
+- **Concurrency and repeats.** Every change locks the work order row first, then reads its operations, so checks across
+  operations hold; the machine row is locked when it is taken or freed. Reports and measurements accept an
+  `Idempotency-Key`; status changes are safe to repeat through the status check.
+
+Stop reasons (`MACHINE_BREAKDOWN`, `MATERIAL_SHORTAGE`, `POWER_FAILURE`, `QUALITY_ISSUE`, `OPERATOR_UNAVAILABLE`,
+`PLANNED_MAINTENANCE`, `CHANGEOVER`, `OTHER`, and `ORDER_ON_HOLD` set by the system) are the spec's downtime
+categories, so phase 7 can summarise downtime from the timeline.
+
 ## 4. Phase plan and progress
 
 | Phase | Scope | Status |
@@ -239,7 +294,7 @@ database keeps append-only, and an audit entry. Reservations are never deleted, 
 | 1 Foundation | Settings, product settings, BOMs, recipes, routings, work centres, machines, permissions, navigation | **Built** |
 | 2 Planning and work orders | Production plans, work orders and their lifecycle, snapshots on release | **Built** |
 | 3 Inventory integration | Availability, reservation, issue, consumption, return | **Built** |
-| 4 Shop floor | Operation execution, quantity reconciliation, machine use | Not started |
+| 4 Shop floor | Operation execution, quantity reconciliation, machine use | **Built** |
 | 5 Quality and rework | Quality gates on operations, NCR/CAPA links, rework | Not started |
 | 6 Completion | Finished-goods receipt, batch completion, closing work orders | Not started |
 | 7 Advanced | Downtime, scheduling, costing, OEE, analytics | Not started |
@@ -250,8 +305,6 @@ Phase 1:
 
 - The product's flat material list stays as it was. A BOM can be started from it, but the two are not kept in step.
 - Routing operations record standard times; nothing uses them until scheduling and costing (Phase 7).
-- Parameters on recipes and operations are definitions only. Recording actual values is Phase 4.
-- Machine status is changed by hand. Work orders do not move it until Phase 4.
 
 Phase 2:
 
@@ -269,6 +322,19 @@ Phase 3:
   still counts as issued, and cannot take reserved stock.
 - Material is issued in the line's unit. A lot in another unit is converted, which may leave a remainder below six
   decimal places.
+- Material substitution (issuing another material against a line) is not built. Scrapped material is recorded as
+  scrap on the operation that lost it (phase 4), not as a separate stock movement.
+
+Phase 4:
+
+- Shop-floor execution needs a routing. An order released without one has no operations to run; turn on
+  `workOrderRequiresRouting` to make sure every order has them.
+- Material issue stays at order level: it is not tied to an operation.
+- Rejected quantities are recorded, not yet sent anywhere. Rework orders and quality holds come with phase 5, which
+  will also show the inspections an operation needs.
+- A machine runs one operation at a time. Machines that run several are not modelled.
+- Stop reasons are recorded on the timeline, but downtime is not yet summarised by machine or period (phase 7).
+- The good output of the last operation is not yet received as finished goods (phase 6).
 
 ## 6. Phase 1 delivery
 
@@ -350,3 +416,38 @@ and the stock movements. The batch page shows each lot's free stock. Configurati
   releasing a reservation, permissions, facility scope and isolation.
 - Vitest: `freeQuantity` and the idempotency header in the proxy.
 - Playwright: `work-orders.spec.ts` now reserves, starts short, issues and returns from the pages.
+
+## 9. Phase 4 delivery
+
+**Migration.** `V25__shop_floor_execution.sql`: three settings (`operations_in_sequence`, `over_report_percent`,
+`operation_requires_machine`); execution columns on `work_order_operations` with checks (quantities not negative,
+rework within rejected, running exactly while in progress, blocked exactly while it has somewhere to go back to), a
+partial unique index for one running operation per machine, and the release trigger widened to protect what was
+released and closed operations; the append-only `operation_reports`, `operation_measurements` and `operation_events`
+with row-level security; two permissions and the Production Operator role.
+
+**Backend.** `ShopFloorService` (also the attachment policy for `WORK_ORDER_OPERATION`), `OperationController` at
+`/api/v1/manufacturing/operations`, the entities `OperationReport`, `OperationMeasurement` and `OperationEvent`, and the
+execution methods on `WorkOrderOperation`. Work order start makes operations ready and hold pauses them; release
+freezes parameters on each operation. `WorkCenterService` locks and moves machines for the floor, keeping their
+history.
+
+**Screens.** Shop floor (Manufacturing → Shop floor): open operations of orders in production as cards, running first,
+with All/Mine, search, facility and work centre filters, refreshed every 30 seconds. The operation screen: large
+buttons to start, resume, report quantities, pause, measure and complete; quantities and WIP; operator, machine,
+running and planned times; instructions; parameters and measurements; reports with reversal; the timeline with
+comments; photographs and documents; supervisor actions to assign, block, unblock and skip. The work order page shows
+each operation's progress and links to it. Configuration has the three new rules.
+
+**Tests.**
+- `ShopFloorIT`: 3 tests. They cover the lifecycle in sequence, start before the order, machine taken and freed,
+  someone else's operation refused, reconciliation (sum, whole pieces, rework within rejected, ceilings from the order
+  and from the operation before), an idempotent report, measurements in and out of limits, a breakdown moving the
+  machine, setup time, completion short with and without a reason, readiness of the next operation, append-only and
+  closed-row protection in the database, audit; operations side by side, the machine rule, assignment and its checks,
+  one running operation per machine, reversal and its limits, a hold pausing the floor, block, unblock and skip,
+  comments, photographs and their permission, the floor list, facility scope and isolation; and five reports racing
+  on one operation.
+- Vitest: `operationActions`, `formatDuration` and `reportMismatch`.
+- Playwright: `shop-floor.spec.ts` starts an operation on a machine, reports, measures out of limits, pauses for a
+  breakdown, is refused until the machine is fixed, resumes, completes, comments, and checks the work order page.

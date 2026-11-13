@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -35,4 +36,13 @@ public class ManufacturingSettings extends TenantOwnedEntity {
 
     /** More than the order needs may be issued. */
     private boolean allowOverIssue;
+
+    /** An operation becomes ready only once the one before it is complete. */
+    private boolean operationsInSequence = true;
+
+    /** How far past the order quantity the first operation may report, in percent. */
+    private BigDecimal overReportPercent = BigDecimal.ZERO;
+
+    /** Starting an operation at a work centre that has machines needs one of them. */
+    private boolean operationRequiresMachine;
 }

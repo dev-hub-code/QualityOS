@@ -31,6 +31,9 @@ const FIELDS: FieldDef[] = [
   { name: "reserveOnRelease", label: "Releasing a work order reserves its material from the oldest free lots", type: "checkbox" },
   { name: "startRequiresMaterials", label: "Production starts only when all material is reserved", type: "checkbox" },
   { name: "allowOverIssue", label: "More material than an order needs may be issued", type: "checkbox" },
+  { name: "operationsInSequence", label: "An operation is ready only once the one before it is complete", type: "checkbox" },
+  { name: "operationRequiresMachine", label: "Starting an operation at a work centre with machines needs one of them", type: "checkbox" },
+  { name: "overReportPercent", label: "The first operation may report this far past the order quantity, in percent", type: "decimal" },
 ];
 
 export default function ManufacturingSettingsPage() {
@@ -54,6 +57,9 @@ export default function ManufacturingSettingsPage() {
             ["Release reserves material", data.reserveOnRelease ? "Yes" : "No"],
             ["Start needs all material reserved", data.startRequiresMaterials ? "Yes" : "No, but a short start is recorded"],
             ["Issuing more than needed", data.allowOverIssue ? "Allowed" : "Refused"],
+            ["Operations", data.operationsInSequence ? "Each after the one before" : "Side by side"],
+            ["Starting an operation needs a machine", data.operationRequiresMachine ? "Yes, where the work centre has one" : "No"],
+            ["Reporting past the order quantity", Number(data.overReportPercent) > 0 ? `Up to ${Number(data.overReportPercent)}%` : "Refused"],
           ]}
         />
         <p className="mt-3 text-sm text-muted-foreground">

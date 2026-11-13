@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { describeLimits, freeQuantity, planActions, revisionActions, toLineRequest, usesKind, workOrderActions } from "@/lib/manufacturing";
+import {
+  describeLimits,
+  formatDuration,
+  freeQuantity,
+  operationActions,
+  planActions,
+  reportMismatch,
+  revisionActions,
+  toLineRequest,
+  usesKind,
+  workOrderActions,
+} from "@/lib/manufacturing";
 
 describe("usesKind", () => {
   it("offers BOMs to discrete and recipes to process organisations, and both to hybrid ones", () => {
@@ -96,5 +107,54 @@ describe("freeQuantity", () => {
     expect(freeQuantity({ remainingQuantity: "20.000000", reservedQuantity: "7.500000" })).toBe("12.5");
     expect(freeQuantity({ remainingQuantity: "5.000000", reservedQuantity: "5.000000" })).toBe("0");
     expect(freeQuantity({ remainingQuantity: "3" })).toBe("3");
+  });
+});
+
+describe("operationActions", () => {
+  const operator = { id: "me", execute: true, supervise: false };
+  const supervisor = { id: "boss", execute: true, supervise: true };
+  const base = { status: "READY" as const, workOrderStatus: "IN_PROGRESS" as const, processed: "0", operatorId: null };
+
+  it("lets an operator run what is free or theirs, while the order is in production", () => {
+    expect(operationActions(base, operator)).toEqual(["start"]);
+    expect(operationActions({ ...base, status: "IN_PROGRESS", operatorId: "me" }, operator)).toEqual([
+      "pause",
+      "report",
+      "measure",
+      "complete",
+    ]);
+    expect(operationActions({ ...base, status: "PAUSED", operatorId: "me" }, operator)).toContain("resume");
+    expect(operationActions({ ...base, operatorId: "someone else" }, operator)).toEqual([]);
+    expect(operationActions({ ...base, workOrderStatus: "ON_HOLD" }, operator)).toEqual([]);
+    expect(operationActions(base, { ...operator, execute: false })).toEqual([]);
+  });
+
+  it("gives supervisors assignment, blocking and skipping", () => {
+    expect(operationActions({ ...base, operatorId: "someone else" }, supervisor)).toEqual(["start", "assign", "block", "skip"]);
+    expect(operationActions({ ...base, status: "BLOCKED", workOrderStatus: "ON_HOLD" }, supervisor)).toEqual([
+      "assign",
+      "unblock",
+      "skip",
+    ]);
+    expect(operationActions({ ...base, status: "PENDING", workOrderStatus: "RELEASED" }, supervisor)).toEqual(["assign", "skip"]);
+    expect(operationActions({ ...base, status: "BLOCKED", processed: "2" }, supervisor)).not.toContain("skip");
+    expect(operationActions({ ...base, status: "COMPLETED" }, supervisor)).toEqual([]);
+  });
+});
+
+describe("formatDuration", () => {
+  it("shows minutes, then hours and minutes", () => {
+    expect(formatDuration(59)).toBe("0 min");
+    expect(formatDuration(25 * 60)).toBe("25 min");
+    expect(formatDuration(135 * 60 + 10)).toBe("2 h 15 min");
+  });
+});
+
+describe("reportMismatch", () => {
+  it("accepts a report whose parts add up, and says by how much one does not", () => {
+    expect(reportMismatch({ quantity: "10", goodQuantity: "8", rejectedQuantity: "1.5", scrapQuantity: "0.5" })).toBeNull();
+    expect(reportMismatch({ quantity: "10", goodQuantity: "8", rejectedQuantity: "1", scrapQuantity: "" })).toBe(
+      "Good, rejected and scrap make 9, not 10.",
+    );
   });
 });

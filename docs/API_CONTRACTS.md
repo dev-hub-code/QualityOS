@@ -323,7 +323,7 @@ every permission below; after a downgrade only `MANUFACTURING_VIEW` stays. See [
 
 | Method and path | Also needs | Purpose |
 |---|---|---|
-| `GET /settings`, `PUT /settings` | `PUT`: `MANUFACTURING_MANAGE` | `manufacturingModel` (DISCRETE, PROCESS, HYBRID), `separateApprover`, and optionally `workOrderRequiresBom` (default true), `workOrderRequiresRouting`, `reserveOnRelease`, `startRequiresMaterials` and `allowOverIssue` (all default false); left out, those keep their value. A model that products still use cannot be dropped |
+| `GET /settings`, `PUT /settings` | `PUT`: `MANUFACTURING_MANAGE` | `manufacturingModel` (DISCRETE, PROCESS, HYBRID), `separateApprover`, and optionally `workOrderRequiresBom` (default true), `workOrderRequiresRouting`, `reserveOnRelease`, `startRequiresMaterials` and `allowOverIssue` (all default false), `operationsInSequence` (default true), `operationRequiresMachine` (default false) and `overReportPercent` (0 to 100, default 0); left out, those keep their value. A model that products still use cannot be dropped |
 | `GET /products/{productId}/settings`, `PUT ...` | `PUT`: `MANUFACTURING_MANAGE` | How one product is made. `manufacturingModel` is null while a hybrid organisation has not chosen |
 | `GET /work-centers`, `POST /work-centers` | `POST`: `MANUFACTURING_MANAGE` | Filter by `q`, `facilityId`. Limited members see their facilities only |
 | `GET /work-centers/{id}`, `PUT ...`, `DELETE ...` | `MANUFACTURING_MANAGE` to change | Detail with machines. `DELETE` archives, and is refused while a machine is not inactive |
@@ -380,3 +380,31 @@ already used on the same work order returns the current materials without moving
 `startRequiresMaterials`, `start` is refused with the shortfalls; otherwise a short start is recorded in the history.
 Lots from `GET /material-receipts/released-lots` and elsewhere now carry `reservedQuantity` and `facilityId`; ordinary
 consumption takes only `remainingQuantity` less `reservedQuantity`.
+
+Work order operations now also carry `statusReason`, `operatorName`, `machineCode`, `input`, `goodQuantity`,
+`rejectedQuantity`, `scrapQuantity` and `waiting`.
+
+#### Shop floor: `/api/v1/manufacturing/operations`
+
+Reading needs `WORK_ORDER_VIEW`. Quantities are in the work order's unit. Every change returns the operation's detail.
+
+| Endpoint | Permission | Notes |
+|---|---|---|
+| `GET /operations` | | Open operations of orders in progress or on hold, running first. `status` (repeatable), `facilityId`, `workCenterId`, `mine`, `q` (order number or product), paged |
+| `GET /operations/{id}` | | `operation` (with `input`, `processed`, `goodQuantity`, `rejectedQuantity`, `scrapQuantity`, `reworkQuantity`, `waiting`), `instructions`, planned and running times, `parameters`, `reports`, `measurements`, `events`, `machines` at its work centre, and `operators` who may run it |
+| `POST /operations/{id}/start` | `PRODUCTION_EXECUTE` | Optional `machineId`. Ready operations of orders in progress |
+| `POST /operations/{id}/pause` | `PRODUCTION_EXECUTE` | `category` (stop reason), optional `reason` |
+| `POST /operations/{id}/resume` | `PRODUCTION_EXECUTE` | |
+| `POST /operations/{id}/reports` | `PRODUCTION_EXECUTE` | `quantity`, `goodQuantity`, `rejectedQuantity`, `scrapQuantity` (must add up to `quantity`), optional `reworkQuantity` (within rejected) and `comment`. Accepts `Idempotency-Key` |
+| `POST /operations/{id}/measurements` | `PRODUCTION_EXECUTE` | `parameterCode`, `value`, optional `comment`. Accepts `Idempotency-Key` |
+| `POST /operations/{id}/complete` | `PRODUCTION_EXECUTE` | Optional `setupMinutes` and `reason`; the reason is required when less was processed than came in |
+| `POST /operations/{id}/comments` | `PRODUCTION_EXECUTE` | `comment` |
+| `POST /operations/{id}/assign` | `PRODUCTION_SUPERVISE` | `operatorId`, `machineId`; either may be null to clear |
+| `POST /operations/{id}/block` | `PRODUCTION_SUPERVISE` | `category`, `reason` |
+| `POST /operations/{id}/unblock` | `PRODUCTION_SUPERVISE` | |
+| `POST /operations/{id}/skip` | `PRODUCTION_SUPERVISE` | `reason`. Only when nothing was reported on it |
+| `POST /operations/{id}/reports/{reportId}/reverse` | `PRODUCTION_SUPERVISE` | `reason`. Once per report, while the operation is open |
+
+An operation assigned to someone else is refused with 403 unless the caller holds `PRODUCTION_SUPERVISE`. Photographs
+use `/api/v1/attachments` with `entityType=WORK_ORDER_OPERATION`: viewing needs `WORK_ORDER_VIEW`, adding needs
+`PRODUCTION_EXECUTE`.

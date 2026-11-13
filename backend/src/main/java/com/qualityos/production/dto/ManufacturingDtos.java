@@ -32,10 +32,13 @@ public final class ManufacturingDtos {
             boolean workOrderRequiresRouting,
             boolean reserveOnRelease,
             boolean startRequiresMaterials,
-            boolean allowOverIssue) {
+            boolean allowOverIssue,
+            boolean operationsInSequence,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal overReportPercent,
+            boolean operationRequiresMachine) {
     }
 
-    /** The work-order rules are optional: left out, they stay as they are. */
+    /** The work-order and shop-floor rules are optional: left out, they stay as they are. */
     public record UpdateSettingsRequest(
             @NotNull ManufacturingModel manufacturingModel,
             @NotNull Boolean separateApprover,
@@ -43,7 +46,10 @@ public final class ManufacturingDtos {
             Boolean workOrderRequiresRouting,
             Boolean reserveOnRelease,
             Boolean startRequiresMaterials,
-            Boolean allowOverIssue) {
+            Boolean allowOverIssue,
+            Boolean operationsInSequence,
+            @DecimalMin("0") @DecimalMax("100") @Digits(integer = 3, fraction = 2) BigDecimal overReportPercent,
+            Boolean operationRequiresMachine) {
     }
 
     /**

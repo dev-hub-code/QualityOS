@@ -28,6 +28,24 @@ async function enterSecondFactor(page: Page, secret = TEST_SECRET) {
   await page.getByRole("button", { name: "Continue" }).click();
 }
 
+/**
+ * A plan of the test's own. Plans are shared by every organisation and test, so a test that edits the seeded ones
+ * races any other run editing them: the second save is refused as a concurrent change.
+ */
+async function ownPlan(page: Page): Promise<{ id: string; name: string }> {
+  const code = `E2E_${unique().replaceAll("-", "_").toUpperCase()}`.slice(0, 28);
+  const plan = await apiCaller(page)("POST", "/platform/plans", { code, name: code });
+  return { id: plan.id, name: code };
+}
+
+/** Archived plans drop out of the lists, so test plans do not pile up across runs. */
+async function archive(page: Page, id: string) {
+  const call = apiCaller(page);
+  const plans: { id: string; version: number }[] = await call("GET", "/platform/plans");
+  const plan = plans.find((found) => found.id === id)!;
+  await call("POST", `/platform/plans/${id}/archive`, { version: plan.version, reason: "Test finished" });
+}
+
 test("an owner chooses a plan, a platform admin records the payment, and the plan starts", async ({ page, browser }) => {
   test.setTimeout(60_000);
   await signUp(page);
@@ -51,6 +69,9 @@ test("an owner chooses a plan, a platform admin records the payment, and the pla
   await signUp(admin, adminEmail);
   makePlatformAdmin(adminEmail);
   await admin.goto("/platform/organisations");
+  // The list is paged, and organisations left by earlier runs can push this one off the first page.
+  await admin.getByLabel("Search name, email or GSTIN").fill(organization);
+  await expect(admin.getByRole("status")).toHaveText("1 organisation, page 1");
   await admin.getByRole("row", { name: organization }).getByRole("button", { name: "Record ₹7,078.82" }).click();
   await admin.getByLabel("Bank or UTR reference").fill(`UTR-${Date.now()}`);
   await admin.getByRole("button", { name: "Save" }).click();
@@ -66,17 +87,22 @@ test("a platform admin changes a price without a release", async ({ page }) => {
   const email = `admin-${unique()}@example.com`;
   await signUp(page, email);
   makePlatformAdmin(email);
+  const plan = await ownPlan(page);
   await page.goto("/platform/plans");
-  await page.getByRole("button", { name: "Edit Starter" }).click();
+  const row = page.getByRole("row", { name: plan.name }).first();
+  await page.getByRole("button", { name: `Edit ${plan.name}` }).click();
+  // A new plan has no description yet, and the form needs one.
+  await page.getByLabel("Description").fill("For testing price changes");
   await page.getByLabel("Monthly price (blank for custom)").fill("3111");
   await page.getByLabel("Reason").fill("Price review");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("cell", { name: "₹3,111.00" }).first()).toBeVisible();
-  await page.getByRole("button", { name: "Edit Starter" }).click();
+  await expect(row.getByRole("cell", { name: "₹3,111.00" })).toBeVisible();
+  await page.getByRole("button", { name: `Edit ${plan.name}` }).click();
   await page.getByLabel("Monthly price (blank for custom)").fill("2999");
   await page.getByLabel("Reason").fill("Back to the list price");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("cell", { name: "₹2,999.00" }).first()).toBeVisible();
+  await expect(row.getByRole("cell", { name: "₹2,999.00" })).toBeVisible();
+  await archive(page, plan.id);
 });
 
 test("signing in opens the Control Center for an operator and the organisation for everyone else", async ({ page, browser }) => {
@@ -296,6 +322,7 @@ test("a platform admin defines a feature, puts it on a plan, and reads usage and
   await signUp(page, email);
   makePlatformAdmin(email);
   const code = `E2E_${Date.now()}`;
+  const plan = await ownPlan(page);
 
   await page.goto("/platform/features");
   await expect(page.getByRole("row", { name: /Dashboards and reports/ }).first()).toContainText("Restricted by the app");
@@ -308,18 +335,19 @@ test("a platform admin defines a feature, puts it on a plan, and reads usage and
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("row", { name: code }).first()).toContainText("Delivered by your team");
 
-  await page.getByRole("button", { name: `Support ${code} on Starter: not included` }).click();
+  await page.getByRole("button", { name: `Support ${code} on ${plan.name}: not included` }).click();
   await page.getByLabel(/Reason/).fill("Testing the catalogue");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("button", { name: `Support ${code} on Starter: included` })).toBeVisible();
+  await expect(page.getByRole("button", { name: `Support ${code} on ${plan.name}: included` })).toBeVisible();
 
-  await page.getByRole("button", { name: `Support ${code} on Starter: included` }).click();
+  await page.getByRole("button", { name: `Support ${code} on ${plan.name}: included` }).click();
   await page.getByLabel(/Reason/).fill("Finished testing");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("button", { name: `Support ${code} on Starter: not included` })).toBeVisible();
+  await expect(page.getByRole("button", { name: `Support ${code} on ${plan.name}: not included` })).toBeVisible();
   await page.getByRole("row", { name: code }).first().getByRole("button", { name: "Deactivate" }).click();
   await page.getByLabel("Reason").fill("Finished testing");
   await page.getByRole("button", { name: "Save" }).click();
+  await archive(page, plan.id);
 
   await page.goto("/platform/usage");
   await expect(page.getByRole("status")).toContainText("page 1");

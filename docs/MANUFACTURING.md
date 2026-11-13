@@ -62,8 +62,13 @@ Status: **Built** (in this branch, tested), **Phase n** (planned), **Reused** (a
 | Shop floor | Operations PENDING → READY → IN_PROGRESS → PAUSED → COMPLETED, BLOCKED, CANCELLED; quantity reconciliation | Built (Phase 4) |
 | Shop floor | Operator and machine assignment, running time, setup time, good/rejected/scrap/rework, partial reporting, WIP | Built (Phase 4) |
 | Shop floor | Measurements against frozen process parameters, comments, photographs, stop reasons | Built (Phase 4) |
-| Quality | Quality checkpoints on operations reusing inspections, NCR and CAPA; completion blocked by open mandatory gates | Phase 5 |
-| Rework | Rework orders and their traceability | Phase 5 |
+| Quality | Configurable quality checkpoints (before an operation, while it runs, before it completes, final release) naming existing inspection templates | Built (Phase 5) |
+| Quality | Gates frozen on the work order at release; inspected through the existing inspection engine on the order's batch; mandatory gates stop the operation | Built (Phase 5) |
+| Quality | Quality hold of the batch, pausing the floor; released only by an in-process reinspection | Built (Phase 5) |
+| Quality | NCRs and CAPAs on the batch shown on the work order (existing NCR engine, raised automatically on failure) | Built (Phase 5) |
+| Quality | Rejected production summary: rejected, to rework, in rework, reworked and accepted, scrapped | Built (Phase 5) |
+| Rework | Rework orders from an operation's rejects, an inspection disposed of as rework, or an NCR; approved by an authorised person (separately, when configured); steps; reinspection; closed on its decision | Built (Phase 5) |
+| Quality | Completion blocked by open mandatory gates and open rework | Phase 6 (the list of what blocks it is built and shown) |
 | Completion | Finished-goods receipt into existing inventory; production batch completed through traceability | Phase 6 |
 | Advanced | Downtime, scheduling, costing, OEE, manufacturing analytics | Phase 7 |
 | Traceability | Batch genealogy, recalls, serials | Reused |
@@ -150,6 +155,12 @@ Production plans and work orders belong to a facility in the same way.
 | WORK_ORDER_MATERIAL_ISSUE | ✓ | ✓ | | Production Operator |
 | PRODUCTION_EXECUTE (run operations, report, measure, comment, photographs) | ✓ | ✓ | | Production Operator (new) |
 | PRODUCTION_SUPERVISE (assign, block, unblock, skip, reverse reports, run anyone's operation) | ✓ | ✓ | | |
+| QUALITY_CHECKPOINT_MANAGE (quality checkpoints) | ✓ | | ✓ | |
+| REWORK_MANAGE (raise, cancel and close rework orders) | ✓ | ✓ | | Quality Engineer |
+| REWORK_APPROVE (authorise rework) | ✓ | ✓ | ✓ | |
+
+Inspecting a gate and reinspecting rework need the existing INSPECTION_CREATE; a quality hold needs INSPECTION_APPROVE;
+working rework steps needs PRODUCTION_EXECUTE. NCRs and CAPAs appear on the work order only for people with NCR_VIEW.
 
 The Production Planner also gets MANUFACTURING_VIEW and the views of facilities, products, purchasing, traceability
 and reports. The Production Operator gets WORK_ORDER_VIEW and the views of facilities, products and traceability.
@@ -287,6 +298,55 @@ Stop reasons (`MACHINE_BREAKDOWN`, `MATERIAL_SHORTAGE`, `POWER_FAILURE`, `QUALIT
 `PLANNED_MAINTENANCE`, `CHANGEOVER`, `OTHER`, and `ORDER_ON_HOLD` set by the system) are the spec's downtime
 categories, so phase 7 can summarise downtime from the timeline.
 
+### Quality gates and rework
+
+Quality in production reuses the inspection, NCR and CAPA engines. Nothing about inspections is duplicated: a gate is
+a pointer from a work order to inspections that the existing engine carries out on the order's production batch.
+
+- **Checkpoints** (`quality_checkpoints`) say where production needs an inspection: before an operation starts, while
+  it runs, before it completes, or at final release. Each names a published inspection template, in-process (IPQC) for
+  the stages of an operation and final (FQC) for release, and may be limited to a product, a work centre and an
+  operation number. Each is mandatory or not. Checkpoints are archived, never deleted.
+- **Gates** (`work_order_quality_gates`, append-only). Release turns each active checkpoint that applies into a gate:
+  one per matching operation, or one for the order at final release. The gate keeps the checkpoint's name, template
+  and whether it is mandatory, so changing or archiving a checkpoint never reaches orders already released.
+- **Gate state** is read from the gate's latest inspection, never stored: none, or the latest cancelled, is *pending*;
+  without a disposition, *in inspection*; ACCEPT or CONDITIONAL_ACCEPTANCE, *passed*; HOLD, *on hold*; REJECT or
+  REWORK, *failed*. Earlier inspections stay listed as evidence.
+- **Inspecting a gate** starts an inspection with the gate's template on the batch, through `InspectionService.create`,
+  while the order is in progress or on hold. A start check is made before the operation starts; the others while it
+  is in progress, paused or blocked. A gate can be inspected while pending, or again after it failed. Final release is
+  checked once the batch is complete, which the inspection engine enforces.
+- **Enforcement on the floor.** An operation cannot start while a mandatory start gate has not passed, or complete
+  while a mandatory in-process or completion gate has not. While the batch is on hold or rejected, operations cannot
+  be started, resumed, reported on, measured or completed.
+- **Dispositions** are the inspection engine's own: REWORK and HOLD put the batch on hold, REJECT rejects it, and the
+  engine raises the NCR when an inspection fails or is disposed of as reject or rework.
+- **Quality hold.** Someone with INSPECTION_APPROVE can put the batch of an order in production on hold. Whatever is
+  running is paused with the reason category `QUALITY_ISSUE` and its machine freed. Only an in-process reinspection of
+  the batch releases it, as for any batch held for rework.
+- **Rework orders** (`rework_orders`, numbered `RW-`) rework goods on the batch they came from, so genealogy is
+  unchanged. Each is raised from at least one of: an operation's rejected goods (at most what the operation marked for
+  rework and is not already on another rework order), an inspection of the batch disposed of as REWORK, or an NCR on
+  the batch. It has numbered steps, optionally at work centres of the order's facility.
+
+  | From | To |
+  |---|---|
+  | OPEN | APPROVED (REWORK_APPROVE; another person when `separateApprover` is on), CANCELLED |
+  | APPROVED | IN_PROGRESS, CANCELLED |
+  | IN_PROGRESS | AWAITING_INSPECTION, once every step is done and reworked plus scrapped equals the quantity |
+  | AWAITING_INSPECTION | CLOSED, with the reinspection's disposition as the outcome; a hold is not a decision |
+
+  The reinspection is a new inspection of the batch (template chosen, or the one that fits). One under way cannot be
+  replaced; a cancelled one can. A closed or cancelled rework order is frozen by a database trigger, a done step
+  cannot change, and its status history is append-only.
+- **On the work order.** The quality view shows the gates, NCRs and CAPAs on the batch, rework orders, the rejected
+  summary (rejected, to rework, in rework, reworked and accepted, and scrapped on operations and in rework), and one
+  sentence for each mandatory gate not passed and each rework order still open: the list completion will check in
+  phase 6.
+- **Concurrency.** Inspecting a gate, a quality hold and every rework change lock the work order row first; rework
+  changes then lock the rework order. Status changes are safe to repeat through their status checks.
+
 ## 4. Phase plan and progress
 
 | Phase | Scope | Status |
@@ -295,7 +355,7 @@ categories, so phase 7 can summarise downtime from the timeline.
 | 2 Planning and work orders | Production plans, work orders and their lifecycle, snapshots on release | **Built** |
 | 3 Inventory integration | Availability, reservation, issue, consumption, return | **Built** |
 | 4 Shop floor | Operation execution, quantity reconciliation, machine use | **Built** |
-| 5 Quality and rework | Quality gates on operations, NCR/CAPA links, rework | Not started |
+| 5 Quality and rework | Quality gates on operations, NCR/CAPA links, rework | **Built** |
 | 6 Completion | Finished-goods receipt, batch completion, closing work orders | Not started |
 | 7 Advanced | Downtime, scheduling, costing, OEE, analytics | Not started |
 
@@ -330,11 +390,25 @@ Phase 4:
 - Shop-floor execution needs a routing. An order released without one has no operations to run; turn on
   `workOrderRequiresRouting` to make sure every order has them.
 - Material issue stays at order level: it is not tied to an operation.
-- Rejected quantities are recorded, not yet sent anywhere. Rework orders and quality holds come with phase 5, which
-  will also show the inspections an operation needs.
+- Rejected quantities are recorded on the operation. Phase 5 adds rework orders, quality holds and the inspections an
+  operation needs.
 - A machine runs one operation at a time. Machines that run several are not modelled.
 - Stop reasons are recorded on the timeline, but downtime is not yet summarised by machine or period (phase 7).
 - The good output of the last operation is not yet received as finished goods (phase 6).
+
+Phase 5:
+
+- Completion is not built yet, so the list of unresolved gates and rework is shown but first enforced in phase 6.
+  Final-release gates are inspected once the batch is complete, which also arrives with phase 6.
+- Material used in rework is issued through the work order's materials while the order is in progress; a rework order
+  has no material lines of its own.
+- A batch put on hold by an inspection's disposition (rather than by a quality hold) does not pause operations already
+  running, but nothing more can be reported, measured or completed on them until it is released.
+- Inspection dispositions apply to the whole batch, as the inspection engine works today. Rework quantities are tracked
+  on the rework order, not as separate stock.
+- Rework steps are entered one per line on the screen, with one work centre for all of them; the API takes a work
+  centre per step.
+- Raw-material checks on receipt stay with the existing incoming inspection (IQC); checkpoints cover production.
 
 ## 6. Phase 1 delivery
 
@@ -451,3 +525,42 @@ each operation's progress and links to it. Configuration has the three new rules
 - Vitest: `operationActions`, `formatDuration` and `reportMismatch`.
 - Playwright: `shop-floor.spec.ts` starts an operation on a machine, reports, measures out of limits, pauses for a
   breakdown, is refused until the machine is fixed, resumes, completes, comments, and checks the work order page.
+
+## 10. Phase 5 delivery
+
+**Migration.** `V26__production_quality_and_rework.sql`: `quality_checkpoints`; the append-only
+`work_order_quality_gates` (one per checkpoint and operation, final-release gates on no operation) and
+`quality_gate_inspections`; `rework_orders` with checks (reworked plus scrapped equals the quantity, closed exactly when
+there is an outcome), `rework_order_steps` and the append-only `rework_order_history`, all with row-level security and
+foreign keys within the tenant; a trigger that refuses deleting rework records, changing a closed or cancelled rework
+order or what it reworks, and changing a done step; three permissions.
+
+**Backend.** `QualityCheckpointService`, `QualityGateService` (gates at release, state, inspection, enforcement, the
+quality view), `ReworkService`, `QualityCheckpointController` at `/api/v1/manufacturing/quality-checkpoints`,
+`ReworkOrderController` at `/api/v1/manufacturing/rework-orders`, and on `WorkOrderController` the quality view, gate
+inspection and quality hold. `ShopFloorService` enforces gates and the batch status, holds the floor, and returns each
+operation's gates and batch status. Reused: `InspectionService.create` and `history`, `InspectionTemplateService`,
+`NcrService.history`, `capaHistory` and `outcomes`, `ProductionService.batch` and `holdForReinspection`,
+`ReviewPolicy`, `DocumentNumberService`, `FacilityScope`, `AuditService`.
+
+**Screens.** Manufacturing → Quality checkpoints: list, add, edit, archive. The work order page has a Quality section:
+the batch-hold notice, what completion waits for, each gate with its latest inspection and Inspect / Inspect again,
+the rejected summary, rework orders, NCRs with their CAPAs, and the Quality hold and Raise rework order actions.
+Manufacturing → Rework orders: a list with a status filter, and a rework page with approve, start, mark steps done,
+complete, reinspect, close and cancel, its details, steps and history. The operation screen shows its quality checks
+with Inspect, and a notice when the batch is on hold or rejected.
+
+**Tests.**
+- `ProductionQualityIT`: 2 tests. They cover checkpoint template rules and permission; gates at release, frozen against
+  later archiving; a start gate stopping the operation, inspection timing, a second inspection refused while one is
+  under way, passing; a completion stopped by an in-process gate; a failed gate putting the batch on hold with an NCR
+  (shown only with NCR_VIEW) and stopping reports; rework capped by the operation, the separate approver, steps,
+  quantities, reinspection rules and closing on its decision; the gate passing on a second inspection; the rejected
+  summary and the unresolved list; database protections and audit; a quality hold before production refused, by
+  permission, pausing the floor with `QUALITY_ISSUE`, refused twice, stopping resume, released by an in-process
+  reinspection; rework while held, cancelled rework not counting, a rework order with no source refused, the list
+  filter; facility scope and isolation between organisations.
+- Vitest: `gateInspectable`, `reworkActions`, `reinspectionState`, `parseSteps` and the navigation entry.
+- Playwright: `production-quality.spec.ts` adds a checkpoint from its page, inspects the gate from the work order,
+  raises a rework order from the failed gate, approves, works, completes, reinspects and closes it, inspects the gate
+  again, starts the operation from the floor, and puts the batch on quality hold.

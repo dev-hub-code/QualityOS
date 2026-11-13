@@ -2036,4 +2036,127 @@ export interface OperationDetail {
   }[];
   machines: { id: string; code: string; name: string; status: string; busy: boolean }[];
   operators: { id: string; name: string }[];
+  /** The production batch's status: on hold or rejected, nothing more is made on it. */
+  batchStatus: string | null;
+  gates: QualityGate[];
+}
+
+export type CheckpointStage = "OPERATION_START" | "IN_PROCESS" | "OPERATION_COMPLETION" | "FINAL_RELEASE";
+
+export interface QualityCheckpoint {
+  id: string;
+  name: string;
+  stage: CheckpointStage;
+  templateId: string;
+  templateCode: string;
+  templateName: string;
+  inspectionType: string;
+  productId: string | null;
+  productCode: string | null;
+  workCenterId: string | null;
+  workCenterCode: string | null;
+  operationSequence: number | null;
+  mandatory: boolean;
+  archived: boolean;
+}
+
+export type GateStatus = "PENDING" | "IN_INSPECTION" | "ON_HOLD" | "PASSED" | "FAILED";
+
+export interface GateInspection {
+  id: string;
+  inspectionNumber: string;
+  status: string;
+  finalResult: string | null;
+  disposition: string | null;
+  createdAt: string;
+}
+
+export interface QualityGate {
+  id: string;
+  name: string;
+  stage: CheckpointStage;
+  mandatory: boolean;
+  operationId: string | null;
+  operationSequence: number | null;
+  operationName: string | null;
+  templateId: string;
+  templateCode: string;
+  templateName: string;
+  /** Read from the latest inspection. */
+  status: GateStatus;
+  inspections: GateInspection[];
+}
+
+export type ReworkStatus = "OPEN" | "APPROVED" | "IN_PROGRESS" | "AWAITING_INSPECTION" | "CLOSED" | "CANCELLED";
+
+export interface ReworkSummary {
+  id: string;
+  reworkNumber: string;
+  workOrderId: string;
+  workOrderNumber: string;
+  productionBatchId: string;
+  batchNumber: string | null;
+  productCode: string | null;
+  productName: string | null;
+  operationId: string | null;
+  operationSequence: number | null;
+  ncrId: string | null;
+  ncrNumber: string | null;
+  quantity: string;
+  uomId: string;
+  status: ReworkStatus;
+  finalDisposition: string | null;
+  createdAt: string;
+}
+
+export interface ReworkDetail {
+  rework: ReworkSummary;
+  reason: string;
+  instructions: string | null;
+  statusReason: string | null;
+  sourceInspectionId: string | null;
+  sourceInspectionNumber: string | null;
+  approvedBy: string | null;
+  approvedByName: string | null;
+  approvedAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  reworkedQuantity: string | null;
+  scrappedQuantity: string | null;
+  reinspection: GateInspection | null;
+  closedAt: string | null;
+  steps: {
+    id: string;
+    sequence: number;
+    description: string;
+    workCenterId: string | null;
+    workCenterCode: string | null;
+    completedBy: string | null;
+    completedByName: string | null;
+    completedAt: string | null;
+    note: string | null;
+  }[];
+  history: {
+    fromStatus: ReworkStatus | null;
+    toStatus: ReworkStatus;
+    reason: string | null;
+    changedBy: string | null;
+    changedByName: string | null;
+    changedAt: string;
+  }[];
+}
+
+export interface WorkOrderQuality {
+  batchId: string | null;
+  batchNumber: string | null;
+  batchStatus: string | null;
+  onHold: boolean;
+  gates: QualityGate[];
+  /** Empty without permission to see NCRs. */
+  ncrs: { id: string; ncrNumber: string; title: string; status: string; severity: string }[];
+  capas: { id: string; capaNumber: string; title: string; status: string; ncrId: string }[];
+  reworkOrders: ReworkSummary[];
+  rejected: { rejected: string; toRework: string; scrapped: string; inRework: string; reworkedAccepted: string };
+  /** What completion waits for. */
+  unresolved: string[];
 }

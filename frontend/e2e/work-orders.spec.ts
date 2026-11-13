@@ -49,7 +49,7 @@ test("a work order raised from a plan is approved, released and started", async 
 
   await page.goto("/manufacturing/production-plans");
   const menu = page.getByRole("navigation", { name: "Main" });
-  await expect(menu.getByRole("link", { name: "Work orders" })).toBeVisible();
+  await expect(menu.getByRole("link", { name: "Work orders", exact: true })).toBeVisible();
   await step(page, "New plan", async (dialog: Locator) => {
     await dialog.getByLabel("Name").fill("Week 46");
     await dialog.getByLabel("Facility").selectOption({ label: "PUNE – Pune Plant" });

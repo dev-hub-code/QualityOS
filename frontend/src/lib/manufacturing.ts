@@ -1,4 +1,14 @@
-import type { LossCategory, ManufacturingModel, OperationStatus, PlanStatus, RevisionStatus, WorkOrderStatus } from "@/lib/types";
+import type {
+  CheckpointStage,
+  GateStatus,
+  LossCategory,
+  ManufacturingModel,
+  OperationStatus,
+  PlanStatus,
+  ReworkStatus,
+  RevisionStatus,
+  WorkOrderStatus,
+} from "@/lib/types";
 
 export type DefinitionKind = "BOM" | "RECIPE" | "ROUTING";
 
@@ -203,4 +213,63 @@ export function reportMismatch(values: { quantity: string; goodQuantity: string;
   const parts = [values.goodQuantity, values.rejectedQuantity, values.scrapQuantity].map((value) => Number(value || 0));
   const total = Number(parts.reduce((sum, part) => sum + part, 0).toFixed(6));
   return total === Number(values.quantity) ? null : `Good, rejected and scrap make ${total}, not ${Number(values.quantity)}.`;
+}
+
+export const STAGE_LABELS: Record<CheckpointStage, string> = {
+  OPERATION_START: "Before the operation starts",
+  IN_PROCESS: "While it runs",
+  OPERATION_COMPLETION: "Before the operation completes",
+  FINAL_RELEASE: "Final release",
+};
+
+/**
+ * Whether a gate can have an inspection started: it is pending or failed, and production is under way. The server
+ * also checks the operation is at the right point for the gate's stage.
+ */
+export function gateInspectable(gate: { status: GateStatus }, orderStatus: WorkOrderStatus, canInspect: boolean): boolean {
+  return canInspect && (gate.status === "PENDING" || gate.status === "FAILED") && (orderStatus === "IN_PROGRESS" || orderStatus === "ON_HOLD");
+}
+
+export type ReworkAction = "approve" | "start" | "complete" | "reinspect" | "close" | "cancel";
+
+/** What a person may do with a rework order, as the server allows it. */
+export function reworkActions(
+  rework: { status: ReworkStatus; reinspectionOpen: boolean; reinspectionDecided: boolean },
+  can: { manage: boolean; approve: boolean; execute: boolean; inspect: boolean },
+): ReworkAction[] {
+  const actions: ReworkAction[] = [];
+  switch (rework.status) {
+    case "OPEN":
+      if (can.approve) actions.push("approve");
+      if (can.manage) actions.push("cancel");
+      break;
+    case "APPROVED":
+      if (can.execute) actions.push("start");
+      if (can.manage) actions.push("cancel");
+      break;
+    case "IN_PROGRESS":
+      if (can.execute) actions.push("complete");
+      break;
+    case "AWAITING_INSPECTION":
+      if (can.inspect && !rework.reinspectionOpen) actions.push("reinspect");
+      if (can.manage && rework.reinspectionDecided) actions.push("close");
+      break;
+  }
+  return actions;
+}
+
+/** Where a reinspection stands: under way until cancelled, decided once it has a disposition other than hold. */
+export function reinspectionState(reinspection: { status: string; disposition: string | null } | null) {
+  const live = reinspection !== null && reinspection.status !== "CANCELLED";
+  const decided = live && reinspection.disposition !== null && reinspection.disposition !== "HOLD";
+  return { reinspectionOpen: live, reinspectionDecided: decided };
+}
+
+/** Rework steps typed one per line, blank lines left out. */
+export function parseSteps(text: string, workCenterId: string | null): { description: string; workCenterId: string | null }[] {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((description) => ({ description, workCenterId }));
 }

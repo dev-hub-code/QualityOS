@@ -183,6 +183,8 @@ public final class ShopFloorDtos {
     /**
      * @param runningSeconds time spent running so far, without pauses
      * @param operators who it can be given to: members who may run operations at the order's facility
+     * @param batchStatus the order's production batch status: on hold or rejected, nothing more is made on it
+     * @param gates the quality checks on this operation
      */
     public record OperationDetail(
             OperationSummary operation,
@@ -198,6 +200,8 @@ public final class ShopFloorDtos {
             List<MeasurementResponse> measurements,
             List<EventResponse> events,
             List<MachineOption> machines,
-            List<PersonOption> operators) {
+            List<PersonOption> operators,
+            String batchStatus,
+            List<com.qualityos.production.dto.ProductionQualityDtos.GateResponse> gates) {
     }
 }

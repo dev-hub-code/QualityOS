@@ -3,10 +3,14 @@ import {
   describeLimits,
   formatDuration,
   freeQuantity,
+  gateInspectable,
   operationActions,
+  parseSteps,
   planActions,
+  reinspectionState,
   reportMismatch,
   revisionActions,
+  reworkActions,
   toLineRequest,
   usesKind,
   workOrderActions,
@@ -156,5 +160,71 @@ describe("reportMismatch", () => {
     expect(reportMismatch({ quantity: "10", goodQuantity: "8", rejectedQuantity: "1", scrapQuantity: "" })).toBe(
       "Good, rejected and scrap make 9, not 10.",
     );
+  });
+});
+
+describe("gateInspectable", () => {
+  it("offers pending and failed gates while production is under way", () => {
+    expect(gateInspectable({ status: "PENDING" }, "IN_PROGRESS", true)).toBe(true);
+    expect(gateInspectable({ status: "FAILED" }, "ON_HOLD", true)).toBe(true);
+  });
+
+  it("keeps gates that passed, are being inspected or await a decision", () => {
+    for (const status of ["PASSED", "IN_INSPECTION", "ON_HOLD"] as const) {
+      expect(gateInspectable({ status }, "IN_PROGRESS", true)).toBe(false);
+    }
+  });
+
+  it("needs production under way and permission to inspect", () => {
+    expect(gateInspectable({ status: "PENDING" }, "RELEASED", true)).toBe(false);
+    expect(gateInspectable({ status: "PENDING" }, "IN_PROGRESS", false)).toBe(false);
+  });
+});
+
+describe("reworkActions", () => {
+  const all = { manage: true, approve: true, execute: true, inspect: true };
+  const none = { reinspectionOpen: false, reinspectionDecided: false };
+
+  it("approves or cancels an open order", () => {
+    expect(reworkActions({ status: "OPEN", ...none }, all)).toEqual(["approve", "cancel"]);
+    expect(reworkActions({ status: "OPEN", ...none }, { ...all, approve: false })).toEqual(["cancel"]);
+  });
+
+  it("starts approved work and completes it, but no longer cancels it once started", () => {
+    expect(reworkActions({ status: "APPROVED", ...none }, all)).toEqual(["start", "cancel"]);
+    expect(reworkActions({ status: "IN_PROGRESS", ...none }, all)).toEqual(["complete"]);
+  });
+
+  it("reinspects once, and closes only on a decision", () => {
+    expect(reworkActions({ status: "AWAITING_INSPECTION", ...none }, all)).toEqual(["reinspect"]);
+    expect(reworkActions({ status: "AWAITING_INSPECTION", reinspectionOpen: true, reinspectionDecided: false }, all)).toEqual([]);
+    expect(reworkActions({ status: "AWAITING_INSPECTION", reinspectionOpen: true, reinspectionDecided: true }, all)).toEqual(["close"]);
+  });
+
+  it("offers nothing on a closed or cancelled order", () => {
+    expect(reworkActions({ status: "CLOSED", ...none }, all)).toEqual([]);
+    expect(reworkActions({ status: "CANCELLED", ...none }, all)).toEqual([]);
+  });
+});
+
+describe("reinspectionState", () => {
+  it("treats a cancelled reinspection as none", () => {
+    expect(reinspectionState(null)).toEqual({ reinspectionOpen: false, reinspectionDecided: false });
+    expect(reinspectionState({ status: "CANCELLED", disposition: null })).toEqual({ reinspectionOpen: false, reinspectionDecided: false });
+  });
+
+  it("is decided by any disposition but hold", () => {
+    expect(reinspectionState({ status: "IN_PROGRESS", disposition: null }).reinspectionDecided).toBe(false);
+    expect(reinspectionState({ status: "COMPLETED", disposition: "HOLD" }).reinspectionDecided).toBe(false);
+    expect(reinspectionState({ status: "COMPLETED", disposition: "ACCEPT" }).reinspectionDecided).toBe(true);
+  });
+});
+
+describe("parseSteps", () => {
+  it("takes one step per line and drops blank lines", () => {
+    expect(parseSteps("Regrind bore\n\n  Re-measure  \n", "wc")).toEqual([
+      { description: "Regrind bore", workCenterId: "wc" },
+      { description: "Re-measure", workCenterId: "wc" },
+    ]);
   });
 });

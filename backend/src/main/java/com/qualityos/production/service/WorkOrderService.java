@@ -95,6 +95,7 @@ public class WorkOrderService {
     private final RoutingOperationRepository routingOperations;
     private final ProcessParameterRepository parameters;
     private final ShopFloorService shopFloor;
+    private final QualityGateService qualityGates;
     private final tools.jackson.databind.json.JsonMapper json;
     private final WorkCenterService workCenters;
     private final ManufacturingSettingsService settings;
@@ -122,6 +123,7 @@ public class WorkOrderService {
             RoutingOperationRepository routingOperations,
             ProcessParameterRepository parameters,
             ShopFloorService shopFloor,
+            QualityGateService qualityGates,
             tools.jackson.databind.json.JsonMapper json,
             WorkCenterService workCenters,
             ManufacturingSettingsService settings,
@@ -147,6 +149,7 @@ public class WorkOrderService {
         this.routingOperations = routingOperations;
         this.parameters = parameters;
         this.shopFloor = shopFloor;
+        this.qualityGates = qualityGates;
         this.json = json;
         this.workCenters = workCenters;
         this.settings = settings;
@@ -279,6 +282,7 @@ public class WorkOrderService {
         if (routing != null) {
             writeOperations(order, routing, definition);
         }
+        int gateCount = qualityGates.writeGates(order, steps.findByWorkOrderIdOrderBySequence(id));
         if (definition != null && settings.rules().reserveOnRelease()) {
             orderMaterials.reserveAvailable(order, null);
         }
@@ -291,6 +295,9 @@ public class WorkOrderService {
         }
         if (routing != null) {
             details.put("routingRevision", routing.getRevision());
+        }
+        if (gateCount > 0) {
+            details.put("qualityGates", gateCount);
         }
         audit.record("WORK_ORDER_RELEASED", ENTITY, id, Map.of("status", from.name()), details);
         return detail(order);

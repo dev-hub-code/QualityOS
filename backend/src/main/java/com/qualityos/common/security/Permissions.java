@@ -62,6 +62,9 @@ public final class Permissions {
     public static final String WORK_ORDER_VIEW = "WORK_ORDER_VIEW";
     public static final String PRODUCTION_EXECUTE = "PRODUCTION_EXECUTE";
     public static final String PRODUCTION_SUPERVISE = "PRODUCTION_SUPERVISE";
+    public static final String QUALITY_CHECKPOINT_MANAGE = "QUALITY_CHECKPOINT_MANAGE";
+    public static final String REWORK_MANAGE = "REWORK_MANAGE";
+    public static final String REWORK_APPROVE = "REWORK_APPROVE";
 
     private Permissions() {
     }
@@ -136,6 +139,9 @@ public final class Permissions {
         public static final String PRODUCTION_PLAN_APPROVE = "hasAuthority('PRODUCTION_PLAN_APPROVE')";
         public static final String PRODUCTION_EXECUTE = "hasAuthority('PRODUCTION_EXECUTE')";
         public static final String PRODUCTION_SUPERVISE = "hasAuthority('PRODUCTION_SUPERVISE')";
+        public static final String QUALITY_CHECKPOINT_MANAGE = "hasAuthority('QUALITY_CHECKPOINT_MANAGE')";
+        public static final String REWORK_MANAGE = "hasAuthority('REWORK_MANAGE')";
+        public static final String REWORK_APPROVE = "hasAuthority('REWORK_APPROVE')";
 
         private Require() {
         }

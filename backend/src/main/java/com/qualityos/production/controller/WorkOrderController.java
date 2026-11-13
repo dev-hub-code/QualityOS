@@ -5,6 +5,10 @@ import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.response.Pages;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.common.security.Permissions.Require;
+import com.qualityos.production.dto.CompletionDtos.CloseRequest;
+import com.qualityos.production.dto.CompletionDtos.CompletionResponse;
+import com.qualityos.production.dto.CompletionDtos.ProductionRecord;
+import com.qualityos.production.dto.CompletionDtos.ReceiptRequest;
 import com.qualityos.production.dto.ProductionQualityDtos.GateResponse;
 import com.qualityos.production.dto.ProductionQualityDtos.HoldRequest;
 import com.qualityos.production.dto.ProductionQualityDtos.QualityResponse;
@@ -20,6 +24,7 @@ import com.qualityos.production.dto.WorkOrderMaterialDtos.MaterialsResponse;
 import com.qualityos.production.dto.WorkOrderMaterialDtos.ReserveRequest;
 import com.qualityos.production.dto.WorkOrderMaterialDtos.ReturnRequest;
 import com.qualityos.production.dto.WorkOrderMaterialDtos.UnreserveRequest;
+import com.qualityos.production.service.CompletionService;
 import com.qualityos.production.service.QualityGateService;
 import com.qualityos.production.service.ShopFloorService;
 import com.qualityos.production.service.WorkOrderMaterialService;
@@ -57,16 +62,19 @@ public class WorkOrderController {
     private final WorkOrderMaterialService orderMaterials;
     private final QualityGateService qualityGates;
     private final ShopFloorService shopFloor;
+    private final CompletionService completion;
 
     WorkOrderController(
             WorkOrderService workOrders,
             WorkOrderMaterialService orderMaterials,
             QualityGateService qualityGates,
-            ShopFloorService shopFloor) {
+            ShopFloorService shopFloor,
+            CompletionService completion) {
         this.workOrders = workOrders;
         this.orderMaterials = orderMaterials;
         this.qualityGates = qualityGates;
         this.shopFloor = shopFloor;
+        this.completion = completion;
     }
 
     @GetMapping
@@ -223,6 +231,36 @@ public class WorkOrderController {
             @Valid @RequestBody ReturnRequest request,
             @RequestHeader(name = IDEMPOTENCY_KEY, required = false) String key) {
         return ApiResponse.ok(orderMaterials.returnMaterial(id, request, key));
+    }
+
+    /** Totals, material variances, the receipt, and what receiving or closing still waits for. */
+    @GetMapping("/{id}/completion")
+    public ApiResponse<CompletionResponse> completion(@PathVariable UUID id) {
+        return ApiResponse.ok(completion.get(id));
+    }
+
+    /** Completes the order's batch with its good output: the finished goods, in the existing inventory. */
+    @PostMapping("/{id}/receipt")
+    @PreAuthorize(Require.WORK_ORDER_COMPLETE)
+    public ApiResponse<CompletionResponse> receive(
+            @PathVariable UUID id,
+            @Valid @RequestBody ReceiptRequest request,
+            @RequestHeader(name = IDEMPOTENCY_KEY, required = false) String key) {
+        return ApiResponse.ok(completion.receive(id, request, key));
+    }
+
+    /** Closes the order as completed, or partially completed with a reason. */
+    @PostMapping("/{id}/complete")
+    @PreAuthorize(Require.WORK_ORDER_COMPLETE)
+    public ApiResponse<CompletionResponse> complete(
+            @PathVariable UUID id, @Valid @RequestBody(required = false) CloseRequest request) {
+        return ApiResponse.ok(completion.close(id, request));
+    }
+
+    /** How a batch was made, when a work order made it; null for a batch recorded by hand. */
+    @GetMapping("/production-record")
+    public ApiResponse<ProductionRecord> productionRecord(@RequestParam UUID batchId) {
+        return ApiResponse.ok(completion.record(batchId).orElse(null));
     }
 
     private static boolean holds(Authentication caller, String permission) {

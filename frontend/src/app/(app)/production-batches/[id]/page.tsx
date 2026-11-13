@@ -13,6 +13,7 @@ import {
   useRefresh,
   useUnits,
 } from "@/components/records/parts";
+import { ProductionRecordPanel, useProductionRecord } from "@/components/manufacturing/production-record";
 import { StartInspectionDialog } from "@/components/inspections/start-inspection-dialog";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
@@ -121,6 +122,7 @@ export default function ProductionBatchPage() {
   const [correcting, setCorrecting] = useState<string | null>(null);
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<BatchDetail>(path) });
   const units = useUnits();
+  const record = useProductionRecord(id);
   if (!data) return <QueryState error={error} />;
 
   const { batch, consumptions, serialNumbers } = data;
@@ -145,7 +147,8 @@ export default function ProductionBatchPage() {
             <Button variant="outline" onClick={() => setOpen("consume")}>
               Record material used
             </Button>
-            <Button onClick={() => setOpen("complete")}>Complete batch</Button>
+            {/* A work order's batch is completed by receiving the order's finished goods. */}
+            {!record && <Button onClick={() => setOpen("complete")}>Complete batch</Button>}
           </>
         )}
         {canManage && batch.producedQuantity !== null && (
@@ -198,6 +201,7 @@ export default function ProductionBatchPage() {
           ))}
         </ul>
       </Section>
+      {record && <ProductionRecordPanel record={record} />}
       {serialNumbers.length > 0 && (
         <Section title="Serial numbers">
           <p className="text-sm break-words">{serialNumbers.join(", ")}</p>

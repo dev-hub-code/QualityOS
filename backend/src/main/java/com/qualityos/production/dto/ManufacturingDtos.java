@@ -35,7 +35,11 @@ public final class ManufacturingDtos {
             boolean allowOverIssue,
             boolean operationsInSequence,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal overReportPercent,
-            boolean operationRequiresMachine) {
+            boolean operationRequiresMachine,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal completionTolerancePercent,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal materialVariancePercent,
+            boolean completionRequiresFinalInspection,
+            boolean serialTracking) {
     }
 
     /** The work-order and shop-floor rules are optional: left out, they stay as they are. */
@@ -49,7 +53,11 @@ public final class ManufacturingDtos {
             Boolean allowOverIssue,
             Boolean operationsInSequence,
             @DecimalMin("0") @DecimalMax("100") @Digits(integer = 3, fraction = 2) BigDecimal overReportPercent,
-            Boolean operationRequiresMachine) {
+            Boolean operationRequiresMachine,
+            @DecimalMin("0") @DecimalMax("100") @Digits(integer = 3, fraction = 2) BigDecimal completionTolerancePercent,
+            @DecimalMin("0") @DecimalMax("100") @Digits(integer = 3, fraction = 2) BigDecimal materialVariancePercent,
+            Boolean completionRequiresFinalInspection,
+            Boolean serialTracking) {
     }
 
     /**

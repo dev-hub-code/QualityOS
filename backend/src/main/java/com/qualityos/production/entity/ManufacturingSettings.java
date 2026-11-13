@@ -45,4 +45,16 @@ public class ManufacturingSettings extends TenantOwnedEntity {
 
     /** Starting an operation at a work centre that has machines needs one of them. */
     private boolean operationRequiresMachine;
+
+    /** A receipt this far below the order quantity, in percent, still closes the order as completed. */
+    private BigDecimal completionTolerancePercent = BigDecimal.ZERO;
+
+    /** A material line issued this far off what the received quantity needed, in percent, needs a reason. */
+    private BigDecimal materialVariancePercent = BigDecimal.valueOf(5);
+
+    /** Closing waits until the batch's final inspection has decided. */
+    private boolean completionRequiresFinalInspection = true;
+
+    /** Discrete products are received with one serial number for each unit. */
+    private boolean serialTracking;
 }

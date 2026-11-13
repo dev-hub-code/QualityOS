@@ -34,6 +34,10 @@ const FIELDS: FieldDef[] = [
   { name: "operationsInSequence", label: "An operation is ready only once the one before it is complete", type: "checkbox" },
   { name: "operationRequiresMachine", label: "Starting an operation at a work centre with machines needs one of them", type: "checkbox" },
   { name: "overReportPercent", label: "The first operation may report this far past the order quantity, in percent", type: "decimal" },
+  { name: "completionTolerancePercent", label: "A receipt this far below the order quantity, in percent, still closes it as completed", type: "decimal" },
+  { name: "materialVariancePercent", label: "Material use further off than this, in percent, needs a reason at receipt", type: "decimal" },
+  { name: "completionRequiresFinalInspection", label: "Closing a work order waits for its batch's final inspection", type: "checkbox" },
+  { name: "serialTracking", label: "Discrete products are received with a serial number for each unit", type: "checkbox" },
 ];
 
 export default function ManufacturingSettingsPage() {
@@ -60,6 +64,15 @@ export default function ManufacturingSettingsPage() {
             ["Operations", data.operationsInSequence ? "Each after the one before" : "Side by side"],
             ["Starting an operation needs a machine", data.operationRequiresMachine ? "Yes, where the work centre has one" : "No"],
             ["Reporting past the order quantity", Number(data.overReportPercent) > 0 ? `Up to ${Number(data.overReportPercent)}%` : "Refused"],
+            [
+              "Closing short",
+              Number(data.completionTolerancePercent) > 0
+                ? `Completed when no more than ${Number(data.completionTolerancePercent)}% short`
+                : "Partially completed when anything is short",
+            ],
+            ["Material variance needing a reason", `More than ${Number(data.materialVariancePercent)}%`],
+            ["Closing waits for final inspection", data.completionRequiresFinalInspection ? "Yes" : "No"],
+            ["Serial numbers", data.serialTracking ? "One for each unit of a discrete product" : "Not required"],
           ]}
         />
         <p className="mt-3 text-sm text-muted-foreground">

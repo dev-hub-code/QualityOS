@@ -140,6 +140,7 @@ public final class WorkOrderDtos {
             String releasedByName,
             Instant releasedAt,
             Instant startedAt,
+            Instant completedAt,
             Instant createdAt) {
     }
 

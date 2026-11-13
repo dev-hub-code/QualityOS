@@ -54,7 +54,9 @@ public class ManufacturingSettingsService {
         return new SettingsResponse(current.getManufacturingModel(), current.isSeparateApprover(),
                 current.isWorkOrderRequiresBom(), current.isWorkOrderRequiresRouting(), current.isReserveOnRelease(),
                 current.isStartRequiresMaterials(), current.isAllowOverIssue(), current.isOperationsInSequence(),
-                current.getOverReportPercent(), current.isOperationRequiresMachine());
+                current.getOverReportPercent(), current.isOperationRequiresMachine(),
+                current.getCompletionTolerancePercent(), current.getMaterialVariancePercent(),
+                current.isCompletionRequiresFinalInspection(), current.isSerialTracking());
     }
 
     /**
@@ -104,6 +106,18 @@ public class ManufacturingSettingsService {
         }
         if (request.operationRequiresMachine() != null) {
             current.setOperationRequiresMachine(request.operationRequiresMachine());
+        }
+        if (request.completionTolerancePercent() != null) {
+            current.setCompletionTolerancePercent(request.completionTolerancePercent());
+        }
+        if (request.materialVariancePercent() != null) {
+            current.setMaterialVariancePercent(request.materialVariancePercent());
+        }
+        if (request.completionRequiresFinalInspection() != null) {
+            current.setCompletionRequiresFinalInspection(request.completionRequiresFinalInspection());
+        }
+        if (request.serialTracking() != null) {
+            current.setSerialTracking(request.serialTracking());
         }
         settings.save(current);
         audit.record("MANUFACTURING_SETTINGS_CHANGED", ENTITY, current.getId(), before, snapshot(current));
@@ -196,7 +210,11 @@ public class ManufacturingSettingsService {
                 Map.entry("allowOverIssue", current.isAllowOverIssue()),
                 Map.entry("operationsInSequence", current.isOperationsInSequence()),
                 Map.entry("overReportPercent", current.getOverReportPercent().toPlainString()),
-                Map.entry("operationRequiresMachine", current.isOperationRequiresMachine()));
+                Map.entry("operationRequiresMachine", current.isOperationRequiresMachine()),
+                Map.entry("completionTolerancePercent", current.getCompletionTolerancePercent().toPlainString()),
+                Map.entry("materialVariancePercent", current.getMaterialVariancePercent().toPlainString()),
+                Map.entry("completionRequiresFinalInspection", current.isCompletionRequiresFinalInspection()),
+                Map.entry("serialTracking", current.isSerialTracking()));
     }
 
     private ManufacturingModel productModel(UUID productId) {

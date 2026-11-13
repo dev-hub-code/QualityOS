@@ -646,7 +646,7 @@ public class WorkOrderService {
                     order.getSubmittedBy(), members.get(order.getSubmittedBy()), order.getSubmittedAt(),
                     order.getApprovedBy(), members.get(order.getApprovedBy()), order.getApprovedAt(),
                     order.getReleasedBy(), members.get(order.getReleasedBy()), order.getReleasedAt(),
-                    order.getStartedAt(), order.getCreatedAt());
+                    order.getStartedAt(), order.getCompletedAt(), order.getCreatedAt());
         };
     }
 }

@@ -273,3 +273,18 @@ export function parseSteps(text: string, workCenterId: string | null): { descrip
     .filter((line) => line.length > 0)
     .map((description) => ({ description, workCenterId }));
 }
+
+/**
+ * What a person may do to finish a work order, as the server allows it: receive its finished goods once nothing blocks
+ * them, then close it once nothing blocks that.
+ */
+export function completionActions(
+  completion: { receiveBlockers: string[]; receipt: unknown; closeBlockers: string[] },
+  orderStatus: WorkOrderStatus,
+  canComplete: boolean,
+): ("receive" | "close")[] {
+  if (!canComplete || orderStatus !== "IN_PROGRESS") return [];
+  if (completion.receipt === null) return completion.receiveBlockers.length === 0 ? ["receive"] : [];
+  return completion.closeBlockers.length === 0 ? ["close"] : [];
+}
+

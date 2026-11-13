@@ -242,6 +242,49 @@ public class QualityGateService {
         return unresolved(responses(order), reworks.ofOrder(order.getId()));
     }
 
+    /**
+     * What stops finished goods being received: mandatory gates on operations not passed, and rework still open.
+     * Final-release gates come after, once the batch is complete.
+     */
+    @Transactional(readOnly = true)
+    public List<String> receiveBlockers(WorkOrder order) {
+        List<GateResponse> onOperations = responses(order).stream()
+                .filter(gate -> gate.stage() != Stage.FINAL_RELEASE).toList();
+        return unresolved(onOperations, reworks.ofOrder(order.getId()));
+    }
+
+    /**
+     * What stops the order closing: a mandatory gate without a final decision, and rework still open. A rejection is a
+     * decision: the batch is rejected and the order closes short.
+     */
+    @Transactional(readOnly = true)
+    public List<String> closeBlockers(WorkOrder order) {
+        List<String> open = new ArrayList<>();
+        responses(order).stream()
+                .filter(gate -> gate.mandatory() && !decided(gate))
+                .forEach(gate -> open.add("%s%s is %s.".formatted(gate.name(),
+                        gate.operationSequence() == null ? "" : " on operation " + gate.operationSequence(),
+                        label(gate.status()))));
+        reworks.ofOrder(order.getId()).stream().filter(rework -> rework.getStatus().isOpen())
+                .forEach(rework -> open.add("Rework order %s is %s.".formatted(rework.getReworkNumber(),
+                        ReworkOrder.label(rework.getStatus()))));
+        return open;
+    }
+
+    /** Every gate of the order, as its production record shows them. */
+    @Transactional(readOnly = true)
+    public List<GateResponse> ofOrder(WorkOrder order) {
+        return responses(order);
+    }
+
+    private static boolean decided(GateResponse gate) {
+        if (gate.status() == GateStatus.PASSED) {
+            return true;
+        }
+        GateInspection latest = gate.inspections().isEmpty() ? null : gate.inspections().getLast();
+        return latest != null && !"CANCELLED".equals(latest.status()) && "REJECT".equals(latest.disposition());
+    }
+
     private static List<String> unresolved(List<GateResponse> gateRows, List<ReworkOrder> reworkRows) {
         List<String> open = new ArrayList<>();
         gateRows.stream().filter(gate -> gate.mandatory() && gate.status() != GateStatus.PASSED)

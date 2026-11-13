@@ -49,7 +49,7 @@ public class ProductionPlanService {
     private static final String ENTITY = "ProductionPlan";
     private static final Set<WorkOrder.Status> OPEN = EnumSet.of(WorkOrder.Status.DRAFT, WorkOrder.Status.SUBMITTED,
             WorkOrder.Status.APPROVED, WorkOrder.Status.RELEASED, WorkOrder.Status.IN_PROGRESS,
-            WorkOrder.Status.ON_HOLD, WorkOrder.Status.PARTIALLY_COMPLETED);
+            WorkOrder.Status.ON_HOLD);
 
     private final ProductionPlanRepository plans;
     private final ProductionPlanLineRepository lines;

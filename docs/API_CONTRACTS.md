@@ -373,7 +373,7 @@ only those facilities' plans and orders; anything else is `404`.
 | `POST /work-orders/{id}/returns` | `WORK_ORDER_MATERIAL_ISSUE` | `consumptionId`, `quantity` (in the source's unit), `reason` |
 
 A step from the wrong status is `422` naming the order's status; a concurrent change to the same order is `409`.
-Nothing reaches COMPLETED or PARTIALLY_COMPLETED yet: that comes with finished-goods receipt in phase 6.
+An order in progress closes as COMPLETED or PARTIALLY_COMPLETED through finished-goods receipt and close, below.
 
 Reserve, automatic reserve, issue and return take an optional `Idempotency-Key` header (1 to 100 characters). A key
 already used on the same work order returns the current materials without moving stock again. With
@@ -431,6 +431,19 @@ Reading needs `MANUFACTURING_VIEW`; changes need `QUALITY_CHECKPOINT_MANAGE`.
 | `GET /work-orders/{id}/quality` | `WORK_ORDER_VIEW` | `batchId`, `batchNumber`, `batchStatus`, `onHold`; `gates` (name, stage, mandatory, operation, template, `status` of `PENDING`, `IN_INSPECTION`, `ON_HOLD`, `PASSED` or `FAILED`, and every inspection started for it); `ncrs` and `capas` on the batch (empty without `NCR_VIEW`); `reworkOrders`; `rejected` (`rejected`, `toRework`, `scrapped`, `inRework`, `reworkedAccepted`); `unresolved`, one sentence per mandatory gate not passed and rework order still open |
 | `POST /work-orders/{id}/quality-gates/{gateId}/inspections` | `INSPECTION_CREATE` | Starts an inspection of the batch with the gate's template, through the inspection engine. Pending or failed gates, while the order is in progress or on hold; a start check before the operation starts, the others while it runs. Returns the gate |
 | `POST /work-orders/{id}/quality-hold` | `INSPECTION_APPROVE` | `reason`. Puts the batch on hold and pauses running operations (`QUALITY_ISSUE`). Only while the batch is in progress; an in-process reinspection releases it. Returns the quality view |
+
+#### Completing a work order
+
+| Endpoint | Permission | Notes |
+|---|---|---|
+| `GET /work-orders/{id}/completion` | `WORK_ORDER_VIEW` | `orderedQuantity`, `expectedQuantity` (the operations' good output plus accepted rework; null without operations), `rejectedQuantity`, `scrapQuantity`, `reworkedQuantity`, `serialsRequired`, `materials` (per line: `expected`, `issued`, `difference`, `percent`, `outside`), `receiveBlockers`, `receipt`, `closeBlockers`, `closesAs`, `completedAt`, `completedByName` |
+| `POST /work-orders/{id}/receipt` | `WORK_ORDER_COMPLETE` | Optional `quantity` (required without operations; otherwise must equal the expected quantity), `shortReason` (required below the order quantity less `completionTolerancePercent`), `varianceReason` (required when a material line is off by more than `materialVariancePercent`), `serialNumbers` (up to 1000; one per unit when `serialTracking` is on and the product is discrete). Completes the batch as finished goods and releases open reservations. Optional `Idempotency-Key`: the same key returns the current view; any other second receipt is `422` |
+| `POST /work-orders/{id}/complete` | `WORK_ORDER_COMPLETE` | Optional `reason`, required when the order closes short. Needs the receipt, mandatory gates and rework settled, the batch not on hold and, with `completionRequiresFinalInspection`, its final inspection decided. → COMPLETED or PARTIALLY_COMPLETED |
+| `GET /work-orders/production-record?batchId=` | `WORK_ORDER_VIEW` | How the batch was made: work order, BOM or recipe revision, routing revision, operations with operators and machines, gates, rework orders, receipt. `data` is null for a batch no work order made, or one in another organisation |
+
+Completing a batch made by a work order through `POST /api/v1/production-batches/{id}/complete` is `422`. The
+settings gain `completionTolerancePercent`, `materialVariancePercent` (0 to 100), `completionRequiresFinalInspection`
+and `serialTracking`.
 
 #### Rework orders: `/api/v1/manufacturing/rework-orders`
 

@@ -1038,7 +1038,7 @@ export const DOC_PAGES: DocPage[] = [
         title: "Good to know",
         list: [
           "Preview shows the first 100 rows, and downloads hold them all.",
-          "A report stops at 5,000 rows and says so. Choose fewer dates to see the rest.",
+          "The screen and the PDF stop at 5,000 rows and say so. Excel holds up to 100,000, for a long period in one file.",
           "Every download is written to the audit log.",
           "Audits, recalls and single inspections have their own detailed reports on the record itself.",
         ],

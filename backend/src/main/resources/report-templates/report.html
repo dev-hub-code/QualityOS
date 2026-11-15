@@ -31,7 +31,7 @@ td { font-size: 8pt; word-wrap: break-word; }
 <h1>{{report.title}}</h1>
 <p class="muted">{{report.organizationName}}, {{report.facilityLabel}}. {{report.periodLabel}}. {{rowCount}} rows.</p>
 <p class="muted">{{report.note}}</p>
-{{#report.truncated}}<p><b>This report stops at {{rowCount}} rows. Choose fewer dates to see the rest.</b></p>{{/report.truncated}}
+{{#report.truncated}}<p><b>This PDF stops at {{rowCount}} rows. Download Excel for the rest, or choose fewer dates.</b></p>{{/report.truncated}}
 {{#empty}}<p>Nothing to report for this period.</p>{{/empty}}
 {{^empty}}<table>
 <thead><tr>{{#headings}}<th class="{{align}}" style="width:{{width}}%">{{label}}</th>{{/headings}}</tr></thead>

@@ -84,7 +84,8 @@ public class ReportExporter {
                 row++;
             }
             if (report.truncated()) {
-                sheet.value(row + 1, 0, "This report stops here. Choose fewer dates to see the rest.");
+                sheet.value(row + 1, 0, "This report stops at " + report.rows().size()
+                        + " rows. Choose fewer dates to see the rest.");
             }
             workbook.finish();
             return out.toByteArray();

@@ -62,7 +62,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A batch trace can still show inspections and NCRs of a lot from another plant, because lineage must stay whole | By design |
 | A dispatch of a batch under an open recall, or of anything made from it, is refused. Someone with `RECALL_MANAGE` can override with a reason, which is audited, and the customer joins the recall at once. Every built-in role that can dispatch can also manage recalls, so in practice the override is a reason, not a second person | Review after real use |
 | A dispatch recorded before a recall started can still have its shipment confirmed. The recall already covers its customer | Review after real use |
-| A recall starts from the traced batch, and other batch numbers can be typed in to join it. Batches cannot be added after the recall starts. A CAPA can be linked when it starts | When a user needs it |
 | Recording an instrument on an inspection is optional, and applies to the whole inspection, not each measurement | Review after real use |
 | A decision to reinspect after a failed calibration holds the goods that are left, but does not recall what was already used or dispatched, nor start the new inspection | Review after real use |
 | A recorded audit finding cannot be edited. A wrong one is handled by cancelling its NCR, and it stays on the report | Review after real use |

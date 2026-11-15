@@ -14,6 +14,7 @@ import com.qualityos.organization.dto.OrganizationResponse;
 import com.qualityos.organization.service.OrganizationService;
 import com.qualityos.quality.service.CapaService;
 import com.qualityos.recall.dto.RecallDtos.AcknowledgementRequest;
+import com.qualityos.recall.dto.RecallDtos.AddBatchesRequest;
 import com.qualityos.recall.dto.RecallDtos.ClosureReview;
 import com.qualityos.recall.dto.RecallDtos.ContactAttemptRequest;
 import com.qualityos.recall.dto.RecallDtos.ContactView;
@@ -55,6 +56,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -140,6 +142,57 @@ public class RecallService implements AttachmentPolicy {
         ids.forEach(id -> batches.save(new RecallBatch(recall.getId(), id)));
         addMissingCustomers(recall, traceability.recallScope(ids, permissions));
         audit.record("RECALL_CREATED", ENTITY, recall.getId());
+        return detail(recall, permissions);
+    }
+
+    /**
+     * Adds batches found after the recall started. Whoever received them, or anything made from them, gets a contact
+     * record, as at the start. A batch already in the recall is left as it is.
+     */
+    @Transactional
+    public RecallDetail addBatches(UUID id, AddBatchesRequest request, Set<String> permissions) {
+        Recall recall = lock(id);
+        recall.requireOpen();
+        Set<UUID> present = batchIds(id);
+        Map<UUID, String> found = new LinkedHashMap<>();
+        for (String number : request.batchNumbers()) {
+            String trimmed = number.trim();
+            found.put(production.byNumber(trimmed)
+                    .orElseThrow(() -> new ResourceNotFoundException("Batch", trimmed)).id(), trimmed);
+        }
+        scope.require(facilitiesOf(found.keySet()), "Batch", "");
+        List<String> added = new ArrayList<>();
+        found.forEach((batchId, number) -> {
+            if (!present.contains(batchId)) {
+                batches.save(new RecallBatch(id, batchId));
+                added.add(number);
+            }
+        });
+        if (added.isEmpty()) {
+            throw new BusinessRuleException("These batches are already in this recall.");
+        }
+        batches.flush();
+        syncedScope(recall, permissions);
+        audit.record("RECALL_BATCHES_ADDED", ENTITY, id, null,
+                Map.of("batches", added, "reason", request.reason().trim()));
+        return detail(recall, permissions);
+    }
+
+    /** Links the CAPA that deals with the cause, or unlinks it, while the recall is open. */
+    @Transactional
+    public RecallDetail linkCapa(UUID id, UUID capaId, Set<String> permissions) {
+        Recall recall = lock(id);
+        if (capaId != null && capas.isClosed(capaId).isEmpty()) {
+            throw new ResourceNotFoundException("CAPA", capaId.toString());
+        }
+        UUID previous = recall.getCapaId();
+        recall.linkCapa(capaId);
+        recalls.flush();
+        Map<String, Object> before = new HashMap<>();
+        before.put("capaId", previous);
+        Map<String, Object> after = new HashMap<>();
+        after.put("capaId", capaId);
+        audit.record("RECALL_CAPA_LINKED", ENTITY, id, before, after);
         return detail(recall, permissions);
     }
 

@@ -131,9 +131,11 @@ public class SupplierService implements AttachmentPolicy {
     @Transactional
     public ContactResponse addContact(UUID supplierId, SaveContactRequest request) {
         load(supplierId);
-        return mapper.toResponse(contacts.save(new SupplierContact(
+        SupplierContact contact = contacts.save(new SupplierContact(
                 supplierId, request.name().trim(), request.designation(), request.email(), request.phone(),
-                request.primary())));
+                request.primary()));
+        audit.record("SUPPLIER_CONTACT_ADDED", "Supplier", supplierId, null, Map.of("contact", contact.getName()));
+        return mapper.toResponse(contact);
     }
 
     @Transactional
@@ -142,6 +144,7 @@ public class SupplierService implements AttachmentPolicy {
                 .filter(found -> found.getSupplierId().equals(supplierId))
                 .orElseThrow(() -> new ResourceNotFoundException("Contact", contactId));
         contacts.delete(contact);
+        audit.record("SUPPLIER_CONTACT_REMOVED", "Supplier", supplierId, Map.of("contact", contact.getName()), null);
     }
 
     @Transactional(readOnly = true)

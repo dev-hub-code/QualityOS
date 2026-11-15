@@ -139,7 +139,9 @@ public class FacilityService {
         if (departments.existsByFacilityIdAndCode(facilityId, code)) {
             throw new ConflictException("This facility already has a department with this code.");
         }
-        return mapper.toResponse(departments.save(new Department(facilityId, code, request.name().trim())));
+        Department department = departments.save(new Department(facilityId, code, request.name().trim()));
+        audit.record("DEPARTMENT_ADDED", "Facility", facilityId, null, Map.of("department", code));
+        return mapper.toResponse(department);
     }
 
     @Transactional
@@ -149,7 +151,9 @@ public class FacilityService {
         if (lines.existsByFacilityIdAndCode(facilityId, code)) {
             throw new ConflictException("This facility already has a production line with this code.");
         }
-        return mapper.toResponse(lines.save(new ProductionLine(facilityId, code, request.name().trim())));
+        ProductionLine line = lines.save(new ProductionLine(facilityId, code, request.name().trim()));
+        audit.record("PRODUCTION_LINE_ADDED", "Facility", facilityId, null, Map.of("productionLine", code));
+        return mapper.toResponse(line);
     }
 
     @Transactional
@@ -159,9 +163,12 @@ public class FacilityService {
         if (shifts.existsByFacilityIdAndName(facilityId, name)) {
             throw new ConflictException("This facility already has a shift with this name.");
         }
-        return mapper.toResponse(shifts.save(new Shift(facilityId, name, request.startsAt(), request.endsAt(),
+        Shift shift = shifts.save(new Shift(facilityId, name, request.startsAt(), request.endsAt(),
                 request.breakMinutes() == null ? 0 : request.breakMinutes(),
-                request.daysOfWeek() == null ? Shift.EVERY_DAY : request.daysOfWeek())));
+                request.daysOfWeek() == null ? Shift.EVERY_DAY : request.daysOfWeek()));
+        audit.record("SHIFT_ADDED", "Facility", facilityId, null, Map.of("shift", name,
+                "startsAt", String.valueOf(request.startsAt()), "endsAt", String.valueOf(request.endsAt())));
+        return mapper.toResponse(shift);
     }
 
     @Transactional
@@ -170,6 +177,7 @@ public class FacilityService {
                 .filter(found -> found.getFacilityId().equals(facilityId))
                 .orElseThrow(() -> new ResourceNotFoundException("Department", id));
         department.setArchivedAt(Instant.now());
+        audit.record("DEPARTMENT_ARCHIVED", "Facility", facilityId, Map.of("department", department.getCode()), null);
     }
 
     @Transactional
@@ -178,6 +186,7 @@ public class FacilityService {
                 .filter(found -> found.getFacilityId().equals(facilityId))
                 .orElseThrow(() -> new ResourceNotFoundException("Production line", id));
         line.setArchivedAt(Instant.now());
+        audit.record("PRODUCTION_LINE_ARCHIVED", "Facility", facilityId, Map.of("productionLine", line.getCode()), null);
     }
 
     @Transactional
@@ -186,6 +195,7 @@ public class FacilityService {
                 .filter(found -> found.getFacilityId().equals(facilityId))
                 .orElseThrow(() -> new ResourceNotFoundException("Shift", id));
         shift.setArchivedAt(Instant.now());
+        audit.record("SHIFT_ARCHIVED", "Facility", facilityId, Map.of("shift", shift.getName()), null);
     }
 
     /** Every facility of the organisation, archived ones included, for reports over history. */

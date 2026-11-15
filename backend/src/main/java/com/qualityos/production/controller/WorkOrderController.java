@@ -27,6 +27,7 @@ import com.qualityos.production.dto.WorkOrderMaterialDtos.ReserveRequest;
 import com.qualityos.production.dto.WorkOrderMaterialDtos.ReturnRequest;
 import com.qualityos.production.dto.WorkOrderMaterialDtos.UnreserveRequest;
 import com.qualityos.production.service.CompletionService;
+import com.qualityos.production.service.ProductionRecordPdf;
 import com.qualityos.production.service.SchedulingService;
 import com.qualityos.production.service.QualityGateService;
 import com.qualityos.production.service.ShopFloorService;
@@ -36,7 +37,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -68,13 +73,17 @@ public class WorkOrderController {
     private final CompletionService completion;
     private final SchedulingService scheduling;
 
+    private final ProductionRecordPdf recordPdf;
+
     WorkOrderController(
             WorkOrderService workOrders,
             WorkOrderMaterialService orderMaterials,
             QualityGateService qualityGates,
             ShopFloorService shopFloor,
             CompletionService completion,
-            SchedulingService scheduling) {
+            SchedulingService scheduling,
+            ProductionRecordPdf recordPdf) {
+        this.recordPdf = recordPdf;
         this.workOrders = workOrders;
         this.orderMaterials = orderMaterials;
         this.qualityGates = qualityGates;
@@ -275,6 +284,16 @@ public class WorkOrderController {
     @GetMapping("/production-record")
     public ApiResponse<ProductionRecord> productionRecord(@RequestParam UUID batchId) {
         return ApiResponse.ok(completion.record(batchId).orElse(null));
+    }
+
+    /** The production record of the batch this order made, as a PDF. */
+    @GetMapping(value = "/{id}/production-record.pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> productionRecordPdf(@PathVariable UUID id) {
+        ProductionRecordPdf.Document document = recordPdf.render(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(document.fileName()).build().toString())
+                .body(document.content());
     }
 
     private static boolean holds(Authentication caller, String permission) {

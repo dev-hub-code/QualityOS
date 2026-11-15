@@ -22,6 +22,8 @@ const REPORTS = [
   ["work-orders", "Work order report", "WORK_ORDER_VIEW"],
   ["production-quality", "Production quality report", "WORK_ORDER_VIEW"],
   ["downtime", "Downtime report", "MANUFACTURING_VIEW"],
+  ["oee", "OEE report", "PRODUCTION_ANALYTICS_VIEW"],
+  ["production-cost", "Production cost report", "PRODUCTION_COST_VIEW"],
 ];
 const PREVIEW_ROWS = 100;
 

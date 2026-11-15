@@ -169,9 +169,14 @@ export default function WorkOrderPage() {
             [
               "Production batch",
               order.productionBatchId ? (
-                <Link key="batch" className={link} href={`/production-batches/${order.productionBatchId}`}>
-                  {order.productionBatchNumber}
-                </Link>
+                <span key="batch" className="flex flex-wrap gap-x-3">
+                  <Link className={link} href={`/production-batches/${order.productionBatchId}`}>
+                    {order.productionBatchNumber}
+                  </Link>
+                  <a className={link} href={`/api/v1/manufacturing/work-orders/${order.id}/production-record.pdf`}>
+                    Production record (PDF)
+                  </a>
+                </span>
               ) : (
                 "Opened when production starts"
               ),

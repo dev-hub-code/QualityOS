@@ -54,6 +54,7 @@ public final class Permissions {
     public static final String AUDIT_CLOSE = "AUDIT_CLOSE";
     public static final String MATERIAL_CORRECTION_REQUEST = "MATERIAL_CORRECTION_REQUEST";
     public static final String MATERIAL_CORRECTION_APPROVE = "MATERIAL_CORRECTION_APPROVE";
+    public static final String INSPECTION_CREATE = "INSPECTION_CREATE";
     public static final String INSPECTION_EXECUTE = "INSPECTION_EXECUTE";
     public static final String MANUFACTURING_VIEW = "MANUFACTURING_VIEW";
     public static final String MANUFACTURING_MANAGE = "MANUFACTURING_MANAGE";

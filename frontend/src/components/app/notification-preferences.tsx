@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import type { NotificationPreference } from "@/lib/types";
 
 const LABELS: Record<string, string> = {
+  MATERIAL_AWAITING_INSPECTION: "Received material is waiting for inspection",
   INSPECTION_AWAITING_APPROVAL: "An inspection is waiting for approval",
   INSPECTION_CRITICAL_FAILURE: "A critical parameter fails",
   INSPECTION_SENT_BACK: "My inspection is sent back",

@@ -291,7 +291,7 @@ export const DOC_PAGES: DocPage[] = [
         list: [
           "You cannot receive more than what remains on the order line.",
           "A lot that requires inspection cannot be used until it is released.",
-          "A receipt does not notify inspectors. Lots appear in the inspection queue.",
+          "Lots that need inspection appear in the inspection queue, and everyone who can start inspections at that facility is notified.",
         ],
       },
     ],

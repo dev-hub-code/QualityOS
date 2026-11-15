@@ -171,6 +171,10 @@ with counts under row-level security. A new module that relies on master data ad
 BOMs, recipes and routings belong to no facility, so their notices reach every approver. As everywhere, the person who
 acted is not told. Emails use the four `production/` templates in English, Hindi and Marathi.
 
+A material receipt with lots that need inspection notifies holders of `INSPECTION_CREATE` at the receiving facility
+(`MATERIAL_AWAITING_INSPECTION`, email template `inspection/material-received`). Lots released on arrival notify
+nobody.
+
 ## Reporting
 
 `reporting` reads across modules with plain SQL, like the traceability search, and writes nothing except an audit row

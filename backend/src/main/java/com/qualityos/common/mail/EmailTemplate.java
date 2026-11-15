@@ -13,6 +13,7 @@ public enum EmailTemplate {
     INSPECTION_ASSIGNMENT("inspection/assignment"),
     INSPECTION_FAILED("inspection/failed"),
     MATERIAL_ON_HOLD("inspection/material-on-hold"),
+    MATERIAL_RECEIVED("inspection/material-received"),
     NCR_CREATED("ncr/created"),
     NCR_ASSIGNED("ncr/assigned"),
     CAPA_ASSIGNED("capa/assigned"),

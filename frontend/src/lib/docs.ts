@@ -750,7 +750,12 @@ export const DOC_PAGES: DocPage[] = [
       {
         title: "Searches",
         terms: [
-          ["Global search", "The box at the top of the menu finds lots, batches, products and serial numbers."],
+          [
+            "Global search",
+            "The box at the top of the menu finds lots, batches and serial numbers, NCRs, CAPAs, suppliers, " +
+              "work orders, machines, inspections, audits, instruments, products, materials, purchase orders, " +
+              "receipts and customers. Each kind shows only to people allowed to see it.",
+          ],
           ["Forward trace", "From a lot, which batches used it and which customers received them."],
           ["Backward trace", "From a batch, which lots and suppliers it came from."],
           ["Serial search", "Where a single unit is now. Earlier customers are on its detail page."],
@@ -761,7 +766,7 @@ export const DOC_PAGES: DocPage[] = [
         list: [
           "A batch's timeline shows inspections, NCRs and corrections in order.",
           "If serial numbers were not named on a dispatch, a trace shows the customer by batch, not by unit.",
-          "Search does not cover NCRs, CAPAs or suppliers.",
+          "Search does not cover dispatches or recalls. Find them on their own pages.",
         ],
       },
     ],

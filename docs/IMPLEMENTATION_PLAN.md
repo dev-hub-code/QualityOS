@@ -39,7 +39,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | With verification switched off for private use, registration reveals that an email has an account | Private use only |
 | Sampling is fixed, percentage or every unit; AQL tables (such as ISO 2859-1) are not built | When a customer needs them |
 | A one-person organisation can review its own inspections, NCR closures and CAPA verifications once an administrator turns this on under Settings. It applies only while there is one active member, and each use needs a reason, recorded as `SELF_REVIEW`. An administrator could deactivate everyone else to use it, but both steps are in the audit log | Review after real use |
-| Recalls, audits and material corrections still need a second person, even in a one-person organisation | When a user needs it |
 | Each organisation chooses which NCR severities need a closed CAPA and which need a verified fix (default: critical and major). The NCR statuses and their order are fixed | When a user needs it |
 | A change to the CAPA rule applies to open NCRs at once. A CAPA keeps the verification rule it was raised under | By design |
 | An NCR raised on a held lot has no rejected quantity, and a later reject does not fill it in | Review after real use |
@@ -50,7 +49,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Material used can be entered in any unit of the same kind as its lot or batch, and is converted to that unit. The dialog lists every unit and the server refuses one that does not convert. A correction of material used is still entered in the source's own unit. Units are added through the API alone, as before | When a user needs it |
 | A customer who returned everything still shows as having received the batch. This is deliberate: a recall should reach them | By design |
 | A return covers any lines of one dispatch at once. A return across several dispatches is recorded once per dispatch. Credit notes and refunds are separate and not built | When a user needs it |
-| Global search covers lots, batches, products and serial numbers, and NCRs (number, title, batch), CAPAs (number, title) and suppliers (code, name, GSTIN). Each kind shows only to people allowed to view it, and stops at 10 matches. Serial search reports where a unit is now; earlier customers are on its detail page | When a user needs it |
+| Global search does not cover dispatches or recalls, whose lists have no search. Customers have no page of their own, so a customer found opens the customer list. Each kind stops at 10 matches | When a user needs it |
 | A lot's internal batch number cannot be corrected, because other records refer to it by number. It is generated, so it cannot be mistyped | By design |
 | A corrected lot keeps its original purchase order line, and a finished NCR keeps its original supplier and material | By design: history is preserved |
 | A correction of an inspected lot does not trigger reinspection. It needs two approvers, who decide whether to act | Review after real use |

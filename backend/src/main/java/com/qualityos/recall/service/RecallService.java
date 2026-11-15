@@ -9,6 +9,7 @@ import com.qualityos.common.security.Permissions;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.FacilityScope;
+import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.organization.dto.OrganizationResponse;
 import com.qualityos.organization.service.OrganizationService;
@@ -91,6 +92,7 @@ public class RecallService implements AttachmentPolicy {
     private final CapaService capas;
     private final OrganizationService organizations;
     private final TenantAccessService access;
+    private final ReviewPolicy reviewPolicy;
     private final FacilityScope scope;
     private final DocumentNumberService numbers;
     private final AuditService audit;
@@ -107,6 +109,7 @@ public class RecallService implements AttachmentPolicy {
             CapaService capas,
             OrganizationService organizations,
             TenantAccessService access,
+            ReviewPolicy reviewPolicy,
             FacilityScope scope,
             DocumentNumberService numbers,
             AuditService audit) {
@@ -121,6 +124,7 @@ public class RecallService implements AttachmentPolicy {
         this.capas = capas;
         this.organizations = organizations;
         this.access = access;
+        this.reviewPolicy = reviewPolicy;
         this.scope = scope;
         this.numbers = numbers;
         this.audit = audit;
@@ -356,13 +360,15 @@ public class RecallService implements AttachmentPolicy {
 
     /** Looks again at everything, because goods may have gone out to someone new since closure was requested. */
     @Transactional
-    public RecallDetail close(UUID id, Set<String> permissions) {
+    public RecallDetail close(UUID id, String note, Set<String> permissions) {
         Recall recall = lock(id);
         ClosureReview review = review(recall, syncedScope(recall, permissions), true);
         if (!review.blockers().isEmpty()) {
             throw new BusinessRuleException("This recall cannot close yet: " + String.join(" ", review.blockers()));
         }
-        recall.close(TenantContext.getCurrentUserId(), Instant.now());
+        UUID actor = TenantContext.getCurrentUserId();
+        recall.close(actor, Instant.now(),
+                reviewPolicy.permits(actor, recall.getClosureRequestedBy(), ENTITY, id, "RECALL_CLOSE", note));
         recalls.flush();
         audit.record("RECALL_CLOSED", ENTITY, id);
         return detail(recall, permissions);
@@ -432,7 +438,8 @@ public class RecallService implements AttachmentPolicy {
         List<String> names = production.views(roots).stream().map(ProductionBatchView::batchNumber).sorted().toList();
         return new RecallDetail(recall.getId(), recall.getRecallNumber(), recall.getRecallDate(), recall.getReason(),
                 recall.getInstructions(), recall.getCapaId(), recall.getStatus().name(), names, recall.getClosureNote(),
-                memberName(recall.getClosureRequestedBy()), recall.getClosureRequestedAt(),
+                recall.getClosureRequestedBy(), memberName(recall.getClosureRequestedBy()),
+                recall.getClosureRequestedAt(),
                 memberName(recall.getClosedBy()), recall.getClosedAt(), review(recall, covered, true));
     }
 

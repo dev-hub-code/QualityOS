@@ -5,11 +5,13 @@ import { useParams } from "next/navigation";
 import { type ReactNode, useState } from "react";
 import { AuditChecklist } from "@/components/audits/audit-checklist";
 import { AuditFindings } from "@/components/audits/audit-findings";
+import { SelfReviewNotice } from "@/components/app/review-policy";
 import { FormError } from "@/components/forms/field";
 import { Details, PageHeader, QueryState, RecordLink, Section, StatusBadge, useAction, useRefresh } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
-import { usePermission } from "@/hooks/use-me";
+import { useMe, usePermission } from "@/hooks/use-me";
+import { useSelfReviewInEffect } from "@/hooks/use-organization-settings";
 import { api } from "@/lib/api";
 import type { FieldDef } from "@/lib/record-form";
 import type { Audit } from "@/lib/types";
@@ -40,6 +42,8 @@ export default function AuditPage() {
   const path = `/audits/${id}`;
   const canManage = usePermission("AUDIT_MANAGE");
   const canClose = usePermission("AUDIT_CLOSE");
+  const { data: me } = useMe();
+  const selfReviewInEffect = useSelfReviewInEffect();
   const refresh = useRefresh();
   const { run, message } = useAction();
   const [step, setStep] = useState<Step | null>(null);
@@ -47,6 +51,7 @@ export default function AuditPage() {
   if (!audit) return <QueryState error={error} />;
   const { status, review } = audit;
   const inProgress = status === "IN_PROGRESS";
+  const ownClosure = me?.user.id === audit.closureRequestedBy;
   const findingStep: Step = {
     title: "Record finding",
     action: "findings",
@@ -100,15 +105,29 @@ export default function AuditPage() {
             Request closure
           </Button>
         )}
-        {canClose && status === "PENDING_CLOSURE" && (
+        {canClose && status === "PENDING_CLOSURE" && (!ownClosure || selfReviewInEffect) && (
           <>
-            <Button onClick={() => run(() => api.post(`${path}/close`))}>Approve closure</Button>
+            {ownClosure ? (
+              <Button
+                onClick={() =>
+                  setStep({ title: "Approve closure", action: "close", fields: note("Why you are closing it yourself") })
+                }
+              >
+                Approve closure
+              </Button>
+            ) : (
+              <Button onClick={() => run(() => api.post(`${path}/close`))}>Approve closure</Button>
+            )}
             <Button variant="outline" onClick={() => setStep({ title: "Send back", action: "send-back", fields: note("What still needs doing") })}>
               Send back
             </Button>
           </>
         )}
       </div>
+      {canClose && status === "PENDING_CLOSURE" && ownClosure && selfReviewInEffect && <SelfReviewNotice />}
+      {canClose && status === "PENDING_CLOSURE" && ownClosure && !selfReviewInEffect && (
+        <p className="text-sm text-muted-foreground">Someone other than you must approve closing this audit.</p>
+      )}
       <Section title="Audit">
         <Details
           items={[

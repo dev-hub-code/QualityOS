@@ -16,8 +16,9 @@ export function ReviewPolicySettings() {
     <section className="space-y-3">
       <h2 className="text-base font-semibold text-[#1b2a55]">Reviews</h2>
       <p className="text-sm text-muted-foreground">
-        Normally a second person approves an inspection, closes an NCR and verifies a CAPA. If you work alone, you can
-        do these yourself. You must give a reason each time, and it is saved in the audit log.
+        Normally a second person approves an inspection, closes an NCR, verifies a CAPA, closes a recall or an audit,
+        and approves a material correction. If you work alone, you can do these yourself. You must give a reason each
+        time, and it is saved in the audit log.
       </p>
       <FormError message={update.error?.message} />
       <div className="flex items-center gap-2">

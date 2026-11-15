@@ -176,6 +176,18 @@ class AuditManagementIT extends TraceabilityFixture {
     }
 
     @Test
+    void aSoleMemberClosesTheirOwnAuditWithAReason() throws Exception {
+        String audit = completedClean();
+        requestClosure(owner, audit).andExpect(status().isOk());
+        workAlone();
+        as(owner, postJson(AUDITS + "/" + audit + "/close", Map.of())).andExpect(status().isUnprocessableEntity());
+        as(owner, postJson(AUDITS + "/" + audit + "/close", Map.of("note", "Sole auditor")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("CLOSED"));
+        assertThat(selfReviews(owner.tenantId(), "AUDIT_CLOSE")).isEqualTo(1);
+    }
+
+    @Test
     void closingTakesASecondPersonAndThenFreezesTheAudit() throws Exception {
         String audit = completedClean();
         requestClosure(owner, audit).andExpect(status().isOk());

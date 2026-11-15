@@ -87,6 +87,10 @@ public final class AuditDtos {
     public record CompleteAuditRequest(@NotBlank @Size(max = MAX_TEXT) String summary) {
     }
 
+    /** The note is needed only when someone approves their own request in a one-person organisation. */
+    public record CloseRequest(@Size(max = MAX_TEXT) String note) {
+    }
+
     public record NoteRequest(@NotBlank @Size(max = MAX_TEXT) String note) {
     }
 

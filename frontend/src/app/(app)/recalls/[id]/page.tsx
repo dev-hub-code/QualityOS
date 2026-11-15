@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
+import { SelfReviewNotice } from "@/components/app/review-policy";
 import { FormError } from "@/components/forms/field";
 import { ContactTable } from "@/components/recalls/contact-table";
 import { RecallChanges } from "@/components/recalls/recall-changes";
@@ -10,7 +11,8 @@ import { RecallDashboardTiles } from "@/components/recalls/recall-dashboard";
 import { Details, PageHeader, QueryState, RecordLink, Section, StatusBadge, useAction, useAssignees, useRefresh } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
-import { usePermission } from "@/hooks/use-me";
+import { useMe, usePermission } from "@/hooks/use-me";
+import { useSelfReviewInEffect } from "@/hooks/use-organization-settings";
 import { api } from "@/lib/api";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { RecallContact, RecallDashboard, RecallDetail, RecallHistoryEntry } from "@/lib/types";
@@ -28,8 +30,11 @@ function Closure({ recall, path }: { recall: RecallDetail; path: string }) {
   const canClose = usePermission("RECALL_CLOSE");
   const refresh = useRefresh();
   const { run, message } = useAction();
-  const [dialog, setDialog] = useState<"request" | "back" | null>(null);
+  const { data: me } = useMe();
+  const selfReviewInEffect = useSelfReviewInEffect();
+  const [dialog, setDialog] = useState<"request" | "back" | "close" | null>(null);
   const { review } = recall;
+  const ownClosure = me?.user.id === recall.closureRequestedById;
   return (
     <Section title="Closure review">
       <FormError message={message} />
@@ -52,15 +57,41 @@ function Closure({ recall, path }: { recall: RecallDetail; path: string }) {
       )}
       <div className="mt-3 flex flex-wrap gap-2">
         {canRequest && recall.status === "OPEN" && <Button onClick={() => setDialog("request")}>Request closure</Button>}
-        {canClose && recall.status === "PENDING_CLOSURE" && (
+        {canClose && recall.status === "PENDING_CLOSURE" && (!ownClosure || selfReviewInEffect) && (
           <>
-            <Button onClick={() => run(() => api.post(`${path}/close`).then(refresh))}>Approve closure</Button>
+            <Button
+              onClick={() =>
+                ownClosure ? setDialog("close") : run(() => api.post(`${path}/close`).then(refresh))
+              }
+            >
+              Approve closure
+            </Button>
             <Button variant="outline" onClick={() => setDialog("back")}>
               Send back
             </Button>
           </>
         )}
       </div>
+      {canClose && recall.status === "PENDING_CLOSURE" && ownClosure && (
+        <div className="mt-2">
+          {selfReviewInEffect ? (
+            <SelfReviewNotice />
+          ) : (
+            <p className="text-sm text-muted-foreground">Someone other than you must approve closing this recall.</p>
+          )}
+        </div>
+      )}
+      {dialog === "close" && (
+        <RecordDialog
+          title="Approve closure"
+          fields={[{ name: "note", label: "Why you are closing it yourself", type: "textarea", required: true }]}
+          onClose={() => setDialog(null)}
+          onSubmit={async (values) => {
+            await api.post(`${path}/close`, values);
+            refresh();
+          }}
+        />
+      )}
       {dialog === "request" && (
         <RecordDialog
           title="Request closure"

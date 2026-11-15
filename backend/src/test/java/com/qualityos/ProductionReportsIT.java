@@ -6,10 +6,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import static org.hamcrest.Matchers.containsString;
+
 import com.jayway.jsonpath.JsonPath;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.ResultActions;
@@ -101,5 +106,38 @@ class ProductionReportsIT extends TraceabilityFixture {
             as(owner, get("/api/v1/reports/" + slug + ".xlsx")).andExpect(status().isOk());
         }
         as(operator, get("/api/v1/reports/work-orders")).andExpect(status().isForbidden());
+
+        // OEE and cost come from the same services as the screens; both export.
+        List<List<String>> oee = rows("oee");
+        assertThat(oee).hasSize(2);
+        assertThat(oee.getFirst().getFirst()).isEqualTo(machineCode);
+        assertThat(oee.getLast().getFirst()).isEqualTo("All machines");
+        assertThat(rows("production-cost")).isEmpty();
+        for (String slug : List.of("oee", "production-cost")) {
+            as(owner, get("/api/v1/reports/" + slug + ".pdf")).andExpect(status().isOk());
+            as(owner, get("/api/v1/reports/" + slug + ".xlsx")).andExpect(status().isOk());
+        }
+        as(operator, get("/api/v1/reports/oee")).andExpect(status().isForbidden());
+
+        // The production record of the batch, as a PDF.
+        byte[] record = as(owner, get(API + "/work-orders/" + order + "/production-record.pdf"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "application/pdf"))
+                .andExpect(header().string("Content-Disposition", containsString(number + "-production-record.pdf")))
+                .andReturn().getResponse().getContentAsByteArray();
+        try (PDDocument document = Loader.loadPDF(record)) {
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text).contains("Production record", number, "10 Turn", "Nothing has been received yet.");
+        }
+    }
+
+    @Test
+    void anOrderWithoutABatchHasNoProductionRecord() throws Exception {
+        String order = JsonPath.read(body(send(owner, "/work-orders", Map.of("productId", product,
+                "facilityId", facility, "quantity", "5", "plannedStart", LocalDate.now().toString(),
+                "plannedEnd", LocalDate.now().plusDays(1).toString())).andExpect(status().isCreated())),
+                "$.data.workOrder.id");
+        as(owner, get(API + "/work-orders/" + order + "/production-record.pdf"))
+                .andExpect(status().isUnprocessableContent());
     }
 }

@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -38,13 +39,16 @@ public class ReportService {
     private final OrganizationService organizations;
     private final FacilityService facilities;
     private final AuditService audit;
+    private final Map<ReportType, ComputedReport> computed = new EnumMap<>(ReportType.class);
 
     ReportService(
             NamedParameterJdbcTemplate jdbc,
             ReportScope scopes,
             OrganizationService organizations,
             FacilityService facilities,
-            AuditService audit) {
+            AuditService audit,
+            List<ComputedReport> computedReports) {
+        computedReports.forEach(report -> computed.put(report.type(), report));
         this.jdbc = jdbc;
         this.scopes = scopes;
         this.organizations = organizations;
@@ -69,16 +73,29 @@ public class ReportService {
     }
 
     private ReportTable build(ReportType type, Resolved scope) {
-        Definition definition = definition(type, scope);
-        int width = definition.columns().size();
-        List<List<String>> rows = new ArrayList<>(jdbc.query(
-                definition.sql() + " LIMIT " + (MAX_ROWS + 1), scope.params(), (row, n) -> {
-                    List<String> values = new ArrayList<>(width);
-                    for (int column = 1; column <= width; column++) {
-                        values.add(row.getString(column));
-                    }
-                    return values;
-                }));
+        ComputedReport source = computed.get(type);
+        List<Column> columns;
+        List<List<String>> rows;
+        String note;
+        if (source != null) {
+            ComputedReport.Table table = source.rows(scope.from(), scope.to(), scope.facilityId());
+            columns = table.columns();
+            rows = new ArrayList<>(table.rows().subList(0, Math.min(table.rows().size(), MAX_ROWS + 1)));
+            note = table.note();
+        } else {
+            Definition definition = definition(type, scope);
+            int width = definition.columns().size();
+            columns = definition.columns();
+            note = definition.note();
+            rows = new ArrayList<>(jdbc.query(
+                    definition.sql() + " LIMIT " + (MAX_ROWS + 1), scope.params(), (row, n) -> {
+                        List<String> values = new ArrayList<>(width);
+                        for (int column = 1; column <= width; column++) {
+                            values.add(row.getString(column));
+                        }
+                        return values;
+                    }));
+        }
         boolean truncated = rows.size() > MAX_ROWS;
         if (truncated) {
             rows.removeLast();
@@ -90,8 +107,8 @@ public class ReportService {
                         : facilities.get(scope.facilityId()).facility().name(),
                 type == ReportType.CALIBRATION ? "As of " + scope.today() : scope.from() + " to " + scope.to(),
                 DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm z").withZone(scope.zone()).format(Instant.now()),
-                definition.note(),
-                definition.columns(),
+                note,
+                columns,
                 rows,
                 truncated);
     }
@@ -102,6 +119,7 @@ public class ReportService {
 
     private static Definition definition(ReportType type, Resolved scope) {
         return switch (type) {
+            case OEE, PRODUCTION_COST -> throw new IllegalStateException(type + " is worked out in code.");
             case INSPECTION -> new Definition(
                     List.of(text("Inspection", 13), text("Type", 6), text("Decided", 9), text("Batch", 14),
                             text("Supplier", 15), text("Item", 17), text("Facility", 12), text("Result", 6),

@@ -172,4 +172,13 @@ test("capacity, downtime, cost and OEE come from what was planned and recorded",
   const excel = page.waitForEvent("download");
   await page.getByRole("link", { name: "Download Excel" }).click();
   expect((await excel).suggestedFilename()).toBe("downtime-report.xlsx");
+
+  // OEE is a report too, and the production record of a batch downloads as a PDF.
+  await page.getByLabel("Report", { exact: true }).selectOption("oee");
+  await expect(page.getByRole("row", { name: /^M-1 WC-1/ })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "All machines" })).toBeVisible();
+  await page.goto(smallPath);
+  const record = page.waitForEvent("download");
+  await page.getByRole("link", { name: "Production record (PDF)" }).click();
+  expect((await record).suggestedFilename()).toBe(`${small.workOrder.workOrderNumber}-production-record.pdf`);
 });

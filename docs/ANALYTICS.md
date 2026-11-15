@@ -42,7 +42,10 @@ The overview, and so the dashboard and analytics page, carries a few production 
 | Shop-floor loss | Rejected and scrapped / processed, from shop-floor reports in the period, reversals netted out |
 | Unplanned downtime | Minutes of stops other than planned maintenance that began in the period, to its end or now |
 
-The work order, production quality and downtime reports export the same records as PDF and Excel.
+The work order, production quality and downtime reports export the same records as PDF and Excel. The OEE report
+(one row per machine and one for all machines, with notes where a figure is not known) and the production cost report
+(orders closed in the period, planned against actual, with a total row) take their figures from production analytics
+and costing, so they match the production analytics page.
 
 Production analytics is a separate page, behind `PRODUCTION_ANALYTICS_VIEW`. The full rules are in
 [MANUFACTURING.md](MANUFACTURING.md), under OEE and analytics.

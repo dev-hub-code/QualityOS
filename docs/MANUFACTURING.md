@@ -404,6 +404,7 @@ an order takes two steps, both needing WORK_ORDER_COMPLETE.
   the order, its BOM or recipe revision and routing revision, each operation with its operators (from events and
   reports) and machines, gates with their latest inspection, rework orders and the receipt. With the existing trace
   (suppliers and lots, inspections, NCRs, CAPAs, dispatches and customers) this covers the batch end to end.
+  `GET /work-orders/{id}/production-record.pdf` prints it, linked from the work order and the batch page.
 
 ### Downtime
 

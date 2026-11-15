@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Production record {{order.workOrderNumber}}</title>
+<meta name="author" content="{{organizationName}}"/>
+<meta name="subject" content="Production record"/>
+<style>
+@page {
+  size: A4 landscape;
+  margin: 18mm 12mm 16mm 12mm;
+  @top-left { content: "{{order.workOrderNumber}}"; font: 8pt "Report Sans"; color: #555; }
+  @top-right { content: "Generated {{generated}}"; font: 8pt "Report Sans"; color: #555; }
+  @bottom-left { content: "{{footerName}}"; font: 8pt "Report Sans"; color: #555; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt "Report Sans"; color: #555; }
+}
+body { font-family: "Report Sans", "Report Devanagari", sans-serif; font-size: 9pt; color: #111; line-height: 1.35; }
+h1 { font-size: 17pt; margin: 0 0 2pt 0; }
+h2 { font-size: 11pt; margin: 14pt 0 5pt 0; border-bottom: 0.75pt solid #333; padding-bottom: 2pt;
+     page-break-after: avoid; -fs-page-break-min-height: 32mm; }
+p { margin: 0 0 5pt 0; }
+ul { margin: 0; padding-left: 14pt; }
+.muted { color: #555; }
+table { width: 100%; border-collapse: collapse; -fs-table-paginate: paginate; table-layout: fixed; }
+thead { display: table-header-group; }
+tr { page-break-inside: avoid; }
+th { background: #e8e8e8; text-align: left; font-weight: 700; font-size: 7.5pt; }
+th, td { border: 0.5pt solid #888; padding: 2.5pt 4pt; vertical-align: top; }
+td { font-size: 8.5pt; overflow-wrap: break-word; word-wrap: break-word; }
+.num { text-align: right; }
+.meta td { border: none; padding: 1pt 8pt 1pt 0; }
+.meta .label { width: 30mm; color: #555; }
+</style>
+</head>
+<body>
+<h1>Production record</h1>
+<p class="muted">{{organizationName}}</p>
+
+<table class="meta">
+<tr><td class="label">Work order</td><td>{{order.workOrderNumber}}</td><td class="label">Status</td><td>{{status}}</td></tr>
+<tr><td class="label">Product</td><td>{{order.productCode}} – {{order.productName}}</td><td class="label">Batch</td><td>{{order.productionBatchNumber}}</td></tr>
+<tr><td class="label">Facility</td><td>{{order.facilityCode}}</td><td class="label">Ordered</td><td>{{quantity}}</td></tr>
+<tr><td class="label">Planned</td><td>{{order.plannedStart}} to {{order.plannedEnd}}</td><td class="label">Definition</td><td>{{#record.definitionKind}}{{.}} revision {{record.definitionRevision}}{{/record.definitionKind}}{{#record.routingRevision}}, routing revision {{.}}{{/record.routingRevision}}</td></tr>
+</table>
+
+<h2>Operations</h2>
+{{#hasOperations}}
+<table>
+<thead><tr><th style="width:5%">Seq.</th><th style="width:15%">Operation</th><th style="width:8%">Work centre</th><th style="width:9%">Status</th><th style="width:15%">Operators</th><th style="width:9%">Machines</th><th style="width:11%">Started</th><th style="width:11%">Completed</th><th style="width:6%" class="num">Good</th><th style="width:6%" class="num">Rejected</th><th style="width:5%" class="num">Scrap</th></tr></thead>
+<tbody>
+{{#operations}}<tr><td>{{sequence}}</td><td>{{name}}</td><td>{{centre}}</td><td>{{status}}</td><td>{{operators}}</td><td>{{machines}}</td><td>{{started}}</td><td>{{completed}}</td><td class="num">{{good}}</td><td class="num">{{rejected}}</td><td class="num">{{scrap}}</td></tr>
+{{/operations}}
+</tbody>
+</table>
+{{/hasOperations}}
+{{^hasOperations}}<p>This work order had no operations.</p>{{/hasOperations}}
+
+{{#hasGates}}<h2>Quality gates</h2>
+<ul>{{#gates}}<li>{{.}}</li>{{/gates}}</ul>{{/hasGates}}
+
+{{#hasReworks}}<h2>Rework</h2>
+<ul>{{#reworks}}<li>{{.}}</li>{{/reworks}}</ul>{{/hasReworks}}
+
+<h2>Finished goods receipt</h2>
+{{#receipt}}
+<p>{{quantity}} received by {{by}} on {{at}}{{#expected}}, against {{.}} expected{{/expected}}. Rejected {{rejected}}, scrapped {{scrap}}, reworked {{reworked}}.{{#serials}} {{.}} serial numbers recorded.{{/serials}}</p>
+{{#shortReason}}<p>Short because: {{.}}</p>{{/shortReason}}
+{{#varianceReason}}<p>Material variance: {{.}}</p>{{/varianceReason}}
+{{/receipt}}
+{{^receipt}}<p>Nothing has been received yet.</p>{{/receipt}}
+</body>
+</html>

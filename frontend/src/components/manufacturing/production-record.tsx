@@ -24,7 +24,14 @@ export function useProductionRecord(batchId: string): ProductionRecord | null {
 export function ProductionRecordPanel({ record }: { record: ProductionRecord }) {
   const kind = record.definitionKind === "RECIPE" ? "Recipe" : "BOM";
   return (
-    <Section title="Production record">
+    <Section
+      title="Production record"
+      action={
+        <a className="text-sm underline" href={`/api/v1/manufacturing/work-orders/${record.workOrderId}/production-record.pdf`}>
+          Download PDF
+        </a>
+      }
+    >
       <Details
         items={[
           [

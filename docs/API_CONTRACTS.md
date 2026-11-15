@@ -226,8 +226,11 @@ may span two years at most. `facilityId` narrows the result; a facility the call
 | GET | `/api/v1/reports/{slug}.xlsx` | The same report as a workbook, audited as `REPORT_EXPORTED` |
 
 Slugs: `inspection`, `supplier-quality`, `material-rejection`, `ncr`, `capa`, `calibration`, `audit`,
-`batch-traceability`, `work-orders` and `production-quality` (`WORK_ORDER_VIEW`), and `downtime`
-(`MANUFACTURING_VIEW`). Each also needs the view permission for what it lists, or the call is a 403.
+`batch-traceability`, `work-orders` and `production-quality` (`WORK_ORDER_VIEW`), `downtime`
+(`MANUFACTURING_VIEW`), `oee` (`PRODUCTION_ANALYTICS_VIEW`, at most 366 days) and `production-cost`
+(`PRODUCTION_COST_VIEW`, at most 366 days). Each also needs the view permission for what it lists, or the call is a 403.
+`oee` and `production-cost` are worked out by the production module's own analytics and costing, through
+`ComputedReport`, so the report and the screen agree.
 
 How each figure is defined is in [ANALYTICS.md](ANALYTICS.md).
 
@@ -459,6 +462,7 @@ Reading needs `MANUFACTURING_VIEW`; changes need `QUALITY_CHECKPOINT_MANAGE`.
 | `POST /work-orders/{id}/receipt` | `WORK_ORDER_COMPLETE` | Optional `quantity` (required without operations; otherwise must equal the expected quantity), `shortReason` (required below the order quantity less `completionTolerancePercent`), `varianceReason` (required when a material line is off by more than `materialVariancePercent`), `serialNumbers` (up to 1000; one per unit when `serialTracking` is on and the product is discrete). Completes the batch as finished goods and releases open reservations. Optional `Idempotency-Key`: the same key returns the current view; any other second receipt is `422` |
 | `POST /work-orders/{id}/complete` | `WORK_ORDER_COMPLETE` | Optional `reason`, required when the order closes short. Needs the receipt, mandatory gates and rework settled, the batch not on hold and, with `completionRequiresFinalInspection`, its final inspection decided. → COMPLETED or PARTIALLY_COMPLETED |
 | `GET /work-orders/production-record?batchId=` | `WORK_ORDER_VIEW` | How the batch was made: work order, BOM or recipe revision, routing revision, operations with operators and machines, gates, rework orders, receipt. `data` is null for a batch no work order made, or one in another organisation |
+| `GET /work-orders/{id}/production-record.pdf` | `WORK_ORDER_VIEW` | The same record as a PDF, named `<work order number>-production-record.pdf`. `422` when the order has not made a batch yet |
 
 Completing a batch made by a work order through `POST /api/v1/production-batches/{id}/complete` is `422`. The
 settings gain `completionTolerancePercent`, `materialVariancePercent` (0 to 100), `completionRequiresFinalInspection`

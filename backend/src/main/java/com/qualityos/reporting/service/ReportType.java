@@ -16,7 +16,9 @@ public enum ReportType {
     BATCH_TRACEABILITY("batch-traceability", "Batch traceability report", Permissions.TRACEABILITY_VIEW),
     WORK_ORDERS("work-orders", "Work order report", Permissions.WORK_ORDER_VIEW),
     PRODUCTION_QUALITY("production-quality", "Production quality report", Permissions.WORK_ORDER_VIEW),
-    DOWNTIME("downtime", "Downtime report", Permissions.MANUFACTURING_VIEW);
+    DOWNTIME("downtime", "Downtime report", Permissions.MANUFACTURING_VIEW),
+    OEE("oee", "OEE report", Permissions.PRODUCTION_ANALYTICS_VIEW),
+    PRODUCTION_COST("production-cost", "Production cost report", Permissions.PRODUCTION_COST_VIEW);
 
     private final String slug;
     private final String title;

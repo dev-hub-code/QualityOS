@@ -274,6 +274,11 @@ released, running or held work order past its planned end, or a line of an appro
 then works under each tenant, in the organisation's own date, and skips a plan line once its work orders have received
 its full quantity into finished goods.
 
+## Organisation contact number (V34)
+
+`tenants.contact_phone` holds the number an organisation gives in its profile, checked by `ck_tenants_contact_phone`.
+The Control Center shows it beside the owner's email.
+
 ## CAPA action reminders (V33)
 
 `capa_actions.overdue_notified_at` records when an open action past its target date was last chased, so the hourly

@@ -25,6 +25,7 @@ describe("organizationSchema", () => {
     gstin: "",
     industry: "",
     address: "",
+    contactPhone: "",
     timezone: "Asia/Kolkata",
     currency: "inr",
   };
@@ -38,5 +39,10 @@ describe("organizationSchema", () => {
 
   it("rejects a malformed GSTIN", () => {
     expect(organizationSchema.safeParse({ ...valid, gstin: "ABC" }).success).toBe(false);
+  });
+
+  it("takes a phone number with a country code, or none", () => {
+    expect(organizationSchema.safeParse({ ...valid, contactPhone: "+91 20 1234 5678" }).success).toBe(true);
+    expect(organizationSchema.safeParse({ ...valid, contactPhone: "call me" }).success).toBe(false);
   });
 });

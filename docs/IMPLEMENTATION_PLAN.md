@@ -98,7 +98,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Duplicate references are checked before saving, so two identical references saved at the same moment for different organisations could both pass | With a payment gateway |
 | Near-limit warnings show only in the Control Center and on the billing page. Customers get no notification or email before a limit stops them | When a user needs it |
 | Only `NCR_CAPA`, `REPORTS` and `ADVANCED` are enforced. A feature added in the Control Center is listed but restricts nothing until code enforces it | When a feature is sold |
-| An organisation's contact number is not recorded anywhere, so the Control Center cannot show it | When a user needs it |
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | All seven manufacturing phases are built, through finished-goods receipt and OEE. Each phase's own limits are listed in [MANUFACTURING.md](MANUFACTURING.md) | Review after real use |
 | Facility sub-records (departments, lines, shifts), supplier contacts, material-to-product mappings, and new units are not audited individually | Review after real use |

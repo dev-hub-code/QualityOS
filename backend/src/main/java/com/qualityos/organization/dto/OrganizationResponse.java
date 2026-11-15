@@ -13,6 +13,7 @@ public record OrganizationResponse(
         String currency,
         String locale,
         String address,
+        String contactPhone,
         boolean onboarded,
         long version) {
 }

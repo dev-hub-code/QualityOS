@@ -124,6 +124,7 @@ public final class SubscriptionDtos {
             String legalName,
             String gstin,
             String contactEmail,
+            String contactPhone,
             String countryCode,
             String timezone,
             Instant registeredAt,

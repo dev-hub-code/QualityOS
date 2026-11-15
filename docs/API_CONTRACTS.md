@@ -139,6 +139,7 @@ unverified sign-in is off. Local Docker Compose enforces it too. Integration tes
 
 | Endpoint | Access | Result |
 |---|---|---|
+| `PUT /organizations/{id}` | `TENANT_MANAGE` | The profile: `name`, `legalName`, `gstin`, `industry`, `countryCode`, `timezone`, `currency`, `locale`, `address`, `contactPhone` (optional, digits with an optional `+`, spaces, brackets or dashes, 6 to 20 characters), `version`. The Control Center's organisation page shows the contact number |
 | `GET /organizations/current/settings` | Any member | `singlePersonReview`, `selfReviewInEffect`, `activeMembers`, `capaRequiredFrom`, `effectivenessRequiredFrom`, `version` (null until first saved) |
 | `PUT /organizations/current/settings` | `TENANT_MANAGE` | Takes every rule (`singlePersonReview`, `capaRequiredFrom`, `effectivenessRequiredFrom`) and the `version` last read. A missing rule is `400`, a stale version `409`. Audited as `TENANT_SETTINGS_UPDATED` with before and after |
 

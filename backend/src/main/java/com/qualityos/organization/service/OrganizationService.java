@@ -63,6 +63,7 @@ public class OrganizationService {
         tenant.setCurrency(request.currency());
         tenant.setLocale(request.locale());
         tenant.setAddress(request.address());
+        tenant.setContactPhone(StringUtils.hasText(request.contactPhone()) ? request.contactPhone().trim() : null);
         if (tenant.getOnboardedAt() == null) {
             tenant.setOnboardedAt(Instant.now());
         }

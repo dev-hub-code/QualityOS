@@ -33,19 +33,19 @@ export function CalibrationHistory({ records, canManage }: { records: Calibratio
 }
 
 export function InstrumentUsage({ uses }: { uses: InstrumentUse[] }) {
-  if (uses.length === 0) return <p className="text-sm text-muted-foreground">No inspection has recorded this instrument.</p>;
+  if (uses.length === 0) return <p className="text-sm text-muted-foreground">Nothing has recorded this instrument.</p>;
   const suspect = uses.filter((use) => use.suspect).length;
   return (
     <>
       {suspect > 0 && (
         <p className="mb-2 text-sm text-destructive">
-          {suspect} inspection(s) used this instrument since its last good calibration. Review them.
+          {suspect} record(s) used this instrument since its last good calibration. Review them.
         </p>
       )}
       <ul className="divide-y text-sm">
         {uses.map((use) => (
-          <li key={use.inspectionId} className="flex flex-wrap items-center gap-2 py-2">
-            <RecordLink href={`/inspections/${use.inspectionId}`}>{use.inspectionNumber}</RecordLink>
+          <li key={use.link} className="flex flex-wrap items-center gap-2 py-2">
+            <RecordLink href={use.link}>{use.label}</RecordLink>
             {use.usedOn}
             {use.suspect && <StatusBadge status="HOLD" />}
           </li>

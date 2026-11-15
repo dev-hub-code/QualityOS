@@ -264,6 +264,7 @@ export default function OperationPage() {
                   <span className="flex items-center gap-2">
                     <StatusBadge status={measurement.withinLimits ? "PASS" : "FAIL"} />
                     {measurement.parameterCode} {formatQuantity(measurement.value)} {measurement.unit ?? ""}
+                    {measurement.instrumentCode && <span className="text-muted-foreground">· {measurement.instrumentCode}</span>}
                     {measurement.comment && <span className="text-muted-foreground">· {measurement.comment}</span>}
                   </span>
                   <span className="text-muted-foreground">
@@ -399,6 +400,15 @@ export default function OperationPage() {
               options: data.parameters.map((parameter) => ({ value: parameter.code, label: `${parameter.code} – ${parameter.name}` })),
             },
             { name: "value", label: "Value", type: "decimal", required: true },
+            {
+              name: "instrumentId",
+              label: "Instrument",
+              type: "select",
+              options: data.instruments.map((instrument) => ({
+                value: instrument.id,
+                label: `${instrument.instrumentCode} – ${instrument.name}`,
+              })),
+            },
             { name: "comment", label: "Comment", type: "textarea" },
           ]}
           onClose={close}

@@ -136,8 +136,8 @@ rework, completion, downtime, scheduling, costing and analytics. Its APIs sit un
   through `MaterialReceiptService`, and batches only through traceability's `ProductionService`. Inspections and NCRs
   go through their own services. It never touches another module's repositories.
 - **What it registers.** `WorkOrderBatchGuard` stops a work order's batch from being completed on the batch page.
-  `ProductionArchiveGuard` stops archiving master data it still uses. Traceability and master data know only the
-  interfaces.
+  `ProductionArchiveGuard` stops archiving master data it still uses. `ProductionInstrumentUses` tells calibration
+  which operations an instrument measured. Traceability, master data and calibration know only the interfaces.
 - **Concurrency.** Every change to an order locks the work order row first, and then any lot, machine or rework order
   it touches. Checks across an order's operations and materials therefore see a stable state.
 - **Repeats.** Reservations, issues, returns, reports, measurements and receipts accept an `Idempotency-Key` header.

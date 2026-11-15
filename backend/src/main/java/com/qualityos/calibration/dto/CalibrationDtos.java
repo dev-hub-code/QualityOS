@@ -77,7 +77,20 @@ public final class CalibrationDtos {
     }
 
     /** @param suspect measured after the last good calibration of an instrument that has since failed */
-    public record UsageResponse(UUID inspectionId, String inspectionNumber, LocalDate usedOn, boolean suspect) {
+    /**
+     * One use of the instrument. An inspection's use has {@code inspectionId}; a use another module reports, such as a
+     * shop-floor measurement, has only {@code label} and {@code link}.
+     */
+    public record UsageResponse(UUID inspectionId, String inspectionNumber, String label, String link,
+            LocalDate usedOn, boolean suspect) {
+    }
+
+    /** An instrument that can measure now: active and within its calibration. */
+    public record InstrumentOption(UUID id, String instrumentCode, String name, LocalDate nextDueOn) {
+    }
+
+    /** A record outside inspection whose measurements are in doubt after a failed calibration. */
+    public record OtherUse(String label, String link, LocalDate usedOn) {
     }
 
     /**
@@ -107,7 +120,8 @@ public final class CalibrationDtos {
             String ncrNumber,
             String ncrStatus,
             long pending,
-            List<ImpactReviewResponse> reviews) {
+            List<ImpactReviewResponse> reviews,
+            List<OtherUse> otherUses) {
     }
 
     public record DecideImpactRequest(

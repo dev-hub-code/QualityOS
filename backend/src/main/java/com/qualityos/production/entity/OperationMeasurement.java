@@ -38,6 +38,7 @@ public class OperationMeasurement extends TenantOwnedEntity {
     private boolean withinLimits;
     private String comment;
     private String requestKey;
+    private UUID instrumentId;
 
     @SuppressWarnings("java:S107")
     public OperationMeasurement(
@@ -57,5 +58,11 @@ public class OperationMeasurement extends TenantOwnedEntity {
                 && (maximum == null || measuredValue.compareTo(maximum) <= 0);
         this.comment = comment;
         this.requestKey = requestKey;
+    }
+
+    /** Names the instrument that took the measurement. */
+    public OperationMeasurement takenWith(UUID instrument) {
+        this.instrumentId = instrument;
+        return this;
     }
 }

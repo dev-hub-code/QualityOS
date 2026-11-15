@@ -5,7 +5,9 @@ import com.qualityos.calibration.dto.CalibrationDtos.ChangeStatusRequest;
 import com.qualityos.calibration.dto.CalibrationDtos.DecideImpactRequest;
 import com.qualityos.calibration.dto.CalibrationDtos.ImpactReviewGroup;
 import com.qualityos.calibration.dto.CalibrationDtos.ImpactReviewResponse;
+import com.qualityos.calibration.dto.CalibrationDtos.InstrumentOption;
 import com.qualityos.calibration.dto.CalibrationDtos.InstrumentResponse;
+import com.qualityos.calibration.dto.CalibrationDtos.OtherUse;
 import com.qualityos.calibration.dto.CalibrationDtos.RecordCalibrationRequest;
 import com.qualityos.calibration.dto.CalibrationDtos.SaveInstrumentRequest;
 import com.qualityos.calibration.dto.CalibrationDtos.UsageResponse;
@@ -42,6 +44,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -65,6 +69,8 @@ public class InstrumentService implements AttachmentPolicy {
     private static final String ATTACHMENT_TYPE = "CALIBRATION_RECORD";
     private static final int DUE_SOON_DAYS = 14;
     private static final Duration OVERDUE_REMINDER_INTERVAL = Duration.ofDays(7);
+    /** Before any calibration: the start of a window with no good calibration behind it. */
+    private static final LocalDate EARLIEST = LocalDate.of(1900, 1, 1);
 
     private final InstrumentRepository instruments;
     private final CalibrationRecordRepository records;
@@ -78,6 +84,7 @@ public class InstrumentService implements AttachmentPolicy {
     private final CalibrationImpactReviewRepository reviews;
     private final NcrService ncrs;
     private final ApplicationEventPublisher events;
+    private final List<InstrumentUseSource> sources;
 
     InstrumentService(
             InstrumentRepository instruments,
@@ -91,8 +98,10 @@ public class InstrumentService implements AttachmentPolicy {
             AuditService audit,
             CalibrationImpactReviewRepository reviews,
             NcrService ncrs,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events,
+            List<InstrumentUseSource> sources) {
         this.events = events;
+        this.sources = sources;
         this.reviews = reviews;
         this.ncrs = ncrs;
         this.instruments = instruments;
@@ -204,41 +213,71 @@ public class InstrumentService implements AttachmentPolicy {
     }
 
     /**
-     * Keeps the inspections in doubt, each to be decided, and raises one NCR for them. Nothing in doubt raises no NCR:
-     * the instrument is already out of service. Returns the notification text.
+     * Keeps the inspections in doubt, each to be decided, and raises one NCR for them and for anything else the
+     * instrument measured, such as shop-floor operations. Nothing in doubt raises no NCR: the instrument is already out
+     * of service. Returns the notification text.
      */
     private String openImpactReview(Instrument instrument, CalibrationRecord record) {
         List<InstrumentUsage> inDoubt = inDoubt(instrument.getId());
-        if (inDoubt.isEmpty()) {
-            return "No inspection used it since its last good calibration.";
+        List<CalibrationRecord> history = records.findByInstrumentIdOrderByCalibratedOnDescCreatedAtDesc(instrument.getId());
+        List<OtherUse> others = otherUses(instrument.getId(), windowStart(history, 0), today());
+        if (inDoubt.isEmpty() && others.isEmpty()) {
+            return "Nothing was measured with it since its last good calibration.";
         }
         inDoubt.forEach(use -> reviews.save(new CalibrationImpactReview(record.getId(), use)));
+        List<String> named = new ArrayList<>(inDoubt.stream().map(InstrumentUsage::getInspectionNumber).sorted().toList());
+        others.forEach(use -> named.add(use.label()));
         NcrOutcome ncr = ncrs.raiseFromCalibration(new CalibrationFailure(
                 record.getId(),
                 instrument.getId(),
                 instrument.getInstrumentCode(),
                 instrument.getName(),
                 record.getCalibratedOn(),
-                inDoubt.stream().map(InstrumentUsage::getInspectionNumber).sorted().toList(),
+                named,
                 instrument.getFacilityId()));
-        return "%d inspection(s) used it since its last good calibration. %s was raised, and each inspection needs a decision."
-                .formatted(inDoubt.size(), ncr.ncrNumber());
+        List<String> parts = new ArrayList<>();
+        if (!inDoubt.isEmpty()) {
+            parts.add("%d inspection(s)".formatted(inDoubt.size()));
+        }
+        if (!others.isEmpty()) {
+            parts.add("%d shop-floor operation(s)".formatted(others.size()));
+        }
+        return "%s used it since its last good calibration. %s was raised%s.".formatted(
+                String.join(" and ", parts), ncr.ncrNumber(),
+                inDoubt.isEmpty() ? "" : ", and each inspection needs a decision");
     }
 
-    /** Every failed calibration with inspections in doubt, newest first, and the decisions so far. */
+    /**
+     * Every failed calibration that put something in doubt, newest first: the inspections with the decisions so far,
+     * and what else it measured, such as shop-floor operations, which the calibration's NCR covers.
+     */
     @Transactional(readOnly = true)
     public List<ImpactReviewGroup> impactReviews(UUID id) {
         load(id);
-        List<CalibrationImpactReview> all = reviews.findByInstrumentIdOrderByCreatedAtDescInspectionNumber(id);
-        Map<UUID, List<CalibrationImpactReview>> byCalibration = all.stream().collect(Collectors.groupingBy(
-                CalibrationImpactReview::getCalibrationRecordId, LinkedHashMap::new, Collectors.toList()));
-        Map<UUID, NcrOutcome> raised = ncrs.forCalibrations(byCalibration.keySet());
-        Map<UUID, CalibrationRecord> calibrations = records.findAllById(byCalibration.keySet()).stream()
+        Map<UUID, List<CalibrationImpactReview>> byCalibration = reviews
+                .findByInstrumentIdOrderByCreatedAtDescInspectionNumber(id).stream()
+                .collect(Collectors.groupingBy(CalibrationImpactReview::getCalibrationRecordId));
+        List<CalibrationRecord> history = records.findByInstrumentIdOrderByCalibratedOnDescCreatedAtDesc(id);
+        Map<UUID, List<OtherUse>> elsewhere = new LinkedHashMap<>();
+        for (int i = 0; i < history.size(); i++) {
+            CalibrationRecord record = history.get(i);
+            if (record.getResult() != CalibrationRecord.Result.FAIL) {
+                continue;
+            }
+            LocalDate to = i == 0 ? today() : history.get(i - 1).getCalibratedOn();
+            List<OtherUse> others = otherUses(id, windowStart(history, i), to);
+            if (!others.isEmpty() || byCalibration.containsKey(record.getId())) {
+                elsewhere.put(record.getId(), others);
+            }
+        }
+        Map<UUID, NcrOutcome> raised = ncrs.forCalibrations(elsewhere.keySet());
+        Map<UUID, CalibrationRecord> calibrations = history.stream()
                 .collect(Collectors.toMap(CalibrationRecord::getId, record -> record));
         Map<UUID, String> members = access.activeMembers();
-        return byCalibration.entrySet().stream().map(entry -> {
+        return elsewhere.entrySet().stream().map(entry -> {
             NcrOutcome ncr = raised.get(entry.getKey());
-            List<ImpactReviewResponse> items = entry.getValue().stream().map(review -> toResponse(review, members)).toList();
+            List<ImpactReviewResponse> items = byCalibration.getOrDefault(entry.getKey(), List.of()).stream()
+                    .map(review -> toResponse(review, members)).toList();
             return new ImpactReviewGroup(
                     entry.getKey(),
                     calibrations.get(entry.getKey()).getCalibratedOn(),
@@ -246,7 +285,8 @@ public class InstrumentService implements AttachmentPolicy {
                     ncr == null ? null : ncr.ncrNumber(),
                     ncr == null ? null : ncr.status(),
                     items.stream().filter(item -> item.decision() == null).count(),
-                    items);
+                    items,
+                    entry.getValue());
         }).toList();
     }
 
@@ -284,10 +324,86 @@ public class InstrumentService implements AttachmentPolicy {
     public List<UsageResponse> usage(UUID id) {
         load(id);
         Set<UUID> doubtful = inDoubt(id).stream().map(InstrumentUsage::getId).collect(Collectors.toSet());
-        return usages.findByInstrumentIdOrderByUsedOnDesc(id).stream()
-                .map(use -> new UsageResponse(use.getInspectionId(), use.getInspectionNumber(), use.getUsedOn(),
+        List<CalibrationRecord> history = records.findByInstrumentIdOrderByCalibratedOnDescCreatedAtDesc(id);
+        LocalDate doubtFrom = !history.isEmpty() && history.getFirst().getResult() == CalibrationRecord.Result.FAIL
+                ? windowStart(history, 0) : null;
+        List<UsageResponse> all = new ArrayList<>(usages.findByInstrumentIdOrderByUsedOnDesc(id).stream()
+                .map(use -> new UsageResponse(use.getInspectionId(), use.getInspectionNumber(),
+                        use.getInspectionNumber(), "/inspections/" + use.getInspectionId(), use.getUsedOn(),
                         doubtful.contains(use.getId())))
+                .toList());
+        otherUses(id, EARLIEST, today()).forEach(use -> all.add(new UsageResponse(null, null, use.label(),
+                use.link(), use.usedOn(), doubtFrom != null && !use.usedOn().isBefore(doubtFrom))));
+        all.sort(java.util.Comparator.comparing(UsageResponse::usedOn).reversed());
+        return all;
+    }
+
+    /** The day of the last good calibration before the one at {@code index} in newest-first history. */
+    private static LocalDate windowStart(List<CalibrationRecord> history, int index) {
+        return history.stream().skip(index + 1L)
+                .filter(record -> record.getResult() != CalibrationRecord.Result.FAIL)
+                .map(CalibrationRecord::getCalibratedOn)
+                .findFirst()
+                .orElse(EARLIEST);
+    }
+
+    private List<OtherUse> otherUses(UUID instrumentId, LocalDate from, LocalDate to) {
+        return sources.stream()
+                .flatMap(source -> source.usesBetween(instrumentId, from, to).stream())
+                .map(use -> new OtherUse(use.label(), use.link(), use.usedOn()))
                 .toList();
+    }
+
+    /**
+     * For a measurement outside inspection: the instrument must be active, within its calibration and at the
+     * facility where it is used.
+     */
+    @Transactional(readOnly = true)
+    public InstrumentOption requireUsable(UUID id, UUID facilityId) {
+        Instrument instrument = instruments.findById(id)
+                .filter(found -> found.getFacilityId().equals(facilityId))
+                .orElseThrow(() -> new BusinessRuleException("This instrument is not at this facility."));
+        if (instrument.getStatus() != Instrument.Status.ACTIVE) {
+            throw new BusinessRuleException("%s is out of service.".formatted(instrument.getInstrumentCode()));
+        }
+        if (instrument.getNextDueOn().isBefore(today())) {
+            throw new BusinessRuleException("%s is overdue for calibration, since %s.".formatted(
+                    instrument.getInstrumentCode(), instrument.getNextDueOn()));
+        }
+        return option(instrument);
+    }
+
+    /** For keeping an instrument at a machine: it must be at that facility and not retired. */
+    @Transactional(readOnly = true)
+    public InstrumentOption requireAt(UUID id, UUID facilityId) {
+        Instrument instrument = instruments.findById(id)
+                .filter(found -> found.getFacilityId().equals(facilityId))
+                .orElseThrow(() -> new BusinessRuleException("This instrument is not at this facility."));
+        instrument.requireNotRetired();
+        return option(instrument);
+    }
+
+    /** Instruments that can measure at the facility now, by code. */
+    @Transactional(readOnly = true)
+    public List<InstrumentOption> usableAt(UUID facilityId) {
+        LocalDate today = today();
+        return instruments.findByFacilityIdAndStatusOrderByInstrumentCode(facilityId, Instrument.Status.ACTIVE)
+                .stream()
+                .filter(instrument -> !instrument.getNextDueOn().isBefore(today))
+                .map(InstrumentService::option)
+                .toList();
+    }
+
+    /** Names instruments recorded elsewhere, whatever their state now. */
+    @Transactional(readOnly = true)
+    public Map<UUID, InstrumentOption> options(Collection<UUID> ids) {
+        return instruments.findAllById(ids).stream()
+                .collect(Collectors.toMap(Instrument::getId, InstrumentService::option));
+    }
+
+    private static InstrumentOption option(Instrument instrument) {
+        return new InstrumentOption(instrument.getId(), instrument.getInstrumentCode(), instrument.getName(),
+                instrument.getNextDueOn());
     }
 
     private List<InstrumentUsage> inDoubt(UUID id) {

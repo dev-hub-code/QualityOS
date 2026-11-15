@@ -107,7 +107,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | All seven manufacturing phases are built, through finished-goods receipt and OEE. Each phase's own limits are listed in [MANUFACTURING.md](MANUFACTURING.md) | Review after real use |
 | Facility sub-records (departments, lines, shifts), supplier contacts, material-to-product mappings, and new units are not audited individually | Review after real use |
 | The dashboard, analytics overview and PDF and Excel reports hold no production figures. Production analytics, costing, downtime and the production record are pages only, with no export or printable version | When a user needs it |
-| Instruments and machines are not linked, and an operation's measurements cannot name the instrument used, so a failed calibration's impact review does not reach shop-floor measurements | When a user needs it |
 
 ## Definition of done for each phase
 

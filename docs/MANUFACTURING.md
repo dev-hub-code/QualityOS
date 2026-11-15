@@ -303,6 +303,10 @@ skipped one, and to what was released (sequence, work centre, planned times, par
   used that output.
 - **Measurements** are taken against the parameters frozen on the operation at release: the routing operation's own,
   then the recipe's. A value outside the limits is kept and flagged. Phase 5 turns this into quality gates.
+  A measurement may name the instrument that took it, which must be at the facility, active and in date. Machines
+  list the instruments kept at them, and those are offered first. When an instrument fails calibration, calibration
+  asks every `InstrumentUseSource` what it measured since its last good calibration. Production answers with the
+  operations, which are named in the calibration's NCR and shown in its impact review.
 - **Timeline, comments and photographs.** Every change of status, assignment and comment is a row in
   `operation_events`, with the reason category when it stopped. Photographs and other files use the existing
   attachments (entity type `WORK_ORDER_OPERATION`), with access following the work order.

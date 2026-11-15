@@ -19,6 +19,8 @@ public interface InstrumentRepository extends JpaRepository<Instrument, UUID>, J
             """)
     List<Instrument> findOverdue(LocalDate today, Instant notifiedBefore);
 
+    List<Instrument> findByFacilityIdAndStatusOrderByInstrumentCode(UUID facilityId, Instrument.Status status);
+
     @Query("""
             SELECT i FROM Instrument i WHERE i.status = ACTIVE AND i.nextDueOn >= :today AND i.nextDueOn <= :until
             AND i.dueRemindedAt IS NULL

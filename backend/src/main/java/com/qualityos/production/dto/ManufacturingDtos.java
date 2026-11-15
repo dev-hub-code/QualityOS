@@ -115,6 +115,9 @@ public final class ManufacturingDtos {
             @Size(max = 100) String serialNumber) {
     }
 
+    public record MachineInstrumentRequest(@jakarta.validation.constraints.NotNull UUID instrumentId) {
+    }
+
     public record ChangeMachineStatusRequest(@NotNull Machine.Status status, @Size(max = 1000) String reason) {
     }
 

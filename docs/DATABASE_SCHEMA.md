@@ -280,3 +280,8 @@ its full quantity into finished goods.
 `manufacturing_settings.rejection_raises_ncr` (default true) decides whether such a report raises an NCR.
 `non_conformances` gains source `PRODUCTION`, with `work_order_id` and `operation_report_id` set exactly for that
 source. A partial unique index allows one NCR per report.
+
+## Instrument links (V32)
+
+`operation_measurements.instrument_id` names the instrument that took a shop-floor measurement, indexed for the lookup
+a failed calibration makes. `machine_instruments` lists the instruments kept at each machine, one row per pair.

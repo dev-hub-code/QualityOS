@@ -32,7 +32,7 @@ export function ImpactReviews({ path, canManage }: { path: string; canManage: bo
     queryFn: () => api.get<ImpactReviewGroup[]>(`${path}/impact-reviews`),
   });
   if (groups.length === 0) {
-    return <p className="text-sm text-muted-foreground">No failed calibration has put an inspection in doubt.</p>;
+    return <p className="text-sm text-muted-foreground">No failed calibration has put a measurement in doubt.</p>;
   }
   return (
     <div className="space-y-4">
@@ -47,9 +47,26 @@ export function ImpactReviews({ path, canManage }: { path: string; canManage: bo
                 {group.ncrStatus && <span className="ml-2"><StatusBadge status={group.ncrStatus} /></span>}
               </>
             )}
-            {" · "}
-            {group.pending === 0 ? "all decided" : `${group.pending} waiting for a decision`}
+            {group.reviews.length > 0 && (
+              <>
+                {" · "}
+                {group.pending === 0 ? "all decided" : `${group.pending} waiting for a decision`}
+              </>
+            )}
           </p>
+          {group.otherUses.length > 0 && (
+            <div className="text-sm">
+              <p className="text-muted-foreground">Shop-floor measurements in doubt, covered by the NCR:</p>
+              <ul className="divide-y">
+                {group.otherUses.map((use) => (
+                  <li key={use.link} className="flex flex-wrap items-center gap-2 py-2">
+                    <RecordLink href={use.link}>{use.label}</RecordLink>
+                    <span className="text-muted-foreground">used {use.usedOn}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <ul className="divide-y text-sm">
             {group.reviews.map((review) => (
               <li key={review.id} className="flex flex-wrap items-center gap-2 py-2">

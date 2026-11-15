@@ -192,8 +192,11 @@ and a second person.
 | `GET /instruments/usable`, `POST /inspections/{id}/instruments` | `INSPECTION_EXECUTE` |
 
 A failed calibration lists each inspection that used the instrument since its last good calibration, and raises one MAJOR
-NCR (source `CALIBRATION`) for them. With nothing in doubt, no NCR is raised. `GET /instruments/{id}/impact-reviews` groups
-the reviews by failed calibration, newest first, with the NCR and the number still pending. A decision takes `decision`
+NCR (source `CALIBRATION`) for them. Shop-floor operations whose measurements named the instrument in that time are
+named in the same NCR. With nothing in doubt, no NCR is raised. `GET /instruments/{id}/impact-reviews` groups
+the reviews by failed calibration, newest first, with the NCR, the number still pending, and `otherUses` (`label`,
+`link`, `usedOn`) for the operations, which need no decision of their own. `GET /instruments/{id}/usage` lists
+inspections and operations alike, each with `label` and `link`; `inspectionId` is null for an operation. A decision takes `decision`
 (`RESULT_STANDS` or `REINSPECT`) and a `note`, is made once (`422` after that), and is audited as
 `CALIBRATION_IMPACT_DECIDED`. `REINSPECT` holds whatever the inspection released: a lot goes back to awaiting
 inspection, and a batch (also for an accepted return) goes `ON_HOLD`, until a new inspection releases it. Stock already
@@ -342,6 +345,7 @@ every permission below; after a downgrade only `MANUFACTURING_VIEW` stays. See [
 Since phase 7 a work centre also takes `capacityUnits` (1 to 1000, default 1; used only when it has no active machines) and optional `labourRate`, `machineRate` and `overheadRate` per hour, in the organisation's currency; a `PUT` without a rate clears it. Facility shifts (`POST /api/v1/facilities/{id}/shifts`) take optional `breakMinutes` (default 0) and `daysOfWeek` (Monday 1, Tuesday 2 … Sunday 64, added together; default 127, every day).
 | `GET /machines`, `POST /machines` | `POST`: `MANUFACTURING_MANAGE` | Filter by `q`, `workCenterId`, `status` |
 | `GET /machines/{id}`, `PUT ...` | `PUT`: `MANUFACTURING_MANAGE` | Detail with the last 100 status changes |
+| `GET /machines/{id}/instruments`, `POST ...` (`instrumentId`), `DELETE .../{instrumentId}` | `MANUFACTURING_MANAGE` to change | Instruments kept at the machine. Only instruments of the machine's facility that are not retired. Each change returns the list |
 | `POST /machines/{id}/status` | `MANUFACTURING_MANAGE` | `status` and `reason`. Only allowed transitions; a reason for maintenance, breakdown and inactive |
 | `GET /boms`, `POST /boms` | `POST`: `BOM_MANAGE` | Filter by `q` (product), `productId`, `status`. `POST` takes `productId`, `changeNote`, `baseQuantity`, and `copyFromId` or `fromProductMaterials` |
 | `GET /boms/{id}`, `PUT ...`, `DELETE ...` | `BOM_MANAGE` to change | `DELETE` discards a draft that was never submitted |
@@ -410,7 +414,7 @@ Reading needs `WORK_ORDER_VIEW`. Quantities are in the work order's unit. Every 
 | `POST /operations/{id}/resume` | `PRODUCTION_EXECUTE` | |
 | `POST /operations/{id}/reports` | `PRODUCTION_EXECUTE` | `quantity`, `goodQuantity`, `rejectedQuantity`, `scrapQuantity` (must add up to `quantity`), optional `reworkQuantity` (within rejected), `comment` and `defectCategoryId`. Accepts `Idempotency-Key`. With `rejectionRaisesNcr` on, a report with anything rejected or scrapped raises one NCR (source `PRODUCTION`, severity MINOR) on the order's batch |
 | `GET /operations/defect-categories` | `WORK_ORDER_VIEW` | The organisation's defect categories, for the report form, without `NCR_VIEW` |
-| `POST /operations/{id}/measurements` | `PRODUCTION_EXECUTE` | `parameterCode`, `value`, optional `comment`. Accepts `Idempotency-Key` |
+| `POST /operations/{id}/measurements` | `PRODUCTION_EXECUTE` | `parameterCode`, `value`, optional `comment` and `instrumentId`. The instrument must be at the order's facility, active and within its calibration. Accepts `Idempotency-Key`. The operation's detail offers `instruments`, those kept at its work centre's machines first |
 | `POST /operations/{id}/complete` | `PRODUCTION_EXECUTE` | Optional `setupMinutes` and `reason`; the reason is required when less was processed than came in |
 | `POST /operations/{id}/comments` | `PRODUCTION_EXECUTE` | `comment` |
 | `POST /operations/{id}/assign` | `PRODUCTION_SUPERVISE` | `operatorId`, `machineId`; either may be null to clear |

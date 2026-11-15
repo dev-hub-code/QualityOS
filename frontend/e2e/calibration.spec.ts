@@ -97,7 +97,7 @@ test("a failed calibration raises an NCR, and a decision to reinspect holds the 
   await call("POST", `/inspections/${inspection.id}/disposition`, { disposition: "ACCEPT", note: "Only member" });
 
   await page.goto(`/calibration/${instrument.id}`);
-  await expect(page.getByText("No failed calibration has put an inspection in doubt.")).toBeVisible();
+  await expect(page.getByText("No failed calibration has put a measurement in doubt.")).toBeVisible();
   await step(page, "Record calibration", async (dialog: Locator) => {
     await dialog.getByLabel("Calibrated on").fill(day(0));
     await dialog.getByLabel("Result").selectOption("FAIL");

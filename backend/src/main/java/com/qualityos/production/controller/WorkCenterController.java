@@ -1,5 +1,7 @@
 package com.qualityos.production.controller;
 
+import com.qualityos.calibration.dto.CalibrationDtos.InstrumentOption;
+import com.qualityos.production.dto.ManufacturingDtos.MachineInstrumentRequest;
 import com.qualityos.common.response.ApiResponse;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.response.Pages;
@@ -15,6 +17,7 @@ import com.qualityos.production.entity.Machine;
 import com.qualityos.production.service.WorkCenterService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -109,6 +112,24 @@ public class WorkCenterController {
     public ApiResponse<MachineResponse> updateMachine(
             @PathVariable UUID id, @Valid @RequestBody SaveMachineRequest request) {
         return ApiResponse.ok(workCenters.updateMachine(id, request));
+    }
+
+    @GetMapping("/machines/{id}/instruments")
+    public ApiResponse<List<InstrumentOption>> machineInstruments(@PathVariable UUID id) {
+        return ApiResponse.ok(workCenters.machineInstruments(id));
+    }
+
+    @PostMapping("/machines/{id}/instruments")
+    @PreAuthorize(Require.MANUFACTURING_MANAGE)
+    public ApiResponse<List<InstrumentOption>> keepInstrument(
+            @PathVariable UUID id, @Valid @RequestBody MachineInstrumentRequest request) {
+        return ApiResponse.ok(workCenters.keepInstrument(id, request.instrumentId()));
+    }
+
+    @DeleteMapping("/machines/{id}/instruments/{instrumentId}")
+    @PreAuthorize(Require.MANUFACTURING_MANAGE)
+    public ApiResponse<List<InstrumentOption>> removeInstrument(@PathVariable UUID id, @PathVariable UUID instrumentId) {
+        return ApiResponse.ok(workCenters.removeInstrument(id, instrumentId));
     }
 
     @PostMapping("/machines/{id}/status")

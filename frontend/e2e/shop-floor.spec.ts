@@ -25,6 +25,14 @@ test("an operator runs an operation from the shop floor", async ({ page }) => {
   await call("POST", "/defect-categories", { code: "BUR", name: "Burr" });
   const centre = await call("POST", "/manufacturing/work-centers", { code: "WC-1", name: "Machining", facilityId: facility.id });
   const machine = await call("POST", "/manufacturing/machines", { code: "M-1", name: "Haas VF-2", workCenterId: centre.id });
+  const gauge = await call("POST", "/instruments", {
+    instrumentCode: "TACH-1",
+    name: "Tachometer",
+    category: "Speed",
+    facilityId: facility.id,
+    frequencyDays: 180,
+    nextDueOn: day(90),
+  });
   const routing = await call("POST", "/manufacturing/routings", { productId: product.id });
   const withOperation = await call("POST", `/manufacturing/routings/${routing.revision.id}/operations`, {
     sequence: 10,
@@ -56,6 +64,13 @@ test("an operator runs an operation from the shop floor", async ({ page }) => {
   await call("POST", `${order}/release`);
   await call("POST", `${order}/start`);
 
+  // The tachometer is kept at the machine, from the machine's page.
+  await page.goto(`/manufacturing/machines/${machine.id}`);
+  await step(page, "Add instrument", async (dialog: Locator) => {
+    await dialog.getByLabel("Instrument").selectOption({ label: "TACH-1 – Tachometer" });
+  });
+  await expect(page.getByRole("link", { name: "TACH-1 – Tachometer" })).toBeVisible();
+
   await page.goto("/manufacturing/shop-floor");
   await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Shop floor" })).toBeVisible();
   await page.getByRole("link", { name: /10\. Machine housing/ }).click();
@@ -83,7 +98,9 @@ test("an operator runs an operation from the shop floor", async ({ page }) => {
   await step(page, "Record measurement", async (dialog: Locator) => {
     await dialog.getByLabel("Parameter").selectOption({ label: "RPM – Spindle speed" });
     await dialog.getByLabel("Value").fill("1300");
+    await dialog.getByLabel("Instrument").selectOption({ label: "TACH-1 – Tachometer" });
   });
+  await expect(page.getByText("· TACH-1")).toBeVisible();
   const parameters = page.locator("[data-slot='card']").filter({ hasText: "Parameters" });
   await expect(parameters.locator("[data-slot='badge']", { hasText: "fail" })).toBeVisible();
 
@@ -114,6 +131,12 @@ test("an operator runs an operation from the shop floor", async ({ page }) => {
   await page.getByRole("link", { name: /^WO-/ }).click();
   const operations = page.locator("[data-slot='card']").filter({ hasText: "Operations" });
   await expect(operations.getByText(/Good 9 · rejected 1 · scrap 0 · waiting 0 PCS/)).toBeVisible();
+
+  // Failing the tachometer's calibration puts this operation's measurement in doubt.
+  await call("POST", `/instruments/${gauge.id}/calibrations`, { calibratedOn: day(0), result: "FAIL", performedBy: "Lab" });
+  await page.goto(`/calibration/${gauge.id}`);
+  await expect(page.getByText("Shop-floor measurements in doubt, covered by the NCR:")).toBeVisible();
+  await expect(page.getByRole("link", { name: /^WO-\d{4}-\d{5} operation 10$/ }).first()).toBeVisible();
 
   // The reject raised an NCR, with its defect, that leads back to the work order.
   await page.goto("/ncrs");

@@ -957,6 +957,8 @@ export interface ImpactReviewGroup {
   ncrStatus: string | null;
   pending: number;
   reviews: ImpactReview[];
+  /** Shop-floor operations it measured, which the NCR covers. */
+  otherUses: { label: string; link: string; usedOn: string }[];
 }
 
 export interface Instrument {
@@ -990,11 +992,22 @@ export interface CalibrationRecord {
   recordedAt: string;
 }
 
+/** One use of an instrument: an inspection, or a record another module reports, such as a shop-floor operation. */
 export interface InstrumentUse {
-  inspectionId: string;
-  inspectionNumber: string;
+  inspectionId: string | null;
+  inspectionNumber: string | null;
+  label: string;
+  link: string;
   usedOn: string;
   suspect: boolean;
+}
+
+/** An instrument that can measure now. */
+export interface InstrumentOption {
+  id: string;
+  instrumentCode: string;
+  name: string;
+  nextDueOn: string;
 }
 
 export interface ChecklistSummary {
@@ -2067,6 +2080,8 @@ export interface OperationDetail {
     value: string;
     withinLimits: boolean;
     comment: string | null;
+    instrumentId: string | null;
+    instrumentCode: string | null;
     measuredBy: string | null;
     measuredByName: string | null;
     measuredAt: string;
@@ -2086,6 +2101,8 @@ export interface OperationDetail {
   }[];
   machines: { id: string; code: string; name: string; status: string; busy: boolean }[];
   operators: { id: string; name: string }[];
+  /** Instruments that can measure here now, the machines' own first. */
+  instruments: InstrumentOption[];
   /** The production batch's status: on hold or rejected, nothing more is made on it. */
   batchStatus: string | null;
   gates: QualityGate[];

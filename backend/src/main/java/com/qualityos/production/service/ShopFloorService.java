@@ -1,5 +1,9 @@
 package com.qualityos.production.service;
 
+import com.qualityos.calibration.dto.CalibrationDtos.InstrumentOption;
+import com.qualityos.calibration.service.InstrumentService;
+import com.qualityos.production.entity.MachineInstrument;
+import com.qualityos.production.repository.MachineInstrumentRepository;
 import com.qualityos.quality.dto.QualityDtos.DefectCategoryResponse;
 import com.qualityos.quality.dto.QualityDtos.ProductionReject;
 import com.qualityos.quality.service.NcrService;
@@ -127,6 +131,8 @@ public class ShopFloorService implements AttachmentPolicy {
     private final DowntimeService downtime;
     private final ProductionAlerts alerts;
     private final NcrService ncrs;
+    private final InstrumentService instruments;
+    private final MachineInstrumentRepository machineInstruments;
 
     @SuppressWarnings("java:S107")
     ShopFloorService(
@@ -148,9 +154,13 @@ public class ShopFloorService implements AttachmentPolicy {
             ProductionService production,
             DowntimeService downtime,
             ProductionAlerts alerts,
-            NcrService ncrs) {
+            NcrService ncrs,
+            InstrumentService instruments,
+            MachineInstrumentRepository machineInstruments) {
         this.alerts = alerts;
         this.ncrs = ncrs;
+        this.instruments = instruments;
+        this.machineInstruments = machineInstruments;
         this.workOrders = workOrders;
         this.operations = operations;
         this.reports = reports;
@@ -550,12 +560,20 @@ public class ShopFloorService implements AttachmentPolicy {
                 .findFirst()
                 .orElseThrow(() -> new BusinessRuleException("Operation %d has no parameter %s."
                         .formatted(operation.getSequence(), request.parameterCode())));
+        if (request.instrumentId() != null) {
+            instruments.requireUsable(request.instrumentId(), order.getFacilityId());
+        }
         OperationMeasurement measurement = measurements.save(new OperationMeasurement(order.getId(), id,
                 parameter.code(), parameter.name(), parameter.unit(), parameter.target(), parameter.minimum(),
-                parameter.maximum(), request.value(), blankToNull(request.comment()), key));
-        audit.record("OPERATION_MEASURED", ENTITY, id, null, Map.of(
+                parameter.maximum(), request.value(), blankToNull(request.comment()), key)
+                .takenWith(request.instrumentId()));
+        Map<String, Object> measured = new HashMap<>(Map.of(
                 "parameter", parameter.code(), "value", plain(request.value()),
                 "withinLimits", measurement.isWithinLimits()));
+        if (request.instrumentId() != null) {
+            measured.put("instrument", request.instrumentId().toString());
+        }
+        audit.record("OPERATION_MEASURED", ENTITY, id, null, measured);
         return detail(order, operation);
     }
 
@@ -919,6 +937,9 @@ public class ShopFloorService implements AttachmentPolicy {
                 .toList();
         boolean previousOpen = siblings.stream().anyMatch(other -> other.getSequence() < operation.getSequence()
                 && !other.getStatus().isClosed());
+        List<OperationMeasurement> taken = measurements.findByOperationIdOrderByCreatedAtAscIdAsc(operation.getId());
+        Map<UUID, InstrumentOption> usedInstruments = instruments.options(taken.stream()
+                .map(OperationMeasurement::getInstrumentId).filter(Objects::nonNull).collect(Collectors.toSet()));
         return new OperationDetail(
                 summary,
                 operation.getInstructions(),
@@ -933,10 +954,12 @@ public class ShopFloorService implements AttachmentPolicy {
                         row.getRejectedQuantity(), row.getScrapQuantity(), row.getReworkQuantity(),
                         row.getReversesReportId(), reversed.contains(row.getId()), row.getComment(),
                         row.getDefectCategoryId(), row.getCreatedBy(), members.get(row.getCreatedBy()), row.getCreatedAt())).toList(),
-                measurements.findByOperationIdOrderByCreatedAtAscIdAsc(operation.getId()).stream()
+                taken.stream()
                         .map(row -> new MeasurementResponse(row.getId(), row.getParameterCode(),
                                 row.getParameterName(), row.getUnit(), row.getTarget(), row.getMinimum(),
                                 row.getMaximum(), row.getMeasuredValue(), row.isWithinLimits(), row.getComment(),
+                                row.getInstrumentId(), row.getInstrumentId() == null ? null
+                                        : usedInstruments.get(row.getInstrumentId()).instrumentCode(),
                                 row.getCreatedBy(), members.get(row.getCreatedBy()), row.getCreatedAt()))
                         .toList(),
                 timeline.stream().map(event -> new EventResponse(event.getId(), event.getEventType(),
@@ -953,8 +976,24 @@ public class ShopFloorService implements AttachmentPolicy {
                                 machine.getStatus(), operations.machineBusy(machine.getId(), operation.getId())))
                         .toList(),
                 operators,
+                instrumentChoices(order, machines),
                 order.getProductionBatchId() == null ? null : production.batch(order.getProductionBatchId()).status(),
                 qualityGates.ofOperation(order, operation.getId()));
+    }
+
+    /**
+     * Instruments that can measure here now: those kept at the work centre's machines first, then the rest of the
+     * facility's, each by code.
+     */
+    private List<InstrumentOption> instrumentChoices(WorkOrder order, List<Machine> machines) {
+        if (!ASSIGNABLE.contains(order.getStatus())) {
+            return List.of();
+        }
+        Set<UUID> atMachines = machineInstruments.findByMachineIdIn(machines.stream().map(Machine::getId).toList())
+                .stream().map(MachineInstrument::getInstrumentId).collect(Collectors.toSet());
+        return instruments.usableAt(order.getFacilityId()).stream()
+                .sorted(java.util.Comparator.comparing((InstrumentOption option) -> !atMachines.contains(option.id())))
+                .toList();
     }
 
     /** Looks up names and codes for a page of operations at once. */

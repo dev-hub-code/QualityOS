@@ -10,7 +10,8 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
-import type { Machine, MachineStatusEvent } from "@/lib/types";
+import type { PageResponse } from "@/lib/api";
+import type { Instrument, InstrumentOption, Machine, MachineStatusEvent } from "@/lib/types";
 
 interface MachineDetail {
   machine: Machine;
@@ -25,8 +26,19 @@ export default function MachinePage() {
   const canManage = usePermission("MANUFACTURING_MANAGE");
   const workCenters = useWorkCenters();
   const refresh = useRefresh();
-  const [dialog, setDialog] = useState<"edit" | "status" | null>(null);
+  const [dialog, setDialog] = useState<"edit" | "status" | "instrument" | null>(null);
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<MachineDetail>(path) });
+  const { data: kept = [] } = useQuery({
+    queryKey: [path, "instruments"],
+    queryFn: () => api.get<InstrumentOption[]>(`${path}/instruments`),
+  });
+  const facilityId = data?.machine.facilityId;
+  const canPick = canManage && Boolean(facilityId);
+  const { data: available } = useQuery({
+    queryKey: ["/instruments", facilityId],
+    queryFn: () => api.get<PageResponse<Instrument>>(`/instruments?size=100&facilityId=${facilityId}`),
+    enabled: canPick && dialog === "instrument",
+  });
   if (!data) return <QueryState error={error} />;
 
   const { machine, history } = data;
@@ -67,6 +79,44 @@ export default function MachinePage() {
           ]}
         />
       </Section>
+      <Section
+        title="Instruments kept here"
+        action={
+          canPick && (
+            <Button variant="outline" size="sm" onClick={() => setDialog("instrument")}>
+              Add instrument
+            </Button>
+          )
+        }
+      >
+        {kept.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            None. Instruments kept here are offered first when measuring on this machine.
+          </p>
+        ) : (
+          <ul className="divide-y text-sm">
+            {kept.map((instrument) => (
+              <li key={instrument.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
+                <Link className="text-primary hover:underline" href={`/calibration/${instrument.id}`}>
+                  {instrument.instrumentCode} – {instrument.name}
+                </Link>
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  Due {instrument.nextDueOn}
+                  {canManage && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => api.delete(`${path}/instruments/${instrument.id}`).then(refresh)}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
       <Section title="Status history">
         <ul className="divide-y text-sm">
           {history.map((event) => (
@@ -89,6 +139,24 @@ export default function MachinePage() {
           record={machine}
           onClose={() => setDialog(null)}
           onSubmit={(values) => api.put(path, values).then(refresh)}
+        />
+      )}
+      {dialog === "instrument" && (
+        <RecordDialog
+          title="Add an instrument"
+          fields={[
+            {
+              name: "instrumentId",
+              label: "Instrument",
+              type: "select",
+              required: true,
+              options: (available?.items ?? [])
+                .filter((instrument) => !kept.some((found) => found.id === instrument.id))
+                .map((instrument) => ({ value: instrument.id, label: `${instrument.instrumentCode} – ${instrument.name}` })),
+            },
+          ]}
+          onClose={() => setDialog(null)}
+          onSubmit={(values) => api.post(`${path}/instruments`, values).then(refresh)}
         />
       )}
       {dialog === "status" && (

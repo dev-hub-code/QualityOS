@@ -1,6 +1,7 @@
 package com.qualityos.production.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.qualityos.calibration.dto.CalibrationDtos.InstrumentOption;
 import com.qualityos.production.entity.Machine;
 import com.qualityos.production.entity.OperationEvent;
 import com.qualityos.production.entity.WorkOrder;
@@ -72,7 +73,8 @@ public final class ShopFloorDtos {
     public record MeasurementRequest(
             @NotBlank @Size(max = 50) String parameterCode,
             @NotNull @Digits(integer = 12, fraction = 6) BigDecimal value,
-            @Size(max = 1000) String comment) {
+            @Size(max = 1000) String comment,
+            UUID instrumentId) {
     }
 
     public record CommentRequest(@NotBlank @Size(max = 2000) String comment) {
@@ -157,6 +159,8 @@ public final class ShopFloorDtos {
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal value,
             boolean withinLimits,
             String comment,
+            UUID instrumentId,
+            String instrumentCode,
             UUID measuredBy,
             String measuredByName,
             Instant measuredAt) {
@@ -203,6 +207,7 @@ public final class ShopFloorDtos {
             List<EventResponse> events,
             List<MachineOption> machines,
             List<PersonOption> operators,
+            List<InstrumentOption> instruments,
             String batchStatus,
             List<com.qualityos.production.dto.ProductionQualityDtos.GateResponse> gates) {
     }

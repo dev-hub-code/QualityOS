@@ -1,5 +1,9 @@
 package com.qualityos.production.service;
 
+import com.qualityos.calibration.dto.CalibrationDtos.InstrumentOption;
+import com.qualityos.calibration.service.InstrumentService;
+import com.qualityos.production.entity.MachineInstrument;
+import com.qualityos.production.repository.MachineInstrumentRepository;
 import com.qualityos.common.audit.AuditService;
 import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ConflictException;
@@ -57,6 +61,8 @@ public class WorkCenterService {
     private final jakarta.persistence.EntityManager entityManager;
 
     private final DowntimeService downtime;
+    private final InstrumentService instruments;
+    private final MachineInstrumentRepository machineInstruments;
 
     WorkCenterService(
             WorkCenterRepository workCenters,
@@ -67,7 +73,11 @@ public class WorkCenterService {
             TenantAccessService access,
             AuditService audit,
             jakarta.persistence.EntityManager entityManager,
-            DowntimeService downtime) {
+            DowntimeService downtime,
+            InstrumentService instruments,
+            MachineInstrumentRepository machineInstruments) {
+        this.instruments = instruments;
+        this.machineInstruments = machineInstruments;
         this.workCenters = workCenters;
         this.machines = machines;
         this.events = events;
@@ -77,6 +87,41 @@ public class WorkCenterService {
         this.audit = audit;
         this.entityManager = entityManager;
         this.downtime = downtime;
+    }
+
+    /** The instruments kept at the machine, by code. */
+    @Transactional(readOnly = true)
+    public List<InstrumentOption> machineInstruments(UUID id) {
+        loadMachine(id);
+        Set<UUID> kept = machineInstruments.findByMachineIdIn(List.of(id)).stream()
+                .map(MachineInstrument::getInstrumentId).collect(Collectors.toSet());
+        return instruments.options(kept).values().stream()
+                .sorted(java.util.Comparator.comparing(InstrumentOption::instrumentCode))
+                .toList();
+    }
+
+    @Transactional
+    public List<InstrumentOption> keepInstrument(UUID id, UUID instrumentId) {
+        Machine machine = loadMachine(id);
+        WorkCenter centre = workCenters.findById(machine.getWorkCenterId()).orElseThrow();
+        InstrumentOption instrument = instruments.requireAt(instrumentId, centre.getFacilityId());
+        if (machineInstruments.findByMachineIdAndInstrumentId(id, instrumentId).isEmpty()) {
+            machineInstruments.save(new MachineInstrument(id, instrumentId));
+            audit.record("MACHINE_INSTRUMENT_ADDED", MACHINE, id, null,
+                    Map.of("instrument", instrument.instrumentCode()));
+        }
+        return machineInstruments(id);
+    }
+
+    @Transactional
+    public List<InstrumentOption> removeInstrument(UUID id, UUID instrumentId) {
+        loadMachine(id);
+        machineInstruments.findByMachineIdAndInstrumentId(id, instrumentId).ifPresent(kept -> {
+            machineInstruments.delete(kept);
+            audit.record("MACHINE_INSTRUMENT_REMOVED", MACHINE, id, Map.of("instrument", instrumentId.toString()),
+                    null);
+        });
+        return machineInstruments(id);
     }
 
     @Transactional(readOnly = true)

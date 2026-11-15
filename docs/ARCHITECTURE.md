@@ -127,6 +127,12 @@ A new job also needs an entry in `JobMonitor`, which holds its own list of what 
 work order past its planned end, and a line of an approved plan past its due date with less made than planned. It
 tells those who manage work orders or plans at that facility, and repeats once a week until the work is done.
 
+## Archive guards
+
+The module that owns a product, material or facility does not read production's tables. Before archiving, it asks
+every `ArchiveGuard` bean what still uses the record, and refuses with the full list. Production implements the guard
+with counts under row-level security. A new module that relies on master data adds its own guard.
+
 ## Production notifications
 
 `ProductionAlerts` decides who hears about each manufacturing event, inside the event's transaction:

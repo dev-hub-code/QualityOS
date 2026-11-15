@@ -59,6 +59,11 @@ fields are allow-listed per endpoint. `data` is a `PageResponse`:
 - Mutable records return `version`, and updates must send it back.
 - State changes are explicit action endpoints (`POST /ncrs/{id}/close`), never a writable `status` field.
 - `DELETE` archives a record. Records referenced by quality history cannot be deleted.
+- Archiving a product, material or facility returns `422` while production still uses it, and the message lists each use:
+  - a product with an open work order, an approved BOM, recipe or routing in effect, or a BOM line that uses it as a
+    component;
+  - a material on a line of an approved BOM or recipe in effect, on an open work order, or with open reservations;
+  - a facility with a work centre in use, an open work order or an open production plan.
 - Requests never carry a tenant ID.
 
 ## Authentication

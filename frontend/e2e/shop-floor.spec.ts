@@ -22,6 +22,7 @@ test("an operator runs an operation from the shop floor", async ({ page }) => {
     separateApprover: false,
     workOrderRequiresBom: false,
   });
+  await call("POST", "/defect-categories", { code: "BUR", name: "Burr" });
   const centre = await call("POST", "/manufacturing/work-centers", { code: "WC-1", name: "Machining", facilityId: facility.id });
   const machine = await call("POST", "/manufacturing/machines", { code: "M-1", name: "Haas VF-2", workCenterId: centre.id });
   const routing = await call("POST", "/manufacturing/routings", { productId: product.id });
@@ -72,7 +73,9 @@ test("an operator runs an operation from the shop floor", async ({ page }) => {
     await dialog.getByLabel("Good", { exact: true }).fill("9");
     await dialog.getByLabel("Rejected", { exact: true }).fill("1");
     await dialog.getByLabel("Of the rejected, to rework").fill("1");
+    await dialog.getByLabel(/^Defect/).selectOption({ label: "BUR – Burr" });
   });
+  await expect(page.getByText(/rejected 1 \(1 rework\) · scrap 0 · Burr/)).toBeVisible();
   const quantities = page.locator("[data-slot='card']").filter({ hasText: "Can come in" });
   await expect(quantities.getByText("9 PCS")).toBeVisible();
   await expect(quantities.getByText("1 PCS, 1 to rework")).toBeVisible();
@@ -111,4 +114,11 @@ test("an operator runs an operation from the shop floor", async ({ page }) => {
   await page.getByRole("link", { name: /^WO-/ }).click();
   const operations = page.locator("[data-slot='card']").filter({ hasText: "Operations" });
   await expect(operations.getByText(/Good 9 · rejected 1 · scrap 0 · waiting 0 PCS/)).toBeVisible();
+
+  // The reject raised an NCR, with its defect, that leads back to the work order.
+  await page.goto("/ncrs");
+  await page.getByRole("row", { name: /operation 10: 1 rejected/ }).getByRole("link", { name: /^NCR-/ }).click();
+  await expect(page.getByText("Burr", { exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Shop-floor report" }).click();
+  await expect(page).toHaveURL(new RegExp(`/manufacturing/work-orders/${created.workOrder.id}$`));
 });

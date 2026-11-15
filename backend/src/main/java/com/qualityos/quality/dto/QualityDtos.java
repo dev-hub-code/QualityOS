@@ -61,6 +61,28 @@ public final class QualityDtos {
             UUID facilityId) {
     }
 
+    /**
+     * Goods rejected or scrapped in one shop-floor report.
+     *
+     * @param quantity rejected plus scrapped, in {@code uomId}
+     */
+    public record ProductionReject(
+            UUID operationReportId,
+            UUID workOrderId,
+            String workOrderNumber,
+            int operationSequence,
+            String operationName,
+            UUID facilityId,
+            String batchNumber,
+            UUID defectCategoryId,
+            BigDecimal rejected,
+            BigDecimal scrapped,
+            BigDecimal rework,
+            BigDecimal quantity,
+            UUID uomId,
+            String comment) {
+    }
+
     public record AuditFailure(
             UUID auditId,
             UUID findingId,
@@ -140,6 +162,7 @@ public final class QualityDtos {
             UUID inspectionId,
             UUID auditId,
             UUID instrumentId,
+            UUID workOrderId,
             UUID supplierId,
             String supplierName,
             UUID materialId,

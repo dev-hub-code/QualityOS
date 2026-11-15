@@ -30,7 +30,7 @@ public class NonConformance extends TenantOwnedEntity {
         }
     }
 
-    public enum Source { INSPECTION, MANUAL, AUDIT, CALIBRATION }
+    public enum Source { INSPECTION, MANUAL, AUDIT, CALIBRATION, PRODUCTION }
 
     public enum Severity { CRITICAL, MAJOR, MINOR }
 
@@ -50,6 +50,8 @@ public class NonConformance extends TenantOwnedEntity {
     private UUID auditFindingId;
     private UUID calibrationRecordId;
     private UUID instrumentId;
+    private UUID workOrderId;
+    private UUID operationReportId;
     private UUID supplierId;
     private UUID materialId;
     private String batchNumber;
@@ -87,6 +89,16 @@ public class NonConformance extends TenantOwnedEntity {
                 Severity.MAJOR, title, description, null);
         ncr.calibrationRecordId = calibrationRecordId;
         ncr.instrumentId = instrumentId;
+        return ncr;
+    }
+
+    /** An NCR for goods rejected or scrapped on a shop-floor operation, on the work order's batch. */
+    public static NonConformance fromProduction(String ncrNumber, UUID workOrderId, UUID operationReportId,
+            String batchNumber, UUID defectCategoryId, String title, String description, BigDecimal quantity) {
+        NonConformance ncr = new NonConformance(ncrNumber, Source.PRODUCTION, null, null, null, batchNumber,
+                defectCategoryId, Severity.MINOR, title, description, quantity);
+        ncr.workOrderId = workOrderId;
+        ncr.operationReportId = operationReportId;
         return ncr;
     }
 

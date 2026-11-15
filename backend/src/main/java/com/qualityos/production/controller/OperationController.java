@@ -18,8 +18,10 @@ import com.qualityos.production.dto.ShopFloorDtos.StartRequest;
 import com.qualityos.production.dto.ShopFloorDtos.StopRequest;
 import com.qualityos.production.entity.WorkOrderOperation;
 import com.qualityos.production.service.ShopFloorService;
+import com.qualityos.quality.dto.QualityDtos.DefectCategoryResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -59,6 +61,12 @@ public class OperationController {
             @RequestParam(defaultValue = "false") boolean mine) {
         return ApiResponse.ok(shopFloor.list(status, facilityId, workCenterId, mine, q,
                 Pages.of(page, size, null, Set.of("sequence"), "sequence")));
+    }
+
+    /** The organisation's defect categories, for naming what a report rejected, without needing NCR access. */
+    @GetMapping("/defect-categories")
+    public ApiResponse<List<DefectCategoryResponse>> defectCategories() {
+        return ApiResponse.ok(shopFloor.defectCategories());
     }
 
     @GetMapping("/{id}")

@@ -62,7 +62,8 @@ public final class ShopFloorDtos {
             @NotNull @PositiveOrZero @Digits(integer = 12, fraction = 6) BigDecimal rejectedQuantity,
             @NotNull @PositiveOrZero @Digits(integer = 12, fraction = 6) BigDecimal scrapQuantity,
             @PositiveOrZero @Digits(integer = 12, fraction = 6) BigDecimal reworkQuantity,
-            @Size(max = 1000) String comment) {
+            @Size(max = 1000) String comment,
+            UUID defectCategoryId) {
     }
 
     public record ReverseRequest(@NotBlank @Size(max = 1000) String reason) {
@@ -139,6 +140,7 @@ public final class ShopFloorDtos {
             UUID reversesReportId,
             boolean reversed,
             String comment,
+            UUID defectCategoryId,
             UUID reportedBy,
             String reportedByName,
             Instant reportedAt) {

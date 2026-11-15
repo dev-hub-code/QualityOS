@@ -22,7 +22,7 @@ import {
   reportMismatch,
 } from "@/lib/manufacturing";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
-import type { LossCategory, OperationDetail } from "@/lib/types";
+import type { DefectCategory, LossCategory, OperationDetail } from "@/lib/types";
 
 type Dialog = "start" | "pause" | "report" | "measure" | "complete" | "assign" | "block" | "skip" | { reverse: string } | null;
 
@@ -42,6 +42,12 @@ export default function OperationPage() {
   const [key, setKey] = useState(newRequestKey);
   const [comment, setComment] = useState("");
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<OperationDetail>(path), refetchInterval: 30_000 });
+  const { data: defects = [] } = useQuery({
+    queryKey: ["/manufacturing/operations/defect-categories"],
+    queryFn: () => api.get<DefectCategory[]>("/manufacturing/operations/defect-categories"),
+    staleTime: 300_000,
+  });
+  const defectName = (id: string | null) => defects.find((defect) => defect.id === id)?.name;
   if (!data) return <QueryState error={error} />;
 
   const { operation } = data;
@@ -280,6 +286,7 @@ export default function OperationPage() {
                   good {formatQuantity(report.goodQuantity)} · rejected {formatQuantity(report.rejectedQuantity)}
                   {Number(report.reworkQuantity) !== 0 && ` (${formatQuantity(report.reworkQuantity)} rework)`} · scrap{" "}
                   {formatQuantity(report.scrapQuantity)}
+                  {report.defectCategoryId && ` · ${defectName(report.defectCategoryId) ?? "defect recorded"}`}
                   {report.comment && <span className="text-muted-foreground"> · {report.comment}</span>}
                 </span>
                 <span className="flex items-center gap-2 text-muted-foreground">
@@ -370,7 +377,7 @@ export default function OperationPage() {
       {dialog === "report" && (
         <RecordDialog
           title="Report quantities"
-          fields={reportFields(unit)}
+          fields={reportFields(unit, defects)}
           record={{ rejectedQuantity: "0", scrapQuantity: "0" }}
           onClose={close}
           onSubmit={(values) => {
@@ -459,13 +466,19 @@ export default function OperationPage() {
   );
 }
 
-function reportFields(unit: string): FieldDef[] {
+function reportFields(unit: string, defects: DefectCategory[]): FieldDef[] {
   return [
     { name: "quantity", label: `Processed, in ${unit}`, type: "decimal", required: true },
     { name: "goodQuantity", label: "Good", type: "decimal", required: true },
     { name: "rejectedQuantity", label: "Rejected", type: "decimal", required: true },
     { name: "reworkQuantity", label: "Of the rejected, to rework", type: "decimal" },
     { name: "scrapQuantity", label: "Scrap", type: "decimal", required: true },
+    {
+      name: "defectCategoryId",
+      label: "Defect, for what was rejected or scrapped",
+      type: "select",
+      options: defects.map((defect) => ({ value: defect.id, label: `${defect.code} – ${defect.name}` })),
+    },
     { name: "comment", label: "Comment", type: "textarea" },
   ];
 }

@@ -184,7 +184,8 @@ class ProductionQualityIT extends TraceabilityFixture {
         assertThat(JsonPath.<Boolean>read(quality, "$.data.onHold")).isTrue();
         assertThat(JsonPath.<List<String>>read(quality, "$.data.gates[?(@.id == '" + patrolGate + "')].status"))
                 .containsExactly("FAILED");
-        assertThat(JsonPath.<List<String>>read(quality, "$.data.ncrs[*].ncrNumber")).hasSize(1);
+        // One NCR for the 2 rejected in the report, and one for the failed patrol.
+        assertThat(JsonPath.<List<String>>read(quality, "$.data.ncrs[*].ncrNumber")).hasSize(2);
         assertThat(JsonPath.<List<String>>read(quality(operator, order), "$.data.ncrs")).isEmpty();
         send(operator, turn + "/reports", report("1", "1", "0", "0"))
                 .andExpect(status().isUnprocessableContent())

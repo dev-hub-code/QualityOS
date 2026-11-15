@@ -69,7 +69,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | The recall PDF does not shape Devanagari: names stay readable, but conjuncts do not form correctly | Before Hindi or Marathi customer names matter |
 | A dispatch of a batch under an open recall, or of anything made from it, is refused. Someone with `RECALL_MANAGE` can override with a reason, which is audited, and the customer joins the recall at once. Every built-in role that can dispatch can also manage recalls, so in practice the override is a reason, not a second person | Review after real use |
 | A dispatch recorded before a recall started can still have its shipment confirmed. The recall already covers its customer | Review after real use |
-| A recall starts from the traced batch, and other batch numbers can be typed in to join it. Batches cannot be added after the recall starts. A CAPA can be linked when it starts, from the first 100 CAPAs | When a user needs it |
+| A recall starts from the traced batch, and other batch numbers can be typed in to join it. Batches cannot be added after the recall starts. A CAPA can be linked when it starts | When a user needs it |
 | Recording an instrument on an inspection is optional, and applies to the whole inspection, not each measurement | Review after real use |
 | A decision to reinspect after a failed calibration holds the goods that are left, but does not recall what was already used or dispatched, nor start the new inspection | Review after real use |
 | Audits are planned one at a time, with no recurring schedule or reminder before the date. A missed audit shows as overdue in the list | When a user needs it |
@@ -100,7 +100,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Only `NCR_CAPA`, `REPORTS` and `ADVANCED` are enforced. A feature added in the Control Center is listed but restricts nothing until code enforces it | When a feature is sold |
 | An organisation's contact number is not recorded anywhere, so the Control Center cannot show it | When a user needs it |
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
-| Facility, supplier, material and product pickers load the first 100 records | Add search when a tenant exceeds this |
 | All seven manufacturing phases are built, through finished-goods receipt and OEE. Each phase's own limits are listed in [MANUFACTURING.md](MANUFACTURING.md) | Review after real use |
 | Facility sub-records (departments, lines, shifts), supplier contacts, material-to-product mappings, and new units are not audited individually | Review after real use |
 

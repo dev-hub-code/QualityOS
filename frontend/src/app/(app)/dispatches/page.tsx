@@ -8,12 +8,13 @@ import { PageHeader, StatusBadge, useRefresh } from "@/components/records/parts"
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
-import { api, ApiError, type PageResponse } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import { toDispatchItems, toReturnItems } from "@/lib/traceability";
 import type { Customer, Dispatch, ProductionBatch, ReversalSummary } from "@/lib/types";
+import { lookupAll } from "@/components/records/parts";
 
-const RELEASED = "/production-batches?status=RELEASED&size=100";
+const RELEASED = "/production-batches?status=RELEASED";
 
 function Row({ dispatch }: { dispatch: Dispatch }) {
   const canManage = usePermission("TRACEABILITY_MANAGE");
@@ -156,13 +157,13 @@ function DispatchDialog({ onClose }: { onClose: () => void }) {
   });
   const { data: batches } = useQuery({
     queryKey: [RELEASED],
-    queryFn: () => api.get<PageResponse<ProductionBatch>>(RELEASED),
+    queryFn: () => lookupAll<ProductionBatch>("/production-batches", "&status=RELEASED"),
   });
   const [lines, setLines] = useState(1);
   const canOverrideRecall = usePermission("RECALL_MANAGE");
   // Set once the server refuses goods under an open recall, so that someone allowed to may give a reason.
   const [heldByRecall, setHeldByRecall] = useState(false);
-  const options = (batches?.items ?? [])
+  const options = (batches ?? [])
     .filter((batch) => Number(batch.availableQuantity) > 0)
     .map((batch) => ({
       value: batch.id,

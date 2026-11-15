@@ -17,9 +17,10 @@ import {
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
-import { api, type PageResponse } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { FieldDef } from "@/lib/record-form";
 import type { Audit, AuditSummary, ChecklistSummary } from "@/lib/types";
+import { lookupAll } from "@/components/records/parts";
 
 const TYPES = ["INTERNAL", "SUPPLIER", "PROCESS", "PRODUCT"].map((value) => ({
   value,
@@ -51,7 +52,7 @@ export default function AuditsPage() {
   const [planning, setPlanning] = useState(false);
   const { data: checklists } = useQuery({
     queryKey: ["/audit-checklists", "options"],
-    queryFn: () => api.get<PageResponse<ChecklistSummary>>("/audit-checklists?size=100"),
+    queryFn: () => lookupAll<ChecklistSummary>("/audit-checklists"),
     enabled: planning,
   });
   const fields: FieldDef[] = [
@@ -66,7 +67,7 @@ export default function AuditsPage() {
       label: "Checklist",
       type: "select",
       required: true,
-      options: (checklists?.items ?? []).map((item) => ({ value: item.id, label: `${item.code} – ${item.name}` })),
+      options: (checklists ?? []).map((item) => ({ value: item.id, label: `${item.code} – ${item.name}` })),
     },
     { name: "plannedOn", label: "Planned for", type: "date", required: true },
     { name: "leadAuditorId", label: "Lead auditor", type: "select", required: true, options: assignees },

@@ -10,8 +10,8 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
-import type { PageResponse } from "@/lib/api";
 import type { Instrument, InstrumentOption, Machine, MachineStatusEvent } from "@/lib/types";
+import { lookupAll } from "@/components/records/parts";
 
 interface MachineDetail {
   machine: Machine;
@@ -36,7 +36,7 @@ export default function MachinePage() {
   const canPick = canManage && Boolean(facilityId);
   const { data: available } = useQuery({
     queryKey: ["/instruments", facilityId],
-    queryFn: () => api.get<PageResponse<Instrument>>(`/instruments?size=100&facilityId=${facilityId}`),
+    queryFn: () => lookupAll<Instrument>("/instruments", `&facilityId=${facilityId}`),
     enabled: canPick && dialog === "instrument",
   });
   if (!data) return <QueryState error={error} />;
@@ -150,7 +150,7 @@ export default function MachinePage() {
               label: "Instrument",
               type: "select",
               required: true,
-              options: (available?.items ?? [])
+              options: (available ?? [])
                 .filter((instrument) => !kept.some((found) => found.id === instrument.id))
                 .map((instrument) => ({ value: instrument.id, label: `${instrument.instrumentCode} – ${instrument.name}` })),
             },

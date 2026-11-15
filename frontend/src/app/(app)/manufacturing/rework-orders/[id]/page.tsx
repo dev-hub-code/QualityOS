@@ -8,10 +8,11 @@ import { Details, PageHeader, QueryState, RecordLink, Section, StatusBadge, useA
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
-import { api, type PageResponse } from "@/lib/api";
+import { api } from "@/lib/api";
 import { reinspectionState, reworkActions } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
 import type { ReworkDetail } from "@/lib/types";
+import { lookupAll } from "@/components/records/parts";
 
 const when = (value: string | null) => (value ? new Date(value).toLocaleString() : "–");
 const words = (value: string | null) => (value ? value.replaceAll("_", " ").toLowerCase() : "–");
@@ -26,9 +27,9 @@ function useBatchTemplates(enabled: boolean) {
     enabled,
     queryFn: async () => {
       const lists = await Promise.all(
-        ["IPQC", "FQC"].map((type) => api.get<PageResponse<Template>>(`/inspection-templates?size=100&type=${type}`)),
+        ["IPQC", "FQC"].map((type) => lookupAll<Template>("/inspection-templates", `&type=${type}`)),
       );
-      return lists.flatMap((list) => list.items);
+      return lists.flat();
     },
   });
   return (data ?? [])

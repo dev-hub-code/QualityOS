@@ -202,6 +202,63 @@ keeps an invoice from being chased twice.
 application role no rights at all, and are reached through functions that check the operator. `support_tickets` and
 `support_notes` also force row-level security, with a policy for the schema owner only.
 
+## Manufacturing (V22 to V28)
+
+Every table here is tenant-owned, with row-level security, composite foreign keys and the standard columns. The design
+behind them is in [MANUFACTURING.md](MANUFACTURING.md).
+
+| Migration | Tables | Purpose |
+|---|---|---|
+| V22 | `manufacturing_settings`, `product_manufacturing_settings` | The organisation's model and rules, and a product's own model |
+| V22 | `work_centers`, `machines`, `machine_status_events` | Where work happens, and every machine status change, append-only |
+| V22 | `boms`, `bom_lines`, `routings`, `routing_operations`, `process_parameters` | Revisioned definitions. `boms.kind` is BOM or RECIPE |
+| V23 | `production_plans`, `production_plan_lines` | What a facility plans to make in a period |
+| V23 | `work_orders`, `work_order_materials`, `work_order_operations`, `work_order_status_history` | The order, what release froze onto it, and its status history, append-only |
+| V24 | `material_reservations`, `work_order_material_movements` | Stock set aside for an order, and every reserve, release, issue and return, append-only |
+| V25 | `operation_reports`, `operation_measurements`, `operation_events` | Output, measurements and the timeline of each operation, all append-only |
+| V26 | `quality_checkpoints`, `work_order_quality_gates`, `quality_gate_inspections` | Where production needs an inspection, the gates release made, and their inspections |
+| V26 | `rework_orders`, `rework_order_steps`, `rework_order_history` | Rework on the batch the goods came from |
+| V27 | `finished_goods_receipts` | One receipt per order and per batch, append-only |
+| V28 | `downtime_records` | Every stop, from the floor, a machine or by hand |
+
+Changes to earlier tables:
+
+- `material_receipt_items.reserved_quantity` (V24). Consumed plus reserved can never pass the lot's quantity.
+- `work_order_operations` gains its operator, machine, running time and reported quantities (V25).
+- `work_orders.completed_by` and `completed_at` (V27), set exactly when the order is completed.
+- `shifts.break_minutes` and `days_of_week` (V28), and `work_centers.capacity_units` and the three cost rates (V28).
+- `manufacturing_settings` gains a column for each rule added by V23 to V27.
+
+Protection in the database:
+
+- `protect_revision` and `protect_revision_content` refuse changing the lines of a revision that is not a draft, and
+  deleting one.
+- `protect_work_order` freezes what release set, and a completed or cancelled order entirely.
+  `protect_released_requirement` keeps released materials and operations in place.
+- `protect_reservation` lets a reservation's open quantity only fall. `protect_rework` freezes a closed or cancelled
+  rework order and a done step. `protect_downtime_record` refuses deletes and moving a stop.
+- `trg_append_only` guards every history, movement, report, event and receipt table.
+
+```mermaid
+erDiagram
+    PRODUCTS ||--o{ BOMS : "made from"
+    PRODUCTS ||--o{ ROUTINGS : "made by"
+    BOMS ||--o{ BOM_LINES : lists
+    ROUTINGS ||--o{ ROUTING_OPERATIONS : orders
+    WORK_CENTERS ||--o{ MACHINES : holds
+    PRODUCTION_PLANS ||--o{ PRODUCTION_PLAN_LINES : plans
+    PRODUCTION_PLAN_LINES ||--o{ WORK_ORDERS : raises
+    WORK_ORDERS ||--o{ WORK_ORDER_MATERIALS : needs
+    WORK_ORDERS ||--o{ WORK_ORDER_OPERATIONS : runs
+    WORK_ORDER_MATERIALS ||--o{ MATERIAL_RESERVATIONS : "set aside by"
+    WORK_ORDER_OPERATIONS ||--o{ OPERATION_REPORTS : reports
+    WORK_ORDERS ||--o{ WORK_ORDER_QUALITY_GATES : gates
+    WORK_ORDERS ||--o{ REWORK_ORDERS : reworks
+    WORK_ORDERS ||--o| FINISHED_GOODS_RECEIPTS : receives
+    WORK_ORDERS ||--o| BATCHES : "opens"
+    MACHINES ||--o{ DOWNTIME_RECORDS : stops
+```
+
 ## Downtime department (V29)
 
 `downtime_records.responsible_department_id` names one of the facility's `departments`, by a tenant-scoped foreign key.

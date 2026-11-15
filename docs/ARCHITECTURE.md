@@ -127,6 +127,26 @@ A new job also needs an entry in `JobMonitor`, which holds its own list of what 
 work order past its planned end, and a line of an approved plan past its due date with less made than planned. It
 tells those who manage work orders or plans at that facility, and repeats once a week until the work is done.
 
+## Production module
+
+`com.qualityos.production` holds manufacturing: definitions, plans, work orders, the shop floor, quality gates,
+rework, completion, downtime, scheduling, costing and analytics. Its APIs sit under `/api/v1/manufacturing`.
+
+- **What it calls.** Products, materials, facilities and organisation settings through their services. Stock moves only
+  through `MaterialReceiptService`, and batches only through traceability's `ProductionService`. Inspections and NCRs
+  go through their own services. It never touches another module's repositories.
+- **What it registers.** `WorkOrderBatchGuard` stops a work order's batch from being completed on the batch page.
+  `ProductionArchiveGuard` stops archiving master data it still uses. Traceability and master data know only the
+  interfaces.
+- **Concurrency.** Every change to an order locks the work order row first, and then any lot, machine or rework order
+  it touches. Checks across an order's operations and materials therefore see a stable state.
+- **Repeats.** Reservations, issues, returns, reports, measurements and receipts accept an `Idempotency-Key` header.
+  A repeated status change is refused by the status check.
+- **History.** Triggers keep status histories, movements, reports, events and receipts append-only, and freeze what
+  release set. The service rules come first; the triggers stop a mistake that gets past them.
+- **Facility scope.** Work centres, machines, plans, work orders and downtime belong to a facility. BOMs, recipes and
+  routings are product master data, visible to everyone with `MANUFACTURING_VIEW`.
+
 ## Archive guards
 
 The module that owns a product, material or facility does not read production's tables. Before archiving, it asks

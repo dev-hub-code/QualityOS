@@ -173,8 +173,11 @@ public class MaterialService implements AttachmentPolicy {
         if (units.existsVisibleByCode(code, tenantId)) {
             throw new ConflictException("This unit already exists.");
         }
-        return mapper.toResponse(units.save(
-                new UnitOfMeasure(tenantId, code, request.name().trim(), request.dimension().trim(), request.toBase())));
+        UnitOfMeasure unit = units.save(
+                new UnitOfMeasure(tenantId, code, request.name().trim(), request.dimension().trim(), request.toBase()));
+        audit.record("UNIT_ADDED", "UnitOfMeasure", unit.getId(), null, Map.of("code", code,
+                "dimension", unit.getDimension(), "toBase", String.valueOf(request.toBase())));
+        return mapper.toResponse(unit);
     }
 
     /**

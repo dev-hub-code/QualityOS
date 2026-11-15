@@ -185,6 +185,8 @@ public class ProductService implements AttachmentPolicy {
         }
         ProductMaterial mapping = productMaterials.save(
                 new ProductMaterial(id, request.materialId(), request.quantityPerUnit(), request.uomId()));
+        audit.record("PRODUCT_MATERIAL_ADDED", "Product", id, null, Map.of("material", material.code(),
+                "quantityPerUnit", request.quantityPerUnit().toPlainString()));
         return toResponse(mapping, material);
     }
 
@@ -194,6 +196,8 @@ public class ProductService implements AttachmentPolicy {
                 .filter(found -> found.getProductId().equals(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Material mapping", mappingId));
         productMaterials.delete(mapping);
+        audit.record("PRODUCT_MATERIAL_REMOVED", "Product", id, Map.of("materialId", mapping.getMaterialId().toString(),
+                "quantityPerUnit", mapping.getQuantityPerUnit().toPlainString()), null);
     }
 
     /** For other modules starting new work on a product. */

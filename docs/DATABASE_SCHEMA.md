@@ -36,6 +36,10 @@ for GRN, NCR, CAPA), `suppliers`, `supplier_contacts`, `product_categories`, `pr
 `material_specifications`, `purchase_orders`, `purchase_order_items`, `material_receipts`,
 `material_receipt_items`, **`units_of_measure`** (configurable UoM), **`production_lines`**, **`shifts`**,
 **`supplier_categories`**, **`product_revisions`**, **`product_materials`** (mapping).
+Sub-records are audited against their parent: departments, production lines and shifts against the facility
+(`DEPARTMENT_ADDED`, `PRODUCTION_LINE_ARCHIVED`, `SHIFT_ADDED`, and so on), contacts against the supplier
+(`SUPPLIER_CONTACT_ADDED`, `SUPPLIER_CONTACT_REMOVED`), material mappings against the product (`PRODUCT_MATERIAL_ADDED`,
+`PRODUCT_MATERIAL_REMOVED`), each with what was added or removed. A new unit is audited as `UNIT_ADDED` on itself.
 
 ### Phase 4: inspection
 `inspection_templates`, `inspection_template_versions` (status, effective dates, sampling plan, immutable once

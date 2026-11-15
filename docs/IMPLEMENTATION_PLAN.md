@@ -100,7 +100,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Only `NCR_CAPA`, `REPORTS` and `ADVANCED` are enforced. A feature added in the Control Center is listed but restricts nothing until code enforces it | When a feature is sold |
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | All seven manufacturing phases are built, through finished-goods receipt and OEE. Each phase's own limits are listed in [MANUFACTURING.md](MANUFACTURING.md) | Review after real use |
-| Facility sub-records (departments, lines, shifts), supplier contacts, material-to-product mappings, and new units are not audited individually | Review after real use |
 
 ## Definition of done for each phase
 

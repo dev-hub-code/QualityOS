@@ -1,5 +1,8 @@
 package com.qualityos.subscription.service;
 
+import com.qualityos.identity.service.TenantAccessService;
+import com.qualityos.notification.service.NotificationService;
+import com.qualityos.notification.service.NotificationType;
 import com.qualityos.common.attachment.AttachmentQuota;
 import com.qualityos.common.exception.BusinessRuleException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -35,10 +38,17 @@ public class PlanLimits implements AttachmentQuota {
             Integer users, Integer facilities, Integer storageMb, Integer inspections, Integer attachments, String plan) {
     }
 
-    private final JdbcTemplate jdbc;
+    private static final double NEAR = 0.8;
+    private static final String LINK = "/settings/billing";
 
-    PlanLimits(JdbcTemplate jdbc) {
+    private final JdbcTemplate jdbc;
+    private final NotificationService notifications;
+    private final TenantAccessService access;
+
+    PlanLimits(JdbcTemplate jdbc, NotificationService notifications, TenantAccessService access) {
         this.jdbc = jdbc;
+        this.notifications = notifications;
+        this.access = access;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -49,6 +59,7 @@ public class PlanLimits implements AttachmentQuota {
             throw new BusinessRuleException("The " + limits.plan() + " plan allows " + limits.users()
                     + " users, counting pending invitations. Change plan to add more.");
         }
+        warn(limits, "users, counting pending invitations", "user", used, used + 1, limits.users());
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -59,6 +70,7 @@ public class PlanLimits implements AttachmentQuota {
             throw new BusinessRuleException("The " + limits.plan() + " plan allows " + limits.facilities()
                     + " facilities. Change plan to add more.");
         }
+        warn(limits, "facilities", "facility", used, used + 1, limits.facilities());
     }
 
     /** Runs when an inspection is started. Records already made stay, and a new month starts the count again. */
@@ -70,6 +82,7 @@ public class PlanLimits implements AttachmentQuota {
             throw new BusinessRuleException("The " + limits.plan() + " plan allows " + limits.inspections()
                     + " inspections a month. Change plan to start more.");
         }
+        warn(limits, "inspections this month", "monthly inspection", used, used + 1, limits.inspections());
     }
 
     /** Before the file is stored, so that a refused upload leaves nothing behind. */
@@ -87,6 +100,46 @@ public class PlanLimits implements AttachmentQuota {
             throw new BusinessRuleException("This file would take the organisation past the " + limits.plan()
                     + " plan's " + limits.storageMb() + " MB of storage. Change plan to add more.");
         }
+        warn(limits, "attachments", "attachment", count, count + 1, limits.attachments());
+        if (limits.storageMb() != null) {
+            long mb = limits.storageMb() * MEGABYTE;
+            if (crossed(stored, stored + bytes, mb) != null) {
+                warn(limits, "MB of storage", "storage", stored / MEGABYTE, (stored + bytes + MEGABYTE - 1) / MEGABYTE,
+                        limits.storageMb(), crossed(stored, stored + bytes, mb));
+            }
+        }
+    }
+
+    /**
+     * Tells those who manage the subscription when this action takes the organisation past 80% of a limit, or onto
+     * it. Each threshold is crossed once, so each warns once until usage falls back below it.
+     */
+    private void warn(Limits limits, String counted, String noun, long before, long after, Integer limit) {
+        if (limit != null) {
+            warn(limits, counted, noun, before, after, limit, crossed(before, after, limit));
+        }
+    }
+
+    private void warn(Limits limits, String counted, String noun, long before, long after, long limit, String level) {
+        if (level == null) {
+            return;
+        }
+        boolean reached = "REACHED".equals(level);
+        String title = reached ? "The " + limits.plan() + " plan's " + noun + " limit is reached"
+                : "Near the " + limits.plan() + " plan's " + noun + " limit";
+        String body = after + " of " + limit + " " + counted + ". "
+                + (reached ? "Change plan to add more." : "Change plan before it stops your work.");
+        notifications.notifyIncludingActor(access.holdersOf(PlanAccess.SUBSCRIPTION_MANAGE),
+                NotificationType.PLAN_LIMIT_WARNING, title, body, LINK);
+    }
+
+    /** @return REACHED, NEAR, or null when this step crosses neither threshold */
+    static String crossed(long before, long after, long limit) {
+        if (before < limit && after >= limit) {
+            return "REACHED";
+        }
+        long near = (long) Math.ceil(limit * NEAR);
+        return before < near && after >= near ? "NEAR" : null;
     }
 
     private Limits current() {

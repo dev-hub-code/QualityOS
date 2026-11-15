@@ -94,7 +94,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Maintenance mode removes change permissions, so a member's action is refused. Signing in, reading, billing and account actions still work | Review after real use |
 | Operators sign in with a password only. There is no second factor | Before customer launch |
 | Duplicate references are checked before saving, so two identical references saved at the same moment for different organisations could both pass | With a payment gateway |
-| Near-limit warnings show only in the Control Center and on the billing page. Customers get no notification or email before a limit stops them | When a user needs it |
 | Only `NCR_CAPA`, `REPORTS` and `ADVANCED` are enforced. A feature added in the Control Center is listed but restricts nothing until code enforces it | When a feature is sold |
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | All seven manufacturing phases are built, through finished-goods receipt and OEE. Each phase's own limits are listed in [MANUFACTURING.md](MANUFACTURING.md) | Review after real use |

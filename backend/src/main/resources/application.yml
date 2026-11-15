@@ -103,6 +103,9 @@ qualityos:
     account-maintenance:
       initial-delay: PT1H
       interval: PT24H
+    production-reminders:
+      initial-delay: PT5M
+      interval: PT1H
     monitor:
       interval: PT15M
   storage:

@@ -1,0 +1,8 @@
+Subject: {{recordNumber}} ची तारीख उलटून गेली
+
+उत्पादनाला उशीर
+
+नमस्कार {{recipientName}},
+{{recordNumber}} ची तारीख {{dueDate}} होती आणि ते अजून पूर्ण झालेले नाही: {{summary}}.
+
+उघडा: {{actionUrl}}

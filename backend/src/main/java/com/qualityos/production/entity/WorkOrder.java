@@ -106,6 +106,10 @@ public class WorkOrder extends TenantOwnedEntity {
     private Instant releasedAt;
     private Instant startedAt;
     private UUID productionBatchId;
+
+    /** When the people who manage work orders were last told it is late. */
+    @lombok.Setter
+    private Instant overdueNotifiedAt;
     private UUID completedBy;
     private Instant completedAt;
 

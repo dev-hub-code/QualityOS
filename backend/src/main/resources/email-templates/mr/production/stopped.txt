@@ -1,0 +1,8 @@
+Subject: उत्पादन थांबले: {{where}}
+
+उत्पादन थांबले आहे
+
+नमस्कार {{recipientName}},
+{{where}} थांबले आहे. कारण: {{reason}}
+
+उघडा: {{actionUrl}}

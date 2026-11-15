@@ -123,6 +123,28 @@ three runs, and reports `STALE` in health.
 
 A new job also needs an entry in `JobMonitor`, which holds its own list of what should be running.
 
+`production-reminders` runs hourly, so each plant's day is noticed soon after it ends in its own time zone. It chases a
+work order past its planned end, and a line of an approved plan past its due date with less made than planned. It
+tells those who manage work orders or plans at that facility, and repeats once a week until the work is done.
+
+## Production notifications
+
+`ProductionAlerts` decides who hears about each manufacturing event, inside the event's transaction:
+
+| Event | Who hears |
+|---|---|
+| Work order submitted | Holders of `WORK_ORDER_APPROVE` at the facility |
+| BOM, recipe or routing revision submitted | Holders of `BOM_APPROVE`, `RECIPE_APPROVE` or `ROUTING_APPROVE` |
+| Rework order raised | Holders of `REWORK_APPROVE` at the facility |
+| Work order or revision sent back | The person who submitted it |
+| Quality hold, blocked operation | Holders of `PRODUCTION_SUPERVISE` at the facility |
+| Machine breakdown | Holders of `PRODUCTION_SUPERVISE` or `DOWNTIME_MANAGE` at the facility |
+| Work order late | Holders of `WORK_ORDER_MANAGE` at the facility |
+| Plan line late | Holders of `PRODUCTION_PLAN_MANAGE` at the facility |
+
+BOMs, recipes and routings belong to no facility, so their notices reach every approver. As everywhere, the person who
+acted is not told. Emails use the four `production/` templates in English, Hindi and Marathi.
+
 ## Reporting
 
 `reporting` reads across modules with plain SQL, like the traceability search, and writes nothing except an audit row

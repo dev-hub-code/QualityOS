@@ -106,8 +106,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Facility, supplier, material and product pickers load the first 100 records | Add search when a tenant exceeds this |
 | All seven manufacturing phases are built, through finished-goods receipt and OEE. Each phase's own limits are listed in [MANUFACTURING.md](MANUFACTURING.md) | Review after real use |
 | Facility sub-records (departments, lines, shifts), supplier contacts, material-to-product mappings, and new units are not audited individually | Review after real use |
-| Manufacturing sends no notifications and has no email templates. A work order, BOM, recipe, routing or rework order awaiting approval, a quality hold, a blocked operation and a machine breakdown are silent, where the equivalent quality events notify | Before customers run production |
-| No scheduled job watches production. A work order past its planned end date, or a plan line past its due date, raises no reminder | Before customers run production |
 | The dashboard, analytics overview and PDF and Excel reports hold no production figures. Production analytics, costing, downtime and the production record are pages only, with no export or printable version | When a user needs it |
 | Rejected and scrapped quantities on an operation raise no NCR and carry no defect category. Only inspection, audit, calibration and manual NCRs exist, so Pareto and scorecards never see production defects | Review after real use |
 | Instruments and machines are not linked, and an operation's measurements cannot name the instrument used, so a failed calibration's impact review does not reach shop-floor measurements | When a user needs it |

@@ -39,6 +39,7 @@ public class JobMonitor implements HealthIndicator {
             @Value("${qualityos.jobs.usage-snapshots.interval}") Duration usage,
             @Value("${qualityos.jobs.unconfirmed-shipments.interval}") Duration shipments,
             @Value("${qualityos.jobs.account-maintenance.interval}") Duration accounts,
+            @Value("${qualityos.jobs.production-reminders.interval}") Duration production,
             @Value("${qualityos.jobs.enabled:false}") boolean enabled) {
         this.jdbc = jdbc;
         this.enabled = enabled;
@@ -50,6 +51,7 @@ public class JobMonitor implements HealthIndicator {
         expected.put("usage-snapshots", usage);
         expected.put("unconfirmed-shipments", shipments);
         expected.put("account-maintenance", accounts);
+        expected.put("production-reminders", production);
     }
 
     public record JobOverview(

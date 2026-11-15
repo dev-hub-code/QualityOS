@@ -82,6 +82,7 @@ public class DowntimeService implements AttachmentPolicy {
     private final FacilityScope scope;
     private final TenantAccessService access;
     private final AuditService audit;
+    private final ProductionAlerts alerts;
 
     @SuppressWarnings("java:S107")
     DowntimeService(
@@ -94,7 +95,9 @@ public class DowntimeService implements AttachmentPolicy {
             ProductionCalendar calendar,
             FacilityScope scope,
             TenantAccessService access,
-            AuditService audit) {
+            AuditService audit,
+            ProductionAlerts alerts) {
+        this.alerts = alerts;
         this.records = records;
         this.centres = centres;
         this.machines = machines;
@@ -147,6 +150,9 @@ public class DowntimeService implements AttachmentPolicy {
             records.saveAndFlush(new DowntimeRecord(Source.MACHINE, centre.getFacilityId(), centre.getId(),
                     machine.getId(), null, null, category, now, reason == null || reason.isBlank()
                             ? "Machine %s %s".formatted(machine.getCode(), label(category)) : reason.trim()));
+            if (category == LossCategory.MACHINE_BREAKDOWN) {
+                alerts.machineBrokeDown(machine, centre.getFacilityId(), reason);
+            }
         }
     }
 

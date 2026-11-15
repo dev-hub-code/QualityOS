@@ -25,6 +25,10 @@ public enum EmailTemplate {
     AUDIT_FINDINGS("audit/findings"),
     SUBSCRIPTION_EXPIRY("subscription/expiry"),
     PAYMENT_CONFIRMATION("subscription/payment-confirmation"),
+    PRODUCTION_APPROVAL("production/approval"),
+    PRODUCTION_SENT_BACK("production/sent-back"),
+    PRODUCTION_STOPPED("production/stopped"),
+    PRODUCTION_OVERDUE("production/overdue"),
     GENERAL("notification/general");
 
     private final String path;

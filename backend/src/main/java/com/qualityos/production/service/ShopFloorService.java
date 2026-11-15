@@ -122,6 +122,7 @@ public class ShopFloorService implements AttachmentPolicy {
     private final QualityGateService qualityGates;
     private final ProductionService production;
     private final DowntimeService downtime;
+    private final ProductionAlerts alerts;
 
     @SuppressWarnings("java:S107")
     ShopFloorService(
@@ -141,7 +142,9 @@ public class ShopFloorService implements AttachmentPolicy {
             JsonMapper json,
             QualityGateService qualityGates,
             ProductionService production,
-            DowntimeService downtime) {
+            DowntimeService downtime,
+            ProductionAlerts alerts) {
+        this.alerts = alerts;
         this.workOrders = workOrders;
         this.operations = operations;
         this.reports = reports;
@@ -349,6 +352,7 @@ public class ShopFloorService implements AttachmentPolicy {
         String reason = request.reason().trim();
         operation.block(Instant.now(), reason(request.category(), reason));
         releaseMachine(locked.order(), operation, request.category(), reason);
+        alerts.operationBlocked(locked.order(), operation, reason);
         return changed(locked, from, OperationEvent.Type.BLOCKED, request.category(), reason, "OPERATION_BLOCKED");
     }
 
@@ -609,6 +613,7 @@ public class ShopFloorService implements AttachmentPolicy {
         }
         audit.record("WORK_ORDER_QUALITY_HOLD", WorkOrderService.ENTITY, orderId, Map.of("batch", batchStatus),
                 Map.of("batch", "ON_HOLD", "reason", why, "operationsPaused", paused));
+        alerts.qualityHold(order, why);
     }
 
     // Attachments: photographs and other evidence from the floor

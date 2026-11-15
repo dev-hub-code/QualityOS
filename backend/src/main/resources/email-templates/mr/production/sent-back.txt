@@ -1,0 +1,8 @@
+Subject: {{recordNumber}} तुम्हाला परत पाठवले
+
+बदलांसाठी परत पाठवले
+
+नमस्कार {{recipientName}},
+{{recordNumber}} मसुद्यात परत पाठवले. टीप: {{note}}
+
+उघडा: {{actionUrl}}

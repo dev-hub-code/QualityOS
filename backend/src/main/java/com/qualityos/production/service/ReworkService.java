@@ -101,6 +101,7 @@ public class ReworkService {
     private final TenantAccessService access;
     private final DocumentNumberService numbers;
     private final AuditService audit;
+    private final ProductionAlerts alerts;
 
     @SuppressWarnings("java:S107")
     ReworkService(
@@ -120,7 +121,9 @@ public class ReworkService {
             ReviewPolicy reviewPolicy,
             TenantAccessService access,
             DocumentNumberService numbers,
-            AuditService audit) {
+            AuditService audit,
+            ProductionAlerts alerts) {
+        this.alerts = alerts;
         this.reworks = reworks;
         this.steps = steps;
         this.history = history;
@@ -278,6 +281,7 @@ public class ReworkService {
         audit.record("REWORK_ORDER_CREATED", ENTITY, rework.getId(), null, Map.of(
                 "number", rework.getReworkNumber(), "workOrder", order.getWorkOrderNumber(),
                 "quantity", plain(rework.getQuantity())));
+        alerts.reworkRaised(rework, order);
         return detail(rework);
     }
 

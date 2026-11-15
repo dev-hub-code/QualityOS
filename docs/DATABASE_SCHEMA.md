@@ -208,3 +208,11 @@ application role no rights at all, and are reached through functions that check 
 `responsible_department` keeps the department's name as it was when chosen, so a stop stays readable after the
 department is renamed or archived. Stops recorded before V29 keep their typed text with no department id.
 
+## Production reminders (V30)
+
+`work_orders.overdue_notified_at` and `production_plan_lines.overdue_notified_at` record when each was last chased as
+late, so the hourly job repeats a reminder once a week at most. `tenants_with_production_due()` is `SECURITY DEFINER`
+and returns tenant ids only, on the same pattern as `tenants_with_overdue_capas()`. It names a tenant with an approved,
+released, running or held work order past its planned end, or a line of an approved plan past its due date. The job
+then works under each tenant, in the organisation's own date, and skips a plan line once its work orders have received
+its full quantity into finished goods.

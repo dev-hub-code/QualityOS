@@ -1,6 +1,7 @@
 package com.qualityos.production.service;
 
 import com.qualityos.common.audit.AuditService;
+import com.qualityos.common.security.Permissions;
 import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
@@ -55,6 +56,7 @@ public class RoutingService {
     private final ProductService products;
     private final RevisionSupport support;
     private final AuditService audit;
+    private final ProductionAlerts alerts;
 
     RoutingService(
             RoutingRepository routings,
@@ -63,7 +65,9 @@ public class RoutingService {
             WorkCenterService workCenters,
             ProductService products,
             RevisionSupport support,
-            AuditService audit) {
+            AuditService audit,
+            ProductionAlerts alerts) {
+        this.alerts = alerts;
         this.routings = routings;
         this.operations = operations;
         this.parameters = parameters;
@@ -210,6 +214,7 @@ public class RoutingService {
         requireWorkCentresInUse(steps);
         support.submit(routing);
         audit.record("ROUTING_SUBMITTED", ENTITY, id);
+        alerts.definitionSubmitted(routing, label(routing), Permissions.ROUTING_APPROVE, link(routing));
         return detail(routing);
     }
 
@@ -218,7 +223,18 @@ public class RoutingService {
         Routing routing = load(id);
         routing.sendBack(request.note().trim());
         audit.record("ROUTING_SENT_BACK", ENTITY, id, null, Map.of("note", request.note().trim()));
+        alerts.definitionSentBack(routing, label(routing), request.note().trim(), link(routing));
         return detail(routing);
+    }
+
+    /** How a notification names the revision, such as "Routing SH-1 revision 2". */
+    private String label(Routing routing) {
+        String code = products.references(List.of(routing.getProductId())).get(routing.getProductId()).code();
+        return "Routing " + code + " revision " + routing.getRevision();
+    }
+
+    private static String link(Routing routing) {
+        return "/manufacturing/routings/" + routing.getId();
     }
 
     @Transactional

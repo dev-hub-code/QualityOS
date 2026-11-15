@@ -31,6 +31,16 @@ const LABELS: Record<string, string> = {
   AUDIT_SCHEDULED: "An audit is scheduled for me",
   AUDIT_FINDINGS: "An audit has findings",
   AUDIT_AWAITING_CLOSURE: "An audit is ready for closure",
+  WORK_ORDER_AWAITING_APPROVAL: "A work order needs approval",
+  WORK_ORDER_SENT_BACK: "My work order is sent back",
+  DEFINITION_AWAITING_APPROVAL: "A BOM, recipe or routing needs approval",
+  DEFINITION_SENT_BACK: "My BOM, recipe or routing is sent back",
+  REWORK_AWAITING_APPROVAL: "A rework order needs approval",
+  PRODUCTION_QUALITY_HOLD: "A work order goes on quality hold",
+  OPERATION_BLOCKED: "An operation is blocked on the shop floor",
+  MACHINE_BREAKDOWN: "A machine breaks down",
+  WORK_ORDER_OVERDUE: "A work order is past its planned end",
+  PLAN_LINE_OVERDUE: "A production plan line is past its due date",
 };
 const PATH = "/notifications/preferences";
 

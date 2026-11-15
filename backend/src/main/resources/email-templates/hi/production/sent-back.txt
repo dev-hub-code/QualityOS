@@ -1,0 +1,8 @@
+Subject: {{recordNumber}} आपको वापस भेजा गया
+
+बदलाव के लिए वापस भेजा गया
+
+नमस्ते {{recipientName}},
+{{recordNumber}} ड्राफ़्ट में वापस भेजा गया। टिप्पणी: {{note}}
+
+खोलें: {{actionUrl}}

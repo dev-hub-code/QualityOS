@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Inspection report {{inspection.inspectionNumber}}</title>
+<meta name="author" content="{{organizationName}}"/>
+<meta name="subject" content="Inspection report"/>
+<style>
+@page {
+  size: A4 landscape;
+  margin: 18mm 12mm 16mm 12mm;
+  @top-left { content: "{{inspection.inspectionNumber}}"; font: 8pt "Report Sans"; color: #555; }
+  @top-right { content: "Generated {{generated}}"; font: 8pt "Report Sans"; color: #555; }
+  @bottom-left { content: "{{footerName}}"; font: 8pt "Report Sans"; color: #555; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt "Report Sans"; color: #555; }
+}
+body { font-family: "Report Sans", "Report Devanagari", sans-serif; font-size: 9pt; color: #111; line-height: 1.35; }
+h1 { font-size: 17pt; margin: 0 0 2pt 0; }
+h2 { font-size: 11pt; margin: 14pt 0 5pt 0; border-bottom: 0.75pt solid #333; padding-bottom: 2pt;
+     page-break-after: avoid; -fs-page-break-min-height: 32mm; }
+p { margin: 0 0 5pt 0; }
+.muted { color: #555; }
+table { width: 100%; border-collapse: collapse; -fs-table-paginate: paginate; table-layout: fixed; }
+thead { display: table-header-group; }
+tr { page-break-inside: avoid; }
+th { background: #e8e8e8; text-align: left; font-weight: 700; font-size: 7.5pt; }
+th, td { border: 0.5pt solid #888; padding: 2.5pt 4pt; vertical-align: top; }
+td { font-size: 8.5pt; overflow-wrap: break-word; word-wrap: break-word; }
+.meta td { border: none; padding: 1pt 8pt 1pt 0; }
+.meta .label { width: 30mm; color: #555; }
+</style>
+</head>
+<body>
+<h1>Inspection report</h1>
+<p class="muted">{{organizationName}}</p>
+
+<table class="meta">
+<tr><td class="label">Inspection</td><td>{{inspection.inspectionNumber}} ({{inspection.inspectionType}})</td><td class="label">Status</td><td>{{status}}</td></tr>
+<tr><td class="label">Material or product</td><td>{{inspection.materialCode}} – {{inspection.materialName}}</td><td class="label">Lot or batch</td><td>{{inspection.batchNumber}}</td></tr>
+<tr><td class="label">Supplier</td><td>{{inspection.supplierName}}</td><td class="label">Quantity</td><td>{{quantity}}</td></tr>
+<tr><td class="label">Template</td><td>{{inspection.specification.templateName}} v{{inspection.specification.versionNumber}}</td><td class="label">Samples</td><td>{{inspection.sampleSize}}</td></tr>
+<tr><td class="label">Result</td><td>{{result}}</td><td class="label">Disposition</td><td>{{disposition}}</td></tr>
+{{#hasInstruments}}<tr><td class="label">Instruments</td><td colspan="3">{{instruments}}</td></tr>{{/hasInstruments}}
+</table>
+
+<h2>Measurements</h2>
+{{#hasResults}}
+<table>
+<thead><tr><th style="width:22%">Parameter</th><th style="width:20%">Requirement</th><th style="width:7%">Sample</th><th style="width:14%">Value</th><th style="width:12%">Evaluation</th><th style="width:25%">Remarks</th></tr></thead>
+<tbody>
+{{#results}}<tr><td>{{parameter}}{{#critical}} (critical){{/critical}}</td><td>{{requirement}}</td><td>{{sample}}</td><td>{{value}}</td><td>{{evaluation}}</td><td>{{remarks}}</td></tr>
+{{/results}}
+</tbody>
+</table>
+{{/hasResults}}
+{{^hasResults}}<p>Nothing has been measured yet.</p>{{/hasResults}}
+
+<h2>Decisions</h2>
+{{#hasDecisions}}
+<table>
+<thead><tr><th style="width:20%">Decision</th><th style="width:45%">Note</th><th style="width:17%">By</th><th style="width:18%">When</th></tr></thead>
+<tbody>
+{{#decisions}}<tr><td>{{decision}}</td><td>{{note}}</td><td>{{by}}</td><td>{{at}}</td></tr>
+{{/decisions}}
+</tbody>
+</table>
+{{/hasDecisions}}
+{{^hasDecisions}}<p>No decision has been recorded yet.</p>{{/hasDecisions}}
+</body>
+</html>

@@ -172,6 +172,21 @@ class InspectionIT extends MasterDataFixture {
 
         as(owner, get("/api/v1/audit-logs"))
                 .andExpect(jsonPath("$.data.items[*].action", hasItem("MATERIAL_DISPOSITION_RECORDED")));
+
+        // The report downloads as a PDF with the frozen specification, the measurements and who decided.
+        String number = JsonPath.read(body(as(owner, get("/api/v1/inspections/" + inspection))),
+                "$.data.inspectionNumber");
+        byte[] report = as(owner, get("/api/v1/inspections/" + inspection + "/report.pdf"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string(HttpHeaders.CONTENT_DISPOSITION, org.hamcrest.Matchers.containsString(number + ".pdf")))
+                .andReturn().getResponse().getContentAsByteArray();
+        try (org.apache.pdfbox.pdmodel.PDDocument document = org.apache.pdfbox.Loader.loadPDF(report)) {
+            String text = new org.apache.pdfbox.text.PDFTextStripper().getText(document);
+            assertThat(text).contains("Inspection report", number, "20.05", "Pass", "Accept");
+        }
+        Session outsider = register();
+        as(outsider, get("/api/v1/inspections/" + inspection + "/report.pdf")).andExpect(status().isNotFound());
     }
 
     @Test

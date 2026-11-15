@@ -37,7 +37,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Notifications are polled once a minute, with no live push. Only email and in-app channels exist | When a user needs it |
 | Hindi and Marathi email text was machine-drafted and needs review by a native speaker before customers see it | Before customer launch |
 | Some notifications have no dedicated template (NCR ready for closure, CAPA actions, verification, send-back, corrections). Their email has a translated frame around English text | When a user needs it |
-| The app itself is still English only | When a user needs it |
 | Organisation branding in email is the organisation name only. There is no logo upload | When a user needs it |
 | With verification switched off for private use, registration reveals that an email has an account | Private use only |
 | Sampling is fixed, percentage or every unit; AQL tables (such as ISO 2859-1) are not built | When a customer needs them |

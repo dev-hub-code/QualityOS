@@ -110,6 +110,8 @@ escaped in HTML. A missing variable fails the send rather than leaving a blank.
 
 To add a language, add it to `qualityos.mail.languages` and add a folder. Any file it lacks falls back to English.
 
+The app's own screens are English only, by decision. Only email is translated.
+
 Account emails retry three times in the background. Notification emails keep the existing retry schedule of about an
 hour. Notifications store their template and variables, not finished text, so the language is chosen when they are sent.
 

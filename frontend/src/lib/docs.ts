@@ -351,7 +351,7 @@ export const DOC_PAGES: DocPage[] = [
           "A changed result leaves an audit event.",
           "Failed material always gets an NCR, however it is disposed of.",
           "An instrument that is overdue or out of service cannot be recorded on an inspection.",
-          "Open a completed inspection to print its report.",
+          "Open a completed inspection to print its report or download it as a PDF.",
         ],
       },
     ],

@@ -14,12 +14,17 @@ import com.qualityos.inspection.dto.InspectionDtos.InspectionSummary;
 import com.qualityos.inspection.dto.InspectionDtos.SendBackRequest;
 import com.qualityos.inspection.dto.TemplateDtos.ApplicableTemplates;
 import com.qualityos.inspection.entity.Inspection;
+import com.qualityos.inspection.service.InspectionPdf;
 import com.qualityos.inspection.service.InspectionService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,8 +44,11 @@ public class InspectionController {
 
     private final InspectionService inspections;
 
-    InspectionController(InspectionService inspections) {
+    private final InspectionPdf pdf;
+
+    InspectionController(InspectionService inspections, InspectionPdf pdf) {
         this.inspections = inspections;
+        this.pdf = pdf;
     }
 
     @GetMapping
@@ -60,6 +68,17 @@ public class InspectionController {
     @PreAuthorize(Require.INSPECTION_VIEW)
     public ApiResponse<InspectionDetail> get(@PathVariable UUID id) {
         return ApiResponse.ok(inspections.get(id));
+    }
+
+    /** The inspection's report as a PDF, from the specification frozen into it. */
+    @GetMapping(value = "/{id}/report.pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize(Require.INSPECTION_VIEW)
+    public ResponseEntity<byte[]> reportPdf(@PathVariable UUID id) {
+        InspectionPdf.Document document = pdf.render(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(document.fileName()).build().toString())
+                .body(document.content());
     }
 
     /** Name one of the three. */

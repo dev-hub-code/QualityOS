@@ -21,8 +21,11 @@ export default function InspectionReportPage() {
   return (
     <div className="space-y-6">
       <PageHeader title={`Inspection report ${inspection.inspectionNumber}`}>
+        <a className="text-sm underline print:hidden" href={`/api/v1/inspections/${id}/report.pdf`}>
+          Download PDF
+        </a>
         <Button className="print:hidden" onClick={() => window.print()}>
-          Print or save as PDF
+          Print
         </Button>
       </PageHeader>
       <Section title="Summary">

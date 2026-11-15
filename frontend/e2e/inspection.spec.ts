@@ -103,6 +103,9 @@ test("a template is published, and a failed critical measurement never releases 
   await manager.getByRole("link", { name: "Report", exact: true }).click();
   await expect(manager.getByRole("heading", { name: /Inspection report/ })).toBeVisible();
   await expect(manager.getByText("19.9 to 20.1").first()).toBeVisible();
+  const pdf = manager.waitForEvent("download");
+  await manager.getByRole("link", { name: "Download PDF" }).click();
+  expect((await pdf).suggestedFilename()).toMatch(/^INS-.*\.pdf$/);
 
   // The failure now has an NCR, which runs through a verified CAPA to closure.
   await manager.goto(url);

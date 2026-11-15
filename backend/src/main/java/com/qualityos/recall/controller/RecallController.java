@@ -6,6 +6,7 @@ import com.qualityos.common.response.Pages;
 import com.qualityos.common.security.Permissions.Require;
 import com.qualityos.recall.dto.RecallDtos.AcknowledgementRequest;
 import com.qualityos.recall.dto.RecallDtos.AddBatchesRequest;
+import com.qualityos.recall.dto.RecallDtos.CloseRequest;
 import com.qualityos.recall.dto.RecallDtos.ContactAttemptRequest;
 import com.qualityos.recall.dto.RecallDtos.ContactStatusRequest;
 import com.qualityos.recall.dto.RecallDtos.ContactView;
@@ -181,8 +182,9 @@ public class RecallController {
 
     @PostMapping("/{id}/close")
     @PreAuthorize(Require.RECALL_CLOSE)
-    public ApiResponse<RecallDetail> close(@PathVariable UUID id, Authentication caller) {
-        return ApiResponse.ok(recalls.close(id, permissions(caller)));
+    public ApiResponse<RecallDetail> close(
+            @PathVariable UUID id, @Valid @RequestBody(required = false) CloseRequest request, Authentication caller) {
+        return ApiResponse.ok(recalls.close(id, request == null ? null : request.note(), permissions(caller)));
     }
 
     @GetMapping("/{id}/report")

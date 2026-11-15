@@ -82,10 +82,8 @@ test("a recall runs from the report through contact, acknowledgement and approve
     await dialog.getByLabel("Closure note").fill("Customer holds stock under quarantine");
     await dialog.getByLabel(/I accept that goods remain/).click();
   });
-  await expect(page.getByRole("button", { name: "Approve closure" })).toBeVisible();
-
-  await page.getByRole("button", { name: "Approve closure" }).click();
-  await expect(page.getByText("Someone else must approve closing this recall.")).toBeVisible();
+  await expect(page.getByText("Someone other than you must approve closing this recall.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Approve closure" })).toHaveCount(0);
 
   await manager.goto(recallUrl);
   await manager.getByRole("button", { name: "Approve closure" }).click();

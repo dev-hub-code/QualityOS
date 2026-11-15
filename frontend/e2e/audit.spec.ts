@@ -91,8 +91,8 @@ test("an audit runs from checklist to a finding's NCR, a report, and closure by 
   await step(page, "Request closure", async (form: Locator) => {
     await form.getByLabel("Closure note").fill("Nothing left open");
   });
-  await page.getByRole("button", { name: "Approve closure" }).click();
-  await expect(page.getByText("Someone else must approve closing this audit.")).toBeVisible();
+  await expect(page.getByText("Someone other than you must approve closing this audit.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Approve closure" })).toHaveCount(0);
 
   await manager.goto(auditUrl);
   await manager.getByRole("button", { name: "Approve closure" }).click();
@@ -123,4 +123,44 @@ test("audit and calibration pages stay closed to other organisations", async ({ 
   await stranger.goto(`/calibration/${instrument.id}`);
   await expect(stranger.getByText("This record does not exist.")).toBeVisible();
   await context.close();
+});
+
+test("a sole member closes their own audit by giving a reason", async ({ page }) => {
+  await signUp(page);
+  const call = apiCaller(page);
+  const me = await call("GET", "/auth/me");
+  const facility = await call("POST", "/facilities", { code: `S-${unique()}`.slice(0, 20), name: "Solo Plant" });
+  const checklist = await call("POST", "/audit-checklists", {
+    code: "SOLO",
+    name: "Solo checks",
+    items: [{ question: "Are gauges labelled?" }],
+  });
+  const audit = await call("POST", "/audits", {
+    auditType: "INTERNAL",
+    title: "Solo audit",
+    scope: "Everything",
+    facilityId: facility.id,
+    checklistId: checklist.id,
+    plannedOn: new Date().toISOString().slice(0, 10),
+    leadAuditorId: me.user.id,
+  });
+  await call("POST", `/audits/${audit.id}/start`);
+  await call("PUT", `/audits/${audit.id}/items/${audit.items[0].id}`, { result: "CONFORMING" });
+  await call("POST", `/audits/${audit.id}/complete`, { summary: "All fine" });
+  await call("POST", `/audits/${audit.id}/request-closure`, { note: "Nothing open" });
+
+  await page.goto(`/audits/${audit.id}`);
+  await expect(page.getByText("Someone other than you must approve closing this audit.")).toBeVisible();
+  await call("PUT", "/organizations/current/settings", {
+    singlePersonReview: true,
+    capaRequiredFrom: "MAJOR",
+    effectivenessRequiredFrom: "MAJOR",
+    version: null,
+  });
+  await page.reload();
+  await expect(page.getByText(/You are reviewing your own work/)).toBeVisible();
+  await step(page, "Approve closure", async (form: Locator) => {
+    await form.getByLabel("Why you are closing it yourself").fill("I am the only person in the company");
+  });
+  await expect(page.getByText("closed", { exact: true }).first()).toBeVisible();
 });

@@ -138,9 +138,10 @@ public class QualityAudit extends TenantOwnedEntity {
         closureNote = null;
     }
 
-    public void close(UUID approver, Instant now) {
+    /** @param reviewPermitted whether the approver may approve, which a requester may only in a one-person organisation */
+    public void close(UUID approver, Instant now, boolean reviewPermitted) {
         require(Status.PENDING_CLOSURE, "This audit is not waiting for closure.");
-        if (approver.equals(closureRequestedBy)) {
+        if (!reviewPermitted) {
             throw new BusinessRuleException("Someone else must approve closing this audit.");
         }
         status = Status.CLOSED;

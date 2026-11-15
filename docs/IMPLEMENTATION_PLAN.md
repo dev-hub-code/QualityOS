@@ -39,7 +39,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | With verification switched off for private use, registration reveals that an email has an account | Private use only |
 | Sampling is fixed, percentage or every unit; AQL tables (such as ISO 2859-1) are not built | When a customer needs them |
 | A one-person organisation can review its own inspections, NCR closures and CAPA verifications once an administrator turns this on under Settings. It applies only while there is one active member, and each use needs a reason, recorded as `SELF_REVIEW`. An administrator could deactivate everyone else to use it, but both steps are in the audit log | Review after real use |
-| Recalls, audits and material corrections still need a second person, even in a one-person organisation | When a user needs it |
 | Each organisation chooses which NCR severities need a closed CAPA and which need a verified fix (default: critical and major). The NCR statuses and their order are fixed | When a user needs it |
 | A change to the CAPA rule applies to open NCRs at once. A CAPA keeps the verification rule it was raised under | By design |
 | An NCR raised on a held lot has no rejected quantity, and a later reject does not fill it in | Review after real use |

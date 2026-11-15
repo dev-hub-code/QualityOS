@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
+import { SelfReviewNotice } from "@/components/app/review-policy";
 import { FormError } from "@/components/forms/field";
 import {
   Details,
@@ -16,6 +17,7 @@ import {
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { useMe, usePermission } from "@/hooks/use-me";
+import { useSelfReviewInEffect } from "@/hooks/use-organization-settings";
 import { api } from "@/lib/api";
 import { humanize } from "@/lib/capa";
 import type { FieldDef } from "@/lib/record-form";
@@ -29,6 +31,7 @@ export default function MaterialCorrectionPage() {
   const refresh = useRefresh();
   const { data: me } = useMe();
   const canApprove = usePermission("MATERIAL_CORRECTION_APPROVE");
+  const selfReviewInEffect = useSelfReviewInEffect();
   const { run, pending, message } = useAction();
   const [dialog, setDialog] = useState<"approve" | "reject" | "cancel" | null>(null);
   const { data: correction, error } = useQuery({ queryKey: [path], queryFn: () => api.get<CorrectionDetail>(path) });
@@ -39,7 +42,7 @@ export default function MaterialCorrectionPage() {
   const awaiting = status === "PENDING_APPROVAL";
   const reachedFurther = Boolean(impact && (impact.inspected || impact.batches.length || impact.customers.length));
   const approveFields: FieldDef[] = [
-    { name: "note", label: "Note", type: "textarea" },
+    mine ? { ...noteField, label: "Why you are approving it yourself" } : { ...noteField, required: false },
     ...(reachedFurther
       ? [{ name: "impactAcknowledged", label: "I have reviewed the impact below", type: "checkbox" } as FieldDef]
       : []),
@@ -60,13 +63,13 @@ export default function MaterialCorrectionPage() {
             Submit for approval
           </Button>
         )}
+        {canApprove && awaiting && (!mine || selfReviewInEffect) && (
+          <Button onClick={() => setDialog("approve")}>Approve</Button>
+        )}
         {canApprove && awaiting && !mine && (
-          <>
-            <Button onClick={() => setDialog("approve")}>Approve</Button>
-            <Button variant="outline" onClick={() => setDialog("reject")}>
-              Reject
-            </Button>
-          </>
+          <Button variant="outline" onClick={() => setDialog("reject")}>
+            Reject
+          </Button>
         )}
         {mine && (status === "DRAFT" || awaiting) && (
           <Button variant="outline" onClick={() => setDialog("cancel")}>
@@ -75,7 +78,10 @@ export default function MaterialCorrectionPage() {
         )}
       </PageHeader>
       <FormError message={message} />
-      {awaiting && mine && <p className="text-sm text-muted-foreground">Someone other than you must approve this.</p>}
+      {awaiting && mine && canApprove && selfReviewInEffect && <SelfReviewNotice />}
+      {awaiting && mine && !(canApprove && selfReviewInEffect) && (
+        <p className="text-sm text-muted-foreground">Someone other than you must approve this.</p>
+      )}
       <Section title="Details">
         <Details
           items={[

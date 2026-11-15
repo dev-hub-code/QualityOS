@@ -804,6 +804,7 @@ export const DOC_PAGES: DocPage[] = [
           "A linked CAPA must be closed.",
           "Someone other than the requester must approve the closure.",
           "While a recall is open, its batches, and anything made from them, cannot be dispatched. Someone who manages recalls can override this with a reason, and the customer joins the recall at once.",
+          "Batches found later can be added to an open recall, and the CAPA behind it can be linked or changed.",
         ],
       },
       {

@@ -44,6 +44,11 @@ public class Recall extends TenantOwnedEntity {
         this.capaId = capaId;
     }
 
+    public void linkCapa(UUID capaId) {
+        requireOpen();
+        this.capaId = capaId;
+    }
+
     public void requireOpen() {
         if (status != Status.OPEN) {
             throw new BusinessRuleException("This recall is no longer open for changes.");

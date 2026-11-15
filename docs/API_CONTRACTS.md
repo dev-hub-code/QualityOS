@@ -181,12 +181,17 @@ a member's facilities answer 404.
 | Recalls | Permission |
 |---|---|
 | `GET /recalls`, `GET /recalls/{id}`, `/customers`, `/contact-history`, `/dashboard`, `/report`, `/report.pdf` | `RECALL_VIEW` |
-| `POST /recalls`, `PUT /recalls/{id}/customers/{customerId}`, `POST .../contact-attempts`, `POST .../status`, `POST /recalls/{id}/acknowledgements`, `POST /recalls/{id}/request-closure` | `RECALL_MANAGE` |
+| `POST /recalls`, `PUT /recalls/{id}/customers/{customerId}`, `POST .../contact-attempts`, `POST .../status`, `POST /recalls/{id}/acknowledgements`, `POST /recalls/{id}/request-closure`, `POST /recalls/{id}/batches`, `PUT /recalls/{id}/capa` | `RECALL_MANAGE` |
 | `POST /recalls/{id}/customers/{customerId}/exception`, `POST /recalls/{id}/send-back`, `POST /recalls/{id}/close` | `RECALL_CLOSE` |
 
 A sent email is an attempt with the outcome `NO_REPLY`. Only `REACHED` moves a customer to `CONTACTED`, and only an
 acknowledgement allows `RESOLVED`. Closing needs every customer resolved or covered by an exception, any linked CAPA closed,
 and a second person.
+
+While a recall is open, `POST /recalls/{id}/batches` adds batches found later (`batchNumbers`, `reason`). Their
+customers get contact records as at the start, a batch already in the recall is skipped, and adding none is a 422. It is
+audited as `RECALL_BATCHES_ADDED` with the numbers and reason. `PUT /recalls/{id}/capa` links, changes or (with an empty
+`capaId`) unlinks the CAPA, audited as `RECALL_CAPA_LINKED`.
 
 | Calibration | Permission |
 |---|---|

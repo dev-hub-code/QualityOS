@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { FormError } from "@/components/forms/field";
 import { ContactTable } from "@/components/recalls/contact-table";
+import { RecallChanges } from "@/components/recalls/recall-changes";
 import { RecallDashboardTiles } from "@/components/recalls/recall-dashboard";
 import { Details, PageHeader, QueryState, RecordLink, Section, StatusBadge, useAction, useAssignees, useRefresh } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
@@ -120,6 +121,7 @@ export default function RecallPage() {
       <PageHeader title={recall.recallNumber} subtitle={`Batches ${recall.batchNumbers.join(", ")}`}>
         <StatusBadge status={recall.status} />
         <RecordLink href={`${path}/report`}>Report</RecordLink>
+        <RecallChanges recall={recall} path={path} />
       </PageHeader>
       <Section title="Recall">
         <Details

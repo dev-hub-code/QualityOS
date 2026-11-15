@@ -283,6 +283,21 @@ public class CapaService implements AttachmentPolicy {
         return overdue.size();
     }
 
+    /** Reminds each late action's owner, and the CAPA's owner, once a week until it is done. */
+    @Transactional
+    public int remindOverdueActions() {
+        Instant now = Instant.now();
+        List<CapaAction> late = actions.findOverdue(today(), now.minus(OVERDUE_REMINDER_INTERVAL));
+        Map<UUID, CorrectiveAction> parents = capas.findAllById(late.stream().map(CapaAction::getCapaId)
+                .collect(java.util.stream.Collectors.toSet())).stream()
+                .collect(java.util.stream.Collectors.toMap(CorrectiveAction::getId, capa -> capa));
+        late.forEach(action -> {
+            alerts.capaActionOverdue(parents.get(action.getCapaId()), action);
+            action.remindedOverdue(now);
+        });
+        return late.size();
+    }
+
     /** Reminds each owner once, shortly before the date. Runs under the current tenant. */
     @Transactional
     public int remindDueSoon() {

@@ -350,6 +350,34 @@ class QualityIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void aLateActionIsChasedWeeklyUntilItIsDone() throws Exception {
+        String capa = capa(null, manager);
+        String number = read(as(owner, get("/api/v1/capas/" + capa)), "$.data.capaNumber");
+        analyse(capa);
+        String action = addAction(capa, "CORRECTIVE");
+        asAppRole(owner.tenantId(), sql -> sql.update(
+                "UPDATE capa_actions SET target_date = current_date - 2 WHERE id = ?", UUID.fromString(action)));
+        asAppRole(null, sql -> assertThat(sql.queryForList("SELECT tenants_with_capas_due()", UUID.class))
+                .contains(owner.tenantId()));
+
+        assertThat(remindActions()).isEqualTo(1);
+        assertThat(remindActions()).isZero();
+        assertThat(titles(manager)).containsOnlyOnce("An action on " + number + " is overdue");
+
+        asAppRole(owner.tenantId(), sql -> sql.update(
+                "UPDATE capa_actions SET overdue_notified_at = now() - interval '8 days' WHERE id = ?",
+                UUID.fromString(action)));
+        act(owner, "/capas/" + capa + "/start-implementation", Map.of()).andExpect(status().isOk());
+        act(owner, "/capas/" + capa + "/actions/" + action + "/complete", Map.of("note", "Done"))
+                .andExpect(status().isOk());
+        assertThat(remindActions()).isZero();
+    }
+
+    private int remindActions() {
+        return TenantContext.callAs(owner.tenantId(), null, capaService::remindOverdueActions);
+    }
+
+    @Test
     void aCapaIsRemindedOnceBeforeItsDueDate() throws Exception {
         String capa = capa(null, manager);
         asAppRole(owner.tenantId(), sql -> sql.update(

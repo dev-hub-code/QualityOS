@@ -77,6 +77,15 @@ class QualityAlerts {
                 capaEmail(EmailTemplate.CAPA_CLOSURE, capa));
     }
 
+    void capaActionOverdue(CorrectiveAction capa, CapaAction action) {
+        Set<UUID> recipients = new HashSet<>();
+        recipients.add(action.getOwnerId());
+        recipients.add(capa.getOwnerId());
+        capa(recipients, NotificationType.CAPA_ACTION_OVERDUE, capa,
+                "An action on " + capa.getCapaNumber() + " is overdue",
+                action.getDescription() + ". It was due on " + action.getTargetDate() + ".", null);
+    }
+
     void capaOverdue(CorrectiveAction capa) {
         capa(Set.of(capa.getOwnerId()), NotificationType.CAPA_OVERDUE, capa,
                 capa.getCapaNumber() + " is overdue",

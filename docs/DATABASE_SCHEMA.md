@@ -274,6 +274,13 @@ released, running or held work order past its planned end, or a line of an appro
 then works under each tenant, in the organisation's own date, and skips a plan line once its work orders have received
 its full quantity into finished goods.
 
+## CAPA action reminders (V33)
+
+`capa_actions.overdue_notified_at` records when an open action past its target date was last chased, so the hourly
+CAPA job reminds the action's owner and the CAPA's owner once a week until it is done. `tenants_with_capas_due()` now
+also names a tenant with such an action, and an `overdue_scan` read policy on `capa_actions` lets the function's owner
+see actions across organisations for that purpose only, as it already could for `corrective_actions`.
+
 ## Production NCRs (V31)
 
 `operation_reports.defect_category_id` names the defect behind a report's rejects and scrap.

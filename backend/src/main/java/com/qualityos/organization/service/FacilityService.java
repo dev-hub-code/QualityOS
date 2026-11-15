@@ -214,6 +214,12 @@ public class FacilityService {
                 .toList();
     }
 
+    /** For other modules that must not fail when a facility has been archived. */
+    @Transactional(readOnly = true)
+    public boolean isActive(UUID id) {
+        return facilities.findById(id).map(facility -> facility.getArchivedAt() == null).orElse(false);
+    }
+
     /** For other modules recording new activity at a facility. */
     @Transactional(readOnly = true)
     public void requireActive(UUID id) {

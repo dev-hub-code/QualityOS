@@ -1,0 +1,8 @@
+Subject: {{auditNumber}} is on {{dueDate}}
+
+An audit you lead is coming up
+
+Hello {{recipientName}},
+{{auditNumber}}, {{auditTitle}}, is planned for {{dueDate}}. You are its lead auditor.
+
+Open audit: {{actionUrl}}

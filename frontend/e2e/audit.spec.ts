@@ -33,9 +33,11 @@ test("an audit runs from checklist to a finding's NCR, a report, and closure by 
   await dialog.getByLabel("Checklist", { exact: true }).selectOption({ label: "SHOP – Shop floor" });
   await dialog.getByLabel("Planned for").fill(new Date().toISOString().slice(0, 10));
   await dialog.getByLabel("Lead auditor").selectOption({ label: "Meera Iyer" });
+  await dialog.getByLabel("Repeat every").selectOption({ label: "Year" });
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("heading", { name: /^AUD-/ })).toBeVisible();
   const auditUrl = page.url();
+  await expect(page.getByText("Every year")).toBeVisible();
 
   await page.getByRole("button", { name: "Start audit" }).click();
   await page.getByLabel("Answer to question 1").selectOption("NONCONFORMING");
@@ -96,6 +98,9 @@ test("an audit runs from checklist to a finding's NCR, a report, and closure by 
   await manager.getByRole("button", { name: "Approve closure" }).click();
   await expect(manager.getByText("closed", { exact: true }).first()).toBeVisible();
   await expect(manager.getByRole("button", { name: "Approve closure" })).toHaveCount(0);
+  await manager.getByRole("link", { name: /^AUD-/ }).click();
+  await expect(manager.getByText("Every year")).toBeVisible();
+  await expect(manager.getByRole("button", { name: "Start audit" })).toBeVisible();
 });
 
 test("audit and calibration pages stay closed to other organisations", async ({ page, browser }) => {

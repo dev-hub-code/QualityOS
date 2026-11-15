@@ -5,6 +5,8 @@ import com.qualityos.auditmanagement.entity.AuditItem;
 import com.qualityos.auditmanagement.entity.QualityAudit;
 import com.qualityos.quality.dto.QualityDtos.NcrOutcome;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -58,14 +60,17 @@ public final class AuditDtos {
             UUID productId,
             @NotNull UUID checklistId,
             @NotNull LocalDate plannedOn,
-            @NotNull UUID leadAuditorId) {
+            @NotNull UUID leadAuditorId,
+            @Min(1) @Max(36) Integer repeatEveryMonths) {
     }
 
+    /** @param repeatEveryMonths empty for a one-off audit */
     public record ReplanAuditRequest(
             @NotBlank @Size(max = 200) String title,
             @NotBlank @Size(max = MAX_TEXT) String scope,
             @NotNull LocalDate plannedOn,
-            @NotNull UUID leadAuditorId) {
+            @NotNull UUID leadAuditorId,
+            @Min(1) @Max(36) Integer repeatEveryMonths) {
     }
 
     public record AnswerItemRequest(@NotNull AuditItem.Result result, @Size(max = MAX_TEXT) String note) {
@@ -151,6 +156,9 @@ public final class AuditDtos {
             String closedByName,
             Instant closedAt,
             String cancelReason,
+            Integer repeatEveryMonths,
+            UUID nextAuditId,
+            String nextAuditNumber,
             List<ItemView> items,
             List<FindingView> findings,
             AuditReview review) {

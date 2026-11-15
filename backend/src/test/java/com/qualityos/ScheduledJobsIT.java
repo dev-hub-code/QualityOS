@@ -126,7 +126,7 @@ class ScheduledJobsIT extends AbstractIntegrationTest {
     void everyJobIsRegisteredAtStartupWithItsConfiguredInterval() {
         assertThat(clock.delays()).containsExactlyInAnyOrder(
                 Duration.ofHours(6), Duration.ofSeconds(30), Duration.ofHours(1), Duration.ofHours(1), Duration.ofHours(1), Duration.ofHours(1),
-                Duration.ofHours(1), Duration.ofHours(24),
+                Duration.ofHours(1), Duration.ofHours(1), Duration.ofHours(24),
                 Duration.ofMinutes(15));
     }
 
@@ -323,7 +323,7 @@ class ScheduledJobsIT extends AbstractIntegrationTest {
         tickEverything();
         assertThat(monitor.stale(Instant.now())).isEmpty();
         assertThat(monitor.stale(Instant.now().plus(Duration.ofHours(4)))).containsKeys(
-                "capa-reminders", "calibration-reminders", "subscription-notices", "unconfirmed-shipments", "notification-delivery");
+                "capa-reminders", "calibration-reminders", "audit-reminders", "subscription-notices", "unconfirmed-shipments", "notification-delivery");
         assertThat(monitor.stale(Instant.now().plus(Duration.ofHours(4)))).doesNotContainKey("account-maintenance");
     }
 }

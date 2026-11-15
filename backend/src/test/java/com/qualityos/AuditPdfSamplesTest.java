@@ -38,7 +38,7 @@ class AuditPdfSamplesTest {
                 "Heat treatment and final inspection at the Chakan plant.", UUID.randomUUID(), "Pune Plant",
                 UUID.randomUUID(), "Bharat Steels", null, null, "Supplier process audit", LocalDate.of(2026, 10, 20),
                 UUID.randomUUID(), "Meera Iyer", "COMPLETED", "The plant follows its procedures, with the exceptions below.",
-                Instant.now(), Instant.now(), null, null, null, null, null, null, items, findings,
+                Instant.now(), Instant.now(), null, null, null, null, null, null, null, null, null, items, findings,
                 new AuditReview(questions, questions, questions - questions / 5, questions / 5, 0, List.of()));
         return new AuditReport("Acme Forgings", "Acme Forgings Private Limited", "Gat 121, Chakan, Pune 410501",
                 "31 Oct 2026, 12:00 IST", audit);

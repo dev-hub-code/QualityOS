@@ -24,6 +24,7 @@ public enum EmailTemplate {
     CALIBRATION_OVERDUE("calibration/overdue"),
     AUDIT_SCHEDULED("audit/scheduled"),
     AUDIT_FINDINGS("audit/findings"),
+    AUDIT_DUE_SOON("audit/due-soon"),
     SUBSCRIPTION_EXPIRY("subscription/expiry"),
     PAYMENT_CONFIRMATION("subscription/payment-confirmation"),
     PRODUCTION_APPROVAL("production/approval"),

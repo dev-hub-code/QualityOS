@@ -16,7 +16,11 @@ const column = createColumnHelper<Facility>();
 const columns = [
   column.accessor("code", {
     header: "Code",
-    cell: (info) => <RecordLink href={`/facilities/${info.row.original.id}`}>{info.getValue()}</RecordLink>,
+    cell: (info) => (
+      <RecordLink href={`/facilities/${info.row.original.id}`}>
+        {info.getValue()}
+      </RecordLink>
+    ),
   }),
   column.accessor("name", { header: "Name" }),
   column.accessor("city", { header: "City" }),
@@ -30,9 +34,12 @@ export default function FacilitiesPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Facilities">
-        {canManage && <Button onClick={() => setAdding(true)}>Add facility</Button>}
+        {canManage && (
+          <Button onClick={() => setAdding(true)}>Add facility</Button>
+        )}
       </PageHeader>
       <DataTable
+        restorable={canManage}
         path="/facilities"
         columns={columns}
         searchLabel="Search facilities"

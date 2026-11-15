@@ -54,8 +54,9 @@ public class WorkCenterController {
             @RequestParam(defaultValue = "25") int size,
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) String q,
-            @RequestParam(required = false) UUID facilityId) {
-        return ApiResponse.ok(workCenters.list(q, facilityId, Pages.of(page, size, sort, CENTRE_SORT, "code")));
+            @RequestParam(required = false) UUID facilityId,
+            @RequestParam(defaultValue = "false") boolean archived) {
+        return ApiResponse.ok(workCenters.list(q, facilityId, archived, Pages.of(page, size, sort, CENTRE_SORT, "code")));
     }
 
     @PostMapping("/work-centers")
@@ -81,6 +82,13 @@ public class WorkCenterController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void archive(@PathVariable UUID id) {
         workCenters.archive(id);
+    }
+
+    @PostMapping("/work-centers/{id}/restore")
+    @PreAuthorize(Require.MANUFACTURING_MANAGE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void restore(@PathVariable UUID id) {
+        workCenters.restore(id);
     }
 
     @GetMapping("/machines")

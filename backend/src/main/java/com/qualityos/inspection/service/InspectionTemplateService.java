@@ -66,8 +66,8 @@ public class InspectionTemplateService {
 
     @Transactional(readOnly = true)
     public PageResponse<TemplateSummary> list(
-            String search, InspectionTemplate.Type type, UUID materialId, Pageable pageable) {
-        Specification<InspectionTemplate> filter = Specification.<InspectionTemplate>where(Searches.notArchived())
+            String search, InspectionTemplate.Type type, UUID materialId, boolean archived, Pageable pageable) {
+        Specification<InspectionTemplate> filter = Specification.<InspectionTemplate>where(Searches.archived(archived))
                 .and(Searches.contains(search, "code", "name"))
                 .and(Searches.equalTo("inspectionType", type))
                 .and(appliesToMaterial(materialId));
@@ -113,6 +113,17 @@ public class InspectionTemplateService {
     public void archive(UUID id) {
         load(id).setArchivedAt(Instant.now());
         audit.record("TEMPLATE_ARCHIVED", "InspectionTemplate", id);
+    }
+
+    /** Brings an archived template back into lists and pickers. */
+    @Transactional
+    public void restore(UUID id) {
+        var restored = load(id);
+        if (restored.getArchivedAt() == null) {
+            throw new BusinessRuleException("This template is not archived.");
+        }
+        restored.setArchivedAt(null);
+        audit.record("TEMPLATE_RESTORED", "InspectionTemplate", id);
     }
 
     /** Starts the next version as a copy of the latest, which stays in force until the copy is published. */

@@ -64,6 +64,10 @@ fields are allow-listed per endpoint. `data` is a `PageResponse`:
     component;
   - a material on a line of an approved BOM or recipe in effect, on an open work order, or with open reservations;
   - a facility with a work centre in use, an open work order or an open production plan.
+- Products, materials, suppliers, facilities, work centres, inspection templates and audit checklists list archived
+  records with `archived=true`, and `POST .../{id}/restore` brings one back (`204`; `422` when it is not archived). Restoring
+  needs the permission that archiving needs, and is audited as `<RECORD>_RESTORED`. Codes stay unique across archived
+  records, so a restore never clashes.
 - Requests never carry a tenant ID.
 
 ## Authentication

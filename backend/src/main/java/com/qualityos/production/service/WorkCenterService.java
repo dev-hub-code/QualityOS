@@ -125,8 +125,8 @@ public class WorkCenterService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<WorkCenterResponse> list(String search, UUID facilityId, Pageable pageable) {
-        Specification<WorkCenter> filter = Specification.<WorkCenter>where(Searches.notArchived())
+    public PageResponse<WorkCenterResponse> list(String search, UUID facilityId, boolean archived, Pageable pageable) {
+        Specification<WorkCenter> filter = Specification.<WorkCenter>where(Searches.archived(archived))
                 .and(Searches.contains(search, "code", "name"))
                 .and(Searches.equalTo("facilityId", facilityId));
         Page<WorkCenter> page = workCenters.findAll(scope.limit(filter, "facilityId"), pageable);
@@ -181,6 +181,17 @@ public class WorkCenterService {
         }
         centre.setArchivedAt(Instant.now());
         audit.record("WORK_CENTER_ARCHIVED", "WorkCenter", id);
+    }
+
+    /** Brings an archived work centre back into lists and pickers. */
+    @Transactional
+    public void restore(UUID id) {
+        var restored = load(id);
+        if (restored.getArchivedAt() == null) {
+            throw new BusinessRuleException("This work centre is not archived.");
+        }
+        restored.setArchivedAt(null);
+        audit.record("WORK_CENTER_RESTORED", "WorkCenter", id);
     }
 
     /** For a routing operation: the work centre must be in use and in one of this member's facilities. */

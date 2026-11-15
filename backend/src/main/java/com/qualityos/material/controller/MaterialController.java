@@ -51,8 +51,9 @@ public class MaterialController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size,
             @RequestParam(required = false) String sort,
-            @RequestParam(required = false) String q) {
-        return ApiResponse.ok(materials.list(q, Pages.of(page, size, sort, SORTABLE, "name")));
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "false") boolean archived) {
+        return ApiResponse.ok(materials.list(q, archived, Pages.of(page, size, sort, SORTABLE, "name")));
     }
 
     @GetMapping("/materials/{id}")
@@ -79,6 +80,13 @@ public class MaterialController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void archive(@PathVariable UUID id) {
         materials.archive(id);
+    }
+
+    @PostMapping("/materials/{id}/restore")
+    @PreAuthorize(Require.PRODUCT_MANAGE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void restore(@PathVariable UUID id) {
+        materials.restore(id);
     }
 
     @PostMapping("/materials/{id}/specifications")

@@ -72,8 +72,8 @@ public class MaterialService implements AttachmentPolicy {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<MaterialResponse> list(String search, Pageable pageable) {
-        Specification<Material> filter = Specification.<Material>where(Searches.notArchived())
+    public PageResponse<MaterialResponse> list(String search, boolean archived, Pageable pageable) {
+        Specification<Material> filter = Specification.<Material>where(Searches.archived(archived))
                 .and(Searches.contains(search, "code", "name", "grade"));
         return PageResponse.from(materials.findAll(filter, pageable), mapper::toResponse);
     }
@@ -115,6 +115,17 @@ public class MaterialService implements AttachmentPolicy {
         ArchiveGuard.check(archiveGuards, ArchiveGuard.Kind.MATERIAL, id, "material");
         material.setArchivedAt(Instant.now());
         audit.record("MATERIAL_ARCHIVED", "Material", id);
+    }
+
+    /** Brings an archived material back into lists and pickers. */
+    @Transactional
+    public void restore(UUID id) {
+        var restored = load(id);
+        if (restored.getArchivedAt() == null) {
+            throw new BusinessRuleException("This material is not archived.");
+        }
+        restored.setArchivedAt(null);
+        audit.record("MATERIAL_RESTORED", "Material", id);
     }
 
     @Transactional

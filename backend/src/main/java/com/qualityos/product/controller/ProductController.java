@@ -52,8 +52,9 @@ public class ProductController {
             @RequestParam(defaultValue = "25") int size,
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) String q,
-            @RequestParam(required = false) Product.Type type) {
-        return ApiResponse.ok(products.list(q, type, Pages.of(page, size, sort, SORTABLE, "name")));
+            @RequestParam(required = false) Product.Type type,
+            @RequestParam(defaultValue = "false") boolean archived) {
+        return ApiResponse.ok(products.list(q, type, archived, Pages.of(page, size, sort, SORTABLE, "name")));
     }
 
     @GetMapping("/{id}")
@@ -80,6 +81,13 @@ public class ProductController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void archive(@PathVariable UUID id) {
         products.archive(id);
+    }
+
+    @PostMapping("/{id}/restore")
+    @PreAuthorize(Require.PRODUCT_MANAGE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void restore(@PathVariable UUID id) {
+        products.restore(id);
     }
 
     @PostMapping("/{id}/revisions")

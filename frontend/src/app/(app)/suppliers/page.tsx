@@ -17,21 +17,35 @@ import { api } from "@/lib/api";
 import { supplierFields } from "@/lib/record-fields";
 import type { Supplier } from "@/lib/types";
 
-const STATUSES = ["DRAFT", "PENDING_APPROVAL", "APPROVED", "REJECTED", "BLOCKED"];
+const STATUSES = [
+  "DRAFT",
+  "PENDING_APPROVAL",
+  "APPROVED",
+  "REJECTED",
+  "BLOCKED",
+];
 
 const column = createColumnHelper<Supplier>();
 const columns = [
   column.accessor("code", {
     header: "Code",
-    cell: (info) => <RecordLink href={`/suppliers/${info.row.original.id}`}>{info.getValue()}</RecordLink>,
+    cell: (info) => (
+      <RecordLink href={`/suppliers/${info.row.original.id}`}>
+        {info.getValue()}
+      </RecordLink>
+    ),
   }),
   column.accessor("name", { header: "Name" }),
   column.accessor("city", { header: "City" }),
-  column.accessor("status", { header: "Status", cell: (info) => <StatusBadge status={info.getValue()} /> }),
+  column.accessor("status", {
+    header: "Status",
+    cell: (info) => <StatusBadge status={info.getValue()} />,
+  }),
 ];
 
 export default function SuppliersPage() {
   const canCreate = usePermission("SUPPLIER_CREATE");
+  const canRestore = usePermission("SUPPLIER_UPDATE");
   const categories = useSupplierCategories();
   const refresh = useRefresh();
   const [adding, setAdding] = useState(false);
@@ -39,7 +53,9 @@ export default function SuppliersPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Suppliers">
-        {canCreate && <Button onClick={() => setAdding(true)}>Add supplier</Button>}
+        {canCreate && (
+          <Button onClick={() => setAdding(true)}>Add supplier</Button>
+        )}
       </PageHeader>
       <select
         aria-label="Filter by status"
@@ -55,6 +71,7 @@ export default function SuppliersPage() {
         ))}
       </select>
       <DataTable
+        restorable={canRestore}
         path="/suppliers"
         columns={columns}
         filter={status && `status=${status}`}

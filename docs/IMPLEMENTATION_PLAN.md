@@ -100,7 +100,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Only `NCR_CAPA`, `REPORTS` and `ADVANCED` are enforced. A feature added in the Control Center is listed but restricts nothing until code enforces it | When a feature is sold |
 | An organisation's contact number is not recorded anywhere, so the Control Center cannot show it | When a user needs it |
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
-| Lists show only active records, with no way to restore an archived one | When a user needs it |
 | Facility, supplier, material and product pickers load the first 100 records | Add search when a tenant exceeds this |
 | All seven manufacturing phases are built, through finished-goods receipt and OEE. Each phase's own limits are listed in [MANUFACTURING.md](MANUFACTURING.md) | Review after real use |
 | Facility sub-records (departments, lines, shifts), supplier contacts, material-to-product mappings, and new units are not audited individually | Review after real use |

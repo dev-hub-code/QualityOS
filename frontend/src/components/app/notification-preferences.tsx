@@ -24,6 +24,7 @@ const LABELS: Record<string, string> = {
   CAPA_AWAITING_VERIFICATION: "A CAPA needs effectiveness verification",
   CAPA_DUE_SOON: "My CAPA is due soon",
   CAPA_OVERDUE: "My CAPA is overdue",
+  CAPA_ACTION_OVERDUE: "An action I own, or on my CAPA, is overdue",
   CAPA_CLOSED: "My CAPA is closed",
   DISPATCH_SHIPMENT_UNCONFIRMED: "Dispatches are waiting for shipment confirmation",
   CALIBRATION_DUE_SOON: "An instrument is due for calibration",

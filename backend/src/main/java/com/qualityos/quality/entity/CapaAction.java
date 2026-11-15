@@ -31,6 +31,7 @@ public class CapaAction extends TenantOwnedEntity {
     private LocalDate targetDate;
     private Instant completedAt;
     private String completionNote;
+    private Instant overdueNotifiedAt;
 
     public CapaAction(UUID capaId, Type actionType, String description, UUID ownerId, LocalDate targetDate) {
         this.capaId = capaId;
@@ -42,6 +43,10 @@ public class CapaAction extends TenantOwnedEntity {
 
     public boolean isDone() {
         return completedAt != null;
+    }
+
+    public void remindedOverdue(Instant now) {
+        overdueNotifiedAt = now;
     }
 
     public void complete(String note, Instant now) {

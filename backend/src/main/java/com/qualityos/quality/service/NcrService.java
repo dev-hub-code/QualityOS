@@ -18,6 +18,7 @@ import com.qualityos.organization.service.FacilityService;
 import com.qualityos.quality.dto.QualityDtos.Assignee;
 import com.qualityos.quality.dto.QualityDtos.AuditFailure;
 import com.qualityos.quality.dto.QualityDtos.CalibrationFailure;
+import com.qualityos.quality.dto.QualityDtos.ProductionReject;
 import com.qualityos.quality.dto.QualityDtos.CapaHistory;
 import com.qualityos.quality.dto.QualityDtos.NcrHistory;
 import com.qualityos.quality.dto.QualityDtos.NcrOutcome;
@@ -40,6 +41,7 @@ import com.qualityos.quality.repository.NcrStatusChangeRepository;
 import com.qualityos.quality.repository.NonConformanceRepository;
 import com.qualityos.supplier.service.SupplierService;
 import java.time.Instant;
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -252,6 +254,59 @@ public class NcrService implements AttachmentPolicy {
                                 .formatted(failure.calibratedOn(), String.join(", ", failure.inspectionNumbers())))));
         return new NcrOutcome(ncr.getId(), ncr.getNcrNumber(), ncr.getStatus().name(), ncr.getStatus().isFinished(),
                 List.of());
+    }
+
+    /**
+     * Joins the report's transaction, so a reject cannot be recorded without its NCR. Repeats return the same NCR. The
+     * part sent to rework is still a nonconformance; its rework order deals with the goods.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public UUID raiseFromProduction(ProductionReject reject) {
+        return ncrs.findByOperationReportId(reject.operationReportId())
+                .orElseGet(() -> raise(reject.facilityId(), NonConformance.fromProduction(
+                        numbers.next(NUMBER_PREFIX),
+                        reject.workOrderId(),
+                        reject.operationReportId(),
+                        reject.batchNumber(),
+                        reject.defectCategoryId(),
+                        "%s operation %d: %s".formatted(reject.workOrderNumber(), reject.operationSequence(),
+                                rejectSummary(reject)),
+                        rejectDescription(reject),
+                        reject.quantity()).rejectedIn(reject.uomId())))
+                .getId();
+    }
+
+    /** For a shop-floor report: the category must exist and be in use. */
+    @Transactional(readOnly = true)
+    public void requireDefectCategory(UUID id) {
+        requireCategory(id);
+    }
+
+    private static String rejectSummary(ProductionReject reject) {
+        List<String> parts = new java.util.ArrayList<>();
+        if (reject.rejected().signum() > 0) {
+            parts.add(plainNumber(reject.rejected()) + " rejected");
+        }
+        if (reject.scrapped().signum() > 0) {
+            parts.add(plainNumber(reject.scrapped()) + " scrapped");
+        }
+        return String.join(", ", parts);
+    }
+
+    private static String rejectDescription(ProductionReject reject) {
+        StringBuilder text = new StringBuilder("Reported on operation %d (%s) of %s: %s.".formatted(
+                reject.operationSequence(), reject.operationName(), reject.workOrderNumber(), rejectSummary(reject)));
+        if (reject.rework().signum() > 0) {
+            text.append(" %s of the rejected go to rework.".formatted(plainNumber(reject.rework())));
+        }
+        if (reject.comment() != null && !reject.comment().isBlank()) {
+            text.append(" Operator's comment: ").append(reject.comment().trim());
+        }
+        return text.toString();
+    }
+
+    private static String plainNumber(BigDecimal value) {
+        return value.stripTrailingZeros().toPlainString();
     }
 
     /** The NCR each failed calibration raised, by calibration. Like {@link #outcomes}, for a caller who sees the instrument. */
@@ -528,6 +583,7 @@ public class NcrService implements AttachmentPolicy {
                 ncr.getInspectionId(),
                 ncr.getAuditId(),
                 ncr.getInstrumentId(),
+                ncr.getWorkOrderId(),
                 ncr.getSupplierId(),
                 ncr.getSupplierId() == null ? null : supplierNames(Set.of(ncr.getSupplierId())).get(ncr.getSupplierId()),
                 ncr.getMaterialId(),

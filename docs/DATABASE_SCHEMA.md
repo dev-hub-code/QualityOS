@@ -273,3 +273,10 @@ and returns tenant ids only, on the same pattern as `tenants_with_overdue_capas(
 released, running or held work order past its planned end, or a line of an approved plan past its due date. The job
 then works under each tenant, in the organisation's own date, and skips a plan line once its work orders have received
 its full quantity into finished goods.
+
+## Production NCRs (V31)
+
+`operation_reports.defect_category_id` names the defect behind a report's rejects and scrap.
+`manufacturing_settings.rejection_raises_ncr` (default true) decides whether such a report raises an NCR.
+`non_conformances` gains source `PRODUCTION`, with `work_order_id` and `operation_report_id` set exactly for that
+source. A partial unique index allows one NCR per report.

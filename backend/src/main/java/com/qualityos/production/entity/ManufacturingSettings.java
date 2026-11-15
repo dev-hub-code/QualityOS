@@ -57,4 +57,7 @@ public class ManufacturingSettings extends TenantOwnedEntity {
 
     /** Discrete products are received with one serial number for each unit. */
     private boolean serialTracking;
+
+    /** Goods rejected or scrapped on an operation raise an NCR. */
+    private boolean rejectionRaisesNcr = true;
 }

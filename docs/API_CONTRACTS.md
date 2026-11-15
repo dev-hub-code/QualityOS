@@ -408,7 +408,8 @@ Reading needs `WORK_ORDER_VIEW`. Quantities are in the work order's unit. Every 
 | `POST /operations/{id}/start` | `PRODUCTION_EXECUTE` | Optional `machineId`. Ready operations of orders in progress |
 | `POST /operations/{id}/pause` | `PRODUCTION_EXECUTE` | `category` (stop reason), optional `reason` |
 | `POST /operations/{id}/resume` | `PRODUCTION_EXECUTE` | |
-| `POST /operations/{id}/reports` | `PRODUCTION_EXECUTE` | `quantity`, `goodQuantity`, `rejectedQuantity`, `scrapQuantity` (must add up to `quantity`), optional `reworkQuantity` (within rejected) and `comment`. Accepts `Idempotency-Key` |
+| `POST /operations/{id}/reports` | `PRODUCTION_EXECUTE` | `quantity`, `goodQuantity`, `rejectedQuantity`, `scrapQuantity` (must add up to `quantity`), optional `reworkQuantity` (within rejected), `comment` and `defectCategoryId`. Accepts `Idempotency-Key`. With `rejectionRaisesNcr` on, a report with anything rejected or scrapped raises one NCR (source `PRODUCTION`, severity MINOR) on the order's batch |
+| `GET /operations/defect-categories` | `WORK_ORDER_VIEW` | The organisation's defect categories, for the report form, without `NCR_VIEW` |
 | `POST /operations/{id}/measurements` | `PRODUCTION_EXECUTE` | `parameterCode`, `value`, optional `comment`. Accepts `Idempotency-Key` |
 | `POST /operations/{id}/complete` | `PRODUCTION_EXECUTE` | Optional `setupMinutes` and `reason`; the reason is required when less was processed than came in |
 | `POST /operations/{id}/comments` | `PRODUCTION_EXECUTE` | `comment` |
@@ -456,7 +457,7 @@ Reading needs `MANUFACTURING_VIEW`; changes need `QUALITY_CHECKPOINT_MANAGE`.
 
 Completing a batch made by a work order through `POST /api/v1/production-batches/{id}/complete` is `422`. The
 settings gain `completionTolerancePercent`, `materialVariancePercent` (0 to 100), `completionRequiresFinalInspection`
-and `serialTracking`.
+and `serialTracking`. V31 adds `rejectionRaisesNcr` (default on). An NCR raised by a report carries `workOrderId`.
 
 #### Rework orders: `/api/v1/manufacturing/rework-orders`
 

@@ -56,7 +56,8 @@ public class ManufacturingSettingsService {
                 current.isStartRequiresMaterials(), current.isAllowOverIssue(), current.isOperationsInSequence(),
                 current.getOverReportPercent(), current.isOperationRequiresMachine(),
                 current.getCompletionTolerancePercent(), current.getMaterialVariancePercent(),
-                current.isCompletionRequiresFinalInspection(), current.isSerialTracking());
+                current.isCompletionRequiresFinalInspection(), current.isSerialTracking(),
+                current.isRejectionRaisesNcr());
     }
 
     /**
@@ -118,6 +119,9 @@ public class ManufacturingSettingsService {
         }
         if (request.serialTracking() != null) {
             current.setSerialTracking(request.serialTracking());
+        }
+        if (request.rejectionRaisesNcr() != null) {
+            current.setRejectionRaisesNcr(request.rejectionRaisesNcr());
         }
         settings.save(current);
         audit.record("MANUFACTURING_SETTINGS_CHANGED", ENTITY, current.getId(), before, snapshot(current));
@@ -214,7 +218,8 @@ public class ManufacturingSettingsService {
                 Map.entry("completionTolerancePercent", current.getCompletionTolerancePercent().toPlainString()),
                 Map.entry("materialVariancePercent", current.getMaterialVariancePercent().toPlainString()),
                 Map.entry("completionRequiresFinalInspection", current.isCompletionRequiresFinalInspection()),
-                Map.entry("serialTracking", current.isSerialTracking()));
+                Map.entry("serialTracking", current.isSerialTracking()),
+                Map.entry("rejectionRaisesNcr", current.isRejectionRaisesNcr()));
     }
 
     private ManufacturingModel productModel(UUID productId) {

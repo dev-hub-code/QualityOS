@@ -500,6 +500,8 @@ export interface Ncr extends NcrSummary {
   auditId: string | null;
   /** Set when a failed calibration raised the NCR. */
   instrumentId: string | null;
+  /** Set when a shop-floor report raised the NCR. */
+  workOrderId: string | null;
   defectCategoryId: string | null;
   defectCategoryName: string | null;
   rejectedQuantity: string | null;
@@ -1618,6 +1620,8 @@ export interface ManufacturingSettings {
   completionRequiresFinalInspection: boolean;
   /** Discrete products are received with one serial number for each unit. */
   serialTracking: boolean;
+  /** Goods rejected or scrapped on an operation raise an NCR. */
+  rejectionRaisesNcr: boolean;
 }
 
 export interface ProductManufacturingSettings {
@@ -2047,6 +2051,7 @@ export interface OperationDetail {
     reversesReportId: string | null;
     reversed: boolean;
     comment: string | null;
+    defectCategoryId: string | null;
     reportedBy: string | null;
     reportedByName: string | null;
     reportedAt: string;

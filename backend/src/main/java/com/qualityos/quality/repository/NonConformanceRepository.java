@@ -24,6 +24,8 @@ public interface NonConformanceRepository
 
     Optional<NonConformance> findByCalibrationRecordId(UUID calibrationRecordId);
 
+    Optional<NonConformance> findByOperationReportId(UUID operationReportId);
+
     java.util.List<NonConformance> findByCalibrationRecordIdIn(java.util.Collection<UUID> calibrationRecordIds);
 
     /** NCRs an inspection raised, and those raised by hand against the batch. */

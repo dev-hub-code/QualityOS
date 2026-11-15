@@ -139,6 +139,8 @@ export default function NcrPage() {
               <RecordLink href={`/audits/${ncr.auditId}`}>Audit</RecordLink>
             ) : ncr.source === "CALIBRATION" && ncr.instrumentId ? (
               <RecordLink href={`/calibration/${ncr.instrumentId}`}>Failed calibration</RecordLink>
+            ) : ncr.source === "PRODUCTION" && ncr.workOrderId ? (
+              <RecordLink href={`/manufacturing/work-orders/${ncr.workOrderId}`}>Shop-floor report</RecordLink>
             ) : ncr.source === "INSPECTION" && ncr.inspectionId ? (
               <RecordLink href={`/inspections/${ncr.inspectionId}`}>Inspection</RecordLink>
             ) : "Raised by hand"],

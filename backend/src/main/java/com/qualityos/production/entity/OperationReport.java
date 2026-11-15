@@ -30,6 +30,7 @@ public class OperationReport extends TenantOwnedEntity {
     private UUID reversesReportId;
     private String comment;
     private String requestKey;
+    private UUID defectCategoryId;
 
     public OperationReport(
             UUID workOrderId, UUID operationId, BigDecimal good, BigDecimal rejected, BigDecimal scrap,
@@ -42,6 +43,12 @@ public class OperationReport extends TenantOwnedEntity {
         this.reworkQuantity = rework;
         this.comment = comment;
         this.requestKey = requestKey;
+    }
+
+    /** Names the kind of defect behind what was rejected or scrapped. */
+    public OperationReport categorised(UUID categoryId) {
+        this.defectCategoryId = categoryId;
+        return this;
     }
 
     public OperationReport reversal(String reason) {

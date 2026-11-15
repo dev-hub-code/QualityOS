@@ -288,6 +288,11 @@ skipped one, and to what was released (sequence, work centre, planned times, par
 - **Reports.** Each report gives the quantity processed and its split into good, rejected and scrap, which must add up
   to it; rework is the part of the rejected that goes to rework. Quantities are in the order's unit, and whole numbers
   when that unit counts (dimension `Count`). Reports add up, so an operation is reported in parts as it goes.
+- **Rejects raise NCRs.** A report may name a defect category. With `rejectionRaisesNcr` on (the default), a report
+  with anything rejected or scrapped raises one MINOR NCR on the order's batch, for rejected plus scrapped, through
+  `NcrService.raiseFromProduction`. Repeating the report with the same key raises nothing more. Reversing a report
+  leaves its NCR, which quality closes or rejects in the usual way. Production defects therefore reach the NCR list,
+  the Pareto and the category split.
 - **Reconciliation.** The first operation (not counting skipped ones) can process the order quantity plus
   `overReportPercent`. Each later one can process only what came through good from the one before it. Completing with
   less processed than came in needs a reason, which stays on the operation and its timeline.

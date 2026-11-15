@@ -38,6 +38,7 @@ const FIELDS: FieldDef[] = [
   { name: "materialVariancePercent", label: "Material use further off than this, in percent, needs a reason at receipt", type: "decimal" },
   { name: "completionRequiresFinalInspection", label: "Closing a work order waits for its batch's final inspection", type: "checkbox" },
   { name: "serialTracking", label: "Discrete products are received with a serial number for each unit", type: "checkbox" },
+  { name: "rejectionRaisesNcr", label: "Goods rejected or scrapped on an operation raise an NCR", type: "checkbox" },
 ];
 
 export default function ManufacturingSettingsPage() {
@@ -73,6 +74,7 @@ export default function ManufacturingSettingsPage() {
             ["Material variance needing a reason", `More than ${Number(data.materialVariancePercent)}%`],
             ["Closing waits for final inspection", data.completionRequiresFinalInspection ? "Yes" : "No"],
             ["Serial numbers", data.serialTracking ? "One for each unit of a discrete product" : "Not required"],
+            ["Rejects and scrap on the floor", data.rejectionRaisesNcr ? "Raise an NCR" : "Recorded on the operation only"],
           ]}
         />
         <p className="mt-3 text-sm text-muted-foreground">

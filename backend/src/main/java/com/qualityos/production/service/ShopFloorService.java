@@ -1,5 +1,8 @@
 package com.qualityos.production.service;
 
+import com.qualityos.quality.dto.QualityDtos.DefectCategoryResponse;
+import com.qualityos.quality.dto.QualityDtos.ProductionReject;
+import com.qualityos.quality.service.NcrService;
 import com.qualityos.common.attachment.AttachmentPolicy;
 import com.qualityos.common.audit.AuditService;
 import com.qualityos.common.exception.BusinessRuleException;
@@ -123,6 +126,7 @@ public class ShopFloorService implements AttachmentPolicy {
     private final ProductionService production;
     private final DowntimeService downtime;
     private final ProductionAlerts alerts;
+    private final NcrService ncrs;
 
     @SuppressWarnings("java:S107")
     ShopFloorService(
@@ -143,8 +147,10 @@ public class ShopFloorService implements AttachmentPolicy {
             QualityGateService qualityGates,
             ProductionService production,
             DowntimeService downtime,
-            ProductionAlerts alerts) {
+            ProductionAlerts alerts,
+            NcrService ncrs) {
         this.alerts = alerts;
+        this.ncrs = ncrs;
         this.workOrders = workOrders;
         this.operations = operations;
         this.reports = reports;
@@ -165,6 +171,11 @@ public class ShopFloorService implements AttachmentPolicy {
     }
 
     // Reading
+
+    @Transactional(readOnly = true)
+    public List<DefectCategoryResponse> defectCategories() {
+        return ncrs.categories();
+    }
 
     /**
      * Operations of orders on the floor (in progress or on hold), the running ones first.
@@ -465,10 +476,20 @@ public class ShopFloorService implements AttachmentPolicy {
         if (operation.processed().add(total).compareTo(ceiling) > 0) {
             throw new BusinessRuleException(ceilingMessage(order, locked.siblings(), operation, ceiling));
         }
-        OperationReport report = reports.save(new OperationReport(order.getId(), id, good, rejected, scrap, rework,
-                blankToNull(request.comment()), key));
+        if (request.defectCategoryId() != null) {
+            ncrs.requireDefectCategory(request.defectCategoryId());
+        }
+        OperationReport report = reports.saveAndFlush(new OperationReport(order.getId(), id, good, rejected, scrap,
+                rework, blankToNull(request.comment()), key).categorised(request.defectCategoryId()));
         operation.record(good, rejected, scrap, rework);
         operations.saveAndFlush(operation);
+        BigDecimal lost = rejected.add(scrap);
+        if (lost.signum() > 0 && settings.rules().rejectionRaisesNcr()) {
+            ncrs.raiseFromProduction(new ProductionReject(report.getId(), order.getId(), order.getWorkOrderNumber(),
+                    operation.getSequence(), operation.getName(), order.getFacilityId(),
+                    production.batch(order.getProductionBatchId()).batchNumber(), request.defectCategoryId(),
+                    rejected, scrap, rework, lost, order.getUomId(), request.comment()));
+        }
         audit.record("OPERATION_REPORTED", ENTITY, id, null, Map.of(
                 "report", report.getId().toString(), "good", plain(good), "rejected", plain(rejected),
                 "scrap", plain(scrap), "rework", plain(rework)));
@@ -911,7 +932,7 @@ public class ShopFloorService implements AttachmentPolicy {
                 rows.stream().map(row -> new ReportResponse(row.getId(), row.getGoodQuantity(),
                         row.getRejectedQuantity(), row.getScrapQuantity(), row.getReworkQuantity(),
                         row.getReversesReportId(), reversed.contains(row.getId()), row.getComment(),
-                        row.getCreatedBy(), members.get(row.getCreatedBy()), row.getCreatedAt())).toList(),
+                        row.getDefectCategoryId(), row.getCreatedBy(), members.get(row.getCreatedBy()), row.getCreatedAt())).toList(),
                 measurements.findByOperationIdOrderByCreatedAtAscIdAsc(operation.getId()).stream()
                         .map(row -> new MeasurementResponse(row.getId(), row.getParameterCode(),
                                 row.getParameterName(), row.getUnit(), row.getTarget(), row.getMinimum(),

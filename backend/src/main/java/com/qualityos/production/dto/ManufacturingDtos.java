@@ -39,7 +39,8 @@ public final class ManufacturingDtos {
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal completionTolerancePercent,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal materialVariancePercent,
             boolean completionRequiresFinalInspection,
-            boolean serialTracking) {
+            boolean serialTracking,
+            boolean rejectionRaisesNcr) {
     }
 
     /** The work-order and shop-floor rules are optional: left out, they stay as they are. */
@@ -57,7 +58,8 @@ public final class ManufacturingDtos {
             @DecimalMin("0") @DecimalMax("100") @Digits(integer = 3, fraction = 2) BigDecimal completionTolerancePercent,
             @DecimalMin("0") @DecimalMax("100") @Digits(integer = 3, fraction = 2) BigDecimal materialVariancePercent,
             Boolean completionRequiresFinalInspection,
-            Boolean serialTracking) {
+            Boolean serialTracking,
+            Boolean rejectionRaisesNcr) {
     }
 
     /**

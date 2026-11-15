@@ -91,24 +91,19 @@ test("an invited person joins with their own password and sees no pending invita
   await expect(page.getByRole("heading", { name: "Pending invitations" })).toHaveCount(0);
 });
 
-test("a user who chooses Hindi receives a Hindi HTML email with a plain text part", async ({ page, browser }) => {
-  const email = `hindi-${unique()}@example.com`;
+test("account email is an English HTML email with a plain text part", async ({ page, browser }) => {
+  const email = `english-${unique()}@example.com`;
   await signUp(page, email);
   await page.goto("/settings");
-  const saved = page.waitForResponse((response) => response.url().includes("/email-language"));
-  await page.getByLabel("Send my emails in").selectOption("hi");
-  expect((await saved).status()).toBe(204);
-  await page.reload();
-  await expect(page.getByLabel("Send my emails in")).toHaveValue("hi");
+  await expect(page.getByText("Send my emails in")).toHaveCount(0);
 
   const visitor = await (await browser.newContext()).newPage();
   await visitor.goto("/forgot-password");
   await visitor.getByLabel("Email").fill(email);
   await visitor.getByRole("button", { name: /send/i }).click();
 
-  const message = await emailWithSubject(email, "अपना ProductionOS पासवर्ड रीसेट करें");
-  expect(message.HTML).toContain('<html lang="hi">');
-  expect(message.HTML).toContain("पासवर्ड रीसेट करें");
+  const message = await emailWithSubject(email, "Reset your ProductionOS password");
+  expect(message.HTML).toContain('<html lang="en">');
   expect(message.Text).toMatch(/reset-password\?token=/);
   expect(message.Text).not.toContain("<p");
 });

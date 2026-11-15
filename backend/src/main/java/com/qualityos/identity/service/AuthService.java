@@ -6,7 +6,6 @@ import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ErrorCode;
 import com.qualityos.common.exception.QualityOsException;
 import com.qualityos.common.exception.ResourceNotFoundException;
-import com.qualityos.common.mail.EmailService;
 import com.qualityos.common.security.JwtProperties;
 import com.qualityos.common.security.TenantJwtAuthenticationConverter;
 import com.qualityos.common.tenant.TenantContext;
@@ -66,7 +65,6 @@ public class AuthService {
     private final OrganizationService organizations;
     private final AccountEmailService accountEmails;
     private final RegistrationProperties registration;
-    private final EmailService emails;
     private final AccessTokenIssuer accessTokens;
     private final PasswordEncoder passwordEncoder;
     private final AuditService audit;
@@ -86,7 +84,6 @@ public class AuthService {
             OrganizationService organizations,
             AccountEmailService accountEmails,
             RegistrationProperties registration,
-            EmailService emails,
             AccessTokenIssuer accessTokens,
             PasswordEncoder passwordEncoder,
             AuditService audit,
@@ -102,7 +99,6 @@ public class AuthService {
         this.organizations = organizations;
         this.accountEmails = accountEmails;
         this.registration = registration;
-        this.emails = emails;
         this.accessTokens = accessTokens;
         this.passwordEncoder = passwordEncoder;
         this.audit = audit;
@@ -353,18 +349,6 @@ public class AuthService {
         });
     }
 
-    /** @param language empty to follow the organisation's default */
-    public void changeEmailLanguage(String language) {
-        if (language != null && !emails.supports(language)) {
-            throw new BusinessRuleException("That language is not available.");
-        }
-        UUID userId = TenantContext.getCurrentUserId();
-        tx.executeWithoutResult(status -> {
-            users.findById(userId).orElseThrow().setPreferredLanguage(language);
-            audit.record("EMAIL_LANGUAGE_CHANGED", "User", userId);
-        });
-    }
-
     public MeResponse me(Set<String> permissions) {
         UUID userId = TenantContext.getCurrentUserId();
         UUID tenantId = TenantContext.getCurrentTenantId();
@@ -373,8 +357,7 @@ public class AuthService {
         boolean hasSubscription = Boolean.TRUE.equals(tx.execute(status -> jdbc.queryForObject(
                 "SELECT EXISTS (SELECT 1 FROM subscriptions WHERE tenant_id = ?)", Boolean.class, tenantId)));
         return new MeResponse(
-                new UserSummary(user.getId(), user.getEmail(), user.getFullName(), user.getEmailVerifiedAt() != null,
-                        user.getPreferredLanguage()),
+                new UserSummary(user.getId(), user.getEmail(), user.getFullName(), user.getEmailVerifiedAt() != null),
                 tenantId,
                 organizations.getCurrent().onboarded(),
                 hasSubscription,

@@ -127,19 +127,17 @@ hour per account, on top of the IP limit.
 Settings are under `app.registration`. The `prod` profile refuses to start unless verification is required and
 unverified sign-in is off. Local Docker Compose enforces it too. Integration tests turn it off, except `EmailVerificationIT`.
 
-`PUT /auth/me/email-language` takes `language` (`en`, `hi`, `mr`, or null for the organisation default) and returns `204`.
-
 ## Audit log
 
 | Endpoint | Access | Result |
 |---|---|---|
-| `GET /audit-logs` | `AUDIT_LOG_VIEW` | The organisation's own entries, newest first, paged. Filters `q` (actor's name or email, target type or ID, correlation ID), `action`, `from` and `to` (days in the organisation's time zone, both included). Each entry has `actor` (null for the system), `action`, `entityType`, `entityId`, `occurredAt`, `reason`, `before`, `after`, `ipAddress`, `correlationId`. Members' account-level events, which have no tenant (`EMAIL_VERIFICATION_SENT`, `EMAIL_VERIFIED`, `PASSWORD_RESET_REQUESTED`, `PASSWORD_RESET`, `PASSWORD_CHANGED`, `LOGIN_FAILED`, `USER_LOCKED`, `PENDING_VERIFICATION_LOGIN`, `EMAIL_LANGUAGE_CHANGED`), appear from the day each member joined |
+| `GET /audit-logs` | `AUDIT_LOG_VIEW` | The organisation's own entries, newest first, paged. Filters `q` (actor's name or email, target type or ID, correlation ID), `action`, `from` and `to` (days in the organisation's time zone, both included). Each entry has `actor` (null for the system), `action`, `entityType`, `entityId`, `occurredAt`, `reason`, `before`, `after`, `ipAddress`, `correlationId`. Members' account-level events, which have no tenant (`EMAIL_VERIFICATION_SENT`, `EMAIL_VERIFIED`, `PASSWORD_RESET_REQUESTED`, `PASSWORD_RESET`, `PASSWORD_CHANGED`, `LOGIN_FAILED`, `USER_LOCKED`, `PENDING_VERIFICATION_LOGIN`, and the retired `EMAIL_LANGUAGE_CHANGED`), appear from the day each member joined |
 
 ## Organisation settings
 
 | Endpoint | Access | Result |
 |---|---|---|
-| `PUT /organizations/{id}` | `TENANT_MANAGE` | The profile: `name`, `legalName`, `gstin`, `industry`, `countryCode`, `timezone`, `currency`, `locale`, `address`, `contactPhone` (optional, digits with an optional `+`, spaces, brackets or dashes, 6 to 20 characters), `version`. The Control Center's organisation page shows the contact number |
+| `PUT /organizations/{id}` | `TENANT_MANAGE` | The profile: `name`, `legalName`, `gstin`, `industry`, `countryCode`, `timezone`, `currency`, `locale` (always `en-IN`; the app and its email are English only), `address`, `contactPhone` (optional, digits with an optional `+`, spaces, brackets or dashes, 6 to 20 characters), `version`. The Control Center's organisation page shows the contact number |
 | `GET /organizations/current/settings` | Any member | `singlePersonReview`, `selfReviewInEffect`, `activeMembers`, `capaRequiredFrom`, `effectivenessRequiredFrom`, `version` (null until first saved) |
 | `PUT /organizations/current/settings` | `TENANT_MANAGE` | Takes every rule (`singlePersonReview`, `capaRequiredFrom`, `effectivenessRequiredFrom`) and the `version` last read. A missing rule is `400`, a stale version `409`. Audited as `TENANT_SETTINGS_UPDATED` with before and after |
 

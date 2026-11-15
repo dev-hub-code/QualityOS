@@ -134,7 +134,7 @@ row-level security. `account_tokens` holds one-time password reset and email ver
   the application role. The delivery job then reads each tenant's rows under that tenant's own context.
 
 - **`email_delivery_logs`** (V12) has one row per delivery attempt. It is insert-only, and account emails have no tenant.
-  `users.preferred_language` holds a person's email language. Tokens stay in `account_tokens` and email opt-outs in
+  Email is in English only. Tokens stay in `account_tokens` and email opt-outs in
   `notification_preferences`, so `email_verification_tokens` and `email_preferences` tables were not needed. Templates are
   files, so there is no `email_templates` table.
 - **`dispatch_shipments`** (V13) is the append-only proof that goods physically left. Triggers refuse a cancellation of a
@@ -277,6 +277,11 @@ and returns tenant ids only, on the same pattern as `tenants_with_overdue_capas(
 released, running or held work order past its planned end, or a line of an approved plan past its due date. The job
 then works under each tenant, in the organisation's own date, and skips a plan line once its work orders have received
 its full quantity into finished goods.
+
+## English only (V36)
+
+Email is in English only, so `users.preferred_language` is dropped. `tenants.locale` stays `en-IN` and no longer chooses
+anything.
 
 ## Account events in the audit log (V35)
 

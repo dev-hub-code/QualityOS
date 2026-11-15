@@ -1,8 +1,0 @@
-Subject: उत्पादन रुका: {{where}}
-
-उत्पादन रुक गया है
-
-नमस्ते {{recipientName}},
-{{where}} रुक गया है। कारण: {{reason}}
-
-खोलें: {{actionUrl}}

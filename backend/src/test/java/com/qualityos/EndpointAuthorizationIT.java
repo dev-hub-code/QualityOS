@@ -33,7 +33,6 @@ class EndpointAuthorizationIT extends AbstractIntegrationTest {
             "POST /api/v1/auth/resend-verification",
             "POST /api/v1/auth/switch-tenant",
             "POST /api/v1/auth/verify-email",
-            "PUT /api/v1/auth/me/email-language",
             // Open to everyone, and hold no organisation data.
             "GET /api/v1/public/plans",
             "GET /api/v1/system/info",

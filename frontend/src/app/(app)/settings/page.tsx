@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { EmailLanguage } from "@/components/app/email-language";
 import { NotificationPreferences } from "@/components/app/notification-preferences";
 import { OrganizationForm } from "@/components/app/organization-form";
 import { QualityRulesSettings } from "@/components/app/quality-rules";
@@ -92,7 +91,6 @@ export default function SettingsPage() {
         <h2 className="text-base font-semibold text-[#1b2a55]">Your password</h2>
         <ChangePasswordForm />
       </section>
-      <EmailLanguage />
       <NotificationPreferences />
     </div>
   );

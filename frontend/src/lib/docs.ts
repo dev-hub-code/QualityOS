@@ -1075,7 +1075,7 @@ export const DOC_PAGES: DocPage[] = [
         list: [
           "Every notification appears in the app under the bell. The count refreshes about once a minute.",
           "In Settings you can turn off email for each type. In-app notifications stay on.",
-          "Email can be sent in English, Hindi or Marathi. The app itself is in English.",
+          "The app and its email are in English.",
         ],
       },
     ],

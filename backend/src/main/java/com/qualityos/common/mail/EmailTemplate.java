@@ -1,6 +1,6 @@
 package com.qualityos.common.mail;
 
-/** Each one is a file in {@code email-templates/<language>/}, with an HTML and a plain text version. */
+/** Each one is a file in {@code email-templates/}, with an HTML and a plain text version. */
 public enum EmailTemplate {
     VERIFICATION("auth/verification"),
     WELCOME("auth/welcome"),

@@ -1,8 +1,0 @@
-Subject: {{instrumentName}} का अंशांकन अतिदेय है
-
-अंशांकन अतिदेय है
-
-नमस्ते {{recipientName}},
-{{instrumentName}} का अंशांकन {{dueDate}} को देय था।
-
-उपकरण खोलें: {{actionUrl}}

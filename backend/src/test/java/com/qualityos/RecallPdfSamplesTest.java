@@ -151,10 +151,4 @@ class RecallPdfSamplesTest {
         write("5-returns-and-contact-history", report(mixed, List.of("PB-2026-00031"), 200, history),
                 "Vanished Traders", "ceased", "Number disconnected", "WhatsApp", "70", "200");
     }
-
-    @Test
-    void aCustomerNamedInHindi() throws IOException {
-        write("6-devanagari-name", report(List.of(new Delivered("महाराष्ट्र ऑटो कंपोनेंट्स लिमिटेड", 10, 0, "PENDING", null, 0)),
-                List.of("PB-2026-00031"), 3, List.of()), "PB-2026-00031");
-    }
 }

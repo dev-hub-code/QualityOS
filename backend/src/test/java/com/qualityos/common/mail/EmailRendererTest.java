@@ -14,12 +14,9 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.junit.jupiter.params.provider.ValueSource;
 
 class EmailRendererTest {
 
-    private static final List<String> LANGUAGES = List.of("en", "hi", "mr");
-    private static final Pattern DEVANAGARI = Pattern.compile("\\p{IsDevanagari}");
     private final EmailRenderer renderer = new EmailRenderer();
 
     private static Map<String, Object> variables() {
@@ -36,30 +33,19 @@ class EmailRendererTest {
 
     @ParameterizedTest
     @EnumSource(EmailTemplate.class)
-    void everyTemplateRendersInEveryLanguageWithHtmlAndText(EmailTemplate template) {
-        for (String language : LANGUAGES) {
-            RenderedEmail email = renderer.render(template, language, variables());
-            assertThat(email.subject()).isNotBlank().doesNotContain("{{");
-            assertThat(email.html()).contains("<html lang=\"" + language + "\"").contains("<a href=")
-                    .contains("max-width:600px").doesNotContain("{{");
-            assertThat(email.text()).contains("https://app.example/path").doesNotContain("<p").doesNotContain("{{");
-            if (!language.equals("en")) {
-                assertThat(DEVANAGARI.matcher(email.text()).find()).as(template + " " + language).isTrue();
-            }
-        }
-    }
-
-    @Test
-    void hindiAndMarathiAreNotTheSameText() {
-        assertThat(renderer.render(EmailTemplate.WELCOME, "hi", variables()).text())
-                .isNotEqualTo(renderer.render(EmailTemplate.WELCOME, "mr", variables()).text());
+    void everyTemplateRendersInEnglishWithHtmlAndText(EmailTemplate template) {
+        RenderedEmail email = renderer.render(template, variables());
+        assertThat(email.subject()).isNotBlank().doesNotContain("{{");
+        assertThat(email.html()).contains("<html lang=\"en\"").contains("<a href=")
+                .contains("max-width:600px").doesNotContain("{{");
+        assertThat(email.text()).contains("https://app.example/path").doesNotContain("<p").doesNotContain("{{");
     }
 
     @Test
     void valuesAreEscapedInHtmlButReadableInText() {
         Map<String, Object> values = variables();
         values.put("recipientName", "<script>alert('x')</script>");
-        RenderedEmail email = renderer.render(EmailTemplate.WELCOME, "en", values);
+        RenderedEmail email = renderer.render(EmailTemplate.WELCOME, values);
         assertThat(email.html()).doesNotContain("<script>").contains("&lt;script&gt;");
         assertThat(email.text()).contains("<script>alert('x')</script>");
     }
@@ -68,27 +54,26 @@ class EmailRendererTest {
     void aValueCannotAddAMailHeader() {
         Map<String, Object> values = variables();
         values.put("title", "Hello\r\nBcc: someone@example.com");
-        assertThat(renderer.render(EmailTemplate.GENERAL, "en", values).subject()).doesNotContain("\n", "\r");
+        assertThat(renderer.render(EmailTemplate.GENERAL, values).subject()).doesNotContain("\n", "\r");
     }
 
     @Test
-    void aLanguageWithoutTemplatesFallsBackToEnglish() {
-        assertThat(renderer.render(EmailTemplate.WELCOME, "ta", variables()).subject()).isEqualTo("Welcome to ProductionOS");
+    void theSubjectIsEnglish() {
+        assertThat(renderer.render(EmailTemplate.WELCOME, variables()).subject()).isEqualTo("Welcome to ProductionOS");
     }
 
     @Test
     void aMissingVariableFailsInsteadOfSendingABlank() {
         Map<String, Object> values = variables();
         values.remove("recipientName");
-        assertThatThrownBy(() -> renderer.render(EmailTemplate.WELCOME, "en", values))
+        assertThatThrownBy(() -> renderer.render(EmailTemplate.WELCOME, values))
                 .isInstanceOf(EmailTemplateException.class);
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"en", "hi", "mr"})
-    void noTemplateAsksForASecret(String language) throws IOException {
+    @Test
+    void noTemplateAsksForASecret() throws IOException {
         Pattern secret = Pattern.compile("\\{\\{\\{?\\s*\\w*(password|secret|token)\\w*", Pattern.CASE_INSENSITIVE);
-        try (Stream<Path> files = Files.walk(Path.of("src/main/resources/email-templates", language))) {
+        try (Stream<Path> files = Files.walk(Path.of("src/main/resources/email-templates"))) {
             assertThat(files.filter(Files::isRegularFile)).allSatisfy(file ->
                     assertThat(secret.matcher(Files.readString(file)).find()).as(file.toString()).isFalse());
         }

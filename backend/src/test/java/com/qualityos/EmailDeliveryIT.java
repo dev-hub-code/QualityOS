@@ -48,13 +48,6 @@ class EmailDeliveryIT extends AbstractIntegrationTest {
         mail.setFailing(false);
     }
 
-    private void chooseLanguage(Session session, String language) throws Exception {
-        as(session, put("/api/v1/auth/me/email-language")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json.writeValueAsString(language == null ? Map.of() : Map.of("language", language))))
-                .andExpect(status().isNoContent());
-    }
-
     private void setOrganizationLocale(Session session, String locale) {
         asAppRole(session.tenantId(), sql -> sql.update("UPDATE tenants SET locale = ? WHERE id = ?", locale, session.tenantId()));
     }
@@ -73,37 +66,25 @@ class EmailDeliveryIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void aMemberGetsTheirChosenLanguageWithALocalDate() throws Exception {
+    void aMemberGetsAnEnglishEmailWithALocalDate() throws Exception {
         Session owner = register();
         Session member = addMember(owner, "VIEWER");
-        chooseLanguage(member, "hi");
-        as(member, get("/api/v1/auth/me")).andExpect(jsonPath("$.data.user.language").value("hi"));
+        as(member, get("/api/v1/auth/me")).andExpect(jsonPath("$.data.user.language").doesNotExist());
 
         capaAssigned(owner, member);
         delivery.deliverPending(new JobContext());
 
         MailMessage email = lastTo(member);
-        assertThat(email.subject()).contains("CAPA-1", "सौंपा");
-        assertThat(email.html()).contains("&lt;b&gt;Fix").contains("2026").contains("नवंबर");
+        assertThat(email.subject()).isEqualTo("CAPA CAPA-1 was assigned to you");
+        assertThat(email.html()).contains("<html lang=\"en\">").contains("&lt;b&gt;Fix").contains("20 November 2026");
         assertThat(email.text()).contains("<b>Fix</b>").contains("http://localhost:3000/capas/1");
     }
 
     @Test
-    void aMemberWithoutAChoiceGetsTheOrganisationDefault() throws Exception {
+    void anOrganisationLocaleDoesNotChangeTheLanguage() throws Exception {
         Session owner = register();
         Session member = addMember(owner, "VIEWER");
         setOrganizationLocale(owner, "mr-IN");
-
-        capaAssigned(owner, member);
-        delivery.deliverPending(new JobContext());
-        assertThat(lastTo(member).subject()).contains("सोपवला");
-    }
-
-    @Test
-    void anUnknownOrganisationLocaleFallsBackToEnglish() throws Exception {
-        Session owner = register();
-        Session member = addMember(owner, "VIEWER");
-        setOrganizationLocale(owner, "fr-FR");
 
         capaAssigned(owner, member);
         delivery.deliverPending(new JobContext());
@@ -111,21 +92,20 @@ class EmailDeliveryIT extends AbstractIntegrationTest {
     }
 
     @Test
-    void anUnavailableLanguageCannotBeChosen() throws Exception {
+    void theEmailLanguageCanNoLongerBeChosen() throws Exception {
         as(register(), put("/api/v1/auth/me/email-language")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"language\":\"fr\"}"))
-                .andExpect(status().isUnprocessableContent());
+                        .content("{\"language\":\"hi\"}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void accountEmailsFollowTheChosenLanguage() throws Exception {
+    void accountEmailsAreInEnglish() throws Exception {
         Session session = register();
-        chooseLanguage(session, "mr");
         mvc.perform(postJson("/api/v1/auth/password-reset/request", Map.of("email", session.email())))
                 .andExpect(status().isAccepted());
         awaitMail(session.email(), 2);
-        assertThat(mail.to(session.email()).getLast().subject()).contains("पासवर्ड");
+        assertThat(mail.to(session.email()).getLast().subject()).isEqualTo("Reset your ProductionOS password");
     }
 
     @Test
@@ -155,7 +135,7 @@ class EmailDeliveryIT extends AbstractIntegrationTest {
         String address = uniqueEmail().toLowerCase();
         mail.failNext(2);
         inTransactionAs(null, null, () -> {
-            events.publishEvent(new MailRequested(new EmailRequest(null, address, EmailTemplate.GENERAL, "en",
+            events.publishEvent(new MailRequested(new EmailRequest(null, address, EmailTemplate.GENERAL,
                     Map.of("title", "T", "body", "B", "recipientName", "A", "actionUrl", "http://x"))));
             return null;
         });
@@ -170,7 +150,7 @@ class EmailDeliveryIT extends AbstractIntegrationTest {
         String address = uniqueEmail().toLowerCase();
         mail.setFailing(true);
         inTransactionAs(null, null, () -> {
-            events.publishEvent(new MailRequested(new EmailRequest(null, address, EmailTemplate.GENERAL, "en",
+            events.publishEvent(new MailRequested(new EmailRequest(null, address, EmailTemplate.GENERAL,
                     Map.of("title", "T", "body", "B", "recipientName", "A", "actionUrl", "http://x"))));
             return null;
         });
@@ -182,7 +162,7 @@ class EmailDeliveryIT extends AbstractIntegrationTest {
     @Test
     void aMissingVariableIsRecordedAsAFailure() {
         String address = uniqueEmail().toLowerCase();
-        assertThatThrownBy(() -> emails.send(new EmailRequest(null, address, EmailTemplate.WELCOME, "en", Map.of())))
+        assertThatThrownBy(() -> emails.send(new EmailRequest(null, address, EmailTemplate.WELCOME, Map.of())))
                 .isInstanceOf(com.qualityos.common.mail.MailGateway.MailDeliveryException.class);
         assertThat(logStatuses(address)).containsExactly("FAILED");
     }
@@ -239,9 +219,9 @@ class EmailDeliveryIT extends AbstractIntegrationTest {
     @Test
     void aDateIsWrittenForTheReader() {
         String address = uniqueEmail().toLowerCase();
-        var email = emails.render(new EmailRequest(null, address, EmailTemplate.CAPA_DUE_REMINDER, "hi", Map.of(
+        var email = emails.render(new EmailRequest(null, address, EmailTemplate.CAPA_DUE_REMINDER, Map.of(
                 "recipientName", "A", "capaNumber", "C", "capaTitle", "T", "actionUrl", "http://x",
                 "dueDate", LocalDate.of(2026, 3, 5))));
-        assertThat(email.subject()).contains("मार्च");
+        assertThat(email.subject()).isEqualTo("CAPA C is due on 5 March 2026");
     }
 }

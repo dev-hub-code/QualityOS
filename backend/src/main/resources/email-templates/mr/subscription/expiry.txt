@@ -1,8 +1,0 @@
-Subject: तुमची ProductionOS सदस्यता {{dueDate}} रोजी संपेल
-
-तुमची सदस्यता संपत आहे
-
-नमस्कार {{recipientName}},
-{{organizationName}} ची सदस्यता {{dueDate}} रोजी संपेल.
-
-सदस्यता व्यवस्थापित करा: {{actionUrl}}

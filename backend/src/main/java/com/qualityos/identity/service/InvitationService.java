@@ -5,7 +5,6 @@ import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.mail.EmailRequest;
-import com.qualityos.common.mail.EmailService;
 import com.qualityos.common.mail.EmailTemplate;
 import com.qualityos.common.mail.MailRequested;
 import com.qualityos.common.tenant.TenantContext;
@@ -63,7 +62,6 @@ public class InvitationService {
     private final AuditService audit;
     private final PlanLimits limits;
     private final ApplicationEventPublisher events;
-    private final EmailService emails;
     private final TransactionTemplate tx;
     private final String appUrl;
 
@@ -80,7 +78,6 @@ public class InvitationService {
             AuditService audit,
             PlanLimits limits,
             ApplicationEventPublisher events,
-            EmailService emails,
             PlatformTransactionManager transactionManager,
             @Value("${qualityos.app-url}") String appUrl) {
         this.invitations = invitations;
@@ -95,7 +92,6 @@ public class InvitationService {
         this.passwordEncoder = passwordEncoder;
         this.audit = audit;
         this.events = events;
-        this.emails = emails;
         this.tx = new TransactionTemplate(transactionManager);
         this.appUrl = appUrl;
     }
@@ -224,9 +220,8 @@ public class InvitationService {
     private void sendEmail(Invitation invitation, String secret) {
         String organization = organizations.getCurrent().name();
         String token = invitation.getTenantId().toString() + SEPARATOR + secret;
-        String language = emails.language(null, organizations.getCurrent().locale());
         events.publishEvent(new MailRequested(new EmailRequest(invitation.getTenantId(), invitation.getEmail(),
-                EmailTemplate.INVITATION, language, Map.of(
+                EmailTemplate.INVITATION, Map.of(
                         "organizationName", organization,
                         "actionUrl", appUrl + "/accept-invitation?token=" + token))));
     }

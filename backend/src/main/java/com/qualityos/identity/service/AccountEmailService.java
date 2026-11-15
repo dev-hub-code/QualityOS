@@ -3,7 +3,6 @@ package com.qualityos.identity.service;
 import com.qualityos.common.audit.AuditService;
 import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.mail.EmailRequest;
-import com.qualityos.common.mail.EmailService;
 import com.qualityos.common.mail.EmailTemplate;
 import com.qualityos.common.mail.MailRequested;
 import com.qualityos.common.tenant.TenantContext;
@@ -47,8 +46,6 @@ public class AccountEmailService {
     private final PasswordEncoder passwordEncoder;
     private final AuditService audit;
     private final ApplicationEventPublisher events;
-    private final EmailService emails;
-    private final TenantAccessService access;
     private final TransactionTemplate tx;
     private final RegistrationProperties registration;
     private final String appUrl;
@@ -60,8 +57,6 @@ public class AccountEmailService {
             PasswordEncoder passwordEncoder,
             AuditService audit,
             ApplicationEventPublisher events,
-            EmailService emails,
-            TenantAccessService access,
             PlatformTransactionManager transactionManager,
             RegistrationProperties registration,
             @Value("${qualityos.app-url}") String appUrl) {
@@ -71,8 +66,6 @@ public class AccountEmailService {
         this.passwordEncoder = passwordEncoder;
         this.audit = audit;
         this.events = events;
-        this.emails = emails;
-        this.access = access;
         this.tx = new TransactionTemplate(transactionManager);
         this.registration = registration;
         this.appUrl = appUrl;
@@ -187,9 +180,7 @@ public class AccountEmailService {
         Map<String, Object> variables = new HashMap<>(details);
         variables.put("recipientName", user.getFullName());
         variables.put("actionUrl", appUrl + path);
-        String language = emails.language(
-                user.getPreferredLanguage(), access.firstOrganizationLocale(user.getId()).orElse(null));
-        events.publishEvent(new MailRequested(new EmailRequest(null, user.getEmail(), template, language, variables)));
+        events.publishEvent(new MailRequested(new EmailRequest(null, user.getEmail(), template, variables)));
     }
 
     private String issue(UUID userId, Purpose purpose, Duration ttl) {

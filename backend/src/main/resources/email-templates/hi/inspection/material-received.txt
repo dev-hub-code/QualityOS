@@ -1,8 +1,0 @@
-Subject: निरीक्षण हेतु सामग्री: {{receiptNumber}}
-
-सामग्री निरीक्षण की प्रतीक्षा में है
-
-नमस्ते {{recipientName}},
-{{supplierName}} से आई {{receiptNumber}} में ऐसे लॉट हैं जिनका उपयोग से पहले निरीक्षण ज़रूरी है: {{lots}}
-
-कतार खोलें: {{actionUrl}}

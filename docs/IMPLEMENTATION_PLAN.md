@@ -35,9 +35,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | The IP rate limit is held per backend instance, so several instances multiply it. Shared limits need Redis or the load balancer | With production work |
 | An expired sign-up is emptied after 30 days, not deleted, because its audit rows cannot be removed. Its suspended organisation row stays. With unverified login allowed, nothing is expired | By design |
 | Notifications are polled once a minute, with no live push. Only email and in-app channels exist | When a user needs it |
-| Hindi and Marathi email text was machine-drafted and needs review by a native speaker before customers see it | Before customer launch |
-| Some notifications have no dedicated template (NCR ready for closure, CAPA actions, verification, send-back, corrections). Their email has a translated frame around English text | When a user needs it |
-| The app itself is still English only | When a user needs it |
+| Some notifications have no dedicated template (NCR ready for closure, CAPA actions, verification, send-back, corrections). Their email uses the general template | When a user needs it |
 | Organisation branding in email is the organisation name only. There is no logo upload | When a user needs it |
 | With verification switched off for private use, registration reveals that an email has an account | Private use only |
 | Sampling is fixed, percentage or every unit; AQL tables (such as ISO 2859-1) are not built | When a customer needs them |
@@ -64,7 +62,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A dispatch carrying goods from two plants is hidden from a member limited to one of them, as is its return | Review after real use |
 | A lot from another plant cannot be consumed by a member limited elsewhere. An unlimited member must record a transfer like that | Review after real use |
 | A batch trace can still show inspections and NCRs of a lot from another plant, because lineage must stay whole | By design |
-| The recall PDF does not shape Devanagari: names stay readable, but conjuncts do not form correctly | Before Hindi or Marathi customer names matter |
 | A dispatch of a batch under an open recall, or of anything made from it, is refused. Someone with `RECALL_MANAGE` can override with a reason, which is audited, and the customer joins the recall at once. Every built-in role that can dispatch can also manage recalls, so in practice the override is a reason, not a second person | Review after real use |
 | A dispatch recorded before a recall started can still have its shipment confirmed. The recall already covers its customer | Review after real use |
 | A recall starts from the traced batch, and other batch numbers can be typed in to join it. Batches cannot be added after the recall starts. A CAPA can be linked when it starts | When a user needs it |

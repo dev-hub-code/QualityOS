@@ -79,7 +79,7 @@ public final class AuthDtos {
         }
     }
 
-    public record UserSummary(UUID id, String email, String fullName, boolean emailVerified, String language) {
+    public record UserSummary(UUID id, String email, String fullName, boolean emailVerified) {
     }
 
     public record OrganizationSummary(UUID id, String name) {
@@ -110,9 +110,6 @@ public final class AuthDtos {
         public String toString() {
             return "PasswordResetConfirmation";
         }
-    }
-
-    public record EmailLanguageRequest(@Size(max = 8) String language) {
     }
 
     public record ResendVerificationRequest(@NotBlank @Email @Size(max = 254) String email) {

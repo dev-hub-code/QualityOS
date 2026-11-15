@@ -52,7 +52,7 @@ public class TenantAccessService implements TenantAccessResolver {
             """;
 
     private static final String ACTIVE_EMAIL = """
-            SELECT u.email, u.full_name, u.preferred_language
+            SELECT u.email, u.full_name
             FROM tenant_memberships m
             JOIN users u ON u.id = m.user_id AND u.status = 'ACTIVE'
             WHERE m.tenant_id = ? AND m.user_id = ? AND m.status = 'ACTIVE'
@@ -70,14 +70,6 @@ public class TenantAccessService implements TenantAccessResolver {
 
     private static final String OPEN_ACCOUNT = "SELECT 1 FROM users WHERE id = ? AND status <> 'DISABLED'";
 
-    private static final String FIRST_LOCALE = """
-            SELECT t.locale
-            FROM tenant_memberships m
-            JOIN tenants t ON t.id = m.tenant_id
-            WHERE m.user_id = ? AND m.status = 'ACTIVE'
-            ORDER BY m.created_at
-            LIMIT 1
-            """;
 
     private final JdbcTemplate jdbc;
     private final PlanAccess plan;
@@ -151,17 +143,11 @@ public class TenantAccessService implements TenantAccessResolver {
     /** The address of an active member of the current tenant. Runs in the caller's transaction. */
     public Optional<MemberContact> activeMemberContact(UUID userId) {
         return jdbc.query(ACTIVE_EMAIL,
-                (rs, row) -> new MemberContact(rs.getString(1), rs.getString(2), rs.getString(3)),
+                (rs, row) -> new MemberContact(rs.getString(1), rs.getString(2)),
                 TenantContext.getCurrentTenantId(), userId).stream().findFirst();
     }
 
-    /** The locale of the first organisation this user joined, for email that belongs to no organisation. */
-    public Optional<String> firstOrganizationLocale(UUID userId) {
-        return jdbc.queryForList(FIRST_LOCALE, String.class, userId).stream().findFirst();
-    }
-
-    /** @param language empty when the member has not chosen one */
-    public record MemberContact(String email, String fullName, String language) {
+    public record MemberContact(String email, String fullName) {
     }
 
     /** Names of the current tenant's active members. Runs in the caller's transaction. */

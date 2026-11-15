@@ -115,7 +115,6 @@ public class NotificationDeliveryService {
         variables.put("recipientName", contact.fullName());
         variables.put("organizationName", organization.name());
         variables.put("actionUrl", notification.getLink() == null ? appUrl : appUrl + notification.getLink());
-        return new EmailRequest(notification.getTenantId(), contact.email(), template,
-                emails.language(contact.language(), organization.locale()), variables, notification.getId());
+        return new EmailRequest(notification.getTenantId(), contact.email(), template, variables, notification.getId());
     }
 }

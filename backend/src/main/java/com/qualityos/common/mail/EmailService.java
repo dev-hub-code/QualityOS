@@ -8,7 +8,6 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -20,12 +19,14 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** The one way email leaves the application: picks the language, renders, sends, and records what happened. */
+/** The one way email leaves the application: renders, sends, and records what happened. Email is in English only. */
 @Service
 public class EmailService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
-    private static final String DEFAULT_LANGUAGE = "en";
+    private static final String LANGUAGE = "en";
+    private static final DateTimeFormatter DATES =
+            DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(Locale.of("en", "IN"));
     private static final String DEFAULT_BRAND = "ProductionOS";
     private static final int MAX_ATTEMPTS = 3;
     private static final String INSERT_LOG = """
@@ -38,7 +39,6 @@ public class EmailService {
     private final MailGateway gateway;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
-    private final List<String> languages;
     private final Duration retryDelay;
 
     EmailService(
@@ -46,38 +46,21 @@ public class EmailService {
             MailGateway gateway,
             JdbcTemplate jdbc,
             PlatformTransactionManager transactionManager,
-            @Value("${qualityos.mail.languages}") List<String> languages,
             @Value("${qualityos.mail.retry-delay}") Duration retryDelay) {
         this.renderer = renderer;
         this.gateway = gateway;
         this.jdbc = jdbc;
         this.tx = new TransactionTemplate(transactionManager);
-        this.languages = languages;
         this.retryDelay = retryDelay;
-    }
-
-    public boolean supports(String language) {
-        return languages.contains(language);
-    }
-
-    /** The user's choice, then the organisation's default, then English. */
-    public String language(String userLanguage, String organizationLocale) {
-        if (userLanguage != null && supports(userLanguage)) {
-            return userLanguage;
-        }
-        String organization = organizationLocale == null ? null : Locale.forLanguageTag(organizationLocale).getLanguage();
-        return organization != null && supports(organization) ? organization : DEFAULT_LANGUAGE;
     }
 
     public RenderedEmail render(EmailRequest request) {
         Map<String, Object> variables = new HashMap<>();
-        Locale locale = Locale.forLanguageTag(request.language() + "-IN");
-        DateTimeFormatter dates = DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(locale);
         request.variables().forEach((name, value) ->
-                variables.put(name, value instanceof LocalDate date ? dates.format(date) : value));
+                variables.put(name, value instanceof LocalDate date ? DATES.format(date) : value));
         Object organization = variables.get("organizationName");
         variables.put("brandName", organization != null ? organization : DEFAULT_BRAND);
-        return renderer.render(request.template(), request.language(), variables);
+        return renderer.render(request.template(), variables);
     }
 
     /**
@@ -129,7 +112,7 @@ public class EmailService {
     /** A caller's open transaction is already bound to the request's tenant, and the row belongs with its outcome. */
     private void record(EmailRequest request, String status, int attempt, String errorType) {
         Runnable insert = () -> jdbc.update(INSERT_LOG, UuidV7.generate(), request.tenantId(), request.to(),
-                request.template().name(), request.language(), status, attempt, errorType, request.notificationId());
+                request.template().name(), LANGUAGE, status, attempt, errorType, request.notificationId());
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             insert.run();
         } else {

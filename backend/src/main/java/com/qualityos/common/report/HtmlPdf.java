@@ -20,11 +20,9 @@ import org.springframework.stereotype.Component;
 public class HtmlPdf {
 
     private static final String SANS = "Report Sans";
-    private static final String DEVANAGARI = "Report Devanagari";
 
     private final byte[] regular = font("fonts/DejaVuSans.ttf");
     private final byte[] bold = font("fonts/DejaVuSans-Bold.ttf");
-    private final byte[] devanagari = font("fonts/NotoSansDevanagari-Regular.ttf");
 
     /** A page header or footer is a CSS string, where a quote in a name would end it and drop the whole rule. */
     public static String cssString(String value) {
@@ -45,7 +43,6 @@ public class HtmlPdf {
                     .useFastMode()
                     .useFont(() -> stream(regular), SANS, 400, FontStyle.NORMAL, true)
                     .useFont(() -> stream(bold), SANS, 700, FontStyle.NORMAL, true)
-                    .useFont(() -> stream(devanagari), DEVANAGARI, 400, FontStyle.NORMAL, true)
                     .withHtmlContent(html, null)
                     .toStream(pdf)
                     .run();

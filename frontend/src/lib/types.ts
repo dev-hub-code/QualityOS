@@ -19,7 +19,7 @@ export interface OrderConfirmation {
 }
 
 export interface Me {
-  user: { id: string; email: string; fullName: string; emailVerified: boolean; language: string | null };
+  user: { id: string; email: string; fullName: string; emailVerified: boolean };
   tenantId: string;
   onboarded: boolean;
   hasSubscription: boolean;

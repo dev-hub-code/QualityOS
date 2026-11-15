@@ -100,18 +100,16 @@ Libraries with no use yet (Recharts) are added in the phase that uses them.
 
 ## Email
 
-`common/mail/EmailService` is the only way email leaves the application. It chooses the language (the user's choice,
-then the organisation's default, then English), renders, sends, and writes one `email_delivery_logs` row per attempt.
+`common/mail/EmailService` is the only way email leaves the application. It renders, sends, and writes one
+`email_delivery_logs` row per attempt. The app and its email are in English only.
 Bodies are never stored, because they can hold one-time links.
 
-Templates live in `resources/email-templates/<language>/<category>/`. Each has an HTML fragment and a `.txt` version,
-whose first line is the subject, and sits inside that language's `layout.html`. They use Mustache: `{{value}}` is
+Templates live in `resources/email-templates/<category>/`. Each has an HTML fragment and a `.txt` version, whose first
+line is the subject, and sits inside `layout.html`. They use Mustache: `{{value}}` is
 escaped in HTML. A missing variable fails the send rather than leaving a blank.
 
-To add a language, add it to `qualityos.mail.languages` and add a folder. Any file it lacks falls back to English.
-
 Account emails retry three times in the background. Notification emails keep the existing retry schedule of about an
-hour. Notifications store their template and variables, not finished text, so the language is chosen when they are sent.
+hour. Notifications store their template and variables, not finished text.
 
 ## Scheduled jobs
 
@@ -169,7 +167,7 @@ with counts under row-level security. A new module that relies on master data ad
 | Plan line late | Holders of `PRODUCTION_PLAN_MANAGE` at the facility |
 
 BOMs, recipes and routings belong to no facility, so their notices reach every approver. As everywhere, the person who
-acted is not told. Emails use the four `production/` templates in English, Hindi and Marathi.
+acted is not told. Emails use the four `production/` templates.
 
 A material receipt with lots that need inspection notifies holders of `INSPECTION_CREATE` at the receiving facility
 (`MATERIAL_AWAITING_INSPECTION`, email template `inspection/material-received`). Lots released on arrival notify

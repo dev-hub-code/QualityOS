@@ -278,6 +278,13 @@ released, running or held work order past its planned end, or a line of an appro
 then works under each tenant, in the organisation's own date, and skips a plan line once its work orders have received
 its full quantity into finished goods.
 
+## Audit reminders and repeats (V37)
+
+`audits.repeat_every_months` (1 to 36, empty for a one-off) and `audits.next_audit_id` link a repeating audit to the one
+planned when it closed. `audits.reminder_sent_at` records the reminder a week before; a new date or lead auditor clears
+it. `tenants_with_audits_due()` is `SECURITY DEFINER` and returns tenant ids only, with a `due_scan` read policy on
+`audits` for its owner, on the pattern of `tenants_with_instruments_due()`.
+
 ## English only (V36)
 
 Email is in English only, so `users.preferred_language` is dropped. `tenants.locale` stays `en-IN` and no longer chooses

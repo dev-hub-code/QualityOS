@@ -214,7 +214,13 @@ inspection carries `impactReview`: `PENDING`, `RESULT_STANDS`, `REINSPECT` or nu
 | `POST /audits/{id}/send-back`, `POST /audits/{id}/close` | `AUDIT_CLOSE` |
 
 A major or minor nonconformity raises an NCR with the finding. An audit closes once its NCRs are finished, and needs a second
-person. The QR code holds only a link, which asks whoever scans it to sign in.
+person.
+
+`POST /audits` and `PUT /audits/{id}` take an optional `repeatEveryMonths` (1 to 36). A `PUT` without it makes the audit a
+one-off. Closing a repeating audit plans the next one, with the same checklist, scope and lead auditor, that many months
+after its planned date (moved on by whole cycles if that date has passed). The detail returns `repeatEveryMonths`,
+`nextAuditId` and `nextAuditNumber`. The repeat is skipped, and `AUDIT_REPEAT_SKIPPED` is logged with the reason, when the
+checklist or facility is archived or the lead auditor has left. The QR code holds only a link, which asks whoever scans it to sign in.
 
 ## Analytics and reports
 

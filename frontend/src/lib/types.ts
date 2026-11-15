@@ -1080,6 +1080,9 @@ export interface Audit {
   closedByName: string | null;
   closedAt: string | null;
   cancelReason: string | null;
+  repeatEveryMonths: number | null;
+  nextAuditId: string | null;
+  nextAuditNumber: string | null;
   items: AuditItem[];
   findings: AuditFinding[];
   review: {

@@ -17,6 +17,7 @@ import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -99,6 +100,13 @@ public class AuditChecklistService {
     List<AuditChecklistItem> questions(UUID id) {
         load(id);
         return items.findByChecklistIdOrderByPosition(id);
+    }
+
+    /** Empty when the checklist has been archived, so that a repeat can be skipped rather than fail. */
+    Optional<List<AuditChecklistItem>> activeQuestions(UUID id) {
+        return checklists.findById(id)
+                .filter(checklist -> checklist.getArchivedAt() == null)
+                .map(checklist -> items.findByChecklistIdOrderByPosition(id));
     }
 
     String name(UUID id) {

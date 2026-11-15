@@ -51,8 +51,17 @@ public class QualityAudit extends TenantOwnedEntity {
     private Instant closedAt;
     private String cancelReason;
 
+    /** Empty for a one-off audit. */
+    private Integer repeatEveryMonths;
+
+    /** The audit planned when this one closed, if it repeats. */
+    private UUID nextAuditId;
+
+    private Instant reminderSentAt;
+
     public QualityAudit(String auditNumber, Type auditType, String title, String scope, UUID facilityId,
-            UUID supplierId, UUID productId, UUID checklistId, LocalDate plannedOn, UUID leadAuditorId) {
+            UUID supplierId, UUID productId, UUID checklistId, LocalDate plannedOn, UUID leadAuditorId,
+            Integer repeatEveryMonths) {
         this.auditNumber = auditNumber;
         this.auditType = auditType;
         this.title = title;
@@ -63,14 +72,37 @@ public class QualityAudit extends TenantOwnedEntity {
         this.checklistId = checklistId;
         this.plannedOn = plannedOn;
         this.leadAuditorId = leadAuditorId;
+        this.repeatEveryMonths = repeatEveryMonths;
     }
 
-    public void replan(String title, String scope, LocalDate plannedOn, UUID leadAuditorId) {
+    /** A new date or a new lead auditor earns a fresh reminder. */
+    public void replan(String title, String scope, LocalDate plannedOn, UUID leadAuditorId, Integer repeatEveryMonths) {
         require(Status.PLANNED, "Only a planned audit can be changed.");
+        if (!plannedOn.equals(this.plannedOn) || !leadAuditorId.equals(this.leadAuditorId)) {
+            reminderSentAt = null;
+        }
         this.title = title;
         this.scope = scope;
         this.plannedOn = plannedOn;
         this.leadAuditorId = leadAuditorId;
+        this.repeatEveryMonths = repeatEveryMonths;
+    }
+
+    public void reminded(Instant now) {
+        reminderSentAt = now;
+    }
+
+    public void followedBy(UUID next) {
+        nextAuditId = next;
+    }
+
+    /** The first date in the repeat cycle that is not before {@code today}. */
+    public LocalDate nextPlannedOn(LocalDate today) {
+        LocalDate next = plannedOn.plusMonths(repeatEveryMonths);
+        while (next.isBefore(today)) {
+            next = next.plusMonths(repeatEveryMonths);
+        }
+        return next;
     }
 
     public void start(Instant now) {

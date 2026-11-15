@@ -7,16 +7,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import com.qualityos.auditmanagement.service.QualityAuditService;
+import com.qualityos.common.tenant.TenantContext;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.ResultActions;
 
 class AuditManagementIT extends TraceabilityFixture {
 
     private static final String AUDITS = "/api/v1/audits";
     private static final String CHECKLISTS = "/api/v1/audit-checklists";
+
+    @Autowired
+    private QualityAuditService audits;
 
     private String checklist() throws Exception {
         return idOf(body(as(owner, postJson(CHECKLISTS, Map.of("code", code(), "name", "Shop floor", "items", List.of(
@@ -241,5 +251,86 @@ class AuditManagementIT extends TraceabilityFixture {
         byte[] pdf = as(owner, get(AUDITS + "/" + audit + "/report.pdf"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
         assertThat(new String(pdf, 0, 5, java.nio.charset.StandardCharsets.ISO_8859_1)).isEqualTo("%PDF-");
+    }
+
+    private int remind() {
+        return TenantContext.callAs(owner.tenantId(), null, audits::remindUpcoming);
+    }
+
+    private String auditNumber(String audit) throws Exception {
+        return JsonPath.read(body(as(owner, get(AUDITS + "/" + audit))), "$.data.auditNumber");
+    }
+
+    @Test
+    void theLeadAuditorIsRemindedOnceAWeekBeforeAndAgainAfterTheDateMoves() throws Exception {
+        Map<String, Object> body = plan("INTERNAL");
+        String inThreeDays = LocalDate.parse(TODAY).plusDays(3).toString();
+        body.put("plannedOn", inThreeDays);
+        String audit = idOf(body(as(owner, postJson(AUDITS, body)).andExpect(status().isCreated())));
+        Map<String, Object> later = new HashMap<>(plan("INTERNAL"));
+        later.put("plannedOn", LocalDate.parse(TODAY).plusDays(30).toString());
+        as(owner, postJson(AUDITS, later)).andExpect(status().isCreated());
+        String number = auditNumber(audit);
+
+        assertThat(remind()).isEqualTo(1);
+        assertThat(remind()).isZero();
+        String written = DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG).withLocale(Locale.of("en", "IN"))
+                .format(LocalDate.parse(inThreeDays));
+        assertThat(emailedSubjects(manager)).containsOnlyOnce(number + " is on " + written);
+
+        String inFiveDays = LocalDate.parse(TODAY).plusDays(5).toString();
+        as(owner, put(AUDITS + "/" + audit).contentType("application/json").content(json.writeValueAsString(Map.of(
+                        "title", "Shop floor audit", "scope", "Machining", "plannedOn", inFiveDays,
+                        "leadAuditorId", manager.userId().toString()))))
+                .andExpect(status().isOk());
+        assertThat(remind()).isEqualTo(1);
+    }
+
+    @Test
+    void closingARepeatingAuditPlansTheNextOne() throws Exception {
+        Session lead = addMember(owner, "AUDITOR");
+        Map<String, Object> body = plan("INTERNAL");
+        body.put("repeatEveryMonths", 6);
+        body.put("leadAuditorId", lead.userId().toString());
+        String audit = idOf(body(as(owner, postJson(AUDITS, body)).andExpect(status().isCreated())));
+        as(owner, get(AUDITS + "/" + audit)).andExpect(jsonPath("$.data.repeatEveryMonths").value(6))
+                .andExpect(jsonPath("$.data.nextAuditId").doesNotExist());
+        as(owner, postJson(AUDITS + "/" + audit + "/start", Map.of())).andExpect(status().isOk());
+        answer(audit, 0, "CONFORMING");
+        answer(audit, 1, "CONFORMING");
+        complete(audit).andExpect(status().isOk());
+        requestClosure(owner, audit).andExpect(status().isOk());
+
+        String closed = body(as(manager, postJson(AUDITS + "/" + audit + "/close", Map.of())).andExpect(status().isOk()));
+        String next = JsonPath.read(closed, "$.data.nextAuditId");
+        String nextNumber = JsonPath.read(closed, "$.data.nextAuditNumber");
+        as(owner, get(AUDITS + "/" + next))
+                .andExpect(jsonPath("$.data.status").value("PLANNED"))
+                .andExpect(jsonPath("$.data.auditNumber").value(nextNumber))
+                .andExpect(jsonPath("$.data.plannedOn").value(LocalDate.parse(TODAY).plusMonths(6).toString()))
+                .andExpect(jsonPath("$.data.repeatEveryMonths").value(6))
+                .andExpect(jsonPath("$.data.leadAuditorId").value(lead.userId().toString()))
+                .andExpect(jsonPath("$.data.items.length()").value(2))
+                .andExpect(jsonPath("$.data.items[0].result").doesNotExist());
+        assertThat(emailedSubjects(lead)).contains("Audit " + nextNumber + " is scheduled");
+    }
+
+    @Test
+    void aRepeatIsSkippedWhenItsChecklistIsArchived() throws Exception {
+        Map<String, Object> body = plan("INTERNAL");
+        body.put("repeatEveryMonths", 12);
+        String audit = idOf(body(as(owner, postJson(AUDITS, body)).andExpect(status().isCreated())));
+        as(owner, postJson(AUDITS + "/" + audit + "/start", Map.of())).andExpect(status().isOk());
+        answer(audit, 0, "CONFORMING");
+        answer(audit, 1, "CONFORMING");
+        complete(audit).andExpect(status().isOk());
+        requestClosure(owner, audit).andExpect(status().isOk());
+        as(owner, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                CHECKLISTS + "/" + body.get("checklistId"))).andExpect(status().isNoContent());
+
+        as(manager, postJson(AUDITS + "/" + audit + "/close", Map.of()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("CLOSED"))
+                .andExpect(jsonPath("$.data.nextAuditId").doesNotExist());
     }
 }

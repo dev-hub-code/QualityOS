@@ -126,6 +126,9 @@ A new job also needs an entry in `JobMonitor`, which holds its own list of what 
 work order past its planned end, and a line of an approved plan past its due date with less made than planned. It
 tells those who manage work orders or plans at that facility, and repeats once a week until the work is done.
 
+`audit-reminders` runs hourly and tells each lead auditor once, a week before a planned audit, in the organisation's own
+date.
+
 ## Production module
 
 `com.qualityos.production` holds manufacturing: definitions, plans, work orders, the shop floor, quality gates,

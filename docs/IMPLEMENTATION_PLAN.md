@@ -66,7 +66,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A recall starts from the traced batch, and other batch numbers can be typed in to join it. Batches cannot be added after the recall starts. A CAPA can be linked when it starts | When a user needs it |
 | Recording an instrument on an inspection is optional, and applies to the whole inspection, not each measurement | Review after real use |
 | A decision to reinspect after a failed calibration holds the goods that are left, but does not recall what was already used or dispatched, nor start the new inspection | Review after real use |
-| Audits are planned one at a time, with no recurring schedule or reminder before the date. A missed audit shows as overdue in the list | When a user needs it |
 | A recorded audit finding cannot be edited. A wrong one is handled by cancelling its NCR, and it stays on the report | Review after real use |
 | `tenant_settings` holds the review rule and the two NCR and CAPA rules so far | Grows as rules are added |
 | Dashboard figures are kept for 60 seconds per organisation, period and facility scope. Anything written to the audit log clears them at once on the same instance. Other changes, and changes on another instance, show within 60 seconds | With production work: use a shared cache if the figures must agree across instances |

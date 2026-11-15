@@ -31,6 +31,7 @@ const LABELS: Record<string, string> = {
   CALIBRATION_OVERDUE: "An instrument is overdue for calibration",
   CALIBRATION_FAILED: "An instrument fails calibration",
   AUDIT_SCHEDULED: "An audit is scheduled for me",
+  AUDIT_DUE_SOON: "An audit I lead is a week away",
   AUDIT_FINDINGS: "An audit has findings",
   AUDIT_AWAITING_CLOSURE: "An audit is ready for closure",
   WORK_ORDER_AWAITING_APPROVAL: "A work order needs approval",

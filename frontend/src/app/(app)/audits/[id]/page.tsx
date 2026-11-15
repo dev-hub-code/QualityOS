@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { AuditChecklist } from "@/components/audits/audit-checklist";
 import { AuditFindings } from "@/components/audits/audit-findings";
 import { FormError } from "@/components/forms/field";
@@ -13,6 +13,13 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import type { FieldDef } from "@/lib/record-form";
 import type { Audit } from "@/lib/types";
+
+function repeats(months: number | null): string {
+  if (!months) return "No";
+  if (months === 1) return "Every month";
+  if (months === 12) return "Every year";
+  return months % 12 === 0 ? `Every ${months / 12} years` : `Every ${months} months`;
+}
 
 const GRADES = [
   { value: "MAJOR_NONCONFORMITY", label: "Major nonconformity" },
@@ -109,6 +116,17 @@ export default function AuditPage() {
             ["Facility", audit.facilityName],
             ["Planned for", audit.plannedOn],
             ["Lead auditor", audit.leadAuditorName],
+            ["Repeats", repeats(audit.repeatEveryMonths)],
+            ...(audit.nextAuditId
+              ? [
+                  [
+                    "Next audit",
+                    <RecordLink key="next" href={`/audits/${audit.nextAuditId}`}>
+                      {audit.nextAuditNumber}
+                    </RecordLink>,
+                  ] as [string, ReactNode],
+                ]
+              : []),
             ["Checklist", audit.checklistName],
             ["Scope", audit.scope],
             ...(audit.supplierName ? [["Supplier", audit.supplierName] as [string, string]] : []),

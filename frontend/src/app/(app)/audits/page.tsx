@@ -42,6 +42,12 @@ const COLUMNS: ColumnDef<AuditSummary>[] = [
   },
 ];
 
+/** Closing a repeating audit plans the next one this many months after its planned date. Blank is a one-off. */
+const REPEATS = [1, 3, 6, 12, 24].map((months) => ({
+  value: String(months),
+  label: months === 1 ? "Month" : months === 12 ? "Year" : months === 24 ? "Two years" : `${months} months`,
+}));
+
 export default function AuditsPage() {
   const router = useRouter();
   const canManage = usePermission("AUDIT_MANAGE");
@@ -71,6 +77,7 @@ export default function AuditsPage() {
     },
     { name: "plannedOn", label: "Planned for", type: "date", required: true },
     { name: "leadAuditorId", label: "Lead auditor", type: "select", required: true, options: assignees },
+    { name: "repeatEveryMonths", label: "Repeat every", type: "select", options: REPEATS },
   ];
   return (
     <div className="space-y-6">

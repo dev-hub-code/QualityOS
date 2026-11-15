@@ -65,6 +65,7 @@ public class QualityAuditService implements AttachmentPolicy {
     private static final String RESOURCE = "Audit";
     private static final String ATTACHMENT_TYPE = "AUDIT_FINDING";
     private static final String NUMBER_PREFIX = "AUD";
+    private static final int REMIND_DAYS_BEFORE = 7;
 
     private final QualityAuditRepository audits;
     private final AuditItemRepository items;
@@ -160,7 +161,7 @@ public class QualityAuditService implements AttachmentPolicy {
             products.requireExists(request.productId());
         }
         List<AuditChecklistItem> questions = checklists.questions(request.checklistId());
-        QualityAudit created = audits.saveAndFlush(new QualityAudit(
+        QualityAudit created = plan(new QualityAudit(
                 numbers.next(NUMBER_PREFIX),
                 request.auditType(),
                 request.title().trim(),
@@ -170,12 +171,69 @@ public class QualityAuditService implements AttachmentPolicy {
                 request.productId(),
                 request.checklistId(),
                 request.plannedOn(),
-                request.leadAuditorId()));
+                request.leadAuditorId(),
+                request.repeatEveryMonths()), questions);
+        return toDetail(created);
+    }
+
+    private QualityAudit plan(QualityAudit row, List<AuditChecklistItem> questions) {
+        QualityAudit created = audits.saveAndFlush(row);
         questions.forEach(question -> items.save(new AuditItem(
                 created.getId(), question.getPosition(), question.getQuestion(), question.getClauseReference())));
         audit.record("AUDIT_PLANNED", ENTITY, created.getId());
         tellLead(created);
-        return toDetail(created);
+        return created;
+    }
+
+    /**
+     * Plans the next audit of a repeating one, with the same checklist, scope and lead auditor. It is skipped, and the
+     * audit log says why, when the checklist or facility has been archived or the lead auditor has left.
+     */
+    private void repeat(QualityAudit row) {
+        if (row.getRepeatEveryMonths() == null) {
+            return;
+        }
+        Optional<List<AuditChecklistItem>> questions = checklists.activeQuestions(row.getChecklistId());
+        String skipped = questions.isEmpty() ? "The checklist is archived."
+                : !facilities.isActive(row.getFacilityId()) ? "The facility is archived."
+                : access.activeMemberContact(row.getLeadAuditorId()).isEmpty() ? "The lead auditor has left."
+                : null;
+        if (skipped != null) {
+            audit.record("AUDIT_REPEAT_SKIPPED", ENTITY, row.getId(), null, Map.of("reason", skipped));
+            return;
+        }
+        QualityAudit next = plan(new QualityAudit(
+                numbers.next(NUMBER_PREFIX),
+                row.getAuditType(),
+                row.getTitle(),
+                row.getScope(),
+                row.getFacilityId(),
+                row.getSupplierId(),
+                row.getProductId(),
+                row.getChecklistId(),
+                row.nextPlannedOn(today()),
+                row.getLeadAuditorId(),
+                row.getRepeatEveryMonths()), questions.get());
+        row.followedBy(next.getId());
+    }
+
+    /** Reminds each lead auditor once, a week before a planned audit. Runs under the current tenant. */
+    @Transactional
+    public int remindUpcoming() {
+        LocalDate today = today();
+        List<QualityAudit> due = audits.findByStatusAndReminderSentAtIsNullAndPlannedOnBetween(
+                QualityAudit.Status.PLANNED, today, today.plusDays(REMIND_DAYS_BEFORE));
+        Instant now = Instant.now();
+        for (QualityAudit row : due) {
+            row.reminded(now);
+            notifications.notify(Set.of(row.getLeadAuditorId()), NotificationType.AUDIT_DUE_SOON,
+                    row.getAuditNumber() + " is on " + row.getPlannedOn(), row.getTitle(), link(row),
+                    new EmailContent(EmailTemplate.AUDIT_DUE_SOON, Map.of(
+                            "auditNumber", row.getAuditNumber(),
+                            "auditTitle", row.getTitle(),
+                            "dueDate", row.getPlannedOn().toString())));
+        }
+        return due.size();
     }
 
     @Transactional
@@ -184,7 +242,8 @@ public class QualityAuditService implements AttachmentPolicy {
         requireMember(request.leadAuditorId());
         boolean told = request.leadAuditorId().equals(row.getLeadAuditorId())
                 && request.plannedOn().equals(row.getPlannedOn());
-        row.replan(request.title().trim(), request.scope().trim(), request.plannedOn(), request.leadAuditorId());
+        row.replan(request.title().trim(), request.scope().trim(), request.plannedOn(), request.leadAuditorId(),
+                request.repeatEveryMonths());
         audit.record("AUDIT_REPLANNED", ENTITY, id);
         if (!told) {
             tellLead(row);
@@ -299,6 +358,7 @@ public class QualityAuditService implements AttachmentPolicy {
         requireNoBlockers(row);
         row.close(TenantContext.getCurrentUserId(), Instant.now());
         audit.record("AUDIT_CLOSED", ENTITY, id);
+        repeat(row);
         return toDetail(row);
     }
 
@@ -428,6 +488,10 @@ public class QualityAuditService implements AttachmentPolicy {
                 members.get(row.getClosedBy()),
                 row.getClosedAt(),
                 row.getCancelReason(),
+                row.getRepeatEveryMonths(),
+                row.getNextAuditId(),
+                row.getNextAuditId() == null ? null
+                        : audits.findById(row.getNextAuditId()).map(QualityAudit::getAuditNumber).orElse(null),
                 questions.stream()
                         .map(item -> new ItemView(item.getId(), item.getPosition(), item.getQuestion(),
                                 item.getClauseReference(), item.getResult() == null ? null : item.getResult().name(),

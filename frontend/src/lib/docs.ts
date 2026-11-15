@@ -250,7 +250,7 @@ export const DOC_PAGES: DocPage[] = [
       },
       {
         title: "Versions",
-        text: "A template starts as a draft, then is published with an effective date. A published version can never be changed. To change it, create a new version, and the old one becomes superseded. Inspections already carried out stay tied to the version they used.",
+        text: "A template starts as a draft, then is published with an effective date. A published version can never be changed. To change it, create a new version, and the old one becomes superseded. Inspections already carried out stay tied to the version they used. The name, and the material or product a template is for, can be changed with Edit; this changes only which items it is offered for from then on.",
       },
     ],
     example: {

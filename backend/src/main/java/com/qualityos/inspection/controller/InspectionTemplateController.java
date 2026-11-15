@@ -9,6 +9,7 @@ import com.qualityos.inspection.dto.TemplateDtos.SaveDraftRequest;
 import com.qualityos.inspection.dto.TemplateDtos.SaveTemplateRequest;
 import com.qualityos.inspection.dto.TemplateDtos.TemplateDetail;
 import com.qualityos.inspection.dto.TemplateDtos.TemplateSummary;
+import com.qualityos.inspection.dto.TemplateDtos.UpdateTemplateRequest;
 import com.qualityos.inspection.entity.InspectionTemplate;
 import com.qualityos.inspection.service.InspectionTemplateService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -65,6 +66,12 @@ public class InspectionTemplateController {
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<TemplateDetail> create(@Valid @RequestBody SaveTemplateRequest request) {
         return ApiResponse.ok(templates.create(request));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize(Require.TEMPLATE_MANAGE)
+    public ApiResponse<TemplateDetail> update(@PathVariable UUID id, @Valid @RequestBody UpdateTemplateRequest request) {
+        return ApiResponse.ok(templates.update(id, request));
     }
 
     @DeleteMapping("/{id}")

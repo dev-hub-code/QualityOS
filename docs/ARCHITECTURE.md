@@ -109,7 +109,8 @@ line is the subject, and sits inside `layout.html`. They use Mustache: `{{value}
 escaped in HTML. A missing variable fails the send rather than leaving a blank.
 
 Account emails retry three times in the background. Notification emails keep the existing retry schedule of about an
-hour. Notifications store their template and variables, not finished text.
+hour. Notifications store their template and variables, not finished text. Every notification type has its own
+template. `notification/general` is kept only for notifications stored before a type had one.
 
 ## Scheduled jobs
 

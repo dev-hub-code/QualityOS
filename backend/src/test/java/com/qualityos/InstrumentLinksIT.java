@@ -115,10 +115,12 @@ class InstrumentLinksIT extends TraceabilityFixture {
         String label = JsonPath.<String>read(detail, "$.data.operation.workOrderNumber") + " operation 10";
 
         // Failing calibration puts the operation in doubt and names it in the NCR.
+        Session qualityManager = addMember(owner, "QUALITY_MANAGER");
         String failed = body(as(owner, postJson("/api/v1/instruments/" + micrometer + "/calibrations", Map.of(
                 "calibratedOn", LocalDate.now().toString(), "result", "FAIL", "performedBy", "Lab")))
                 .andExpect(status().isCreated()));
         assertThat(failed).isNotEmpty();
+        assertThat(emailedSubjects(qualityManager)).anyMatch(subject -> subject.endsWith(" failed calibration"));
         String reviews = body(as(owner, get("/api/v1/instruments/" + micrometer + "/impact-reviews")));
         assertThat(JsonPath.<List<String>>read(reviews, "$.data[0].otherUses[*].label")).containsExactly(label);
         assertThat(JsonPath.<List<Object>>read(reviews, "$.data[0].reviews")).isEmpty();

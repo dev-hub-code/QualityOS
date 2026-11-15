@@ -253,6 +253,9 @@ class MaterialCorrectionIT extends TraceabilityFixture {
         approve(manager, id, false).andExpect(status().isOk());
         as(engineer, get("/api/v1/notifications")).andExpect(jsonPath("$.data.items[*].type",
                 hasItem("MATERIAL_CORRECTION_DECIDED")));
+        String number = JsonPath.read(body(as(engineer, get(PATH + "/" + id))), "$.data.correctionNumber");
+        assertThat(emailedSubjects(manager)).contains(number + " needs approval");
+        assertThat(emailedSubjects(engineer)).contains(number + " was approved and applied");
     }
 
     @Test

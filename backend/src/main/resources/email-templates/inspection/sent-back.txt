@@ -1,0 +1,8 @@
+Subject: {{inspectionNumber}} was sent back to you
+
+An inspection was sent back
+
+Hello {{recipientName}},
+{{inspectionNumber}} needs correcting before it can be approved. The note says: {{note}}
+
+Open inspection: {{actionUrl}}

@@ -8,6 +8,7 @@ import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.inspection.entity.Inspection;
 import com.qualityos.notification.service.NotificationService;
 import com.qualityos.notification.service.NotificationType;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -56,7 +57,8 @@ class InspectionAlerts {
     void sentBack(Inspection inspection, UUID inspector, String note) {
         String number = inspection.getInspectionNumber();
         send(Set.of(inspector), NotificationType.INSPECTION_SENT_BACK, inspection, number + " was sent back",
-                "Inspection " + number + " needs correcting: " + note, EmailTemplate.GENERAL);
+                "Inspection " + number + " needs correcting: " + note, EmailTemplate.INSPECTION_SENT_BACK,
+                Map.of("note", note));
     }
 
     void disposed(Inspection inspection) {
@@ -69,7 +71,8 @@ class InspectionAlerts {
                 "Inspection " + number + " was closed with the disposition " + inspection.getDisposition() + ".",
                 "HOLD".equals(String.valueOf(inspection.getDisposition()))
                         ? EmailTemplate.MATERIAL_ON_HOLD
-                        : EmailTemplate.GENERAL);
+                        : EmailTemplate.INSPECTION_DISPOSITION,
+                Map.of("disposition", String.valueOf(inspection.getDisposition())));
     }
 
     private void send(
@@ -79,9 +82,21 @@ class InspectionAlerts {
             String title,
             String body,
             EmailTemplate template) {
-        EmailContent email = template == EmailTemplate.GENERAL ? null : new EmailContent(template, Map.of(
-                "inspectionNumber", inspection.getInspectionNumber(),
-                "batchNumber", String.valueOf(inspection.getBatchNumber())));
+        send(recipients, type, inspection, title, body, template, Map.of());
+    }
+
+    private void send(
+            Set<UUID> recipients,
+            NotificationType type,
+            Inspection inspection,
+            String title,
+            String body,
+            EmailTemplate template,
+            Map<String, String> details) {
+        Map<String, String> variables = new HashMap<>(details);
+        variables.put("inspectionNumber", inspection.getInspectionNumber());
+        variables.put("batchNumber", String.valueOf(inspection.getBatchNumber()));
+        EmailContent email = new EmailContent(template, variables);
         notifications.notify(scope.allowedIn(inspection.getFacilityId(), recipients), type, title, body,
                 "/inspections/" + inspection.getId(), email);
     }

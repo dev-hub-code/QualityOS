@@ -406,6 +406,8 @@ class PlatformEntitlementsIT extends MasterDataFixture {
                 "Near the Metered " + plan + " plan's facility limit");
         String body = body(as(owner, get("/api/v1/notifications")));
         assertThat(body).contains("5 of 5 facilities. Change plan to add more.", "/settings/billing");
+        assertThat(emailedSubjects(owner)).contains("Near the Metered " + plan + " plan's facility limit",
+                "The Metered " + plan + " plan's facility limit is reached");
     }
 
     private List<String> limitWarnings() throws Exception {

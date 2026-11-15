@@ -1,0 +1,9 @@
+Subject: New action on {{capaNumber}}
+
+An action was assigned to you
+
+Hello {{recipientName}},
+You own a new action on {{capaNumber}}, {{capaTitle}}: {{actionDescription}}.
+It is due on {{dueDate}}.
+
+Open CAPA: {{actionUrl}}

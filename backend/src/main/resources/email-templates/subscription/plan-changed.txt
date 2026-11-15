@@ -1,0 +1,8 @@
+Subject: Your organisation is now on the {{planName}} plan
+
+Plan changed
+
+Hello {{recipientName}},
+Your organisation is now on the {{planName}} plan.
+
+Open billing: {{actionUrl}}

@@ -207,7 +207,9 @@ public class InstrumentService implements AttachmentPolicy {
                     NotificationType.CALIBRATION_FAILED,
                     instrument.getName() + " failed calibration",
                     raised,
-                    "/calibration/" + id);
+                    "/calibration/" + id,
+                    new EmailContent(EmailTemplate.CALIBRATION_FAILED, Map.of(
+                            "instrumentName", instrument.getName(), "impact", raised)));
         }
         return toResponse(record);
     }

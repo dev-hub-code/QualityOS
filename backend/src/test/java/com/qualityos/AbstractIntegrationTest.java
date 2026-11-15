@@ -4,12 +4,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import com.qualityos.common.job.JobContext;
+import com.qualityos.common.mail.MailMessage;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.notification.service.NotificationDeliveryService;
 import java.util.Map;
 import com.qualityos.common.security.SecretBox;
 import com.qualityos.common.security.Totp;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,6 +78,9 @@ public abstract class AbstractIntegrationTest {
     protected RecordingMailGateway mail;
 
     @Autowired
+    private NotificationDeliveryService notificationDelivery;
+
+    @Autowired
     private SecretBox secretBox;
 
     /** Every operator the tests make shares this authenticator secret, so that any test can produce a code. */
@@ -105,6 +112,12 @@ public abstract class AbstractIntegrationTest {
     /** The code an enrolled test operator's app would show now. */
     protected static String secondFactorCode() {
         return Totp.code(SECOND_FACTOR_SECRET, Totp.step(Instant.now()));
+    }
+
+    /** Sends the notification emails waiting now, and returns every subject this person has been emailed. */
+    protected List<String> emailedSubjects(Session session) {
+        notificationDelivery.deliverPending(new JobContext());
+        return mail.to(session.email()).stream().map(MailMessage::subject).toList();
     }
 
     protected static String uniqueEmail() {

@@ -50,7 +50,7 @@ public class NotificationService {
         notify(recipients, type, title, body, link, null);
     }
 
-    /** @param email a template for this event, which lets the email be written in each recipient's language */
+    /** @param email this event's own template, rather than the general one */
     @Transactional(propagation = Propagation.MANDATORY)
     public void notify(
             Set<UUID> recipients, NotificationType type, String title, String body, String link, EmailContent email) {
@@ -65,8 +65,8 @@ public class NotificationService {
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public void notifyIncludingActor(Set<UUID> recipients, NotificationType type, String title, String body,
-            String link) {
-        deliver(new HashSet<>(recipients), type, title, body, link, null);
+            String link, EmailContent email) {
+        deliver(new HashSet<>(recipients), type, title, body, link, email);
     }
 
     private void deliver(

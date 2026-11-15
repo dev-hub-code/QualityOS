@@ -1,0 +1,9 @@
+Subject: Invoice {{invoiceNumber}} is overdue
+
+An invoice is overdue
+
+Hello {{recipientName}},
+Invoice {{invoiceNumber}} was due on {{dueDate}}.
+Please pay it to keep your subscription.
+
+Open billing: {{actionUrl}}

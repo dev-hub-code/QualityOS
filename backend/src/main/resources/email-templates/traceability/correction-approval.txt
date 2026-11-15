@@ -1,0 +1,9 @@
+Subject: {{correctionNumber}} needs approval
+
+A material correction needs approval
+
+Hello {{recipientName}},
+{{correctionNumber}} was submitted and needs someone other than the requester to approve it.
+The reason given: {{reason}}
+
+Open correction: {{actionUrl}}

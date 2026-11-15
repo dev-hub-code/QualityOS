@@ -382,7 +382,8 @@ public class SubscriptionService {
         Instant start = subscription.activate(invoice.getPlanId(), invoice.getBillingCycle(), now);
         if (!previousPlan.equals(invoice.getPlanId())) {
             notifications.notify(access.holdersOf(PlanAccess.SUBSCRIPTION_MANAGE), NotificationType.PLAN_CHANGED,
-                    "Plan changed", "Your organisation is now on the " + invoice.getPlanName() + " plan.", LINK);
+                    "Plan changed", "Your organisation is now on the " + invoice.getPlanName() + " plan.", LINK,
+                    new EmailContent(EmailTemplate.PLAN_CHANGED, Map.of("planName", invoice.getPlanName())));
         }
         invoice.setStatus(SubscriptionInvoice.Status.PAID);
         invoice.setPaidAt(now);
@@ -404,7 +405,10 @@ public class SubscriptionService {
                     invoice.setOverdueNotifiedAt(Instant.now());
                     notifications.notify(access.holdersOf(PlanAccess.SUBSCRIPTION_MANAGE), NotificationType.INVOICE_OVERDUE,
                             "Invoice overdue", "Invoice " + invoice.getInvoiceNumber() + " was due on "
-                                    + invoice.getDueOn() + ". Please pay it to keep your subscription.", LINK);
+                                    + invoice.getDueOn() + ". Please pay it to keep your subscription.", LINK,
+                            new EmailContent(EmailTemplate.INVOICE_OVERDUE, Map.of(
+                                    "invoiceNumber", invoice.getInvoiceNumber(),
+                                    "dueDate", invoice.getDueOn().toString())));
                     return 1;
                 })
                 .orElse(0);

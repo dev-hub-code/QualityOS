@@ -2,10 +2,12 @@ package com.qualityos;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -148,5 +150,46 @@ class TemplateSelectionIT extends TraceabilityFixture {
     @Test
     void theSubjectMustBeNamedOnce() throws Exception {
         as(owner, get(APPLICABLE)).andExpect(status().isUnprocessableContent());
+    }
+
+    private ResultActions update(Session session, String template, String name, String materialId, String productId)
+            throws Exception {
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", name);
+        body.put("materialId", materialId);
+        body.put("productId", productId);
+        return as(session, put("/api/v1/inspection-templates/" + template).contentType("application/json")
+                .content(json.writeValueAsString(body)));
+    }
+
+    @Test
+    void aTemplateCanBePointedAtAnotherMaterialAndIsOfferedForItFromThen() throws Exception {
+        String first = material(owner, true);
+        String second = material(owner, true);
+        String template = template("IQC", Map.of("materialId", first));
+        Lot lot = pendingLot(second);
+        assertThat(JsonPath.<List<String>>read(body(as(owner, get(APPLICABLE + "receiptItemId=" + lot.id()))),
+                "$.data.templates[*].id")).doesNotContain(template);
+
+        update(owner, template, "Bar stock IQC", second, null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.template.name").value("Bar stock IQC"));
+        assertThat(JsonPath.<String>read(body(as(owner, get(APPLICABLE + "receiptItemId=" + lot.id()))),
+                "$.data.suggestedId")).isEqualTo(template);
+
+        String audit = body(as(owner, get("/api/v1/audit-logs?action=TEMPLATE_UPDATED")));
+        assertThat(JsonPath.<List<String>>read(audit, "$.data.items[*].entityId")).contains(template);
+    }
+
+    @Test
+    void aTemplateCanBecomeGeneralButNotNameBothAMaterialAndAProduct() throws Exception {
+        String material = material(owner, true);
+        String template = template("IQC", Map.of("materialId", material));
+        update(owner, template, "Any material", material, product())
+                .andExpect(status().isUnprocessableContent());
+        update(owner, template, "Any material", null, null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.template.appliesTo").isEmpty());
+        update(addMember(owner, "VIEWER"), template, "Mine", null, null).andExpect(status().isForbidden());
     }
 }

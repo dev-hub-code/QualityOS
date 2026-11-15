@@ -4,13 +4,23 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
-import { PageHeader, QueryState, Section, StatusBadge, useAction, useRefresh } from "@/components/records/parts";
+import {
+  PageHeader,
+  QueryState,
+  Section,
+  StatusBadge,
+  useAction,
+  useMaterials,
+  useProducts,
+  useRefresh,
+} from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { TemplateDraftForm } from "@/components/records/template-draft-form";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { requirement } from "@/lib/inspection";
+import { templateEditFields } from "@/lib/record-fields";
 import type { FieldDef } from "@/lib/record-form";
 import type { TemplateDetail, TemplateVersion } from "@/lib/types";
 
@@ -54,6 +64,9 @@ export default function InspectionTemplatePage() {
   const refresh = useRefresh();
   const { run, pending, message } = useAction();
   const [publishing, setPublishing] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const materials = useMaterials();
+  const products = useProducts();
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<TemplateDetail>(path) });
   if (!data) return <QueryState error={error} />;
 
@@ -63,6 +76,11 @@ export default function InspectionTemplatePage() {
   return (
     <div className="space-y-6">
       <PageHeader title={template.name} subtitle={`${template.code} · ${template.inspectionType} · ${template.appliesTo ? `Only for ${template.appliesTo}` : "For any item"}`}>
+        {canManage && (
+          <Button variant="outline" onClick={() => setEditing(true)}>
+            Edit
+          </Button>
+        )}
         {canManage && !draft && (
           <Button disabled={pending} onClick={() => run(() => api.post(`${path}/versions`))}>
             New version
@@ -81,6 +99,15 @@ export default function InspectionTemplatePage() {
         .map((version) => (
           <PublishedVersion key={version.id} version={version} />
         ))}
+      {editing && (
+        <RecordDialog
+          title={`Edit ${template.code}`}
+          fields={templateEditFields(materials, products)}
+          record={template}
+          onClose={() => setEditing(false)}
+          onSubmit={(values) => api.put(path, values).then(refresh)}
+        />
+      )}
       {publishing && (
         <RecordDialog
           title={`Publish version ${draft?.versionNumber}`}

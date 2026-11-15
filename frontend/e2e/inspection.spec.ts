@@ -69,11 +69,15 @@ test("a template is published, and a failed critical measurement never releases 
   await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("button", { name: "New version" })).toBeVisible();
   await expect(page.getByText("19.9 to 20.1")).toBeVisible();
+  await page.getByRole("button", { name: "Edit" }).click();
+  await page.getByRole("dialog").getByLabel("Name").fill("Bar stock incoming");
+  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("heading", { name: "Bar stock incoming" })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/inspections");
   await page.getByRole("button", { name: "Inspect" }).click();
-  await page.getByLabel("Template").selectOption({ label: "BAR-IQC – Bar incoming" });
+  await page.getByLabel("Template").selectOption({ label: "BAR-IQC – Bar stock incoming" });
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page).toHaveURL(/inspections\//);
 

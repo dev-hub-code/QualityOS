@@ -39,6 +39,7 @@ test("capacity, downtime, cost and OEE come from what was planned and recorded",
   await call("POST", `/manufacturing/boms/${bom.revision.id}/submit`);
   await call("POST", `/manufacturing/boms/${bom.revision.id}/approve`, {});
   const centre = await call("POST", "/manufacturing/work-centers", { code: "WC-1", name: "Turning", facilityId: facility.id });
+  await call("POST", `/facilities/${facility.id}/departments`, { code: "EL", name: "Electrical" });
   const machine = await call("POST", "/manufacturing/machines", { code: "M-1", name: "Lathe", workCenterId: centre.id });
 
   // Labour and overhead rates are set on the work centre; the machine rate is left out.
@@ -95,7 +96,7 @@ test("capacity, downtime, cost and OEE come from what was planned and recorded",
     await dialog.getByLabel("End (leave blank while it lasts) date").fill(day(0));
     await dialog.getByLabel("End (leave blank while it lasts) time").fill("00:20");
     await dialog.getByLabel("Reason").fill("Grid outage");
-    await dialog.getByLabel("Responsible department").fill("Electrical");
+    await dialog.getByLabel("Responsible department").selectOption({ label: "PUNE · EL – Electrical" });
   });
   const stop = page.locator("[data-slot='table-row']").filter({ hasText: "Grid outage" });
   await expect(stop.getByRole("cell", { name: "20 min", exact: true })).toBeVisible();

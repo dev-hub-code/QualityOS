@@ -10,7 +10,9 @@ import com.qualityos.production.dto.DowntimeDtos.GroupBy;
 import com.qualityos.production.dto.DowntimeDtos.RecordDowntimeRequest;
 import com.qualityos.production.dto.DowntimeDtos.UpdateDowntimeRequest;
 import com.qualityos.production.entity.OperationEvent.LossCategory;
+import com.qualityos.organization.dto.FacilityDtos.DepartmentOption;
 import com.qualityos.production.service.DowntimeService;
+import java.util.List;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -68,6 +70,12 @@ public class DowntimeController {
             @RequestParam(required = false) UUID facilityId,
             @RequestParam(defaultValue = "MACHINE") GroupBy groupBy) {
         return ApiResponse.ok(downtime.summary(from, to, facilityId, groupBy));
+    }
+
+    /** The departments a stop can be blamed on, across the facilities the caller can see. */
+    @GetMapping("/departments")
+    public ApiResponse<List<DepartmentOption>> departments() {
+        return ApiResponse.ok(downtime.departments());
     }
 
     @GetMapping("/{id}")

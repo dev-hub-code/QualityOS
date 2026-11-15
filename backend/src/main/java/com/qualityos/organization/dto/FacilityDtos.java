@@ -51,6 +51,10 @@ public final class FacilityDtos {
     public record UnitResponse(UUID id, String code, String name) {
     }
 
+    /** A department named with its facility, for choosing one from several plants at once. */
+    public record DepartmentOption(UUID id, UUID facilityId, String facilityCode, String code, String name) {
+    }
+
     public record SaveShiftRequest(
             @NotBlank @Size(max = 100) String name,
             @NotNull LocalTime startsAt,

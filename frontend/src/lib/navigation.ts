@@ -117,6 +117,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Facilities", href: "/facilities", icon: Factory, anyPermission: ["FACILITY_VIEW"] },
   { label: "Users", href: "/users", icon: Users, anyPermission: ["USER_MANAGE"] },
   { label: "Roles", href: "/roles", icon: ShieldCheck, anyPermission: ["ROLE_MANAGE", "USER_MANAGE"] },
+  { label: "Audit log", href: "/audit-log", icon: ScrollText, anyPermission: ["AUDIT_LOG_VIEW"] },
   { label: "Billing", href: "/settings/billing", icon: CreditCard, anyPermission: ["SUBSCRIPTION_MANAGE"] },
   { label: "Settings", href: "/settings", icon: Settings },
   { label: "Documentation", href: "/docs", icon: BookOpen },

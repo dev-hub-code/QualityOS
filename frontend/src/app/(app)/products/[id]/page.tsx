@@ -10,7 +10,9 @@ import {
   Details,
   PageHeader,
   QueryState,
+  RecordLink,
   Section,
+  StatusBadge,
   SpecificationTable,
   specificationFields,
   useAction,
@@ -22,10 +24,10 @@ import {
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
-import { api } from "@/lib/api";
+import { api, type PageResponse } from "@/lib/api";
 import { productFields } from "@/lib/record-fields";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
-import type { ProductDetail } from "@/lib/types";
+import type { ProductDetail, ProductionBatch } from "@/lib/types";
 
 const REVISION_FIELDS: FieldDef[] = [
   { name: "revision", label: "Revision", required: true },
@@ -38,6 +40,7 @@ export default function ProductPage() {
   const path = `/products/${id}`;
   const canManage = usePermission("PRODUCT_MANAGE");
   const canSeeManufacturing = usePermission("MANUFACTURING_VIEW");
+  const canTrace = usePermission("TRACEABILITY_VIEW");
   const units = useUnits();
   const categories = useProductCategories();
   const materials = useMaterials();
@@ -116,6 +119,7 @@ export default function ProductPage() {
         </ul>
       </Section>
       {canSeeManufacturing && <ProductManufacturing productId={id} />}
+      {canTrace && <ProductBatches productId={id} />}
       <AttachmentPanel entityType="PRODUCT" entityId={id} canManage={canManage} />
       {dialog === "edit" && (
         <RecordDialog
@@ -155,5 +159,36 @@ export default function ProductPage() {
         />
       )}
     </div>
+  );
+}
+
+const BATCHES_SHOWN = 10;
+
+/** The most recent batches made of this product, each opening its trace. */
+function ProductBatches({ productId }: { productId: string }) {
+  const path = `/traceability/products/${productId}?size=${BATCHES_SHOWN}`;
+  const { data } = useQuery({ queryKey: [path], queryFn: () => api.get<PageResponse<ProductionBatch>>(path) });
+  if (!data) return null;
+  return (
+    <Section title="Batches">
+      {data.items.length === 0 && <p className="text-sm text-muted-foreground">No batch of this product yet.</p>}
+      <ul className="divide-y text-sm">
+        {data.items.map((batch) => (
+          <li key={batch.id} className="flex flex-wrap items-center gap-2 py-2">
+            <RecordLink href={`/traceability/${encodeURIComponent(batch.batchNumber)}`}>{batch.batchNumber}</RecordLink>
+            <span className="text-muted-foreground">
+              {formatQuantity(batch.producedQuantity ?? batch.plannedQuantity)}
+              {batch.producedQuantity ? " made" : " planned"}
+            </span>
+            <StatusBadge status={batch.status} />
+          </li>
+        ))}
+      </ul>
+      {data.totalItems > BATCHES_SHOWN && (
+        <p className="pt-2 text-sm text-muted-foreground">
+          Showing the last {BATCHES_SHOWN} of {data.totalItems}. <RecordLink href="/production-batches">All batches</RecordLink>
+        </p>
+      )}
+    </Section>
   );
 }

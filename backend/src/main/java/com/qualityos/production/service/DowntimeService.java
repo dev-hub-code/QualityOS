@@ -9,6 +9,7 @@ import com.qualityos.common.security.Permissions;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.TenantAccessService;
+import com.qualityos.organization.dto.FacilityDtos.DepartmentOption;
 import com.qualityos.organization.service.FacilityService;
 import com.qualityos.production.dto.DowntimeDtos.DowntimeResponse;
 import com.qualityos.production.dto.DowntimeDtos.DowntimeSummary;
@@ -228,12 +229,19 @@ public class DowntimeService implements AttachmentPolicy {
                         .map(WorkCenter::getProductionLineId).map(UUID::toString).orElse("none");
                 case FACILITY -> record.getFacilityId().toString();
                 case CATEGORY -> record.getCategory().name();
+                case DEPARTMENT -> record.getResponsibleDepartmentId() == null ? "none"
+                        : record.getResponsibleDepartmentId().toString();
             };
             double[] sums = totals.computeIfAbsent(key, ignored -> new double[2]);
             sums[record.isPlanned() ? 0 : 1] += minutes;
             counts.merge(key, 1L, Long::sum);
         }
         Map<String, String> labels = labels(groupBy, totals.keySet(), centreById);
+        if (groupBy == GroupBy.DEPARTMENT) {
+            // The name as it was when chosen, so a department since renamed or archived still has a row.
+            found.stream().filter(record -> record.getResponsibleDepartmentId() != null).forEach(record ->
+                    labels.putIfAbsent(record.getResponsibleDepartmentId().toString(), record.getResponsibleDepartment()));
+        }
         List<SummaryRow> rows = totals.entrySet().stream()
                 .map(entry -> new SummaryRow(entry.getKey(), labels.getOrDefault(entry.getKey(), entry.getKey()),
                         counts.get(entry.getKey()), minutes(entry.getValue()[0] + entry.getValue()[1]),
@@ -295,7 +303,7 @@ public class DowntimeService implements AttachmentPolicy {
         DowntimeRecord record = new DowntimeRecord(Source.MANUAL, centre.getFacilityId(), centre.getId(),
                 machine == null ? null : machine.getId(), request.workOrderId(), null, request.category(),
                 request.startedAt(), request.reason().trim());
-        record.setResponsibleDepartment(blankToNull(request.responsibleDepartment()));
+        blame(record, request.responsibleDepartmentId());
         record.setComments(blankToNull(request.comments()));
         if (request.endedAt() != null) {
             record.end(request.endedAt(), TenantContext.getCurrentUserId());
@@ -332,12 +340,26 @@ public class DowntimeService implements AttachmentPolicy {
         if (request.reason() != null && !request.reason().isBlank()) {
             record.setReason(request.reason().trim());
         }
-        record.setResponsibleDepartment(blankToNull(request.responsibleDepartment()));
+        blame(record, request.responsibleDepartmentId());
         record.setComments(blankToNull(request.comments()));
         requireSensible(record);
         records.saveAndFlush(record);
         audit.record("DOWNTIME_UPDATED", ENTITY, id, before, snapshot(record));
         return get(id);
+    }
+
+    /** The department must be one of the facility where the stop happened. */
+    private void blame(DowntimeRecord record, UUID departmentId) {
+        record.blame(departmentId, departmentId == null ? null
+                : facilities.requireDepartment(record.getFacilityId(), departmentId));
+    }
+
+    /** The departments a stop can be blamed on: those of every facility the caller can see. */
+    @Transactional(readOnly = true)
+    public List<DepartmentOption> departments() {
+        Collection<UUID> facilityIds = scope.restriction().map(allowed -> (Collection<UUID>) allowed)
+                .orElseGet(facilities::allIds);
+        return facilities.departmentsOf(facilityIds);
     }
 
     /** Ends a stop entered by hand. Stops from the floor or a machine end when the operation or machine goes on. */
@@ -387,13 +409,18 @@ public class DowntimeService implements AttachmentPolicy {
         Set<UUID> ids = keys.stream().filter(key -> !"none".equals(key) && groupBy != GroupBy.CATEGORY)
                 .map(UUID::fromString).collect(Collectors.toSet());
         Map<String, String> labels = new HashMap<>();
-        labels.put("none", groupBy == GroupBy.MACHINE ? "No machine" : "No production line");
+        labels.put("none", switch (groupBy) {
+            case MACHINE -> "No machine";
+            case DEPARTMENT -> "No department named";
+            default -> "No production line";
+        });
         switch (groupBy) {
             case MACHINE -> machines.findAllById(ids).forEach(m -> labels.put(m.getId().toString(), m.getCode()));
             case WORK_CENTER -> centreById.values().forEach(c -> labels.put(c.getId().toString(), c.getCode()));
             case PRODUCTION_LINE, FACILITY -> facilities.codes(ids)
                     .forEach((id, code) -> labels.put(id.toString(), code));
             case CATEGORY -> keys.forEach(key -> labels.put(key, label(LossCategory.valueOf(key))));
+            case DEPARTMENT -> { /* named from the records themselves */ }
         }
         return labels;
     }
@@ -425,8 +452,8 @@ public class DowntimeService implements AttachmentPolicy {
                 record.getSource(), record.getCategory(), record.isPlanned(), record.getStartedAt(),
                 record.getEndedAt(), minutes(record.minutesWithin(record.getStartedAt(),
                         record.getEndedAt() == null ? now : record.getEndedAt(), now)),
-                record.getReason(), record.getResponsibleDepartment(), record.getComments(),
-                name(members, record.getCreatedBy()), name(members, record.getEndedBy()));
+                record.getReason(), record.getResponsibleDepartmentId(), record.getResponsibleDepartment(),
+                record.getComments(), name(members, record.getCreatedBy()), name(members, record.getEndedBy()));
     }
 
     private static String name(Map<UUID, String> members, UUID id) {

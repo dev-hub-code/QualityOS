@@ -18,10 +18,11 @@ import { StartInspectionDialog } from "@/components/inspections/start-inspection
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
-import { api, type PageResponse } from "@/lib/api";
+import { api } from "@/lib/api";
 import { freeQuantity } from "@/lib/manufacturing";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import { inspectionTypeFor, parseSerials, toConsumeRequest } from "@/lib/traceability";
+import { lookupAll } from "@/components/records/parts";
 import type {
   BatchDetail,
   CorrectionDetail,
@@ -29,7 +30,7 @@ import type {
   ReleasedLot,
 } from "@/lib/types";
 
-const RELEASED = "/production-batches?status=RELEASED&size=100";
+const RELEASED = "/production-batches?status=RELEASED";
 const LOTS = "/material-receipts/released-lots";
 
 /** A quantity with its unit's code, such as "7.5 KG". */
@@ -43,14 +44,14 @@ function ConsumeDialog({ path, batchId, onClose }: { path: string; batchId: stri
   const { data: lots = [] } = useQuery({ queryKey: [LOTS], queryFn: () => api.get<ReleasedLot[]>(LOTS) });
   const { data: batches } = useQuery({
     queryKey: [RELEASED],
-    queryFn: () => api.get<PageResponse<ProductionBatch>>(RELEASED),
+    queryFn: () => lookupAll<ProductionBatch>("/production-batches", "&status=RELEASED"),
   });
   const options = [
     ...lots.map((lot) => ({
       value: `lot:${lot.itemId}`,
       label: `${lot.internalBatch} – ${lot.materialCode} (${withUnit(freeQuantity(lot), units.label(lot.uomId))} free)`,
     })),
-    ...(batches?.items ?? [])
+    ...(batches ?? [])
       .filter((batch) => batch.id !== batchId && Number(batch.availableQuantity) > 0)
       .map((batch) => ({
         value: `batch:${batch.id}`,

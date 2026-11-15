@@ -10,8 +10,8 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { STAGE_LABELS } from "@/lib/manufacturing";
 import type { FieldDef } from "@/lib/record-form";
-import type { PageResponse } from "@/lib/api";
 import type { CheckpointStage, QualityCheckpoint } from "@/lib/types";
+import { lookupAll } from "@/components/records/parts";
 
 const PATH = "/manufacturing/quality-checkpoints";
 
@@ -23,9 +23,9 @@ function useCheckpointTemplates() {
     queryKey: ["/inspection-templates", "checkpoints"],
     queryFn: async () => {
       const [inProcess, final] = await Promise.all(
-        ["IPQC", "FQC"].map((type) => api.get<PageResponse<Template>>(`/inspection-templates?size=100&type=${type}`)),
+        ["IPQC", "FQC"].map((type) => lookupAll<Template>("/inspection-templates", `&type=${type}`)),
       );
-      return [...inProcess.items, ...final.items];
+      return [...inProcess, ...final];
     },
   });
   return (data ?? [])

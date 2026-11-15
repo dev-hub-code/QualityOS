@@ -135,14 +135,25 @@ export function useSupplierCategories(): FieldOption[] {
 }
 
 const LOOKUP_SIZE = 100;
+/** A picker reads at most this many pages, 5,000 records, which a native select still searches by typing. */
+const LOOKUP_PAGES = 50;
+
+/** Every active record, page by page, so that a picker is not cut off at one page. */
+export async function lookupAll<T>(path: string, filter = ""): Promise<T[]> {
+  const page = (number: number) => api.get<PageResponse<T>>(`${path}?size=${LOOKUP_SIZE}&page=${number}${filter}`);
+  const first = await page(0);
+  const remaining = Math.min(first.totalPages, LOOKUP_PAGES) - 1;
+  if (remaining <= 0) return first.items;
+  const rest = await Promise.all(Array.from({ length: remaining }, (_, index) => page(index + 1)));
+  return [first, ...rest].flatMap((result) => result.items);
+}
 
 function useLookup<T extends { id: string; code: string; name: string }>(path: string, filter = ""): FieldOption[] {
-  const query = `size=${LOOKUP_SIZE}${filter}`;
   const { data } = useQuery({
-    queryKey: [path, query],
-    queryFn: () => api.get<PageResponse<T>>(`${path}?${query}`),
+    queryKey: [path, `lookup${filter}`],
+    queryFn: () => lookupAll<T>(path, filter),
   });
-  return (data?.items ?? []).map((item) => ({ value: item.id, label: `${item.code} – ${item.name}` }));
+  return (data ?? []).map((item) => ({ value: item.id, label: `${item.code} – ${item.name}` }));
 }
 
 export const useApprovedSuppliers = () => useLookup<Supplier>("/suppliers", "&status=APPROVED");

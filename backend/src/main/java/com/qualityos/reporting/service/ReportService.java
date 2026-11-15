@@ -17,6 +17,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ReportService {
 
-    private static final int MAX_ROWS = 5000;
     private static final String DATE = "to_char(%s AT TIME ZONE CAST(:zone AS text), 'YYYY-MM-DD')";
     private static final String DECIDED = "i.final_result IS NOT NULL AND i.approved_at >= :start AND i.approved_at < :end";
     private static final String LOTS = DECIDED + " AND i.receipt_item_id IS NOT NULL AND i.disposition <> 'HOLD'";
@@ -40,6 +40,8 @@ public class ReportService {
     private final FacilityService facilities;
     private final AuditService audit;
     private final Map<ReportType, ComputedReport> computed = new EnumMap<>(ReportType.class);
+    private final int screenRows;
+    private final int excelRows;
 
     ReportService(
             NamedParameterJdbcTemplate jdbc,
@@ -47,7 +49,11 @@ public class ReportService {
             OrganizationService organizations,
             FacilityService facilities,
             AuditService audit,
-            List<ComputedReport> computedReports) {
+            List<ComputedReport> computedReports,
+            @Value("${qualityos.reports.screen-rows}") int screenRows,
+            @Value("${qualityos.reports.excel-rows}") int excelRows) {
+        this.screenRows = screenRows;
+        this.excelRows = excelRows;
         computedReports.forEach(report -> computed.put(report.type(), report));
         this.jdbc = jdbc;
         this.scopes = scopes;
@@ -58,21 +64,24 @@ public class ReportService {
 
     @Transactional(readOnly = true)
     public ReportTable view(ReportType type, LocalDate from, LocalDate to, UUID facilityId) {
-        return build(type, scopes.resolve(from, to, facilityId));
+        return build(type, scopes.resolve(from, to, facilityId), screenRows);
     }
 
-    /** Taking a copy of quality records out of the system leaves a trace. */
+    /**
+     * Taking a copy of quality records out of the system leaves a trace. A PDF stops where the screen does, since it is
+     * read page by page; an Excel download holds many more rows, for a long period that would otherwise be split.
+     */
     @Transactional
     public ReportTable export(ReportType type, String format, LocalDate from, LocalDate to, UUID facilityId) {
         Resolved scope = scopes.resolve(from, to, facilityId);
-        ReportTable table = build(type, scope);
+        ReportTable table = build(type, scope, "EXCEL".equals(format) ? excelRows : screenRows);
         audit.record("REPORT_EXPORTED", "Report", type.slug(), null, Map.of(
                 "format", format, "from", scope.from().toString(), "to", scope.to().toString(),
                 "rows", table.rows().size()));
         return table;
     }
 
-    private ReportTable build(ReportType type, Resolved scope) {
+    private ReportTable build(ReportType type, Resolved scope, int limit) {
         ComputedReport source = computed.get(type);
         List<Column> columns;
         List<List<String>> rows;
@@ -80,7 +89,7 @@ public class ReportService {
         if (source != null) {
             ComputedReport.Table table = source.rows(scope.from(), scope.to(), scope.facilityId());
             columns = table.columns();
-            rows = new ArrayList<>(table.rows().subList(0, Math.min(table.rows().size(), MAX_ROWS + 1)));
+            rows = new ArrayList<>(table.rows().subList(0, Math.min(table.rows().size(), limit + 1)));
             note = table.note();
         } else {
             Definition definition = definition(type, scope);
@@ -88,7 +97,7 @@ public class ReportService {
             columns = definition.columns();
             note = definition.note();
             rows = new ArrayList<>(jdbc.query(
-                    definition.sql() + " LIMIT " + (MAX_ROWS + 1), scope.params(), (row, n) -> {
+                    definition.sql() + " LIMIT " + (limit + 1), scope.params(), (row, n) -> {
                         List<String> values = new ArrayList<>(width);
                         for (int column = 1; column <= width; column++) {
                             values.add(row.getString(column));
@@ -96,7 +105,7 @@ public class ReportService {
                         return values;
                     }));
         }
-        boolean truncated = rows.size() > MAX_ROWS;
+        boolean truncated = rows.size() > limit;
         if (truncated) {
             rows.removeLast();
         }

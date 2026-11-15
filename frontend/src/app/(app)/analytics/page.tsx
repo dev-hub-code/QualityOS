@@ -3,9 +3,11 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { MonthBars, RankBars, type Rank } from "@/components/analytics/charts";
-import { KpiTiles } from "@/components/analytics/kpi-tiles";
+import Link from "next/link";
+import { KpiTiles, ProductionTiles } from "@/components/analytics/kpi-tiles";
 import { NO_PERIOD, PeriodFilter, periodQuery } from "@/components/analytics/period-filter";
 import { PageHeader, QueryState, Section } from "@/components/records/parts";
+import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import type { Overview, QualityShare } from "@/lib/types";
 
@@ -19,6 +21,7 @@ const passRates = (shares: QualityShare[]): Rank[] =>
 
 export default function AnalyticsPage() {
   const [period, setPeriod] = useState(NO_PERIOD);
+  const seesProduction = usePermission("WORK_ORDER_VIEW");
   const path = `/analytics/overview?${periodQuery(period)}`;
   const { data, error } = useQuery({
     queryKey: [path],
@@ -35,6 +38,18 @@ export default function AnalyticsPage() {
       {data && (
         <>
           <KpiTiles kpis={data.kpis} all />
+          {seesProduction && (
+            <Section
+              title="Production"
+              action={
+                <Link className="text-sm text-primary hover:underline" href="/manufacturing/analytics">
+                  OEE and output
+                </Link>
+              }
+            >
+              <ProductionTiles figures={data.production} />
+            </Section>
+          )}
           <div className="grid gap-6 lg:grid-cols-2">
             <Section title="Inspection trend">
               <MonthBars

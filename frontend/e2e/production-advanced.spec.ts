@@ -160,4 +160,16 @@ test("capacity, downtime, cost and OEE come from what was planned and recorded",
   await expect(lathe.getByRole("cell", { name: "50%", exact: true })).toBeVisible();
   await expect(page.getByText("Scrap rate")).toBeVisible();
   await expect(page.locator("[data-slot='card']").filter({ hasText: "Downtime by category" }).getByTitle("Power failure")).toBeVisible();
+
+  // The quality analytics carry production too, and downtime is a report that can be exported.
+  await page.goto("/analytics");
+  const production = page.locator("[data-slot='card']").filter({ hasText: "OEE and output" });
+  await expect(production.getByText("Shop-floor loss")).toBeVisible();
+  await expect(production.getByText("Unplanned downtime")).toBeVisible();
+  await page.goto("/reports");
+  await page.getByLabel("Report", { exact: true }).selectOption("downtime");
+  await expect(page.getByRole("row", { name: /POWER FAILURE No 20 Electrical Grid outage/ })).toBeVisible();
+  const excel = page.waitForEvent("download");
+  await page.getByRole("link", { name: "Download Excel" }).click();
+  expect((await excel).suggestedFilename()).toBe("downtime-report.xlsx");
 });

@@ -106,7 +106,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Facility, supplier, material and product pickers load the first 100 records | Add search when a tenant exceeds this |
 | All seven manufacturing phases are built, through finished-goods receipt and OEE. Each phase's own limits are listed in [MANUFACTURING.md](MANUFACTURING.md) | Review after real use |
 | Facility sub-records (departments, lines, shifts), supplier contacts, material-to-product mappings, and new units are not audited individually | Review after real use |
-| The dashboard, analytics overview and PDF and Excel reports hold no production figures. Production analytics, costing, downtime and the production record are pages only, with no export or printable version | When a user needs it |
+| OEE, production cost and the production record have no PDF or Excel export. The overview and the work order, production quality and downtime reports cover the rest | When a user needs it |
 
 ## Definition of done for each phase
 

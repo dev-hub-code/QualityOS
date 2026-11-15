@@ -1,4 +1,4 @@
-import type { Kpis } from "@/lib/types";
+import type { Kpis, ProductionFigures } from "@/lib/types";
 
 export const rate = (value: number | null) => (value === null ? "No data" : `${value}%`);
 
@@ -26,8 +26,29 @@ const REST = (kpis: Kpis): [string, string | number][] => [
   ["Inspection turnaround", hours(kpis.turnaroundHours)],
 ];
 
+/** Minutes as hours once there are enough of them. */
+export function downtime(minutes: number) {
+  return minutes < 120 ? `${minutes} min` : `${(minutes / 60).toFixed(1)} h`;
+}
+
+const PRODUCTION = (figures: ProductionFigures): [string, string | number][] => [
+  ["Open work orders", figures.openWorkOrders],
+  ["Late work orders", figures.lateWorkOrders],
+  ["Work orders completed", figures.completedWorkOrders],
+  ["Completed on time", rate(figures.onTimeRate)],
+  ["Shop-floor loss", rate(figures.lossRate)],
+  ["Unplanned downtime", downtime(figures.unplannedDowntimeMinutes)],
+];
+
+export function ProductionTiles({ figures }: { figures: ProductionFigures }) {
+  return <Tiles tiles={PRODUCTION(figures)} />;
+}
+
 export function KpiTiles({ kpis, all = false }: { kpis: Kpis; all?: boolean }) {
-  const tiles = all ? [...KEY(kpis), ...REST(kpis)] : KEY(kpis);
+  return <Tiles tiles={all ? [...KEY(kpis), ...REST(kpis)] : KEY(kpis)} />;
+}
+
+function Tiles({ tiles }: { tiles: [string, string | number][] }) {
   return (
     <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {tiles.map(([label, value]) => (

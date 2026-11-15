@@ -220,13 +220,14 @@ may span two years at most. `facilityId` narrows the result; a facility the call
 
 | Method | Path | Result |
 |---|---|---|
-| GET | `/api/v1/analytics/overview` | Key figures, chart series, pending approvals, recent activity |
+| GET | `/api/v1/analytics/overview` | Key figures, chart series, pending approvals, recent activity, and `production`: open and late work orders, work orders completed and on time, shop-floor loss and unplanned downtime |
 | GET | `/api/v1/reports/{slug}` | Report as JSON: columns, up to 5,000 rows, `truncated` |
 | GET | `/api/v1/reports/{slug}.pdf` | The same report as a PDF, audited as `REPORT_EXPORTED` |
 | GET | `/api/v1/reports/{slug}.xlsx` | The same report as a workbook, audited as `REPORT_EXPORTED` |
 
 Slugs: `inspection`, `supplier-quality`, `material-rejection`, `ncr`, `capa`, `calibration`, `audit`,
-`batch-traceability`. Each also needs the view permission for what it lists, or the call is a 403.
+`batch-traceability`, `work-orders` and `production-quality` (`WORK_ORDER_VIEW`), and `downtime`
+(`MANUFACTURING_VIEW`). Each also needs the view permission for what it lists, or the call is a 403.
 
 How each figure is defined is in [ANALYTICS.md](ANALYTICS.md).
 

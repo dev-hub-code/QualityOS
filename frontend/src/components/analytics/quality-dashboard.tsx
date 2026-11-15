@@ -6,8 +6,12 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   ArrowUpRight,
+  CalendarClock,
   ClipboardCheck,
+  Factory,
   FileWarning,
+  PackageX,
+  TimerOff,
   GitBranch,
   ListChecks,
   ScanSearch,
@@ -16,7 +20,8 @@ import {
   TimerReset,
   Wrench,
 } from "lucide-react";
-import { rate } from "@/components/analytics/kpi-tiles";
+import { downtime, rate } from "@/components/analytics/kpi-tiles";
+import { usePermission } from "@/hooks/use-me";
 import { MonthBars, RankBars } from "@/components/analytics/charts";
 import { QueryState, RecordLink, StatusBadge } from "@/components/records/parts";
 import { DashboardFrame, FloatCard, HeroCard, HeroHeading, Panel, Pending, Tile, type QuickAction } from "@/components/app/showcase";
@@ -78,6 +83,7 @@ function PassRateCard({ data }: { data: Overview }) {
 /** Opening page: the last 90 days at a glance, what is waiting, and what just happened. */
 export function QualityDashboard({ name }: { name?: string }) {
   const path = "/analytics/overview";
+  const seesProduction = usePermission("WORK_ORDER_VIEW");
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<Overview>(path) });
   if (!data) {
     return (
@@ -126,6 +132,14 @@ export function QualityDashboard({ name }: { name?: string }) {
         <Tile icon={FileWarning} label="Open NCRs" value={kpis.openNcrs} />
         <Tile icon={ShieldAlert} label="Overdue CAPAs" value={kpis.overdueCapas} />
       </dl>
+      {seesProduction && (
+        <dl className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Production">
+          <Tile icon={Factory} label="Open work orders" value={data.production.openWorkOrders} />
+          <Tile icon={CalendarClock} label="Late work orders" value={data.production.lateWorkOrders} />
+          <Tile icon={PackageX} label="Shop-floor loss" value={rate(data.production.lossRate)} />
+          <Tile icon={TimerOff} label="Unplanned downtime" value={downtime(data.production.unplannedDowntimeMinutes)} />
+        </dl>
+      )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Panel title="Inspection trend">

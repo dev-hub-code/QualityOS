@@ -234,6 +234,73 @@ public class ReportService {
                     """.formatted(scope.facility("b.facility_id")),
                     "Batches started in the period, with one level of lots and customers. Customers include those"
                             + " who later returned goods. A full trace is on each batch.");
+            case WORK_ORDERS -> new Definition(
+                    List.of(text("Work order", 13), text("Product", 18), text("Facility", 12), text("Status", 11),
+                            number("Ordered", 8), number("Received", 8), text("Unit", 5), text("Planned end", 9),
+                            text("Completed", 9), text("On time", 6)),
+                    """
+                    SELECT w.work_order_number, p.name, f.name, w.status, trim_scale(w.quantity)::text,
+                           trim_scale(r.quantity)::text, u.code, w.planned_end::text, %s,
+                           CASE WHEN w.completed_at IS NULL THEN
+                                    CASE WHEN w.status IN %s AND w.planned_end < :today THEN 'Late' ELSE '' END
+                                WHEN (w.completed_at AT TIME ZONE CAST(:zone AS text))::date <= w.planned_end THEN 'Yes'
+                                ELSE 'No' END
+                    FROM work_orders w
+                    JOIN products p ON p.tenant_id = w.tenant_id AND p.id = w.product_id
+                    JOIN facilities f ON f.tenant_id = w.tenant_id AND f.id = w.facility_id
+                    JOIN units_of_measure u ON u.id = w.uom_id
+                    LEFT JOIN finished_goods_receipts r ON r.tenant_id = w.tenant_id AND r.work_order_id = w.id
+                    WHERE w.status <> 'DRAFT' AND w.planned_start <= CAST(:to AS date)
+                      AND w.planned_end >= CAST(:from AS date)%s
+                    ORDER BY w.planned_end, w.work_order_number
+                    """.formatted(date("w.completed_at"), AnalyticsService.WORK_ORDER_RUNNING,
+                            scope.facility("w.facility_id")),
+                    "Work orders planned to run at any time in the period, drafts left out. Late means still open"
+                            + " after its planned end.");
+            case PRODUCTION_QUALITY -> new Definition(
+                    List.of(text("Product", 20), text("Operation", 16), text("Work centre", 14), text("Unit", 5),
+                            number("Processed", 9), number("Good", 9), number("Rejected", 9), number("Scrap", 9),
+                            number("Rework", 9), number("Loss %", 7)),
+                    """
+                    SELECT p.name, o.sequence || ' ' || o.name, c.name, u.code,
+                           trim_scale(sum(r.good_quantity + r.rejected_quantity + r.scrap_quantity))::text,
+                           trim_scale(sum(r.good_quantity))::text, trim_scale(sum(r.rejected_quantity))::text,
+                           trim_scale(sum(r.scrap_quantity))::text, trim_scale(sum(r.rework_quantity))::text,
+                           %s
+                    FROM operation_reports r
+                    JOIN work_orders w ON w.tenant_id = r.tenant_id AND w.id = r.work_order_id
+                    JOIN work_order_operations o ON o.tenant_id = r.tenant_id AND o.id = r.operation_id
+                    JOIN work_centers c ON c.tenant_id = o.tenant_id AND c.id = o.work_center_id
+                    JOIN products p ON p.tenant_id = w.tenant_id AND p.id = w.product_id
+                    JOIN units_of_measure u ON u.id = w.uom_id
+                    WHERE r.created_at >= :start AND r.created_at < :end%s
+                    GROUP BY p.name, o.sequence, o.name, c.name, u.code
+                    HAVING sum(r.good_quantity + r.rejected_quantity + r.scrap_quantity) <> 0
+                    ORDER BY sum(r.rejected_quantity + r.scrap_quantity)
+                                 / sum(r.good_quantity + r.rejected_quantity + r.scrap_quantity) DESC, p.name, o.sequence
+                    """.formatted(RATE.formatted("sum(r.rejected_quantity + r.scrap_quantity)",
+                            "sum(r.good_quantity + r.rejected_quantity + r.scrap_quantity)"),
+                            scope.facility("w.facility_id")),
+                    "Shop-floor reports made in the period, by product and operation, with reversals netted out."
+                            + " Loss is rejected plus scrap over processed.");
+            case DOWNTIME -> new Definition(
+                    List.of(text("Started", 11), text("Ended", 11), text("Facility", 11), text("Work centre", 11),
+                            text("Machine", 9), text("Category", 13), text("Planned", 6), number("Minutes", 6),
+                            text("Department", 10), text("Reason", 18)),
+                    """
+                    SELECT to_char(d.started_at AT TIME ZONE CAST(:zone AS text), 'YYYY-MM-DD HH24:MI'),
+                           COALESCE(to_char(d.ended_at AT TIME ZONE CAST(:zone AS text), 'YYYY-MM-DD HH24:MI'), 'Open'),
+                           f.name, c.name, m.code, d.category, CASE WHEN d.planned THEN 'Yes' ELSE 'No' END,
+                           round(extract(epoch FROM COALESCE(d.ended_at, now()) - d.started_at) / 60)::text,
+                           d.responsible_department, d.reason
+                    FROM downtime_records d
+                    JOIN facilities f ON f.tenant_id = d.tenant_id AND f.id = d.facility_id
+                    JOIN work_centers c ON c.tenant_id = d.tenant_id AND c.id = d.work_center_id
+                    LEFT JOIN machines m ON m.tenant_id = d.tenant_id AND m.id = d.machine_id
+                    WHERE d.started_at >= :start AND d.started_at < :end%s
+                    ORDER BY d.started_at DESC
+                    """.formatted(scope.facility("d.facility_id")),
+                    "Stops that began in the period. An open stop counts to now.");
         };
     }
 }

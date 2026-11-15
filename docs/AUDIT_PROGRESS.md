@@ -55,13 +55,13 @@ Phase 11 is on hold until you ask for it.
 - [ ] Enforce every plan feature, or label it as not enforced. Today only NCR_CAPA, REPORTS and ADVANCED are enforced
 - [ ] Customer support portal: customers raise and track tickets
 - [ ] Support access to a customer's data only with their consent, for a limited time, and audited
-- [ ] MFA for platform operators
+- [x] MFA for platform operators (V20, authenticator app)
 
 ### P2: experience and scale
 
 - [ ] Push notifications instead of one-minute polling, complete email templates, tenant logo
 - [ ] Reviewed Hindi and Marathi translations, and translating the app itself
-- [ ] Search across NCRs, CAPAs and suppliers, server-side search in pickers (now capped at 100), and restoring archived records
+- [ ] Server-side search in pickers (now capped at 100), and restoring archived records. Search across NCRs, CAPAs and suppliers is built
 - [ ] Background report exports beyond 5,000 rows, and separate permissions for totals and detail
 - [ ] Audit every change to child records, with before and after values
 - [ ] Offline inspection on the shop floor

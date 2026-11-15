@@ -7,7 +7,7 @@ import { PageHeader, QueryState, RecordLink, Section, StatusBadge } from "@/comp
 import { usePermission } from "@/hooks/use-me";
 import { api, type PageResponse } from "@/lib/api";
 import { searchHitLink } from "@/lib/search";
-import type { CapaSummary, NcrSummary, SearchHit, Supplier } from "@/lib/types";
+import type { CapaSummary, Machine, NcrSummary, ReworkSummary, SearchHit, Supplier, WorkOrder } from "@/lib/types";
 
 /** How many of each kind a search shows. A wider list is on that kind's own page, searched there. */
 const PER_KIND = 10;
@@ -63,7 +63,10 @@ function Results() {
   const canSeeNcrs = usePermission("NCR_VIEW");
   const canSeeCapas = usePermission("CAPA_VIEW");
   const canSeeSuppliers = usePermission("SUPPLIER_VIEW");
-  const nothingToSearch = !canTrace && !canSeeNcrs && !canSeeCapas && !canSeeSuppliers;
+  const canSeeWorkOrders = usePermission("WORK_ORDER_VIEW");
+  const canSeeMachines = usePermission("MANUFACTURING_VIEW");
+  const nothingToSearch =
+    !canTrace && !canSeeNcrs && !canSeeCapas && !canSeeSuppliers && !canSeeWorkOrders && !canSeeMachines;
   return (
     <div className="max-w-3xl space-y-6">
       <PageHeader title="Search" subtitle={`Results for “${term}”`} />
@@ -128,6 +131,54 @@ function Results() {
                   label: supplier.code,
                   description: supplier.name,
                   detail: supplier.gstin ? `GSTIN ${supplier.gstin}` : undefined,
+                }))
+              }
+            />
+          )}
+          {canSeeWorkOrders && (
+            <Kind<PageResponse<WorkOrder>>
+              title="Work orders"
+              path={`/manufacturing/work-orders?${page}`}
+              paged
+              toFound={(orders) =>
+                orders.items.map((order) => ({
+                  key: order.id,
+                  href: `/manufacturing/work-orders/${order.id}`,
+                  label: order.workOrderNumber,
+                  description: `${order.productCode} – ${order.productName}`,
+                  detail: <StatusBadge status={order.status} />,
+                }))
+              }
+            />
+          )}
+          {canSeeWorkOrders && (
+            <Kind<PageResponse<ReworkSummary>>
+              title="Rework orders"
+              path={`/manufacturing/rework-orders?${page}`}
+              paged
+              toFound={(reworks) =>
+                reworks.items.map((rework) => ({
+                  key: rework.id,
+                  href: `/manufacturing/rework-orders/${rework.id}`,
+                  label: rework.reworkNumber,
+                  description: `${rework.workOrderNumber}${rework.productCode ? ` · ${rework.productCode}` : ""}`,
+                  detail: <StatusBadge status={rework.status} />,
+                }))
+              }
+            />
+          )}
+          {canSeeMachines && (
+            <Kind<PageResponse<Machine>>
+              title="Machines"
+              path={`/manufacturing/machines?${page}`}
+              paged
+              toFound={(machines) =>
+                machines.items.map((machine) => ({
+                  key: machine.id,
+                  href: `/manufacturing/machines/${machine.id}`,
+                  label: machine.code,
+                  description: machine.name,
+                  detail: <StatusBadge status={machine.status} />,
                 }))
               }
             />

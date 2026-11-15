@@ -26,7 +26,8 @@ public final class DowntimeDtos {
             @NotNull Instant startedAt,
             Instant endedAt,
             @NotBlank @Size(max = 1000) String reason,
-            @Size(max = 200) String responsibleDepartment,
+            /* One of the facility's departments. */
+            UUID responsibleDepartmentId,
             @Size(max = 4000) String comments) {
     }
 
@@ -39,7 +40,8 @@ public final class DowntimeDtos {
             Instant startedAt,
             Instant endedAt,
             @Size(max = 1000) String reason,
-            @Size(max = 200) String responsibleDepartment,
+            /* One of the facility's departments; null clears it. */
+            UUID responsibleDepartmentId,
             @Size(max = 4000) String comments) {
     }
 
@@ -66,13 +68,15 @@ public final class DowntimeDtos {
             /** To the end, or to now while it is open. */
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal minutes,
             String reason,
+            UUID responsibleDepartmentId,
+            /** The department's name as it was when chosen. */
             String responsibleDepartment,
             String comments,
             String recordedByName,
             String endedByName) {
     }
 
-    public enum GroupBy { MACHINE, WORK_CENTER, PRODUCTION_LINE, FACILITY, CATEGORY }
+    public enum GroupBy { MACHINE, WORK_CENTER, PRODUCTION_LINE, FACILITY, CATEGORY, DEPARTMENT }
 
     public record SummaryRow(
             String key,

@@ -6,6 +6,7 @@ import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
+import com.qualityos.organization.dto.FacilityDtos.DepartmentOption;
 import com.qualityos.organization.dto.FacilityDtos.FacilityDetail;
 import com.qualityos.organization.dto.FacilityDtos.FacilityResponse;
 import com.qualityos.organization.dto.FacilityDtos.SaveFacilityRequest;
@@ -203,6 +204,38 @@ public class FacilityService {
         if (line.getArchivedAt() != null) {
             throw new BusinessRuleException("This production line is archived.");
         }
+    }
+
+    /** The active departments of these facilities, each named with its facility, for other modules' pickers. */
+    @Transactional(readOnly = true)
+    public List<DepartmentOption> departmentsOf(Collection<UUID> facilityIds) {
+        if (facilityIds.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, String> facilityCodes = new HashMap<>();
+        facilities.findAllById(facilityIds).forEach(facility -> facilityCodes.put(facility.getId(), facility.getCode()));
+        return departments.findByFacilityIdInAndArchivedAtIsNullOrderByName(facilityIds).stream()
+                .map(department -> new DepartmentOption(department.getId(), department.getFacilityId(),
+                        facilityCodes.get(department.getFacilityId()), department.getCode(), department.getName()))
+                .sorted(java.util.Comparator.comparing(DepartmentOption::facilityCode, java.util.Comparator.nullsLast(
+                        java.util.Comparator.naturalOrder())).thenComparing(DepartmentOption::name))
+                .toList();
+    }
+
+    /**
+     * For other modules naming a department: it must be active and belong to the facility.
+     *
+     * @return the department's name, to keep on the record as it was when chosen
+     */
+    @Transactional(readOnly = true)
+    public String requireDepartment(UUID facilityId, UUID departmentId) {
+        Department department = departments.findById(departmentId)
+                .filter(found -> found.getFacilityId().equals(facilityId))
+                .orElseThrow(() -> new BusinessRuleException("This department is not part of the facility."));
+        if (department.getArchivedAt() != null) {
+            throw new BusinessRuleException("This department is archived.");
+        }
+        return department.getName();
     }
 
     /** Codes of facilities and production lines, by id, for other modules to show. */

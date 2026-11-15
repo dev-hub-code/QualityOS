@@ -70,6 +70,10 @@ describe("visibleNavItems", () => {
     expect(labels(["USER_MANAGE"])).toEqual(["Dashboard", "Users", "Roles", "Settings", "Documentation"]);
     expect(labels(["ROLE_MANAGE"])).toEqual(["Dashboard", "Roles", "Settings", "Documentation"]);
   });
+
+  it("shows the audit log to those allowed to read it", () => {
+    expect(labels(["AUDIT_LOG_VIEW"])).toEqual(["Dashboard", "Audit log", "Settings", "Documentation"]);
+  });
 });
 
 describe("activeNavHref", () => {

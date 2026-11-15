@@ -11,7 +11,7 @@ import { usePermission } from "@/hooks/use-me";
 import { api, ApiError, type PageResponse } from "@/lib/api";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import { toDispatchItems, toReturnItems } from "@/lib/traceability";
-import type { Customer, Dispatch, ProductionBatch } from "@/lib/types";
+import type { Customer, Dispatch, ProductionBatch, ReversalSummary } from "@/lib/types";
 
 const RELEASED = "/production-batches?status=RELEASED&size=100";
 
@@ -81,6 +81,7 @@ function Row({ dispatch }: { dispatch: Dispatch }) {
         <RecordDialog
           title={`Record return against ${dispatch.dispatchNumber}`}
           fields={returnFields}
+          extra={<ReturnStanding dispatchId={dispatch.id} />}
           onClose={() => setReturning(false)}
           onSubmit={async (values) => {
             const items = toReturnItems(
@@ -111,6 +112,20 @@ function Row({ dispatch }: { dispatch: Dispatch }) {
       )}
     </>
   );
+}
+
+/** How much of the dispatch is already back, expected back, or still with the customer. */
+function ReturnStanding({ dispatchId }: { dispatchId: string }) {
+  const path = `/dispatches/${dispatchId}/reversal-summary`;
+  const { data } = useQuery({ queryKey: [path], queryFn: () => api.get<ReversalSummary>(path) });
+  if (!data) return null;
+  const parts = [
+    `${formatQuantity(data.dispatchedQuantity)} dispatched`,
+    Number(data.reversedQuantity) > 0 && `${formatQuantity(data.reversedQuantity)} back`,
+    Number(data.pendingQuantity) > 0 && `${formatQuantity(data.pendingQuantity)} on its way back`,
+    `${formatQuantity(data.remainingQuantity)} still with the customer`,
+  ].filter(Boolean);
+  return <p className="text-sm text-muted-foreground">{parts.join(" · ")}.</p>;
 }
 
 const column = createColumnHelper<Dispatch>();

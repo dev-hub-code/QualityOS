@@ -169,7 +169,30 @@ export default function TraceReportPage() {
           </p>
         </Section>
       )}
+      <Corrections batchId={subject.id} />
       <Timeline events={timeline} />
     </div>
+  );
+}
+
+/** Corrections requested on this lot or batch, whatever came of them. */
+function Corrections({ batchId }: { batchId: string }) {
+  const path = `/batches/${batchId}/correction-history`;
+  const { data = [] } = useQuery({ queryKey: [path], queryFn: () => api.get<CorrectionDetail[]>(path) });
+  if (data.length === 0) return null;
+  return (
+    <Section title="Corrections">
+      <ul className="divide-y text-sm">
+        {data.map((correction) => (
+          <li key={correction.id} className="flex flex-wrap items-center gap-2 py-2">
+            <RecordLink href={`/material-corrections/${correction.id}`}>{correction.correctionNumber}</RecordLink>
+            <span>
+              {correction.changes.map((change) => `${change.field}: ${change.originalValue ?? "—"} → ${change.correctedValue}`).join("; ")}
+            </span>
+            <StatusBadge status={correction.status} />
+          </li>
+        ))}
+      </ul>
+    </Section>
   );
 }

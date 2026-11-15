@@ -628,6 +628,35 @@ export interface Dispatch {
   reversalReason: string | null;
 }
 
+/** How much of a dispatch has come back, is on its way back, or is still with the customer. */
+export interface ReversalSummary {
+  dispatchId: string;
+  status: string;
+  dispatchedQuantity: string;
+  reversedQuantity: string;
+  remainingQuantity: string;
+  expectedQuantity: string;
+  pendingQuantity: string;
+  acceptedQuantity: string;
+  rejectedQuantity: string;
+}
+
+/** One entry of the organisation's own audit trail. {@code actor} is null for an event the system raised itself. */
+export interface AuditEntry {
+  id: string;
+  userId: string | null;
+  actor: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  occurredAt: string;
+  ipAddress: string | null;
+  correlationId: string | null;
+  reason: string | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+}
+
 export interface SearchHit {
   batchNumber: string;
   serialNumber: string | null;
@@ -2274,13 +2303,24 @@ export interface DowntimeRecord {
   endedAt: string | null;
   minutes: string;
   reason: string;
+  responsibleDepartmentId: string | null;
+  /** The department's name as it was when chosen. */
   responsibleDepartment: string | null;
   comments: string | null;
   recordedByName: string | null;
   endedByName: string | null;
 }
 
-export type DowntimeGroupBy = "MACHINE" | "WORK_CENTER" | "PRODUCTION_LINE" | "FACILITY" | "CATEGORY";
+/** A department named with its facility, for choosing one from several plants at once. */
+export interface DepartmentOption {
+  id: string;
+  facilityId: string;
+  facilityCode: string | null;
+  code: string;
+  name: string;
+}
+
+export type DowntimeGroupBy = "MACHINE" | "WORK_CENTER" | "PRODUCTION_LINE" | "FACILITY" | "CATEGORY" | "DEPARTMENT";
 
 export interface DowntimeSummaryRow {
   key: string;

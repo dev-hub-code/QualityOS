@@ -15,7 +15,7 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { formatMinutes, LOSS_CATEGORY_LABELS, localDate, toInstant } from "@/lib/manufacturing";
 import type { FieldDef } from "@/lib/record-form";
-import type { DowntimeGroupBy, DowntimeRecord, DowntimeSummary, LossCategory } from "@/lib/types";
+import type { DepartmentOption, DowntimeGroupBy, DowntimeRecord, DowntimeSummary, LossCategory } from "@/lib/types";
 
 const PATH = "/manufacturing/downtime";
 const SELECT_CLASS = "h-9 rounded-xl border border-input bg-white/70 px-2 text-sm";
@@ -27,6 +27,7 @@ const GROUP_LABELS: Record<DowntimeGroupBy, string> = {
   PRODUCTION_LINE: "Production line",
   FACILITY: "Facility",
   CATEGORY: "Category",
+  DEPARTMENT: "Responsible department",
 };
 /** A work order on hold is recorded only from the order itself. */
 const CATEGORIES = (Object.keys(LOSS_CATEGORY_LABELS) as LossCategory[])
@@ -41,9 +42,21 @@ const timeFields = (prefix: "start" | "end", label: string, required: boolean): 
   { name: `${prefix}Time`, label: `${label} time`, type: "time", required },
 ];
 
-const NOTE_FIELDS: FieldDef[] = [
+/** The departments of every facility the person can see, named with their plant. */
+function useDepartments() {
+  const { data = [] } = useQuery({
+    queryKey: [`${PATH}/departments`],
+    queryFn: () => api.get<DepartmentOption[]>(`${PATH}/departments`),
+  });
+  return data.map((department) => ({
+    value: department.id,
+    label: `${department.facilityCode ? `${department.facilityCode} · ` : ""}${department.code} – ${department.name}`,
+  }));
+}
+
+const noteFields = (departments: FieldDef["options"]): FieldDef[] => [
   { name: "reason", label: "Reason", type: "textarea", required: true },
-  { name: "responsibleDepartment", label: "Responsible department" },
+  { name: "responsibleDepartmentId", label: "Responsible department", type: "select", options: departments },
   { name: "comments", label: "Comments", type: "textarea" },
 ];
 
@@ -140,6 +153,8 @@ export default function DowntimePage() {
   const canManage = usePermission("DOWNTIME_MANAGE");
   const machines = useMachines();
   const workCenters = useWorkCenters();
+  const departments = useDepartments();
+  const NOTE_FIELDS = noteFields(departments);
   const refresh = useRefresh();
   const { run, pending, message } = useAction();
   const [openOnly, setOpenOnly] = useState(false);
@@ -261,9 +276,9 @@ export default function DowntimePage() {
           record={{ startDate: localDate() }}
           onClose={() => setDialog(null)}
           onSubmit={(values) => {
-            const { machineId, workCenterId, category: lost, reason, responsibleDepartment, comments } = values;
+            const { machineId, workCenterId, category: lost, reason, responsibleDepartmentId, comments } = values;
             return api
-              .post(PATH, { machineId, workCenterId, category: lost, reason, responsibleDepartment, comments, ...timesOf(values) })
+              .post(PATH, { machineId, workCenterId, category: lost, reason, responsibleDepartmentId, comments, ...timesOf(values) })
               .then(refresh);
           }}
         />
@@ -275,7 +290,7 @@ export default function DowntimePage() {
           record={editRecord(dialog)}
           onClose={() => setDialog(null)}
           onSubmit={(values) => {
-            const notes = { reason: values.reason, responsibleDepartment: values.responsibleDepartment, comments: values.comments };
+            const notes = { reason: values.reason, responsibleDepartmentId: values.responsibleDepartmentId, comments: values.comments };
             const request = dialog.source === "MANUAL" ? { ...notes, category: values.category, ...timesOf(values) } : notes;
             return api.put(`${PATH}/${dialog.id}`, request).then(refresh);
           }}

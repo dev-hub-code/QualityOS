@@ -120,6 +120,12 @@ unverified sign-in is off. Local Docker Compose enforces it too. Integration tes
 
 `PUT /auth/me/email-language` takes `language` (`en`, `hi`, `mr`, or null for the organisation default) and returns `204`.
 
+## Audit log
+
+| Endpoint | Access | Result |
+|---|---|---|
+| `GET /audit-logs` | `AUDIT_LOG_VIEW` | The organisation's own entries, newest first, paged. Filters `q` (actor's name or email, target type or ID, correlation ID), `action`, `from` and `to` (days in the organisation's time zone, both included). Each entry has `actor` (null for the system), `action`, `entityType`, `entityId`, `occurredAt`, `reason`, `before`, `after`, `ipAddress`, `correlationId`. Account-level events have no tenant and never appear |
+
 ## Organisation settings
 
 | Endpoint | Access | Result |
@@ -474,9 +480,10 @@ instants; `minutes` runs to now while a stop is open.
 |---|---|---|
 | `GET /downtime` | | Newest first, paged. Filters `facilityId`, `workCenterId`, `machineId`, `workOrderId`, `category`, `open`, `from`, `to` (instants; stops overlapping them) |
 | `GET /downtime/{id}` | | One stop: where, `source` (`SHOP_FLOOR`, `MACHINE`, `MANUAL`), `category`, `planned`, times, `minutes`, reason, department, comments, who recorded and ended it |
-| `GET /downtime/summary` | | `from`, `to` (dates, at most 366 days), optional `facilityId`, `groupBy` (`MACHINE` default, `WORK_CENTER`, `PRODUCTION_LINE`, `FACILITY`, `CATEGORY`). Rows of `stops`, `minutes`, `plannedMinutes`, `unplannedMinutes`, and totals |
-| `POST /downtime` | `DOWNTIME_MANAGE` | `machineId` or `workCenterId`, optional `workOrderId`, `category` (not `ORDER_ON_HOLD`), `startedAt`, optional `endedAt`, `reason`, optional `responsibleDepartment`, `comments`. Only `PLANNED_MAINTENANCE` may start in the future, and then needs `endedAt`. `201` |
-| `PUT /downtime/{id}` | `DOWNTIME_MANAGE` | Any of `category`, `startedAt`, `endedAt`, `reason`, `responsibleDepartment`, `comments`. On a stop not entered by hand only the last three may change |
+| `GET /downtime/departments` | | The departments a stop can be blamed on, across the facilities the caller can see, each with `facilityId` and `facilityCode` |
+| `GET /downtime/summary` | | `from`, `to` (dates, at most 366 days), optional `facilityId`, `groupBy` (`MACHINE` default, `WORK_CENTER`, `PRODUCTION_LINE`, `FACILITY`, `CATEGORY`, `DEPARTMENT`). Rows of `stops`, `minutes`, `plannedMinutes`, `unplannedMinutes`, and totals |
+| `POST /downtime` | `DOWNTIME_MANAGE` | `machineId` or `workCenterId`, optional `workOrderId`, `category` (not `ORDER_ON_HOLD`), `startedAt`, optional `endedAt`, `reason`, optional `responsibleDepartmentId` (one of the facility's active departments), `comments`. Only `PLANNED_MAINTENANCE` may start in the future, and then needs `endedAt`. `201` |
+| `PUT /downtime/{id}` | `DOWNTIME_MANAGE` | Any of `category`, `startedAt`, `endedAt`, `reason`, `responsibleDepartmentId`, `comments`. On a stop not entered by hand only the last three may change |
 | `POST /downtime/{id}/end` | `DOWNTIME_MANAGE` | Optional `endedAt` (default now). Manual stops only; the others end when the operation resumes or the machine is set back |
 
 Stops from the floor and from machine status are recorded by the existing endpoints. Evidence uses

@@ -44,6 +44,9 @@ public class DowntimeRecord extends TenantOwnedEntity {
     private Instant endedAt;
     private UUID endedBy;
     private String reason;
+    private UUID responsibleDepartmentId;
+
+    /** The department's name as it was when chosen; kept when the department is renamed or archived. */
     private String responsibleDepartment;
     private String comments;
 
@@ -65,6 +68,12 @@ public class DowntimeRecord extends TenantOwnedEntity {
     public void categorise(LossCategory value) {
         this.category = value;
         this.planned = value == LossCategory.PLANNED_MAINTENANCE;
+    }
+
+    /** Who was responsible, or nobody when {@code departmentId} is null. */
+    public void blame(UUID departmentId, String departmentName) {
+        this.responsibleDepartmentId = departmentId;
+        this.responsibleDepartment = departmentId == null ? null : departmentName;
     }
 
     public boolean isOpen() {

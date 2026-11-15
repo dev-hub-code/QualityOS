@@ -141,10 +141,25 @@ class AdvancedManufacturingIT extends TraceabilityFixture {
         as(supervisor, put(API + "/downtime/" + floorStop).contentType("application/json")
                         .content(json.writeValueAsString(Map.of("category", "OTHER"))))
                 .andExpect(status().isUnprocessableContent());
+        // The department is one of the facility's own, and its name stays on the stop.
+        String upkeep = idOf(body(as(owner, postJson("/api/v1/facilities/" + facility + "/departments",
+                Map.of("code", "MNT", "name", "Maintenance"))).andExpect(status().isCreated())));
+        String elsewhere = idOf(body(as(owner, postJson("/api/v1/facilities/" + facility(owner) + "/departments",
+                Map.of("code", "MNT", "name", "Maintenance"))).andExpect(status().isCreated())));
         as(supervisor, put(API + "/downtime/" + floorStop).contentType("application/json")
-                        .content(json.writeValueAsString(Map.of("responsibleDepartment", "Maintenance"))))
+                        .content(json.writeValueAsString(Map.of("responsibleDepartmentId", elsewhere))))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(containsString("not part of the facility")));
+        as(supervisor, put(API + "/downtime/" + floorStop).contentType("application/json")
+                        .content(json.writeValueAsString(Map.of("responsibleDepartmentId", upkeep))))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.responsibleDepartmentId").value(upkeep))
                 .andExpect(jsonPath("$.data.responsibleDepartment").value("Maintenance"));
+        assertThat(JsonPath.<List<String>>read(body(as(supervisor, get(API + "/downtime/departments"))),
+                "$.data[*].id")).contains(upkeep, elsewhere);
+        String byDepartment = body(as(owner, get(API + "/downtime/summary").param("from", LocalDate.now().minusDays(1).toString())
+                .param("to", LocalDate.now().plusDays(1).toString()).param("groupBy", "DEPARTMENT")));
+        assertThat(JsonPath.<List<String>>read(byDepartment, "$.data.rows[*].label")).contains("Maintenance");
         assertThatThrownBy(() -> asAppRole(owner.tenantId(), jdbc -> jdbc.update(
                 "UPDATE downtime_records SET ended_at = started_at WHERE id = ?::uuid", floorStop)))
                 .isInstanceOf(DataAccessException.class);

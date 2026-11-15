@@ -201,3 +201,10 @@ keeps an invoice from being chased twice.
 `platform_settings_save` can write it. `platform_announcements`, `support_tickets` and `support_notes` give the
 application role no rights at all, and are reached through functions that check the operator. `support_tickets` and
 `support_notes` also force row-level security, with a policy for the schema owner only.
+
+## Downtime department (V29)
+
+`downtime_records.responsible_department_id` names one of the facility's `departments`, by a tenant-scoped foreign key.
+`responsible_department` keeps the department's name as it was when chosen, so a stop stays readable after the
+department is renamed or archived. Stops recorded before V29 keep their typed text with no department id.
+

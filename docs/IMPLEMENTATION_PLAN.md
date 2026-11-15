@@ -34,7 +34,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Someone can still deliberately lock out a known email (10 failures, 15 minutes), though the IP limit slows it down. A reset link unlocks the account | Review after real use |
 | The IP rate limit is held per backend instance, so several instances multiply it. Shared limits need Redis or the load balancer | With production work |
 | An expired sign-up is emptied after 30 days, not deleted, because its audit rows cannot be removed. Its suspended organisation row stays. With unverified login allowed, nothing is expired | By design |
-| Account-level audit events (verification, password reset) have no tenant, so no organisation can read them in-app | With the next admin work |
+| Account-level audit events (verification, password reset) have no tenant, so the organisation's audit log page does not show them | With the next admin work |
 | A material receipt does not notify inspectors; they see it in the inspection queue | When a user needs it |
 | Notifications are polled once a minute, with no live push. Only email and in-app channels exist | When a user needs it |
 | Hindi and Marathi email text was machine-drafted and needs review by a native speaker before customers see it | Before customer launch |
@@ -111,12 +111,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | The dashboard, analytics overview and PDF and Excel reports hold no production figures. Production analytics, costing, downtime and the production record are pages only, with no export or printable version | When a user needs it |
 | Rejected and scrapped quantities on an operation raise no NCR and carry no defect category. Only inspection, audit, calibration and manual NCRs exist, so Pareto and scorecards never see production defects | Review after real use |
 | Instruments and machines are not linked, and an operation's measurements cannot name the instrument used, so a failed calibration's impact review does not reach shop-floor measurements | When a user needs it |
-| Global search does not cover work orders, rework orders or machines | When a user needs it |
 | The in-app documentation has no page or flow for manufacturing | Before customers run production |
-| Downtime's responsible department is typed as text, not chosen from the facility's departments. Departments are referenced by nothing outside facility set-up | When a user needs it |
-| An organisation's audit log can be read through the API with `AUDIT_LOG_VIEW`, but no page shows it. Only the Control Center has an audit log page | With the next admin work |
-| A supplier can be blocked or rejected through the API, but the supplier page offers only submit, approve and reinstate | When a user needs it |
-| A batch's correction history, a dispatch's reversal summary and a product's trace are served by the API and used by no page | Remove or use |
 | Archiving a product, material or facility checks nothing: a product with an approved BOM or open work order, a material on BOM lines or in reserved lots, and a facility with work centres can all be archived. Voiding a receipt, correcting a lot and archiving a work centre do check | Review after real use |
 | `DATABASE_SCHEMA.md`, `ARCHITECTURE.md` and `ANALYTICS.md` stop before the manufacturing migrations (V22 to V28) and do not describe the production module | With the next manufacturing change |
 

@@ -212,6 +212,23 @@ class RecallIT extends TraceabilityFixture {
     }
 
     @Test
+    void aSoleMemberClosesTheirOwnRecallWithAReason() throws Exception {
+        String recall = resolved();
+        returnAll();
+        requestClosure(owner, recall, false).andExpect(status().isOk());
+        String path = "/api/v1/recalls/" + recall + "/close";
+        as(owner, postJson(path, Map.of())).andExpect(status().isUnprocessableContent());
+
+        workAlone();
+        as(owner, postJson(path, Map.of())).andExpect(status().isUnprocessableContent());
+        as(owner, postJson(path, Map.of("note", "I am the only person here")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("CLOSED"))
+                .andExpect(jsonPath("$.data.closureRequestedById").value(owner.userId().toString()));
+        assertThat(selfReviews(owner.tenantId(), "RECALL_CLOSE")).isEqualTo(1);
+    }
+
+    @Test
     void closureNeedsASecondPersonAndIsFinal() throws Exception {
         String recall = resolved();
         returnAll();

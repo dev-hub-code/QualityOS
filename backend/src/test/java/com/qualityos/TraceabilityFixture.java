@@ -26,6 +26,13 @@ abstract class TraceabilityFixture extends MasterDataFixture {
         manager = addMember(owner, "QUALITY_MANAGER");
     }
 
+    /** Leaves the owner as the only active member, allowed to review their own work. */
+    protected void workAlone() throws Exception {
+        as(owner, postJson("/api/v1/users/" + membershipId(owner, manager.userId()) + "/deactivate", Map.of()))
+                .andExpect(status().is2xxSuccessful());
+        allowSinglePersonReview(owner);
+    }
+
     protected void limit(Session member, String facility) throws Exception {
         String users = body(as(owner, get("/api/v1/users?size=100")));
         List<String> ids = JsonPath.read(users, "$.data.items[?(@.userId == '" + member.userId() + "')].membershipId");

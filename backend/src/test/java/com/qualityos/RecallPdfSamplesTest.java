@@ -68,7 +68,7 @@ class RecallPdfSamplesTest {
                 + "drive shafts from these batches during a customer's incoming inspection. Metallurgy points to "
                 + "incorrect heat treatment on furnace 3.", "Stop using the affected units at once. Quarantine "
                 + "remaining stock, and tell us how many units you hold.\nDo not scrap anything: we will arrange "
-                + "collection within five working days.", null, "OPEN", batches, null, null, null, null, null, review);
+                + "collection within five working days.", null, "OPEN", batches, null, null, null, null, null, null, review);
         List<ReportProduct> products = batches.stream()
                 .map(batch -> new ReportProduct("DS-40", "Drive Shaft 40mm", batch, "RELEASED")).toList();
         List<String> serials = IntStream.range(0, serialCount).mapToObj(i -> "DS40-2026-%06d".formatted(i)).toList();

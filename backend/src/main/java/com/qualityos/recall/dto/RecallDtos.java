@@ -81,6 +81,10 @@ public final class RecallDtos {
         }
     }
 
+    /** The note is needed only when someone approves their own request in a one-person organisation. */
+    public record CloseRequest(@Size(max = 2000) String note) {
+    }
+
     public record ReasonRequest(@NotBlank @Size(max = 2000) String reason) {
     }
 
@@ -112,6 +116,7 @@ public final class RecallDtos {
             String status,
             List<String> batchNumbers,
             String closureNote,
+            UUID closureRequestedById,
             String closureRequestedBy,
             Instant closureRequestedAt,
             String closedBy,

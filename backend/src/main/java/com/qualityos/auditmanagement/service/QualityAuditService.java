@@ -29,6 +29,7 @@ import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.FacilityScope;
+import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.notification.service.NotificationService;
 import com.qualityos.notification.service.NotificationType;
@@ -77,6 +78,7 @@ public class QualityAuditService implements AttachmentPolicy {
     private final ProductService products;
     private final OrganizationService organizations;
     private final TenantAccessService access;
+    private final ReviewPolicy reviewPolicy;
     private final FacilityScope scope;
     private final NotificationService notifications;
     private final DocumentNumberService numbers;
@@ -93,6 +95,7 @@ public class QualityAuditService implements AttachmentPolicy {
             ProductService products,
             OrganizationService organizations,
             TenantAccessService access,
+            ReviewPolicy reviewPolicy,
             FacilityScope scope,
             NotificationService notifications,
             DocumentNumberService numbers,
@@ -107,6 +110,7 @@ public class QualityAuditService implements AttachmentPolicy {
         this.products = products;
         this.organizations = organizations;
         this.access = access;
+        this.reviewPolicy = reviewPolicy;
         this.scope = scope;
         this.notifications = notifications;
         this.numbers = numbers;
@@ -353,10 +357,12 @@ public class QualityAuditService implements AttachmentPolicy {
     }
 
     @Transactional
-    public AuditDetail close(UUID id) {
+    public AuditDetail close(UUID id, String note) {
         QualityAudit row = load(id);
         requireNoBlockers(row);
-        row.close(TenantContext.getCurrentUserId(), Instant.now());
+        UUID actor = TenantContext.getCurrentUserId();
+        row.close(actor, Instant.now(),
+                reviewPolicy.permits(actor, row.getClosureRequestedBy(), ENTITY, id, "AUDIT_CLOSE", note));
         audit.record("AUDIT_CLOSED", ENTITY, id);
         repeat(row);
         return toDetail(row);

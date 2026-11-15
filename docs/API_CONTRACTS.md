@@ -143,8 +143,11 @@ unverified sign-in is off. Local Docker Compose enforces it too. Integration tes
 
 `selfReviewInEffect` is true while `singlePersonReview` is on and the organisation has one active member. Then that
 person may approve or send back their own inspection, close an NCR whose verification they requested, and verify or
-close a CAPA they own. Each of those needs a note, and is recorded in the audit log as `SELF_REVIEW` with the step
-(`INSPECTION_APPROVE`, `INSPECTION_SEND_BACK`, `NCR_CLOSE`, `CAPA_VERIFY`, `CAPA_CLOSE`) and the reason. Once a second
+close a CAPA they own, close a recall or an audit whose closure they requested, and approve their own material
+correction, which then needs no second approval. Each of those needs a note (`note` in the body of the recall and audit
+`close` calls), and is recorded in the audit log as `SELF_REVIEW` with the step (`INSPECTION_APPROVE`,
+`INSPECTION_SEND_BACK`, `NCR_CLOSE`, `CAPA_VERIFY`, `CAPA_CLOSE`, `RECALL_CLOSE`, `AUDIT_CLOSE`,
+`MATERIAL_CORRECTION_APPROVE`) and the reason. Once a second
 member is active, the usual rule returns without anyone changing the setting.
 
 `capaRequiredFrom` and `effectivenessRequiredFrom` each name the least severe NCR a rule covers: `MINOR` (every NCR),

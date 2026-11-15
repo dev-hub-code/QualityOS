@@ -1,5 +1,6 @@
 package com.qualityos.organization.service;
 
+import com.qualityos.common.archive.ArchiveGuard;
 import com.qualityos.common.audit.AuditService;
 import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ConflictException;
@@ -46,6 +47,7 @@ public class FacilityService {
     private final ShiftRepository shifts;
     private final FacilityMapper mapper;
     private final AuditService audit;
+    private final List<ArchiveGuard> archiveGuards;
     private final PlanLimits limits;
 
     FacilityService(
@@ -55,7 +57,8 @@ public class FacilityService {
             ShiftRepository shifts,
             FacilityMapper mapper,
             PlanLimits limits,
-            AuditService audit) {
+            AuditService audit,
+            List<ArchiveGuard> archiveGuards) {
         this.limits = limits;
         this.facilities = facilities;
         this.departments = departments;
@@ -63,6 +66,7 @@ public class FacilityService {
         this.shifts = shifts;
         this.mapper = mapper;
         this.audit = audit;
+        this.archiveGuards = archiveGuards;
     }
 
     @Transactional(readOnly = true)
@@ -111,7 +115,9 @@ public class FacilityService {
 
     @Transactional
     public void archive(UUID id) {
-        load(id).setArchivedAt(Instant.now());
+        Facility facility = load(id);
+        ArchiveGuard.check(archiveGuards, ArchiveGuard.Kind.FACILITY, id, "facility");
+        facility.setArchivedAt(Instant.now());
         audit.record("FACILITY_ARCHIVED", "Facility", id);
     }
 

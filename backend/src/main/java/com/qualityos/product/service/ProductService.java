@@ -1,5 +1,6 @@
 package com.qualityos.product.service;
 
+import com.qualityos.common.archive.ArchiveGuard;
 import com.qualityos.common.attachment.AttachmentPolicy;
 import com.qualityos.common.audit.AuditService;
 import com.qualityos.common.exception.BusinessRuleException;
@@ -53,6 +54,7 @@ public class ProductService implements AttachmentPolicy {
     private final MaterialService materials;
     private final ProductMapper mapper;
     private final AuditService audit;
+    private final List<ArchiveGuard> archiveGuards;
 
     ProductService(
             ProductRepository products,
@@ -61,7 +63,8 @@ public class ProductService implements AttachmentPolicy {
             ProductMaterialRepository productMaterials,
             MaterialService materials,
             ProductMapper mapper,
-            AuditService audit) {
+            AuditService audit,
+            List<ArchiveGuard> archiveGuards) {
         this.products = products;
         this.revisions = revisions;
         this.specifications = specifications;
@@ -69,6 +72,7 @@ public class ProductService implements AttachmentPolicy {
         this.materials = materials;
         this.mapper = mapper;
         this.audit = audit;
+        this.archiveGuards = archiveGuards;
     }
 
     @Transactional(readOnly = true)
@@ -118,7 +122,9 @@ public class ProductService implements AttachmentPolicy {
 
     @Transactional
     public void archive(UUID id) {
-        load(id).setArchivedAt(Instant.now());
+        Product product = load(id);
+        ArchiveGuard.check(archiveGuards, ArchiveGuard.Kind.PRODUCT, id, "product");
+        product.setArchivedAt(Instant.now());
         audit.record("PRODUCT_ARCHIVED", "Product", id);
     }
 

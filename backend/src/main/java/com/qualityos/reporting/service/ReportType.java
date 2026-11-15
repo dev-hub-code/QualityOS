@@ -13,7 +13,10 @@ public enum ReportType {
     CAPA("capa", "CAPA report", Permissions.CAPA_VIEW),
     CALIBRATION("calibration", "Calibration report", Permissions.CALIBRATION_VIEW),
     AUDIT("audit", "Audit report", Permissions.AUDIT_VIEW),
-    BATCH_TRACEABILITY("batch-traceability", "Batch traceability report", Permissions.TRACEABILITY_VIEW);
+    BATCH_TRACEABILITY("batch-traceability", "Batch traceability report", Permissions.TRACEABILITY_VIEW),
+    WORK_ORDERS("work-orders", "Work order report", Permissions.WORK_ORDER_VIEW),
+    PRODUCTION_QUALITY("production-quality", "Production quality report", Permissions.WORK_ORDER_VIEW),
+    DOWNTIME("downtime", "Downtime report", Permissions.MANUFACTURING_VIEW);
 
     private final String slug;
     private final String title;

@@ -30,8 +30,22 @@ open NCRs now. Supplier scorecards show rejection and NCR counts, with no compos
 
 ## Production analytics
 
-Production analytics is a separate page, behind `PRODUCTION_ANALYTICS_VIEW`. The quality dashboard above holds no
-production figures yet. The full rules are in [MANUFACTURING.md](MANUFACTURING.md), under OEE and analytics.
+The overview, and so the dashboard and analytics page, carries a few production figures for people with
+`WORK_ORDER_VIEW`:
+
+| Figure | Definition |
+|---|---|
+| Open work orders | Now: approved, released, in progress or on hold |
+| Late work orders | Now: open, with a planned end before today |
+| Work orders completed | Completed in full or short in the period |
+| Completed on time | Completed on or before the planned end / completed in the period |
+| Shop-floor loss | Rejected and scrapped / processed, from shop-floor reports in the period, reversals netted out |
+| Unplanned downtime | Minutes of stops other than planned maintenance that began in the period, to its end or now |
+
+The work order, production quality and downtime reports export the same records as PDF and Excel.
+
+Production analytics is a separate page, behind `PRODUCTION_ANALYTICS_VIEW`. The full rules are in
+[MANUFACTURING.md](MANUFACTURING.md), under OEE and analytics.
 
 | Figure | Definition |
 |---|---|

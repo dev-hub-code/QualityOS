@@ -7,6 +7,7 @@ import com.qualityos.reporting.dto.ReportingDtos.Kpis;
 import com.qualityos.reporting.dto.ReportingDtos.MonthCount;
 import com.qualityos.reporting.dto.ReportingDtos.Overview;
 import com.qualityos.reporting.dto.ReportingDtos.Pending;
+import com.qualityos.reporting.dto.ReportingDtos.ProductionFigures;
 import com.qualityos.reporting.dto.ReportingDtos.QualityShare;
 import com.qualityos.reporting.dto.ReportingDtos.RecentActivity;
 import com.qualityos.reporting.dto.ReportingDtos.SupplierScore;
@@ -46,6 +47,8 @@ public class AnalyticsService {
     /** Lots whose receiving inspection ended in a final disposition in the period. */
     private static final String LOTS = DECIDED + " AND i.receipt_item_id IS NOT NULL AND i.disposition <> 'HOLD'";
     private static final int TOP = 10;
+    /** Approved to run, running or held: a work order still to finish. */
+    static final String WORK_ORDER_RUNNING = "('APPROVED', 'RELEASED', 'IN_PROGRESS', 'ON_HOLD')";
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ReportScope scopes;
@@ -67,7 +70,44 @@ public class AnalyticsService {
         MapSqlParameterSource params = scope.params();
         return new Overview(scope.from(), scope.to(), kpis(scope, params), inspectionTrend(scope, params),
                 suppliers(scope, params), defects(scope, params), products(scope, params), facilities(scope, params),
-                ncrAgeing(scope, params), capaTrend(scope, params), pending(scope, params), recent(scope, params));
+                ncrAgeing(scope, params), capaTrend(scope, params), pending(scope, params), recent(scope, params),
+                production(scope, params));
+    }
+
+    /** Production in the period, from work orders, shop-floor reports and downtime. Nulls where nothing happened. */
+    private ProductionFigures production(Resolved scope, MapSqlParameterSource params) {
+        Map<String, Object> orders = jdbc.queryForMap("""
+                SELECT count(*) FILTER (WHERE w.status IN %s) AS open,
+                       count(*) FILTER (WHERE w.status IN %s AND w.planned_end < :today) AS late,
+                       count(*) FILTER (WHERE w.completed_at >= :start AND w.completed_at < :end) AS completed,
+                       count(*) FILTER (WHERE w.completed_at >= :start AND w.completed_at < :end
+                           AND (w.completed_at AT TIME ZONE CAST(:zone AS text))::date <= w.planned_end) AS on_time
+                FROM work_orders w WHERE TRUE%s
+                """.formatted(WORK_ORDER_RUNNING, WORK_ORDER_RUNNING, scope.facility("w.facility_id")), params);
+        Map<String, Object> reported = jdbc.queryForMap("""
+                SELECT sum(r.good_quantity + r.rejected_quantity + r.scrap_quantity) AS processed,
+                       sum(r.rejected_quantity + r.scrap_quantity) AS lost
+                FROM operation_reports r
+                JOIN work_orders w ON w.tenant_id = r.tenant_id AND w.id = r.work_order_id
+                WHERE r.created_at >= :start AND r.created_at < :end%s
+                """.formatted(scope.facility("w.facility_id")), params);
+        Long minutes = jdbc.queryForObject("""
+                SELECT round(sum(extract(epoch FROM LEAST(COALESCE(d.ended_at, now()), :end) - d.started_at)) / 60)
+                FROM downtime_records d
+                WHERE NOT d.planned AND d.started_at >= :start AND d.started_at < :end%s
+                """.formatted(scope.facility("d.facility_id")), params, Long.class);
+        long completed = count(orders, "completed");
+        BigDecimal processed = (BigDecimal) reported.get("processed");
+        BigDecimal lost = (BigDecimal) reported.get("lost");
+        return new ProductionFigures(
+                count(orders, "open"),
+                count(orders, "late"),
+                completed,
+                rate(count(orders, "on_time"), completed),
+                processed == null || processed.signum() == 0 ? null
+                        : round(lost.multiply(BigDecimal.valueOf(100)).divide(processed, 4, RoundingMode.HALF_UP)
+                                .doubleValue()),
+                minutes == null ? 0 : minutes);
     }
 
     private Kpis kpis(Resolved scope, MapSqlParameterSource params) {

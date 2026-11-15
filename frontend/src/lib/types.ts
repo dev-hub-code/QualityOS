@@ -1144,6 +1144,18 @@ export interface Overview {
   capaTrend: { month: string; opened: number; closed: number }[];
   pending: { inspectionsAwaitingApproval: number; ncrsAwaitingClosure: number; auditsAwaitingClosure: number };
   recent: { kind: string; reference: string; link: string; status: string; on: string }[];
+  production: ProductionFigures;
+}
+
+/** Production in the period. Open and late work orders are as of now. */
+export interface ProductionFigures {
+  openWorkOrders: number;
+  lateWorkOrders: number;
+  completedWorkOrders: number;
+  onTimeRate: number | null;
+  /** Rejected and scrapped of everything processed on the shop floor. */
+  lossRate: number | null;
+  unplannedDowntimeMinutes: number;
 }
 
 export interface ReportTable {

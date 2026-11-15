@@ -61,7 +61,24 @@ public final class ReportingDtos {
             List<AgeBucket> ncrAgeing,
             List<CapaMonth> capaTrend,
             Pending pending,
-            List<RecentActivity> recent) {
+            List<RecentActivity> recent,
+            ProductionFigures production) {
+    }
+
+    /**
+     * @param openWorkOrders approved, released, in progress or on hold, now
+     * @param lateWorkOrders open now, past their planned end
+     * @param onTimeRate completed in the period on or before their planned end, of those completed
+     * @param lossRate rejected and scrapped of everything processed on the shop floor in the period
+     * @param unplannedDowntimeMinutes stops other than planned maintenance that began in the period, to its end or now
+     */
+    public record ProductionFigures(
+            long openWorkOrders,
+            long lateWorkOrders,
+            long completedWorkOrders,
+            Double onTimeRate,
+            Double lossRate,
+            long unplannedDowntimeMinutes) {
     }
 
     public record Column(String label, int weight, boolean numeric) {

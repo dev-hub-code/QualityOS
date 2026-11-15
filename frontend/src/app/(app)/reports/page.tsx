@@ -19,6 +19,9 @@ const REPORTS = [
   ["calibration", "Calibration report", "CALIBRATION_VIEW"],
   ["audit", "Audit report", "AUDIT_VIEW"],
   ["batch-traceability", "Batch traceability report", "TRACEABILITY_VIEW"],
+  ["work-orders", "Work order report", "WORK_ORDER_VIEW"],
+  ["production-quality", "Production quality report", "WORK_ORDER_VIEW"],
+  ["downtime", "Downtime report", "MANUFACTURING_VIEW"],
 ];
 const PREVIEW_ROWS = 100;
 

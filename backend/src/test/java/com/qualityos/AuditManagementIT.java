@@ -169,6 +169,8 @@ class AuditManagementIT extends TraceabilityFixture {
     void closingTakesASecondPersonAndThenFreezesTheAudit() throws Exception {
         String audit = completedClean();
         requestClosure(owner, audit).andExpect(status().isOk());
+        String number = JsonPath.read(body(as(owner, get(AUDITS + "/" + audit))), "$.data.auditNumber");
+        assertThat(emailedSubjects(manager)).contains(number + " is ready for closure");
         as(owner, postJson(AUDITS + "/" + audit + "/close", Map.of())).andExpect(status().isUnprocessableEntity());
         as(manager, postJson(AUDITS + "/" + audit + "/close", Map.of()))
                 .andExpect(status().isOk())

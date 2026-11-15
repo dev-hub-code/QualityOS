@@ -4,6 +4,8 @@ import com.qualityos.common.audit.AuditService;
 import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
+import com.qualityos.common.mail.EmailContent;
+import com.qualityos.common.mail.EmailTemplate;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
@@ -221,7 +223,9 @@ public class MaterialCorrectionService {
         Set<UUID> approvers = new HashSet<>(access.holdersOf(Permissions.MATERIAL_CORRECTION_APPROVE));
         approvers.remove(correction.getCreatedBy());
         notifications.notify(approvers, NotificationType.MATERIAL_CORRECTION_AWAITING_APPROVAL,
-                correction.getCorrectionNumber() + " needs approval", correction.getReason(), link(correction));
+                correction.getCorrectionNumber() + " needs approval", correction.getReason(), link(correction),
+                new EmailContent(EmailTemplate.MATERIAL_CORRECTION_APPROVAL, Map.of(
+                        "correctionNumber", correction.getCorrectionNumber(), "reason", correction.getReason())));
         return toDetail(correction);
     }
 
@@ -254,7 +258,7 @@ public class MaterialCorrectionService {
             audit.record("MATERIAL_CORRECTION_APPROVED", ENTITY, id);
             correction.applied(apply(correction), now);
             audit.record("MATERIAL_CORRECTION_APPLIED", ENTITY, id, originals(id), Map.of("number", correction.getCorrectionNumber()));
-            notifyDecision(correction, " was approved and applied");
+            notifyDecision(correction, "approved and applied");
         }
         return toDetail(correction);
     }
@@ -267,7 +271,7 @@ public class MaterialCorrectionService {
         }
         correction.reject(note.trim(), Instant.now());
         audit.record("MATERIAL_CORRECTION_REJECTED", ENTITY, id, null, Map.of("note", note.trim()));
-        notifyDecision(correction, " was rejected");
+        notifyDecision(correction, "rejected");
         return toDetail(correction);
     }
 
@@ -358,7 +362,10 @@ public class MaterialCorrectionService {
         affected.add(correction.getCreatedBy());
         affected.remove(TenantContext.getCurrentUserId());
         notifications.notify(affected, NotificationType.MATERIAL_CORRECTION_DECIDED,
-                correction.getCorrectionNumber() + outcome, correction.getReason(), link(correction));
+                correction.getCorrectionNumber() + " was " + outcome, correction.getReason(), link(correction),
+                new EmailContent(EmailTemplate.MATERIAL_CORRECTION_DECIDED, Map.of(
+                        "correctionNumber", correction.getCorrectionNumber(), "outcome", outcome,
+                        "reason", correction.getReason())));
     }
 
     private static String link(MaterialCorrection correction) {

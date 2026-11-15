@@ -43,7 +43,8 @@ class QualityAlerts {
 
     void ncrAwaitingClosure(NonConformance ncr) {
         ncr(access.holdersOf(Permissions.NCR_CLOSE), NotificationType.NCR_AWAITING_CLOSURE, ncr,
-                ncr.getNcrNumber() + " is ready for closure", ncr.getTitle(), null);
+                ncr.getNcrNumber() + " is ready for closure", ncr.getTitle(),
+                ncrEmail(EmailTemplate.NCR_AWAITING_CLOSURE, ncr));
     }
 
     void capaAssigned(CorrectiveAction capa) {
@@ -55,12 +56,14 @@ class QualityAlerts {
     void actionAssigned(CorrectiveAction capa, CapaAction action) {
         capa(Set.of(action.getOwnerId()), NotificationType.CAPA_ACTION_ASSIGNED, capa,
                 "New action on " + capa.getCapaNumber(),
-                action.getDescription() + ". Due " + action.getTargetDate() + ".", null);
+                action.getDescription() + ". Due " + action.getTargetDate() + ".",
+                actionEmail(EmailTemplate.CAPA_ACTION_ASSIGNED, capa, action));
     }
 
     void capaAwaitingVerification(CorrectiveAction capa) {
         capa(access.holdersOf(Permissions.CAPA_APPROVE), NotificationType.CAPA_AWAITING_VERIFICATION, capa,
-                capa.getCapaNumber() + " needs effectiveness verification", capa.getTitle(), null);
+                capa.getCapaNumber() + " needs effectiveness verification", capa.getTitle(),
+                capaEmail(EmailTemplate.CAPA_VERIFICATION, capa));
     }
 
     void capaDueSoon(CorrectiveAction capa) {
@@ -83,7 +86,8 @@ class QualityAlerts {
         recipients.add(capa.getOwnerId());
         capa(recipients, NotificationType.CAPA_ACTION_OVERDUE, capa,
                 "An action on " + capa.getCapaNumber() + " is overdue",
-                action.getDescription() + ". It was due on " + action.getTargetDate() + ".", null);
+                action.getDescription() + ". It was due on " + action.getTargetDate() + ".",
+                actionEmail(EmailTemplate.CAPA_ACTION_OVERDUE, capa, action));
     }
 
     void capaOverdue(CorrectiveAction capa) {
@@ -101,6 +105,14 @@ class QualityAlerts {
                 "capaNumber", capa.getCapaNumber(),
                 "capaTitle", capa.getTitle(),
                 "dueDate", capa.getTargetDate().toString()));
+    }
+
+    private static EmailContent actionEmail(EmailTemplate template, CorrectiveAction capa, CapaAction action) {
+        return new EmailContent(template, Map.of(
+                "capaNumber", capa.getCapaNumber(),
+                "capaTitle", capa.getTitle(),
+                "actionDescription", action.getDescription(),
+                "dueDate", action.getTargetDate().toString()));
     }
 
     private void ncr(Set<UUID> to, NotificationType type, NonConformance ncr, String title, String body, EmailContent email) {

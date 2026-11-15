@@ -1,0 +1,9 @@
+Subject: {{correctionNumber}} was {{outcome}}
+
+A material correction was decided
+
+Hello {{recipientName}},
+{{correctionNumber}} was {{outcome}}.
+The reason given: {{reason}}
+
+Open correction: {{actionUrl}}

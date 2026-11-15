@@ -293,6 +293,10 @@ class PlatformOperatorsIT extends MasterDataFixture {
                 "SELECT count(*) FROM notifications WHERE tenant_id = ? AND type = 'PLAN_CHANGED'", Long.class, owner.tenantId()))
                 .isPositive();
         assertThat(noticeJob()).isZero();
+        String number = asDatabaseSuperuser().queryForObject(
+                "SELECT invoice_number FROM subscription_invoices WHERE id = ?::uuid", String.class, invoice);
+        assertThat(emailedSubjects(owner)).contains("Invoice " + number + " is overdue")
+                .anyMatch(subject -> subject.startsWith("Your organisation is now on the "));
     }
 
     @Test

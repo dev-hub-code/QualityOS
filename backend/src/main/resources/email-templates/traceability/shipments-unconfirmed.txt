@@ -1,0 +1,9 @@
+Subject: {{count}} dispatches have no confirmed shipment
+
+Dispatches are waiting for confirmation
+
+Hello {{recipientName}},
+{{count}} dispatches have no confirmed shipment.
+Confirm each shipment, or cancel the dispatch if the goods never left.
+
+Open dispatches: {{actionUrl}}

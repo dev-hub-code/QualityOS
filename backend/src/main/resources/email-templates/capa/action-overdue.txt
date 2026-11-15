@@ -1,0 +1,9 @@
+Subject: An action on {{capaNumber}} is overdue
+
+A CAPA action is overdue
+
+Hello {{recipientName}},
+An action on {{capaNumber}}, {{capaTitle}}, is not done: {{actionDescription}}.
+It was due on {{dueDate}}.
+
+Open CAPA: {{actionUrl}}

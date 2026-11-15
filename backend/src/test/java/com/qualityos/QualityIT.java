@@ -145,6 +145,8 @@ class QualityIT extends AbstractIntegrationTest {
 
         act(owner, "/ncrs/" + ncr + "/request-verification", Map.of("note", "Fixed"))
                 .andExpect(jsonPath("$.data.status").value("PENDING_VERIFICATION"));
+        String number = read(as(owner, get("/api/v1/ncrs/" + ncr)), "$.data.ncrNumber");
+        assertThat(emailedSubjects(manager)).contains(number + " is ready for closure");
         act(owner, "/ncrs/" + ncr + "/close", Map.of("note", "Mine")).andExpect(status().isUnprocessableContent());
         act(manager, "/ncrs/" + ncr + "/close", Map.of("note", "Verified on the floor"))
                 .andExpect(jsonPath("$.data.status").value("CLOSED"))
@@ -323,6 +325,8 @@ class QualityIT extends AbstractIntegrationTest {
         analyse(capa);
         implement(capa, addAction(capa, "CORRECTIVE"));
         assertThat(titles(manager)).contains("New action on " + capaNumber, capaNumber + " needs effectiveness verification");
+        assertThat(emailedSubjects(manager))
+                .contains("New action on " + capaNumber, capaNumber + " needs effectiveness verification");
     }
 
     @Test
@@ -363,6 +367,7 @@ class QualityIT extends AbstractIntegrationTest {
         assertThat(remindActions()).isEqualTo(1);
         assertThat(remindActions()).isZero();
         assertThat(titles(manager)).containsOnlyOnce("An action on " + number + " is overdue");
+        assertThat(emailedSubjects(manager)).containsOnlyOnce("An action on " + number + " is overdue");
 
         asAppRole(owner.tenantId(), sql -> sql.update(
                 "UPDATE capa_actions SET overdue_notified_at = now() - interval '8 days' WHERE id = ?",

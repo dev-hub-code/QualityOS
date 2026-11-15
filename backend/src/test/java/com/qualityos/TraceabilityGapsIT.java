@@ -191,5 +191,6 @@ class TraceabilityGapsIT extends TraceabilityFixture {
         assertThat(inTransactionAs(stranger.tenantId(), null, () -> dispatches.remindUnconfirmed())).isZero();
         as(owner, get("/api/v1/notifications"))
                 .andExpect(jsonPath("$.data.items[0].type").value("DISPATCH_SHIPMENT_UNCONFIRMED"));
+        assertThat(emailedSubjects(owner)).contains("1 dispatches have no confirmed shipment");
     }
 }

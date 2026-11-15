@@ -1,10 +1,13 @@
 package com.qualityos.subscription.service;
 
+import com.qualityos.common.mail.EmailContent;
+import com.qualityos.common.mail.EmailTemplate;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.notification.service.NotificationService;
 import com.qualityos.notification.service.NotificationType;
 import com.qualityos.common.attachment.AttachmentQuota;
 import com.qualityos.common.exception.BusinessRuleException;
+import java.util.Map;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -127,10 +130,12 @@ public class PlanLimits implements AttachmentQuota {
         boolean reached = "REACHED".equals(level);
         String title = reached ? "The " + limits.plan() + " plan's " + noun + " limit is reached"
                 : "Near the " + limits.plan() + " plan's " + noun + " limit";
-        String body = after + " of " + limit + " " + counted + ". "
-                + (reached ? "Change plan to add more." : "Change plan before it stops your work.");
+        String usage = after + " of " + limit + " " + counted;
+        String advice = reached ? "Change plan to add more." : "Change plan before it stops your work.";
         notifications.notifyIncludingActor(access.holdersOf(PlanAccess.SUBSCRIPTION_MANAGE),
-                NotificationType.PLAN_LIMIT_WARNING, title, body, LINK);
+                NotificationType.PLAN_LIMIT_WARNING, title, usage + ". " + advice, LINK,
+                new EmailContent(EmailTemplate.PLAN_LIMIT,
+                        Map.of("headline", title, "usage", usage, "advice", advice)));
     }
 
     /** @return REACHED, NEAR, or null when this step crosses neither threshold */

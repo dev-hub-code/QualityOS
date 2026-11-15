@@ -4,6 +4,8 @@ import com.qualityos.common.audit.AuditService;
 import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
+import com.qualityos.common.mail.EmailContent;
+import com.qualityos.common.mail.EmailTemplate;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.identity.service.FacilityScope;
@@ -370,7 +372,8 @@ public class DispatchService {
         notifications.notify(access.holdersOf(Permissions.TRACEABILITY_MANAGE),
                 NotificationType.DISPATCH_SHIPMENT_UNCONFIRMED,
                 waiting + " dispatches have no confirmed shipment",
-                "Confirm each shipment, or cancel the dispatch if the goods never left.", "/dispatches");
+                "Confirm each shipment, or cancel the dispatch if the goods never left.", "/dispatches",
+                new EmailContent(EmailTemplate.SHIPMENTS_UNCONFIRMED, Map.of("count", String.valueOf(waiting))));
         return (int) waiting;
     }
 

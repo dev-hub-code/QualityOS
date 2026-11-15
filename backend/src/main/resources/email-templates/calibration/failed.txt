@@ -1,0 +1,9 @@
+Subject: {{instrumentName}} failed calibration
+
+An instrument failed calibration
+
+Hello {{recipientName}},
+{{instrumentName}} failed calibration and is out of service.
+{{impact}}
+
+Open instrument: {{actionUrl}}

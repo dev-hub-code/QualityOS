@@ -24,7 +24,9 @@ class EmailRendererTest {
         for (String name : List.of("recipientName", "organizationName", "brandName", "inspectionNumber", "batchNumber",
                 "ncrNumber", "ncrTitle", "capaNumber", "capaTitle", "dueDate", "expiryMinutes", "lockMinutes",
                 "instrumentName", "auditNumber", "amount", "title", "body", "recordNumber", "summary", "note",
-                "where", "reason", "receiptNumber", "lots", "supplierName")) {
+                "where", "reason", "receiptNumber", "lots", "supplierName", "actionDescription", "disposition",
+                "correctionNumber", "outcome", "count", "impact", "auditTitle", "planName", "invoiceNumber", "headline",
+                "usage", "advice")) {
             values.put(name, "value-" + name);
         }
         values.put("actionUrl", "https://app.example/path");

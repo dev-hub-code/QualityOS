@@ -30,6 +30,20 @@ public enum EmailTemplate {
     PRODUCTION_SENT_BACK("production/sent-back"),
     PRODUCTION_STOPPED("production/stopped"),
     PRODUCTION_OVERDUE("production/overdue"),
+    NCR_AWAITING_CLOSURE("ncr/awaiting-closure"),
+    CAPA_ACTION_ASSIGNED("capa/action-assigned"),
+    CAPA_ACTION_OVERDUE("capa/action-overdue"),
+    CAPA_VERIFICATION("capa/verification"),
+    INSPECTION_SENT_BACK("inspection/sent-back"),
+    INSPECTION_DISPOSITION("inspection/disposition"),
+    MATERIAL_CORRECTION_APPROVAL("traceability/correction-approval"),
+    MATERIAL_CORRECTION_DECIDED("traceability/correction-decided"),
+    SHIPMENTS_UNCONFIRMED("traceability/shipments-unconfirmed"),
+    CALIBRATION_FAILED("calibration/failed"),
+    AUDIT_AWAITING_CLOSURE("audit/awaiting-closure"),
+    PLAN_CHANGED("subscription/plan-changed"),
+    INVOICE_OVERDUE("subscription/invoice-overdue"),
+    PLAN_LIMIT("subscription/plan-limit"),
     GENERAL("notification/general");
 
     private final String path;

@@ -1,0 +1,8 @@
+Subject: {{auditNumber}} is ready for closure
+
+An audit is ready for closure
+
+Hello {{recipientName}},
+{{auditNumber}} is ready for someone to close it: {{auditTitle}}.
+
+Open audit: {{actionUrl}}

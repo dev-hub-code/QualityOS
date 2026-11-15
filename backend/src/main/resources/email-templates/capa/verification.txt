@@ -1,0 +1,9 @@
+Subject: {{capaNumber}} needs effectiveness verification
+
+A CAPA needs verification
+
+Hello {{recipientName}},
+Every action on {{capaNumber}} is done: {{capaTitle}}.
+Check that the fix worked, then verify or reopen it.
+
+Open CAPA: {{actionUrl}}

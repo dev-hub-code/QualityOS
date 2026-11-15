@@ -1,0 +1,8 @@
+Subject: {{ncrNumber}} is ready for closure
+
+An NCR is ready for closure
+
+Hello {{recipientName}},
+{{ncrNumber}} is ready for someone to close it: {{ncrTitle}}.
+
+Open NCR: {{actionUrl}}

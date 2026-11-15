@@ -545,6 +545,8 @@ class InspectionIT extends MasterDataFixture {
                 number + " needs a disposition");
         dispose(owner, id, "ACCEPT").andExpect(status().isOk());
         assertTitles(inspector, number + " was sent back", "Disposition recorded for " + number);
+        assertThat(emailedSubjects(inspector))
+                .contains(number + " was sent back to you", "Disposition recorded for " + number);
         assertTitles(viewer);
     }
 

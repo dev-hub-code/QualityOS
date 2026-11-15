@@ -280,7 +280,8 @@ public class QualityAuditService implements AttachmentPolicy {
         audit.record("AUDIT_CLOSURE_REQUESTED", ENTITY, id);
         notifications.notify(scope.allowedIn(row.getFacilityId(), access.holdersOf(Permissions.AUDIT_CLOSE)),
                 NotificationType.AUDIT_AWAITING_CLOSURE, row.getAuditNumber() + " is ready for closure", row.getTitle(),
-                link(row));
+                link(row), new EmailContent(EmailTemplate.AUDIT_AWAITING_CLOSURE, Map.of(
+                        "auditNumber", row.getAuditNumber(), "auditTitle", row.getTitle())));
         return toDetail(row);
     }
 

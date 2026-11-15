@@ -1,0 +1,8 @@
+Subject: Disposition recorded for {{inspectionNumber}}
+
+A disposition was recorded
+
+Hello {{recipientName}},
+{{inspectionNumber}} was closed with the disposition {{disposition}}.
+
+Open inspection: {{actionUrl}}

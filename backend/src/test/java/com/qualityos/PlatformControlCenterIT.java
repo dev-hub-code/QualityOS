@@ -312,7 +312,21 @@ class PlatformControlCenterIT extends AbstractIntegrationTest {
     @Test
     void anOrganisationsPageShowsFiguresForThatOrganisationAlone() throws Exception {
         as(admin, get(PLATFORM + "/organisations/" + owner.tenantId()))
+                .andExpect(jsonPath("$.data.contactPhone").doesNotExist());
+        Map<String, Object> profile = new HashMap<>(Map.of("name", "Acme Forgings", "countryCode", "IN",
+                "timezone", "Asia/Kolkata", "currency", "INR", "locale", "en-IN", "version", 0));
+        profile.put("contactPhone", "call me");
+        as(owner, put("/api/v1/organizations/" + owner.tenantId()).contentType("application/json")
+                .content(json.writeValueAsString(profile))).andExpect(status().isBadRequest());
+        profile.put("contactPhone", " +91 20 1234 5678 ");
+        as(owner, put("/api/v1/organizations/" + owner.tenantId()).contentType("application/json")
+                .content(json.writeValueAsString(profile)))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.contactPhone").value("+91 20 1234 5678"));
+
+        as(admin, get(PLATFORM + "/organisations/" + owner.tenantId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.contactPhone").value("+91 20 1234 5678"))
                 .andExpect(jsonPath("$.data.contactEmail").value(owner.email().toLowerCase()))
                 .andExpect(jsonPath("$.data.usage.inspections").value(0))
                 .andExpect(jsonPath("$.data.subscription.state").value("TRIAL"));

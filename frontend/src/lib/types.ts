@@ -38,6 +38,7 @@ export interface Organization {
   currency: string;
   locale: string;
   address: string | null;
+  contactPhone: string | null;
   onboarded: boolean;
   version: number;
 }
@@ -1240,6 +1241,7 @@ export interface OrganisationDetail {
   legalName: string | null;
   gstin: string | null;
   contactEmail: string | null;
+  contactPhone: string | null;
   countryCode: string;
   timezone: string;
   registeredAt: string;

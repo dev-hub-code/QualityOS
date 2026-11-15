@@ -31,6 +31,7 @@ public class Tenant extends AuditedEntity {
     private String currency = "INR";
     private String locale = "en-IN";
     private String address;
+    private String contactPhone;
     private Instant onboardedAt;
 
     @Enumerated(EnumType.STRING)

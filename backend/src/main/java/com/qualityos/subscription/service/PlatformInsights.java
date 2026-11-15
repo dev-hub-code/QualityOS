@@ -294,7 +294,7 @@ public class PlatformInsights {
             List<String> contact = jdbc.queryForList(CONTACT, String.class, tenant);
             return jdbc.queryForObject(TENANT, (rows, row) -> new OrganisationDetail(
                     tenant, organization.name(), organization.legalName(), organization.gstin(),
-                    contact.isEmpty() ? null : contact.getFirst(), organization.countryCode(), organization.timezone(),
+                    contact.isEmpty() ? null : contact.getFirst(), organization.contactPhone(), organization.countryCode(), organization.timezone(),
                     rows.getTimestamp("created_at").toInstant(), instant(rows, "suspended_at"),
                     rows.getString("suspension_reason"), subscriptions.current(), usage, subscriptions.invoices(),
                     subscriptions.payments(), activity), tenant);

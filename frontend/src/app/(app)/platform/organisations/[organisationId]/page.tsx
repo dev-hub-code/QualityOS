@@ -76,6 +76,7 @@ export default function PlatformOrganisationPage() {
             items={[
               ["Legal name", data.legalName ?? "Not recorded"],
               ["Email", data.contactEmail ?? "Not recorded"],
+              ["Phone", data.contactPhone ?? "Not recorded"],
               ["GSTIN", data.gstin ?? "Not recorded"],
               ["Country", data.countryCode],
               ["Time zone", data.timezone],

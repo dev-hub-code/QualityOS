@@ -15,5 +15,6 @@ public record UpdateOrganizationRequest(
         @NotBlank @Size(min = 3, max = 3) String currency,
         @NotBlank @Size(max = 16) String locale,
         @Size(max = 1000) String address,
+        @Pattern(regexp = "^\\s*$|^\\s*\\+?[0-9 ()-]{6,20}\\s*$", message = "must be a phone number") String contactPhone,
         @NotNull Long version) {
 }

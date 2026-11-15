@@ -24,6 +24,10 @@ export const organizationSchema = z.object({
   gstin: z.string().trim().toUpperCase().regex(/^$|^[0-9]{2}[A-Z0-9]{13}$/, "Must be a 15 character GSTIN"),
   industry: z.string().trim().max(100),
   address: z.string().trim().max(1000),
+  contactPhone: z
+    .string()
+    .trim()
+    .regex(/^$|^\+?[0-9 ()-]{6,20}$/, "Enter a phone number"),
   timezone: z.string().trim().min(1, "Enter a time zone").max(64),
   currency: z.string().trim().toUpperCase().length(3, "Use a 3 letter code"),
 });

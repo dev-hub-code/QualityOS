@@ -36,6 +36,7 @@ export function OrganizationForm({ organization, submitLabel, readOnly, onSaved 
       gstin: organization.gstin ?? "",
       industry: organization.industry ?? "",
       address: organization.address ?? "",
+      contactPhone: organization.contactPhone ?? "",
       timezone: organization.timezone,
       currency: organization.currency,
     },
@@ -74,6 +75,14 @@ export function OrganizationForm({ organization, submitLabel, readOnly, onSaved 
         <Field label="GSTIN" id="gstin" error={errors.gstin} {...register("gstin")} />
         <Field label="Industry" id="industry" placeholder="CNC machining" error={errors.industry} {...register("industry")} />
         <Field label="Address" id="address" error={errors.address} {...register("address")} />
+        <Field
+          label="Contact number"
+          id="contactPhone"
+          type="tel"
+          placeholder="+91 20 1234 5678"
+          error={errors.contactPhone}
+          {...register("contactPhone")}
+        />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Time zone" id="timezone" error={errors.timezone} {...register("timezone")} />
           <Field label="Currency" id="currency" error={errors.currency} {...register("currency")} />

@@ -37,6 +37,7 @@ export default function ProductsPage() {
         {canManage && <Button onClick={() => setAdding(true)}>Add product</Button>}
       </PageHeader>
       <DataTable
+        restorable={canManage}
         path="/products"
         columns={columns}
         searchLabel="Search products"

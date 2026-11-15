@@ -33,6 +33,7 @@ export default function FacilitiesPage() {
         {canManage && <Button onClick={() => setAdding(true)}>Add facility</Button>}
       </PageHeader>
       <DataTable
+        restorable={canManage}
         path="/facilities"
         columns={columns}
         searchLabel="Search facilities"

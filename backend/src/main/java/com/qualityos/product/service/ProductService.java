@@ -76,8 +76,8 @@ public class ProductService implements AttachmentPolicy {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<ProductResponse> list(String search, Product.Type type, Pageable pageable) {
-        Specification<Product> filter = Specification.<Product>where(Searches.notArchived())
+    public PageResponse<ProductResponse> list(String search, Product.Type type, boolean archived, Pageable pageable) {
+        Specification<Product> filter = Specification.<Product>where(Searches.archived(archived))
                 .and(Searches.contains(search, "code", "name"))
                 .and(Searches.equalTo("productType", type));
         return PageResponse.from(products.findAll(filter, pageable), mapper::toResponse);
@@ -126,6 +126,17 @@ public class ProductService implements AttachmentPolicy {
         ArchiveGuard.check(archiveGuards, ArchiveGuard.Kind.PRODUCT, id, "product");
         product.setArchivedAt(Instant.now());
         audit.record("PRODUCT_ARCHIVED", "Product", id);
+    }
+
+    /** Brings an archived product back into lists and pickers. */
+    @Transactional
+    public void restore(UUID id) {
+        var restored = load(id);
+        if (restored.getArchivedAt() == null) {
+            throw new BusinessRuleException("This product is not archived.");
+        }
+        restored.setArchivedAt(null);
+        audit.record("PRODUCT_RESTORED", "Product", id);
     }
 
     @Transactional

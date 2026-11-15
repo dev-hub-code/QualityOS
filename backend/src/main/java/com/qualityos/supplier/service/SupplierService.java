@@ -61,8 +61,8 @@ public class SupplierService implements AttachmentPolicy {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<SupplierResponse> list(String search, Status status, Pageable pageable) {
-        Specification<Supplier> filter = Specification.<Supplier>where(Searches.notArchived())
+    public PageResponse<SupplierResponse> list(String search, Status status, boolean archived, Pageable pageable) {
+        Specification<Supplier> filter = Specification.<Supplier>where(Searches.archived(archived))
                 .and(Searches.contains(search, "code", "name", "gstin"))
                 .and(Searches.equalTo("status", status));
         return PageResponse.from(suppliers.findAll(filter, pageable), mapper::toResponse);
@@ -104,6 +104,17 @@ public class SupplierService implements AttachmentPolicy {
     public void archive(UUID id) {
         load(id).setArchivedAt(Instant.now());
         audit.record("SUPPLIER_ARCHIVED", "Supplier", id);
+    }
+
+    /** Brings an archived supplier back into lists and pickers. */
+    @Transactional
+    public void restore(UUID id) {
+        var restored = load(id);
+        if (restored.getArchivedAt() == null) {
+            throw new BusinessRuleException("This supplier is not archived.");
+        }
+        restored.setArchivedAt(null);
+        audit.record("SUPPLIER_RESTORED", "Supplier", id);
     }
 
     @Transactional

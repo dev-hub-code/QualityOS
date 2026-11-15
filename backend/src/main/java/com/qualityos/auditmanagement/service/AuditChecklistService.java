@@ -1,5 +1,6 @@
 package com.qualityos.auditmanagement.service;
 
+import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.auditmanagement.dto.AuditDtos.ChecklistDetail;
 import com.qualityos.auditmanagement.dto.AuditDtos.ChecklistItemRequest;
 import com.qualityos.auditmanagement.dto.AuditDtos.ChecklistItemResponse;
@@ -41,9 +42,9 @@ public class AuditChecklistService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<ChecklistSummary> list(String search, Pageable pageable) {
+    public PageResponse<ChecklistSummary> list(String search, boolean archived, Pageable pageable) {
         Specification<AuditChecklist> filter =
-                Specification.<AuditChecklist>where(Searches.notArchived()).and(Searches.contains(search, "code", "name"));
+                Specification.<AuditChecklist>where(Searches.archived(archived)).and(Searches.contains(search, "code", "name"));
         return PageResponse.from(checklists.findAll(filter, pageable),
                 checklist -> new ChecklistSummary(checklist.getId(), checklist.getCode(), checklist.getName()));
     }
@@ -80,6 +81,18 @@ public class AuditChecklistService {
     public void archive(UUID id) {
         load(id).setArchivedAt(Instant.now());
         audit.record("AUDIT_CHECKLIST_ARCHIVED", ENTITY, id);
+    }
+
+    /** Brings an archived checklist back into lists and pickers. */
+    @Transactional
+    public void restore(UUID id) {
+        var restored = checklists.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(RESOURCE, id.toString()));
+        if (restored.getArchivedAt() == null) {
+            throw new BusinessRuleException("This checklist is not archived.");
+        }
+        restored.setArchivedAt(null);
+        audit.record("AUDIT_CHECKLIST_RESTORED", ENTITY, id);
     }
 
     /** @return the questions as they stand, for an audit to copy */

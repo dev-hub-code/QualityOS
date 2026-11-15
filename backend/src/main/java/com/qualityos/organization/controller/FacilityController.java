@@ -48,8 +48,9 @@ public class FacilityController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size,
             @RequestParam(required = false) String sort,
-            @RequestParam(required = false) String q) {
-        return ApiResponse.ok(facilities.list(q, Pages.of(page, size, sort, SORTABLE, "name")));
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "false") boolean archived) {
+        return ApiResponse.ok(facilities.list(q, archived, Pages.of(page, size, sort, SORTABLE, "name")));
     }
 
     @GetMapping("/{id}")
@@ -77,6 +78,13 @@ public class FacilityController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void archive(@PathVariable UUID id) {
         facilities.archive(id);
+    }
+
+    @PostMapping("/{id}/restore")
+    @PreAuthorize(Require.FACILITY_MANAGE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void restore(@PathVariable UUID id) {
+        facilities.restore(id);
     }
 
     @PostMapping("/{id}/departments")

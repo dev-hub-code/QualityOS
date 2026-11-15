@@ -70,8 +70,8 @@ public class FacilityService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<FacilityResponse> list(String search, Pageable pageable) {
-        Specification<Facility> filter = Specification.<Facility>where(Searches.notArchived())
+    public PageResponse<FacilityResponse> list(String search, boolean archived, Pageable pageable) {
+        Specification<Facility> filter = Specification.<Facility>where(Searches.archived(archived))
                 .and(Searches.contains(search, "code", "name", "city"));
         return PageResponse.from(facilities.findAll(filter, pageable), mapper::toResponse);
     }
@@ -119,6 +119,17 @@ public class FacilityService {
         ArchiveGuard.check(archiveGuards, ArchiveGuard.Kind.FACILITY, id, "facility");
         facility.setArchivedAt(Instant.now());
         audit.record("FACILITY_ARCHIVED", "Facility", id);
+    }
+
+    /** Brings an archived facility back into lists and pickers. */
+    @Transactional
+    public void restore(UUID id) {
+        var restored = load(id);
+        if (restored.getArchivedAt() == null) {
+            throw new BusinessRuleException("This facility is not archived.");
+        }
+        restored.setArchivedAt(null);
+        audit.record("FACILITY_RESTORED", "Facility", id);
     }
 
     @Transactional

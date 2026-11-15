@@ -15,6 +15,11 @@ public final class Searches {
         return (root, query, cb) -> cb.isNull(root.get("archivedAt"));
     }
 
+    /** Archived records only when asked for, active ones otherwise. */
+    public static <T> Specification<T> archived(boolean archived) {
+        return archived ? (root, query, cb) -> cb.isNotNull(root.get("archivedAt")) : notArchived();
+    }
+
     /** Case-insensitive substring match on any of the fields. Matches everything when the term is blank. */
     public static <T> Specification<T> contains(String term, String... fields) {
         if (term == null || term.isBlank()) {

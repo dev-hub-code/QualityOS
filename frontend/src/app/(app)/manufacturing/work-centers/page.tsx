@@ -35,6 +35,7 @@ export default function WorkCentersPage() {
         {canManage && <Button onClick={() => setAdding(true)}>Add work centre</Button>}
       </PageHeader>
       <DataTable
+        restorable={canManage}
         path="/manufacturing/work-centers"
         columns={COLUMNS}
         searchLabel="Search work centres"

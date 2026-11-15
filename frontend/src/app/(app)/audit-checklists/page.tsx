@@ -47,7 +47,7 @@ export default function AuditChecklistsPage() {
       <PageHeader title="Audit checklists" subtitle="A change applies to audits planned afterwards.">
         {canManage && <Button onClick={() => setEditing({})}>New checklist</Button>}
       </PageHeader>
-      <DataTable path="/audit-checklists" columns={columns} searchLabel="Search checklists" emptyMessage="No checklists." />
+      <DataTable restorable={canManage} path="/audit-checklists" columns={columns} searchLabel="Search checklists" emptyMessage="No checklists." />
       {editing && (
         <RecordDialog
           title={editing.id ? "Edit checklist" : "New checklist"}

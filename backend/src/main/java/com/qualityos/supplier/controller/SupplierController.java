@@ -52,8 +52,9 @@ public class SupplierController {
             @RequestParam(defaultValue = "25") int size,
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) String q,
-            @RequestParam(required = false) Status status) {
-        return ApiResponse.ok(suppliers.list(q, status, Pages.of(page, size, sort, SORTABLE, "name")));
+            @RequestParam(required = false) Status status,
+            @RequestParam(defaultValue = "false") boolean archived) {
+        return ApiResponse.ok(suppliers.list(q, status, archived, Pages.of(page, size, sort, SORTABLE, "name")));
     }
 
     @GetMapping("/categories")
@@ -107,6 +108,13 @@ public class SupplierController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void archive(@PathVariable UUID id) {
         suppliers.archive(id);
+    }
+
+    @PostMapping("/{id}/restore")
+    @PreAuthorize(Require.SUPPLIER_UPDATE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void restore(@PathVariable UUID id) {
+        suppliers.restore(id);
     }
 
     @PostMapping("/{id}/submit")

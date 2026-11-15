@@ -37,6 +37,7 @@ export default function MaterialsPage() {
         {canManage && <Button onClick={() => setAdding(true)}>Add material</Button>}
       </PageHeader>
       <DataTable
+        restorable={canManage}
         path="/materials"
         columns={columns}
         searchLabel="Search materials"

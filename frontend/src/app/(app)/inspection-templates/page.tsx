@@ -42,6 +42,7 @@ export default function InspectionTemplatesPage() {
         {canManage && <Button onClick={() => setAdding(true)}>Add template</Button>}
       </PageHeader>
       <DataTable
+        restorable={canManage}
         path="/inspection-templates"
         columns={columns}
         searchLabel="Search templates"

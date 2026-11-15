@@ -44,8 +44,9 @@ public class AuditChecklistController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size,
             @RequestParam(required = false) String sort,
-            @RequestParam(required = false) String q) {
-        return ApiResponse.ok(checklists.list(q, Pages.of(page, size, sort, SORTABLE, "code")));
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "false") boolean archived) {
+        return ApiResponse.ok(checklists.list(q, archived, Pages.of(page, size, sort, SORTABLE, "code")));
     }
 
     @GetMapping("/{id}")
@@ -71,5 +72,12 @@ public class AuditChecklistController {
     @PreAuthorize(Require.AUDIT_MANAGE)
     public void archive(@PathVariable UUID id) {
         checklists.archive(id);
+    }
+
+    @PostMapping("/{id}/restore")
+    @PreAuthorize(Require.AUDIT_MANAGE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void restore(@PathVariable UUID id) {
+        checklists.restore(id);
     }
 }

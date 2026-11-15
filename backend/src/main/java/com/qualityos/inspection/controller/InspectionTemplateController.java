@@ -49,8 +49,9 @@ public class InspectionTemplateController {
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) InspectionTemplate.Type type,
-            @RequestParam(required = false) UUID materialId) {
-        return ApiResponse.ok(templates.list(q, type, materialId, Pages.of(page, size, sort, SORTABLE, "name")));
+            @RequestParam(required = false) UUID materialId,
+            @RequestParam(defaultValue = "false") boolean archived) {
+        return ApiResponse.ok(templates.list(q, type, materialId, archived, Pages.of(page, size, sort, SORTABLE, "name")));
     }
 
     @GetMapping("/{id}")
@@ -71,6 +72,13 @@ public class InspectionTemplateController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void archive(@PathVariable UUID id) {
         templates.archive(id);
+    }
+
+    @PostMapping("/{id}/restore")
+    @PreAuthorize(Require.TEMPLATE_MANAGE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void restore(@PathVariable UUID id) {
+        templates.restore(id);
     }
 
     @PostMapping("/{id}/versions")

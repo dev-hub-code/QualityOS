@@ -32,6 +32,7 @@ const columns = [
 
 export default function SuppliersPage() {
   const canCreate = usePermission("SUPPLIER_CREATE");
+  const canRestore = usePermission("SUPPLIER_UPDATE");
   const categories = useSupplierCategories();
   const refresh = useRefresh();
   const [adding, setAdding] = useState(false);
@@ -55,6 +56,7 @@ export default function SuppliersPage() {
         ))}
       </select>
       <DataTable
+        restorable={canRestore}
         path="/suppliers"
         columns={columns}
         filter={status && `status=${status}`}

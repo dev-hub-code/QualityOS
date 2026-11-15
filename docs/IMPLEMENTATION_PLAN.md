@@ -104,8 +104,21 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | Lists show only active records, with no way to restore an archived one | When a user needs it |
 | Facility, supplier, material and product pickers load the first 100 records | Add search when a tenant exceeds this |
-| Manufacturing has its foundation, production plans, work orders up to started production, material reservation, issue and return, shop-floor execution of operations, quality gates and rework: no completion or finished-goods receipt yet. See [MANUFACTURING.md](MANUFACTURING.md) for what each later phase adds | Manufacturing phases 6 and 7 |
+| All seven manufacturing phases are built, through finished-goods receipt and OEE. Each phase's own limits are listed in [MANUFACTURING.md](MANUFACTURING.md) | Review after real use |
 | Facility sub-records (departments, lines, shifts), supplier contacts, material-to-product mappings, and new units are not audited individually | Review after real use |
+| Manufacturing sends no notifications and has no email templates. A work order, BOM, recipe, routing or rework order awaiting approval, a quality hold, a blocked operation and a machine breakdown are silent, where the equivalent quality events notify | Before customers run production |
+| No scheduled job watches production. A work order past its planned end date, or a plan line past its due date, raises no reminder | Before customers run production |
+| The dashboard, analytics overview and PDF and Excel reports hold no production figures. Production analytics, costing, downtime and the production record are pages only, with no export or printable version | When a user needs it |
+| Rejected and scrapped quantities on an operation raise no NCR and carry no defect category. Only inspection, audit, calibration and manual NCRs exist, so Pareto and scorecards never see production defects | Review after real use |
+| Instruments and machines are not linked, and an operation's measurements cannot name the instrument used, so a failed calibration's impact review does not reach shop-floor measurements | When a user needs it |
+| Global search does not cover work orders, rework orders or machines | When a user needs it |
+| The in-app documentation has no page or flow for manufacturing | Before customers run production |
+| Downtime's responsible department is typed as text, not chosen from the facility's departments. Departments are referenced by nothing outside facility set-up | When a user needs it |
+| An organisation's audit log can be read through the API with `AUDIT_LOG_VIEW`, but no page shows it. Only the Control Center has an audit log page | With the next admin work |
+| A supplier can be blocked or rejected through the API, but the supplier page offers only submit, approve and reinstate | When a user needs it |
+| A batch's correction history, a dispatch's reversal summary and a product's trace are served by the API and used by no page | Remove or use |
+| Archiving a product, material or facility checks nothing: a product with an approved BOM or open work order, a material on BOM lines or in reserved lots, and a facility with work centres can all be archived. Voiding a receipt, correcting a lot and archiving a work centre do check | Review after real use |
+| `DATABASE_SCHEMA.md`, `ARCHITECTURE.md` and `ANALYTICS.md` stop before the manufacturing migrations (V22 to V28) and do not describe the production module | With the next manufacturing change |
 
 ## Definition of done for each phase
 

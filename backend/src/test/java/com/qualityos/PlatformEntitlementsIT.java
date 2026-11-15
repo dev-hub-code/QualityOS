@@ -392,6 +392,27 @@ class PlatformEntitlementsIT extends MasterDataFixture {
         as(admin, get(PLATFORM + "/usage?alert=WRONG")).andExpect(status().isUnprocessableContent());
     }
 
+    @Test
+    void thoseWhoManageTheSubscriptionAreWarnedOnceNearALimitAndOnceOnIt() throws Exception {
+        String plan = planWith(owner, "max_facilities", 5);
+        for (int count = 0; count < 3; count++) {
+            facility(owner);
+        }
+        assertThat(limitWarnings()).isEmpty();
+        facility(owner);
+        assertThat(limitWarnings()).containsExactly("Near the Metered " + plan + " plan's facility limit");
+        facility(owner);
+        assertThat(limitWarnings()).containsExactly("The Metered " + plan + " plan's facility limit is reached",
+                "Near the Metered " + plan + " plan's facility limit");
+        String body = body(as(owner, get("/api/v1/notifications")));
+        assertThat(body).contains("5 of 5 facilities. Change plan to add more.", "/settings/billing");
+    }
+
+    private List<String> limitWarnings() throws Exception {
+        return JsonPath.read(body(as(owner, get("/api/v1/notifications"))),
+                "$.data.items[?(@.type == 'PLAN_LIMIT_WARNING')].title");
+    }
+
     private String nameOf(Session session) {
         return asDatabaseSuperuser().queryForObject(
                 "SELECT name FROM tenants WHERE id = ?", String.class, session.tenantId());

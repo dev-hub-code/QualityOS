@@ -55,8 +55,23 @@ public class NotificationService {
     public void notify(
             Set<UUID> recipients, NotificationType type, String title, String body, String link, EmailContent email) {
         Set<UUID> targets = new HashSet<>(recipients);
-        targets.remove(null);
         TenantContext.findCurrentUserId().ifPresent(targets::remove);
+        deliver(targets, type, title, body, link, email);
+    }
+
+    /**
+     * For a notice about the organisation rather than about someone's work, such as a plan limit, which the person
+     * whose action caused it must see too.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void notifyIncludingActor(Set<UUID> recipients, NotificationType type, String title, String body,
+            String link) {
+        deliver(new HashSet<>(recipients), type, title, body, link, null);
+    }
+
+    private void deliver(
+            Set<UUID> targets, NotificationType type, String title, String body, String link, EmailContent email) {
+        targets.remove(null);
         if (targets.isEmpty()) {
             return;
         }

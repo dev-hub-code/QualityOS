@@ -251,6 +251,10 @@ Reading `/api/v1/subscription` needs only membership. Everything else here needs
 | POST | `/api/v1/subscription/cancel`, `/resume` | Cancelling runs to the end of the period |
 | GET | `/api/v1/subscription/invoices`, `/invoices/{id}/pdf`, `/payments` | Billing history |
 
+Adding a user or facility, starting an inspection or storing an attachment that takes the organisation past 80% of a plan
+limit, or onto it, sends a `PLAN_LIMIT_WARNING` notification to holders of `SUBSCRIPTION_MANAGE`, the person who acted
+included, with a link to billing. Each threshold warns once as it is crossed.
+
 `GET /api/v1/public/plans` needs no sign-in. It serves the website's price list: plans on offer, without ids, tax or
 grace settings.
 

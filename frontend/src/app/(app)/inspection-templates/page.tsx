@@ -4,13 +4,7 @@ import { createColumnHelper } from "@tanstack/react-table";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { DataTable } from "@/components/records/data-table";
-import {
-  PageHeader,
-  RecordLink,
-  useMaterials,
-  useProducts,
-  useRefresh,
-} from "@/components/records/parts";
+import { PageHeader, RecordLink, useMaterials, useProducts, useRefresh } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
@@ -23,21 +17,15 @@ const columns = [
   column.accessor("code", {
     header: "Code",
     cell: (info) => (
-      <RecordLink href={`/inspection-templates/${info.row.original.id}`}>
-        {info.getValue()}
-      </RecordLink>
+      <RecordLink href={`/inspection-templates/${info.row.original.id}`}>{info.getValue()}</RecordLink>
     ),
   }),
   column.accessor("name", { header: "Name" }),
   column.accessor("inspectionType", { header: "Type" }),
-  column.accessor("appliesTo", {
-    header: "For",
-    cell: (info) => info.getValue() ?? "Any item",
-  }),
+  column.accessor("appliesTo", { header: "For", cell: (info) => info.getValue() ?? "Any item" }),
   column.accessor("publishedVersion", {
     header: "Published",
-    cell: (info) =>
-      info.getValue() ? `Version ${info.getValue()}` : "Not published",
+    cell: (info) => (info.getValue() ? `Version ${info.getValue()}` : "Not published"),
   }),
 ];
 
@@ -51,9 +39,7 @@ export default function InspectionTemplatesPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Inspection templates">
-        {canManage && (
-          <Button onClick={() => setAdding(true)}>Add template</Button>
-        )}
+        {canManage && <Button onClick={() => setAdding(true)}>Add template</Button>}
       </PageHeader>
       <DataTable
         restorable={canManage}
@@ -68,10 +54,7 @@ export default function InspectionTemplatesPage() {
           fields={templateFields(materials, products)}
           onClose={() => setAdding(false)}
           onSubmit={async (values) => {
-            const created = await api.post<TemplateDetail>(
-              "/inspection-templates",
-              values,
-            );
+            const created = await api.post<TemplateDetail>("/inspection-templates", values);
             await refresh();
             router.push(`/inspection-templates/${created.template.id}`);
           }}

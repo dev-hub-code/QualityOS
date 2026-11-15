@@ -492,8 +492,10 @@ class InspectionIT extends MasterDataFixture {
                 .andExpect(status().isUnprocessableContent());
     }
 
+    /** The inspection's own notices; the receipt that brought the lot is announced separately. */
     private void assertTitles(Session session, String... titles) throws Exception {
-        List<String> found = JsonPath.read(body(as(session, get("/api/v1/notifications"))), "$.data.items[*].title");
+        List<String> found = JsonPath.read(body(as(session, get("/api/v1/notifications"))),
+                "$.data.items[?(@.type != 'MATERIAL_AWAITING_INSPECTION')].title");
         assertThat(found).containsExactlyInAnyOrder(titles);
     }
 

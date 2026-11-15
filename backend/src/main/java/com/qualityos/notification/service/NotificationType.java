@@ -1,6 +1,7 @@
 package com.qualityos.notification.service;
 
 public enum NotificationType {
+    MATERIAL_AWAITING_INSPECTION,
     INSPECTION_AWAITING_APPROVAL,
     INSPECTION_CRITICAL_FAILURE,
     INSPECTION_SENT_BACK,

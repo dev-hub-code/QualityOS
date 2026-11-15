@@ -7,7 +7,12 @@ import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
+import com.qualityos.common.mail.EmailContent;
+import com.qualityos.common.mail.EmailTemplate;
 import com.qualityos.common.security.Permissions;
+import com.qualityos.identity.service.TenantAccessService;
+import com.qualityos.notification.service.NotificationService;
+import com.qualityos.notification.service.NotificationType;
 import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.material.dto.MaterialDtos.MaterialReference;
 import com.qualityos.material.service.MaterialService;
@@ -65,6 +70,8 @@ public class MaterialReceiptService implements AttachmentPolicy {
     private final DocumentNumberService numbers;
     private final AuditService audit;
     private final FacilityScope scope;
+    private final NotificationService notifications;
+    private final TenantAccessService access;
 
     private final EntityManager entityManager;
 
@@ -77,8 +84,12 @@ public class MaterialReceiptService implements AttachmentPolicy {
             DocumentNumberService numbers,
             AuditService audit,
             FacilityScope scope,
+            NotificationService notifications,
+            TenantAccessService access,
             EntityManager entityManager) {
         this.scope = scope;
+        this.notifications = notifications;
+        this.access = access;
         this.entityManager = entityManager;
         this.receipts = receipts;
         this.items = items;
@@ -139,7 +150,26 @@ public class MaterialReceiptService implements AttachmentPolicy {
         }
         receipts.saveAndFlush(receipt);
         audit.record("MATERIAL_RECEIVED", "MaterialReceipt", receipt.getId());
+        tellInspectors(receipt, referenced);
         return toDetail(receipt);
+    }
+
+    /** Lots that need inspection go to those who start inspections at that facility. */
+    private void tellInspectors(MaterialReceipt receipt, Map<UUID, MaterialReference> referenced) {
+        List<String> lots = receipt.getItems().stream().filter(MaterialReceiptItem::isInspectionRequired)
+                .map(item -> item.getInternalBatch() + " (" + referenced.get(item.getMaterialId()).code() + ")")
+                .toList();
+        if (lots.isEmpty()) {
+            return;
+        }
+        String supplier = suppliers.references(Set.of(receipt.getSupplierId())).values().stream().findFirst()
+                .map(SupplierReference::name).orElse("the supplier");
+        String list = String.join(", ", lots);
+        notifications.notify(scope.allowedIn(receipt.getFacilityId(), access.holdersOf(Permissions.INSPECTION_CREATE)),
+                NotificationType.MATERIAL_AWAITING_INSPECTION,
+                receipt.getGrnNumber() + ": " + lots.size() + " lot(s) to inspect", list, "/inspections",
+                new EmailContent(EmailTemplate.MATERIAL_RECEIVED, Map.of("receiptNumber", receipt.getGrnNumber(),
+                        "supplierName", supplier, "lots", list)));
     }
 
     /** Takes the quantities back off the order. Refused once an inspection exists. */

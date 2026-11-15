@@ -1,0 +1,8 @@
+Subject: Material to inspect: {{receiptNumber}}
+
+Material is waiting for inspection
+
+Hello {{recipientName}},
+{{receiptNumber}} from {{supplierName}} brought lots that must be inspected before use: {{lots}}
+
+Open the queue: {{actionUrl}}

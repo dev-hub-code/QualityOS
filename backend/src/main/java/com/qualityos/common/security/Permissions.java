@@ -69,6 +69,10 @@ public final class Permissions {
     public static final String QUALITY_CHECKPOINT_MANAGE = "QUALITY_CHECKPOINT_MANAGE";
     public static final String REWORK_MANAGE = "REWORK_MANAGE";
     public static final String REWORK_APPROVE = "REWORK_APPROVE";
+    public static final String BOM_APPROVE = "BOM_APPROVE";
+    public static final String RECIPE_APPROVE = "RECIPE_APPROVE";
+    public static final String ROUTING_APPROVE = "ROUTING_APPROVE";
+    public static final String PRODUCTION_PLAN_MANAGE = "PRODUCTION_PLAN_MANAGE";
 
     private Permissions() {
     }

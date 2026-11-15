@@ -22,6 +22,9 @@ public class ProductionPlanLine extends TenantOwnedEntity {
     private UUID productId;
     private BigDecimal quantity;
     private LocalDate dueDate;
+
+    /** When planners were last told this line is late. */
+    private java.time.Instant overdueNotifiedAt;
     private String notes;
 
     public ProductionPlanLine(UUID planId) {

@@ -26,7 +26,8 @@ class EmailRendererTest {
         Map<String, Object> values = new HashMap<>();
         for (String name : List.of("recipientName", "organizationName", "brandName", "inspectionNumber", "batchNumber",
                 "ncrNumber", "ncrTitle", "capaNumber", "capaTitle", "dueDate", "expiryMinutes", "lockMinutes",
-                "instrumentName", "auditNumber", "amount", "title", "body")) {
+                "instrumentName", "auditNumber", "amount", "title", "body", "recordNumber", "summary", "note",
+                "where", "reason")) {
             values.put(name, "value-" + name);
         }
         values.put("actionUrl", "https://app.example/path");

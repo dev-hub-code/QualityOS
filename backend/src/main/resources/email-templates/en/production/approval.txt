@@ -1,0 +1,8 @@
+Subject: {{recordNumber}} is waiting for your approval
+
+Production record waiting for approval
+
+Hello {{recipientName}},
+{{recordNumber}} was submitted and needs someone to approve it: {{summary}}.
+
+Open it: {{actionUrl}}

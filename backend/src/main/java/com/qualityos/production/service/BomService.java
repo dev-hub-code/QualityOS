@@ -1,6 +1,7 @@
 package com.qualityos.production.service;
 
 import com.qualityos.common.audit.AuditService;
+import com.qualityos.common.security.Permissions;
 import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
@@ -72,6 +73,7 @@ public class BomService {
     private final ManufacturingSettingsService settings;
     private final RevisionSupport support;
     private final AuditService audit;
+    private final ProductionAlerts alerts;
 
     BomService(
             BomRepository boms,
@@ -81,7 +83,9 @@ public class BomService {
             MaterialService materials,
             ManufacturingSettingsService settings,
             RevisionSupport support,
-            AuditService audit) {
+            AuditService audit,
+            ProductionAlerts alerts) {
+        this.alerts = alerts;
         this.boms = boms;
         this.lines = lines;
         this.parameters = parameters;
@@ -237,6 +241,8 @@ public class BomService {
         }
         support.submit(bom);
         audit.record(action(kind, "SUBMITTED"), entity(kind), id);
+        alerts.definitionSubmitted(bom, label(bom), kind == Bom.Kind.BOM ? Permissions.BOM_APPROVE
+                : Permissions.RECIPE_APPROVE, link(bom));
         return detail(bom);
     }
 
@@ -245,6 +251,7 @@ public class BomService {
         Bom bom = load(kind, id);
         bom.sendBack(request.note().trim());
         audit.record(action(kind, "SENT_BACK"), entity(kind), id, null, Map.of("note", request.note().trim()));
+        alerts.definitionSentBack(bom, label(bom), request.note().trim(), link(bom));
         return detail(bom);
     }
 
@@ -500,6 +507,16 @@ public class BomService {
         return lines.findById(lineId)
                 .filter(line -> line.getBomId().equals(bomId))
                 .orElseThrow(() -> new ResourceNotFoundException("Line", lineId));
+    }
+
+    /** How a notification names the revision, such as "BOM SH-1 revision 2". */
+    private String label(Bom bom) {
+        String code = products.references(List.of(bom.getProductId())).get(bom.getProductId()).code();
+        return (bom.getKind() == Bom.Kind.BOM ? "BOM " : "Recipe ") + code + " revision " + bom.getRevision();
+    }
+
+    private static String link(Bom bom) {
+        return (bom.getKind() == Bom.Kind.BOM ? "/manufacturing/boms/" : "/manufacturing/recipes/") + bom.getId();
     }
 
     private static String entity(Bom.Kind kind) {

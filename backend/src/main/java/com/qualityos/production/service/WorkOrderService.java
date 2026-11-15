@@ -109,6 +109,7 @@ public class WorkOrderService {
     private final ReviewPolicy reviewPolicy;
     private final DocumentNumberService numbers;
     private final AuditService audit;
+    private final ProductionAlerts alerts;
 
     WorkOrderService(
             WorkOrderRepository workOrders,
@@ -136,7 +137,9 @@ public class WorkOrderService {
             FacilityScope scope,
             ReviewPolicy reviewPolicy,
             DocumentNumberService numbers,
-            AuditService audit) {
+            AuditService audit,
+            ProductionAlerts alerts) {
+        this.alerts = alerts;
         this.workOrders = workOrders;
         this.requirements = requirements;
         this.steps = steps;
@@ -225,9 +228,11 @@ public class WorkOrderService {
     public WorkOrderDetail submit(UUID id) {
         WorkOrder order = load(id);
         WorkOrder.Status from = order.getStatus();
-        products.requireActive(order.getProductId());
+        String productCode = products.requireActive(order.getProductId()).code();
         order.submit(TenantContext.getCurrentUserId(), Instant.now());
-        return saved(order, from, null, "WORK_ORDER_SUBMITTED");
+        WorkOrderDetail detail = saved(order, from, null, "WORK_ORDER_SUBMITTED");
+        alerts.workOrderSubmitted(order, productCode);
+        return detail;
     }
 
     @Transactional
@@ -236,7 +241,9 @@ public class WorkOrderService {
         WorkOrder.Status from = order.getStatus();
         String note = request.note().trim();
         order.sendBack(note);
-        return saved(order, from, note, "WORK_ORDER_SENT_BACK");
+        WorkOrderDetail detail = saved(order, from, note, "WORK_ORDER_SENT_BACK");
+        alerts.workOrderSentBack(order, note);
+        return detail;
     }
 
     /** Under the organisation's rule, whoever submitted cannot approve, except as a recorded self-review. */

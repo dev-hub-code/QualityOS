@@ -1,0 +1,8 @@
+Subject: {{recordNumber}} is past its date
+
+Production is running late
+
+Hello {{recipientName}},
+{{recordNumber}} was due on {{dueDate}} and is not finished: {{summary}}.
+
+Open it: {{actionUrl}}

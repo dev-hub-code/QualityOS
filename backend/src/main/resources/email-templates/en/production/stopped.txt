@@ -1,0 +1,8 @@
+Subject: Production stopped: {{where}}
+
+Production has stopped
+
+Hello {{recipientName}},
+{{where}} has stopped. Reason: {{reason}}
+
+Open it: {{actionUrl}}

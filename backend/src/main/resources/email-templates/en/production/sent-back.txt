@@ -1,0 +1,8 @@
+Subject: {{recordNumber}} was sent back to you
+
+Sent back for changes
+
+Hello {{recipientName}},
+{{recordNumber}} was sent back to draft. The note says: {{note}}
+
+Open it: {{actionUrl}}

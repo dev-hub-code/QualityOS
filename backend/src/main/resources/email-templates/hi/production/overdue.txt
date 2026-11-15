@@ -1,0 +1,8 @@
+Subject: {{recordNumber}} की तारीख निकल गई
+
+उत्पादन में देरी
+
+नमस्ते {{recipientName}},
+{{recordNumber}} की तारीख {{dueDate}} थी और यह अभी पूरा नहीं हुआ: {{summary}}।
+
+खोलें: {{actionUrl}}

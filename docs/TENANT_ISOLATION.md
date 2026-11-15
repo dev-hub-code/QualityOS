@@ -46,7 +46,7 @@ layers, so that one mistake does not expose data.
 | Attachments | Stored under an opaque key. Downloads load the parent record first (so tenant and permission checks apply), then issue a short-lived presigned URL |
 | Reports and exports | Same services and RLS as the API, plus facility scoping |
 | Facility limits | `FacilityScope`, in the services: lists, reads, writes, attachments and alerts. A refused record answers 404. This narrows access inside an organisation, on top of the tenant layers. It is not enforced by RLS |
-| Logs and audit | `audit_logs` has RLS and the app role has only `INSERT` and `SELECT` on it |
+| Logs and audit | `audit_logs` has RLS and the app role has only `INSERT` and `SELECT` on it. Tenantless account events are readable by an organisation only for its own members, from the day each joined (`account_events_read`) |
 | Connection pooling | `app.tenant_id` is only set with local scope. If PgBouncer is added, it must run in transaction mode |
 
 ## Verification

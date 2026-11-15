@@ -29,7 +29,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * An organisation's own audit trail: what its members did, newest first. Row-level security limits every query to
- * the current tenant, so account-level events (verification, password reset), which have no tenant, never appear.
+ * the current tenant, plus its members' account-level events (verification, password reset, failed sign-ins) from the
+ * day they joined, which belong to no tenant.
  */
 @RestController
 @RequestMapping("/api/v1/audit-logs")

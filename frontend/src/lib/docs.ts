@@ -1146,7 +1146,7 @@ export const DOC_PAGES: DocPage[] = [
           "Each organisation is separated in the database itself, not only in the application.",
           "Your organisation comes from your signed-in session, never from anything a browser sends.",
           "Attachments are only reachable by someone allowed to see the record they belong to.",
-          "Critical actions are written to an audit log. It is read through the API, as there is no screen for it yet.",
+          "Critical actions are written to the audit log, with members' sign-in and password events from the day they joined.",
           "Ten failed sign-ins lock an account for 15 minutes, and a reset link unlocks it.",
           "Change your own password under Settings.",
         ],

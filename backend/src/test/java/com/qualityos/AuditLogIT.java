@@ -49,4 +49,27 @@ class AuditLogIT extends MasterDataFixture {
         Session viewer = addMember(owner, "VIEWER");
         as(viewer, get("/api/v1/audit-logs")).andExpect(status().isForbidden());
     }
+
+    @Test
+    void membersAccountEventsShowFromTheDayTheyJoined() throws Exception {
+        Session owner = register();
+        Session member = addMember(owner, "VIEWER");
+        Session elsewhere = register();
+        mvc.perform(postJson("/api/v1/auth/password-reset/request", java.util.Map.of("email", elsewhere.email())))
+                .andExpect(status().is2xxSuccessful());
+        addExistingAccount(owner, elsewhere, "VIEWER");
+        mvc.perform(postJson("/api/v1/auth/password-reset/request", java.util.Map.of("email", member.email())))
+                .andExpect(status().is2xxSuccessful());
+
+        // The member's request shows; the other account's, made before it joined, does not.
+        String page = body(as(owner, get("/api/v1/audit-logs").param("action", "PASSWORD_RESET_REQUESTED"))
+                .andExpect(status().isOk()));
+        assertThat(JsonPath.<List<String>>read(page, "$.data.items[*].entityId"))
+                .containsExactly(member.userId().toString());
+
+        // Another organisation the member does not belong to sees none of it.
+        Session stranger = register();
+        as(stranger, get("/api/v1/audit-logs").param("action", "PASSWORD_RESET_REQUESTED"))
+                .andExpect(jsonPath("$.data.totalItems").value(0));
+    }
 }

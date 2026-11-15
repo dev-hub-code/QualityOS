@@ -34,7 +34,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Someone can still deliberately lock out a known email (10 failures, 15 minutes), though the IP limit slows it down. A reset link unlocks the account | Review after real use |
 | The IP rate limit is held per backend instance, so several instances multiply it. Shared limits need Redis or the load balancer | With production work |
 | An expired sign-up is emptied after 30 days, not deleted, because its audit rows cannot be removed. Its suspended organisation row stays. With unverified login allowed, nothing is expired | By design |
-| Account-level audit events (verification, password reset) have no tenant, so the organisation's audit log page does not show them | With the next admin work |
 | Notifications are polled once a minute, with no live push. Only email and in-app channels exist | When a user needs it |
 | Hindi and Marathi email text was machine-drafted and needs review by a native speaker before customers see it | Before customer launch |
 | Some notifications have no dedicated template (NCR ready for closure, CAPA actions, verification, send-back, corrections). Their email has a translated frame around English text | When a user needs it |

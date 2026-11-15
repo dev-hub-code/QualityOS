@@ -278,6 +278,12 @@ released, running or held work order past its planned end, or a line of an appro
 then works under each tenant, in the organisation's own date, and skips a plan line once its work orders have received
 its full quantity into finished goods.
 
+## Account events in the audit log (V35)
+
+Account-level audit rows have no tenant. The `account_events_read` policy lets an organisation read such a row when it
+is about a `User` who is a member, the action is on a fixed list of account events, and it happened at or after the
+membership began. Every other tenantless row stays hidden.
+
 ## Organisation contact number (V34)
 
 `tenants.contact_phone` holds the number an organisation gives in its profile, checked by `ck_tenants_contact_phone`.

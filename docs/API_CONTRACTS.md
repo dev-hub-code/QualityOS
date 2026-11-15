@@ -133,7 +133,7 @@ unverified sign-in is off. Local Docker Compose enforces it too. Integration tes
 
 | Endpoint | Access | Result |
 |---|---|---|
-| `GET /audit-logs` | `AUDIT_LOG_VIEW` | The organisation's own entries, newest first, paged. Filters `q` (actor's name or email, target type or ID, correlation ID), `action`, `from` and `to` (days in the organisation's time zone, both included). Each entry has `actor` (null for the system), `action`, `entityType`, `entityId`, `occurredAt`, `reason`, `before`, `after`, `ipAddress`, `correlationId`. Account-level events have no tenant and never appear |
+| `GET /audit-logs` | `AUDIT_LOG_VIEW` | The organisation's own entries, newest first, paged. Filters `q` (actor's name or email, target type or ID, correlation ID), `action`, `from` and `to` (days in the organisation's time zone, both included). Each entry has `actor` (null for the system), `action`, `entityType`, `entityId`, `occurredAt`, `reason`, `before`, `after`, `ipAddress`, `correlationId`. Members' account-level events, which have no tenant (`EMAIL_VERIFICATION_SENT`, `EMAIL_VERIFIED`, `PASSWORD_RESET_REQUESTED`, `PASSWORD_RESET`, `PASSWORD_CHANGED`, `LOGIN_FAILED`, `USER_LOCKED`, `PENDING_VERIFICATION_LOGIN`, `EMAIL_LANGUAGE_CHANGED`), appear from the day each member joined |
 
 ## Organisation settings
 

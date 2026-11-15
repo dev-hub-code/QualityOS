@@ -204,6 +204,64 @@ export const DOC_FLOWS: Record<string, Flow> = {
       { label: "Released", note: "It can now be dispatched." },
     ],
   },
+  "manufacturing-setup": {
+    title: "Getting a definition approved",
+    steps: [
+      { label: "Draft", note: "Add lines or operations. Only a draft can change." },
+      { label: "Submit", note: "Approvers are notified." },
+      {
+        label: "Approver's decision",
+        branches: [{ when: "Send back", then: "Returns to draft with a note, and the submitter is notified." }],
+      },
+      { label: "Approved", note: "Takes effect on its date. The revision before it ends the day before." },
+      { label: "Retired", note: "Obsolete. A newer revision, or none, is used from then on." },
+    ],
+  },
+  "work-orders": {
+    title: "Work order life cycle",
+    steps: [
+      { label: "Draft", note: "Raised by hand or from a line of an approved plan." },
+      {
+        label: "Submitted",
+        branches: [{ when: "Sent back", then: "Draft again, with the approver's note." }],
+      },
+      { label: "Approved" },
+      { label: "Released", note: "The BOM or recipe and routing are frozen. Material can be reserved." },
+      { label: "In progress", note: "The production batch opens. Material is issued to it." },
+      {
+        label: "Finished goods received",
+        branches: [{ when: "Short beyond the tolerance, or the batch rejected", then: "Partially completed, with a reason." }],
+      },
+      { label: "Completed" },
+    ],
+  },
+  "shop-floor": {
+    title: "An operation on the floor",
+    steps: [
+      { label: "Ready", note: "Its turn has come, and its start gates have passed." },
+      { label: "In progress", note: "On a machine at its work centre." },
+      {
+        label: "Report output",
+        note: "Good, rejected and scrap.",
+        branches: [
+          { when: "Rejected goods to rework", then: "A rework order, approved, then reinspected." },
+          { when: "A stop", then: "Paused or blocked with a reason. A downtime record opens until it resumes." },
+          { when: "Quality hold", then: "Everything pauses until the batch is reinspected." },
+        ],
+      },
+      { label: "Completed", note: "Its completion gates must have passed. The next operation becomes ready." },
+    ],
+  },
+  "production-completion": {
+    title: "From last operation to closed order",
+    steps: [
+      { label: "Every operation done", note: "And no rework open." },
+      { label: "Receive finished goods", note: "Completes the batch, and releases reservations." },
+      { label: "Final inspection", note: "Decides whether the batch is released or rejected." },
+      { label: "Close the order", note: "Completed, or partially completed with a reason." },
+      { label: "Cost and OEE", note: "Appear in Production analytics." },
+    ],
+  },
   "dispatches-and-returns": {
     title: "Shipping, and what comes back",
     steps: [

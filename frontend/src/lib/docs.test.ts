@@ -40,5 +40,7 @@ describe("documentation", () => {
 
 function permissions() {
   return ["SUPPLIER", "PRODUCT", "PURCHASE", "INSPECTION", "TEMPLATE", "NCR", "CAPA", "TRACEABILITY", "RECALL",
-    "CALIBRATION", "AUDIT", "REPORT", "FACILITY"].map((name) => `${name}_VIEW`);
+    "CALIBRATION", "AUDIT", "REPORT", "FACILITY", "MANUFACTURING", "WORK_ORDER", "PRODUCTION_ANALYTICS"]
+    .map((name) => `${name}_VIEW`)
+    .concat("PRODUCTION_EXECUTE");
 }

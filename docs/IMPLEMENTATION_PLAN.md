@@ -109,7 +109,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | The dashboard, analytics overview and PDF and Excel reports hold no production figures. Production analytics, costing, downtime and the production record are pages only, with no export or printable version | When a user needs it |
 | Rejected and scrapped quantities on an operation raise no NCR and carry no defect category. Only inspection, audit, calibration and manual NCRs exist, so Pareto and scorecards never see production defects | Review after real use |
 | Instruments and machines are not linked, and an operation's measurements cannot name the instrument used, so a failed calibration's impact review does not reach shop-floor measurements | When a user needs it |
-| The in-app documentation has no page or flow for manufacturing | Before customers run production |
 | `DATABASE_SCHEMA.md`, `ARCHITECTURE.md` and `ANALYTICS.md` stop before the manufacturing migrations (V22 to V28) and do not describe the production module | With the next manufacturing change |
 
 ## Definition of done for each phase

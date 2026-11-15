@@ -498,6 +498,198 @@ export const DOC_PAGES: DocPage[] = [
     },
   },
   {
+    slug: "manufacturing-setup",
+    group: "Manufacturing",
+    title: "Work centres and definitions",
+    summary: "Describe where work happens and how each product is made, then get each definition approved.",
+    menu: "Work centres, Machines, BOMs, Recipes, Routings, Configuration",
+    roles: "Production Manager, Quality Manager",
+    plan: PROFESSIONAL,
+    sections: [
+      {
+        title: "What you set up",
+        terms: [
+          ["Work centre", "A place in a facility where operations run, such as a turning cell. It can carry labour, machine and overhead rates per hour."],
+          ["Machine", "Equipment at a work centre. Its status is AVAILABLE, RUNNING, IDLE, MAINTENANCE, BREAKDOWN or INACTIVE, and every change is kept."],
+          ["BOM", "The materials and sub-assemblies that make one or more units of a discrete product, with scrap allowances."],
+          ["Recipe", "A BOM for a process product: a base batch size, lines that scale or stay fixed, and process parameters."],
+          ["Routing", "The numbered operations that make the product, each at a work centre with setup and run times and its own parameters."],
+        ],
+      },
+      {
+        title: "Revisions",
+        list: [
+          "BOMs, recipes and routings are revisioned. Each revision goes Draft, Submitted, Approved, and later Obsolete.",
+          "Only a draft can be changed. A submitted revision can be sent back with a note, and returns to draft.",
+          "Approval sets the date the revision takes effect. The revision it replaces ends the day before.",
+          "Under the separate approver rule, the person who submitted cannot approve, except as a recorded self-review.",
+          "A product cannot use itself, at any depth. The check runs when a line is added and again on approval.",
+        ],
+      },
+      {
+        title: "Good to know",
+        list: [
+          "Approvers are notified when a revision is submitted, and the submitter when it is sent back.",
+          "Configuration sets the manufacturing model, discrete, process or both, and whether work orders need a BOM or routing.",
+          "A work centre cannot be archived while any of its machines is not inactive.",
+          "A product or material with an approved definition in effect cannot be archived. Retire the revision first.",
+        ],
+      },
+    ],
+    example: {
+      title: "Defining how a shaft is made",
+      steps: [
+        { who: "Arjun, Production Manager", action: "Adds work centre WC-TURN at Pune Plant, with lathe M-01.", result: "Turning can now be scheduled and costed." },
+        { who: "Arjun, Production Manager", action: "Drafts BOM revision 1 for Drive Shaft, with 1.05 kg of EN8 bar, and submits it.", result: "Meera is notified that it needs approval." },
+        { who: "Meera, Quality Manager", action: "Approves the BOM with today's date. Arjun drafts the routing, turn then grind, and Meera approves that too.", result: "Work orders for Drive Shaft can now be released." },
+      ],
+    },
+  },
+  {
+    slug: "work-orders",
+    group: "Manufacturing",
+    title: "Plans and work orders",
+    summary: "Plan what to make, raise work orders, set material aside, and check the load on each work centre.",
+    menu: "Production plans, Work orders, Scheduling",
+    roles: "Production Planner, Production Manager",
+    plan: PROFESSIONAL,
+    sections: [
+      {
+        title: "Work order status",
+        terms: [
+          ["Draft", "Being prepared. The only status in which the order can be edited."],
+          ["Submitted", "Waiting for approval. It can be sent back to draft with a note."],
+          ["Approved", "Agreed, but nothing is frozen yet."],
+          ["Released", "The BOM or recipe and routing in effect on the planned start are frozen onto the order, as its materials and operations."],
+          ["In progress", "Started. Its production batch is open, so consumption and traceability work as for any batch."],
+          ["On hold", "Stopped with a reason. Resuming returns it to where it was."],
+          ["Completed", "Finished goods were received and the order was closed."],
+          ["Partially completed", "Closed short, or with the batch rejected, and a reason recorded."],
+          ["Cancelled", "Stopped for good, with a reason. Its reservations are released."],
+        ],
+      },
+      {
+        title: "Plans and materials",
+        list: [
+          "A production plan covers one facility and a period, with products, quantities and due dates. Work orders are raised from the lines of an approved plan.",
+          "After release, the order lists what it needs and what is short. Released lots can be reserved by hand, or the oldest free lots reserved at once.",
+          "Issuing material records consumption on the order's batch. Reservations are used first.",
+          "Scheduling shows each work centre's load against its shift capacity, and warns about late orders and overloaded days. The planner decides what to move.",
+        ],
+      },
+      {
+        title: "Good to know",
+        list: [
+          "Approvers are notified when an order is submitted. The submitter hears if it is sent back.",
+          "People who manage work orders are reminded of an order past its planned end, and planners of a plan line past its due date with less made than planned. The reminder repeats weekly until the work is done.",
+          "Rescheduling needs a reason, and is recorded.",
+        ],
+      },
+    ],
+    example: {
+      title: "Making 200 shafts next week",
+      steps: [
+        { who: "Kavya, Production Planner", action: "Plans 200 Drive Shafts at Pune Plant, due Friday. Arjun approves the plan.", result: "Work orders can be raised from the plan line." },
+        { who: "Kavya, Production Planner", action: "Raises WO-2026-00014 for 200 from the line, and submits it.", result: "Arjun is notified that it needs approval." },
+        { who: "Arjun, Production Manager", action: "Approves and releases the order, then reserves what is free.", result: "The BOM and routing are frozen onto the order, and 210 kg of bar is set aside." },
+        { who: "Arjun, Production Manager", action: "Starts the order.", result: "Batch PB-2026-00031 opens, and the first operation is ready on the shop floor." },
+      ],
+    },
+  },
+  {
+    slug: "shop-floor",
+    group: "Manufacturing",
+    title: "Shop floor, quality and downtime",
+    summary: "Run operations, report output, hold for quality, rework what failed, and record every stop.",
+    menu: "Shop floor, Quality checkpoints, Rework orders, Downtime",
+    roles: "Production Operator, Production Manager, Quality Manager",
+    plan: PROFESSIONAL,
+    sections: [
+      {
+        title: "Operation status",
+        terms: [
+          ["Pending", "Waiting for the operations before it."],
+          ["Ready", "Its turn has come. An operator can start it."],
+          ["In progress", "Running, on a machine at its work centre where one is needed."],
+          ["Paused", "Stopped with a reason, such as a breakdown or a material shortage."],
+          ["Blocked", "Stopped by a supervisor. Unblocking returns it to where it was."],
+          ["Completed", "Done. Completing with less than came in needs a reason."],
+          ["Cancelled", "Skipped by a supervisor, before anyone reported on it."],
+        ],
+      },
+      {
+        title: "Reporting and quality",
+        list: [
+          "Each report gives the quantity processed and its split into good, rejected and scrap. Reports add up.",
+          "An operation can process only what came through good from the one before it.",
+          "Reports are never edited. A supervisor reverses one with a reason.",
+          "Quality checkpoints turn into gates on release. A mandatory gate stops the operation from starting or completing until its inspection passes.",
+          "A quality hold pauses everything running and holds the batch until it is reinspected.",
+          "Rework orders rework rejected goods on the same batch, and close on the reinspection's decision.",
+        ],
+      },
+      {
+        title: "Downtime",
+        list: [
+          "Pausing or blocking with a reason opens a stop on the operation and machine. Resuming ends it.",
+          "Setting a machine to breakdown or maintenance opens a stop too, and supervisors are notified of a breakdown.",
+          "Stops can also be entered by hand. Only planned maintenance may be entered ahead of time.",
+          "Each stop can name the department responsible, chosen from the facility's departments.",
+          "The summary shows minutes lost by machine, work centre, line, facility, category or department.",
+        ],
+      },
+    ],
+    example: {
+      title: "A stop and a hold on WO-2026-00014",
+      steps: [
+        { who: "Suresh, Production Operator", action: "Starts operation 10 on lathe M-01 and reports 120 processed: 116 good, 4 rejected.", result: "Operation 20 can take the 116 good shafts." },
+        { who: "Suresh, Production Operator", action: "Pauses with Machine breakdown: spindle seized.", result: "M-01 goes to Breakdown, a stop opens, and Arjun is notified." },
+        { who: "Meera, Quality Manager", action: "Puts the order on quality hold: suspect gauge.", result: "Everything running pauses, and the batch is on hold until an in-process reinspection." },
+        { who: "Dev, Quality Engineer", action: "Raises a rework order for the 4 rejected, which Meera approves.", result: "Approvers are notified, and the rework closes when its reinspection passes." },
+      ],
+    },
+  },
+  {
+    slug: "production-completion",
+    group: "Manufacturing",
+    title: "Completion, cost and OEE",
+    summary: "Receive finished goods, close the order, and see what it cost and how well the plant ran.",
+    menu: "Work orders, Production analytics",
+    roles: "Production Manager, Production Planner",
+    plan: PROFESSIONAL,
+    sections: [
+      {
+        title: "Finishing an order",
+        list: [
+          "Receiving finished goods completes the batch. Every operation must be done, every mandatory gate except final release passed, and no rework open.",
+          "The quantity comes from the last operation's good output. Below the order quantity less the tolerance, a reason is needed.",
+          "Material used is compared with what the output needed. A line off by more than the allowed variance needs a reason.",
+          "Closing needs the receipt and, by default, the batch's final inspection decided.",
+          "A completed order cannot be changed. Quantities on its batch are corrected through material corrections and returns.",
+        ],
+      },
+      {
+        title: "Figures",
+        terms: [
+          ["Cost", "Material from purchase prices, and labour, machine and overhead from work centre rates. A missing price is listed, never guessed."],
+          ["Availability", "Running time divided by planned production time."],
+          ["Performance", "Ideal cycle time for what was reported, divided by running time."],
+          ["Quality", "Good units divided by units reported."],
+          ["OEE", "Availability × performance × quality."],
+          ["Not known", "Shown when a figure cannot be worked out, such as with no shifts set. It is never shown as zero."],
+        ],
+      },
+    ],
+    example: {
+      title: "Closing WO-2026-00014",
+      steps: [
+        { who: "Arjun, Production Manager", action: "Receives 196 shafts, with the reason 4 rejected at turning.", result: "The batch is completed, and its reservations are released." },
+        { who: "Ravi, Inspector", action: "Runs the final inspection. Meera records Accept.", result: "The batch is released for dispatch." },
+        { who: "Arjun, Production Manager", action: "Closes the order.", result: "It is Completed. Its cost and OEE appear in Production analytics." },
+      ],
+    },
+  },
+  {
     slug: "dispatches-and-returns",
     group: "Production and dispatch",
     title: "Dispatches and returns",

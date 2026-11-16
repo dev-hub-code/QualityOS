@@ -27,12 +27,13 @@ const OPEN_FIELDS: FieldDef[] = [
   { name: "note", label: "First internal note", type: "textarea", required: true },
 ];
 const NOTE_FIELDS: FieldDef[] = [{ name: "body", label: "Internal note", type: "textarea", required: true }];
+const REPLY_FIELDS: FieldDef[] = [{ name: "body", label: "Reply to the customer", type: "textarea", required: true }];
 const time = (value: string) => new Date(value).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
 function TicketDialog({ ticket, onClose }: { ticket: SupportTicket; onClose: () => void }) {
   const refresh = useRefresh();
   const manage = usePermission("PLATFORM_CUSTOMER_MANAGE");
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<"note" | "reply" | null>(null);
   const [failure, setFailure] = useState("");
   const path = `/platform/support/tickets/${ticket.id}`;
   const { data, error } = useQuery({ queryKey: [`${path}/notes`], queryFn: () => api.get<TicketNote[]>(`${path}/notes`) });
@@ -43,7 +44,12 @@ function TicketDialog({ ticket, onClose }: { ticket: SupportTicket; onClose: () 
         <DialogHeader>
           <DialogTitle>{ticket.subject}</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground">{ticket.organisation}. Notes are private to operators.</p>
+        <p className="text-sm text-muted-foreground">
+          {ticket.organisation}.{" "}
+          {ticket.raisedByCustomer
+            ? "Raised by the customer. They see their own messages and your replies, never your internal notes."
+            : "Opened by support. Notes are private to operators."}
+        </p>
         {manage && !closed && (
           <div className="space-y-1.5">
             <Label htmlFor="ticket-status">Status</Label>
@@ -73,20 +79,28 @@ function TicketDialog({ ticket, onClose }: { ticket: SupportTicket; onClose: () 
           <ul className="max-h-72 space-y-3 overflow-auto">
             {data.map((note) => (
               <li key={note.id} className="rounded-md border p-2 text-sm">
-                <p className="text-muted-foreground">{note.author}, {time(note.createdAt)}</p>
+                <p className="text-muted-foreground">
+                  {note.author}, {time(note.createdAt)}
+                  {ticket.raisedByCustomer && (note.shared ? " · seen by the customer" : " · internal")}
+                </p>
                 <p className="whitespace-pre-wrap">{note.body}</p>
               </li>
             ))}
           </ul>
         )}
-        {manage && !closed && <Button variant="outline" onClick={() => setAdding(true)}>Add note</Button>}
+        {manage && !closed && (
+          <div className="flex flex-wrap gap-2">
+            {ticket.raisedByCustomer && <Button onClick={() => setAdding("reply")}>Reply to customer</Button>}
+            <Button variant="outline" onClick={() => setAdding("note")}>Add note</Button>
+          </div>
+        )}
         {adding && (
           <RecordDialog
-            title="Add internal note"
-            fields={NOTE_FIELDS}
-            onClose={() => setAdding(false)}
+            title={adding === "reply" ? "Reply to the customer" : "Add internal note"}
+            fields={adding === "reply" ? REPLY_FIELDS : NOTE_FIELDS}
+            onClose={() => setAdding(null)}
             onSubmit={async (values) => {
-              await api.post(`${path}/notes`, values);
+              await api.post(`${path}/notes`, { ...values, toCustomer: adding === "reply" });
               await refresh();
             }}
           />
@@ -121,7 +135,10 @@ function Tickets({ tenantId, status, onView }: { tenantId?: string; status?: str
         <TableBody>
           {data.items.map((ticket) => (
             <TableRow key={ticket.id}>
-              <TableCell className="max-w-64 truncate font-medium">{ticket.subject}</TableCell>
+              <TableCell className="max-w-64 truncate font-medium">
+                {ticket.subject}
+                {ticket.raisedByCustomer && <span className="ml-2 text-xs text-muted-foreground">from customer</span>}
+              </TableCell>
               <TableCell className="max-w-48 truncate">{ticket.organisation}</TableCell>
               <TableCell><StatusBadge status={ticket.status} /></TableCell>
               <TableCell className="whitespace-nowrap">{time(ticket.updatedAt)}</TableCell>
@@ -211,7 +228,7 @@ export default function PlatformSupportPage() {
     <div className="space-y-6">
       <PageHeader
         title="Support console"
-        subtitle="Account and billing facts only. Support cannot open a customer's quality records, and tickets and notes are never shown to customers."
+        subtitle="Account and billing facts only. Support cannot open a customer's quality records. Customers see the requests they raised and your replies, never internal notes or tickets you open."
       />
       <div className="max-w-md space-y-1.5">
         <Label htmlFor="support-search">Find an organisation</Label>

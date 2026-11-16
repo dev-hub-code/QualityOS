@@ -1600,6 +1600,7 @@ export interface SupportTicket {
   subject: string;
   status: string;
   openedBy: string;
+  raisedByCustomer: boolean;
   createdAt: string;
   updatedAt: string;
   version: number;
@@ -1613,6 +1614,25 @@ export interface SupportTicketList {
 export interface TicketNote {
   id: string;
   author: string;
+  body: string;
+  shared: boolean;
+  createdAt: string;
+}
+
+/** A support request raised by the signed-in organisation. */
+export interface CustomerTicket {
+  id: string;
+  subject: string;
+  status: string;
+  openedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SupportMessage {
+  id: string;
+  author: string;
+  fromSupport: boolean;
   body: string;
   createdAt: string;
 }

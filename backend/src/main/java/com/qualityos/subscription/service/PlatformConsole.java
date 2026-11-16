@@ -4,6 +4,12 @@ import com.qualityos.common.audit.AuditService;
 import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
+import com.qualityos.common.mail.EmailContent;
+import com.qualityos.common.mail.EmailTemplate;
+import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.identity.service.TenantAccessService;
+import com.qualityos.notification.service.NotificationService;
+import com.qualityos.notification.service.NotificationType;
 import com.qualityos.subscription.dto.PlatformConsoleDtos.AddNoteRequest;
 import com.qualityos.subscription.dto.PlatformConsoleDtos.Announcement;
 import com.qualityos.subscription.dto.PlatformConsoleDtos.CustomerAnnouncement;
@@ -22,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -47,16 +54,22 @@ public class PlatformConsole {
     private final JdbcTemplate jdbc;
     private final AuditService audit;
     private final PlatformStepUp stepUp;
+    private final NotificationService notifications;
+    private final TenantAccessService access;
     private final TransactionTemplate tx;
 
     PlatformConsole(
             JdbcTemplate jdbc,
             AuditService audit,
             PlatformStepUp stepUp,
+            NotificationService notifications,
+            TenantAccessService access,
             PlatformTransactionManager transactionManager) {
         this.jdbc = jdbc;
         this.audit = audit;
         this.stepUp = stepUp;
+        this.notifications = notifications;
+        this.access = access;
         this.tx = new TransactionTemplate(transactionManager);
     }
 
@@ -144,7 +157,8 @@ public class PlatformConsole {
                     total.add(result.getLong("total"));
                     return new Ticket(result.getObject("id", UUID.class), result.getObject("tenant_id", UUID.class),
                             result.getString("organisation"), result.getString("subject"), result.getString("status"),
-                            result.getString("opened_by"), result.getTimestamp("created_at").toInstant(),
+                            result.getString("opened_by"), result.getBoolean("raised_by_customer"),
+                            result.getTimestamp("created_at").toInstant(),
                             result.getTimestamp("updated_at").toInstant(), result.getLong("version"));
                 }, tenant, text(state), size, page * size));
         return new TicketList(total.isEmpty() ? 0 : total.getFirst().intValue(), rows);
@@ -167,14 +181,43 @@ public class PlatformConsole {
                     request.version()), ticket);
             audit.record("TICKET_STATUS_CHANGED", "SupportTicket", ticket, null, Map.of("status", request.status()));
         });
+        tellCustomer(ticket, "Its status is now " + request.status().toLowerCase().replace('_', ' ') + ".");
     }
 
     public void addNote(UUID ticket, AddNoteRequest request) {
         tx.executeWithoutResult(status -> {
-            refuse(jdbc.queryForObject("SELECT platform_support_note(?, ?)", String.class, ticket, request.body().trim()),
-                    ticket);
-            audit.record("TICKET_NOTE_ADDED", "SupportTicket", ticket);
+            refuse(jdbc.queryForObject("SELECT platform_support_note(?, ?, ?)", String.class, ticket,
+                    request.body().trim(), request.shared()), ticket);
+            audit.record("TICKET_NOTE_ADDED", "SupportTicket", ticket, null, Map.of("toCustomer", request.shared()));
         });
+        if (request.shared()) {
+            tellCustomer(ticket, "Support replied.");
+        }
+    }
+
+    /**
+     * Tells whoever raised a customer ticket that something changed, in the app and by email. The message names no
+     * operator and repeats nothing from the notes, so it says only that there is something to read.
+     */
+    private void tellCustomer(UUID ticket, String update) {
+        record Contact(UUID tenantId, UUID openedBy, String subject) {
+        }
+        List<Contact> found = tx.execute(status -> jdbc.query(
+                "SELECT * FROM platform_support_ticket_contact(?) WHERE raised_by_customer", (rows, row) -> new Contact(
+                        rows.getObject("tenant_id", UUID.class), rows.getObject("opened_by", UUID.class),
+                        rows.getString("subject")), ticket));
+        if (found == null || found.isEmpty()) {
+            return;
+        }
+        Contact contact = found.getFirst();
+        TenantContext.runAs(contact.tenantId(), null, () -> tx.executeWithoutResult(status -> {
+            if (access.activeMemberIds().contains(contact.openedBy())) {
+                notifications.notifyIncludingActor(Set.of(contact.openedBy()), NotificationType.SUPPORT_TICKET_UPDATED,
+                        "Your support request: " + contact.subject(), update, "/support/" + ticket,
+                        new EmailContent(EmailTemplate.SUPPORT_UPDATE, Map.of("subject", contact.subject(),
+                                "update", update)));
+            }
+        }));
     }
 
     private static void refuse(String outcome, UUID ticket) {
@@ -182,6 +225,8 @@ public class PlatformConsole {
             case "NOT_FOUND" -> throw new ResourceNotFoundException("Ticket", ticket.toString());
             case "CLOSED" -> throw new BusinessRuleException("This ticket is closed. Open a new one instead.");
             case "STALE" -> throw new ConflictException(MOVED_ON);
+            case "INTERNAL" -> throw new BusinessRuleException(
+                    "Support opened this ticket, so the customer cannot see it. Add an internal note instead.");
             default -> { }
         }
     }
@@ -189,7 +234,7 @@ public class PlatformConsole {
     public List<TicketNote> notes(UUID ticket) {
         return tx.execute(status -> jdbc.query("SELECT * FROM platform_support_notes(?)", (rows, row) -> new TicketNote(
                 rows.getObject("id", UUID.class), rows.getString("author"), rows.getString("body"),
-                rows.getTimestamp("created_at").toInstant()), ticket));
+                rows.getBoolean("shared"), rows.getTimestamp("created_at").toInstant()), ticket));
     }
 
     public List<SupportError> errors(UUID tenant) {

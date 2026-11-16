@@ -335,6 +335,9 @@ may be sent again after `POST /reauthenticate`.
 | Method and path | Also needs | Purpose |
 |---|---|---|
 | `GET /api/v1/platform-notices` | Any member, not `PLATFORM_ADMIN` | Maintenance state, support email and today's announcements |
+| `GET`, `POST /api/v1/support/tickets` | Any member | The caller's own requests, or all of the organisation's with `TENANT_MANAGE`. `POST` takes `subject`, `message` and returns `id` |
+| `GET /api/v1/support/tickets/{id}`, `GET .../{id}/messages` | Any member who can see it | The request, and its messages and support's replies. Internal notes never appear. Unknown or someone else's is `404` |
+| `POST /api/v1/support/tickets/{id}/replies` | Any member who can see it | `body`. Reopens a ticket that was waiting for the customer or resolved. A closed one is `422` |
 | `GET /api/v1/platform/settings` | | Read settings |
 | `PUT /api/v1/platform/settings` | `PLATFORM_SETTINGS_MANAGE`, password | Save, with `version` and `reason` |
 | `GET /api/v1/platform/announcements` | | List |
@@ -342,7 +345,7 @@ may be sent again after `POST /reauthenticate`.
 | `GET /api/v1/platform/support/tickets` | | Filter by `tenantId`, `status` |
 | `POST /api/v1/platform/support/tickets` | `PLATFORM_CUSTOMER_MANAGE` | Open with `tenantId`, `subject`, `note` |
 | `PUT /api/v1/platform/support/tickets/{id}/status` | `PLATFORM_CUSTOMER_MANAGE` | Change status, with `version` |
-| `GET`, `POST /api/v1/platform/support/tickets/{id}/notes` | `POST` needs `PLATFORM_CUSTOMER_MANAGE` | Read or add notes |
+| `GET`, `POST /api/v1/platform/support/tickets/{id}/notes` | `POST` needs `PLATFORM_CUSTOMER_MANAGE` | Read or add notes. `toCustomer: true` sends a reply the customer sees, only on a ticket they raised (`422` otherwise). Notes show `shared` |
 | `GET /api/v1/platform/support/organisations/{tenantId}/errors` | | Failed emails in the last 30 days |
 
 ## Recall hold on dispatch

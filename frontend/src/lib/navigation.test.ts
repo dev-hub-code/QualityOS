@@ -59,20 +59,20 @@ describe("leavesWorkspace", () => {
 
 describe("visibleNavItems", () => {
   it("hides administration from users without permissions", () => {
-    expect(labels([])).toEqual(["Dashboard", "Settings", "Documentation"]);
+    expect(labels([])).toEqual(["Dashboard", "Settings", "Support", "Documentation"]);
   });
 
   it("shows master data by module permission", () => {
-    expect(labels(["PURCHASE_VIEW"])).toEqual(["Dashboard", "Purchase orders", "Receipts", "Settings", "Documentation"]);
+    expect(labels(["PURCHASE_VIEW"])).toEqual(["Dashboard", "Purchase orders", "Receipts", "Settings", "Support", "Documentation"]);
   });
 
   it("shows items for any matching permission", () => {
-    expect(labels(["USER_MANAGE"])).toEqual(["Dashboard", "Users", "Roles", "Settings", "Documentation"]);
-    expect(labels(["ROLE_MANAGE"])).toEqual(["Dashboard", "Roles", "Settings", "Documentation"]);
+    expect(labels(["USER_MANAGE"])).toEqual(["Dashboard", "Users", "Roles", "Settings", "Support", "Documentation"]);
+    expect(labels(["ROLE_MANAGE"])).toEqual(["Dashboard", "Roles", "Settings", "Support", "Documentation"]);
   });
 
   it("shows the audit log to those allowed to read it", () => {
-    expect(labels(["AUDIT_LOG_VIEW"])).toEqual(["Dashboard", "Audit log", "Settings", "Documentation"]);
+    expect(labels(["AUDIT_LOG_VIEW"])).toEqual(["Dashboard", "Audit log", "Settings", "Support", "Documentation"]);
   });
 });
 

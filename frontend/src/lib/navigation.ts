@@ -120,6 +120,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Audit log", href: "/audit-log", icon: ScrollText, anyPermission: ["AUDIT_LOG_VIEW"] },
   { label: "Billing", href: "/settings/billing", icon: CreditCard, anyPermission: ["SUBSCRIPTION_MANAGE"] },
   { label: "Settings", href: "/settings", icon: Settings },
+  { label: "Support", href: "/support", icon: LifeBuoy },
   { label: "Documentation", href: "/docs", icon: BookOpen },
   { label: "Control Center", href: "/platform/dashboard", icon: ShieldEllipsis, anyPermission: ["PLATFORM_ADMIN"] },
 ];

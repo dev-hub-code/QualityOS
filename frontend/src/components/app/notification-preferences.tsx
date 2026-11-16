@@ -44,6 +44,7 @@ const LABELS: Record<string, string> = {
   MACHINE_BREAKDOWN: "A machine breaks down",
   WORK_ORDER_OVERDUE: "A work order is past its planned end",
   PLAN_LINE_OVERDUE: "A production plan line is past its due date",
+  ANNOUNCEMENT: "ProductionOS sends an announcement",
 };
 const PATH = "/notifications/preferences";
 

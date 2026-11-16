@@ -39,6 +39,7 @@ const FIELDS: FieldDef[] = [
   { name: "startsOn", label: "Start date", type: "date", required: true },
   { name: "endsOn", label: "End date", type: "date", required: true },
   { name: "active", label: "Active", type: "checkbox" },
+  { name: "email", label: "Also email every member it reaches, once, when it starts", type: "checkbox" },
   REASON_FIELD,
 ];
 
@@ -50,7 +51,7 @@ export default function PlatformAnnouncementsPage() {
   const today = new Date().toLocaleDateString("en-CA");
   return (
     <div className="space-y-6">
-      <PageHeader title="Announcements" subtitle="Shown as a banner to signed-in customers between the two dates, in Indian Standard Time. No email is sent.">
+      <PageHeader title="Announcements" subtitle="Shown as a banner to signed-in customers between the two dates, in Indian Standard Time. You can also email it.">
         {manage && <Button onClick={() => setEditing("new")}>New announcement</Button>}
       </PageHeader>
       {!data ? (
@@ -77,7 +78,10 @@ export default function PlatformAnnouncementsPage() {
                   <TableCell><StatusBadge status={item.severity} /></TableCell>
                   <TableCell>{AUDIENCE[item.audience]}</TableCell>
                   <TableCell className="whitespace-nowrap">{formatDate(item.startsOn)} to {formatDate(item.endsOn)}</TableCell>
-                  <TableCell>{item.active ? "Active" : "Inactive"}</TableCell>
+                  <TableCell>
+                    {item.active ? "Active" : "Inactive"}
+                    {item.email && " · emailed"}
+                  </TableCell>
                   <TableCell className="text-right">
                     {manage && <Button size="sm" variant="outline" onClick={() => setEditing(item)}>Edit</Button>}
                   </TableCell>
@@ -91,7 +95,7 @@ export default function PlatformAnnouncementsPage() {
         <RecordDialog
           title={editing === "new" ? "New announcement" : "Edit announcement"}
           fields={FIELDS}
-          record={editing === "new" ? { severity: "INFO", audience: "ALL", startsOn: today, endsOn: today, active: true } : { ...editing }}
+          record={editing === "new" ? { severity: "INFO", audience: "ALL", startsOn: today, endsOn: today, active: true, email: false } : { ...editing }}
           onClose={() => setEditing(null)}
           onSubmit={async (values) => {
             if (editing === "new") {

@@ -1583,6 +1583,7 @@ export interface PlatformAnnouncement {
   startsOn: string;
   endsOn: string;
   active: boolean;
+  email: boolean;
   version: number;
 }
 

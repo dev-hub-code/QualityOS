@@ -41,7 +41,7 @@ public class PlatformConsole {
                    updated_at
             FROM platform_settings
             """;
-    private static final String SAVE_ANNOUNCEMENT = "SELECT platform_announcement_save(?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    private static final String SAVE_ANNOUNCEMENT = "SELECT platform_announcement_save(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     private static final String MOVED_ON = "Someone else changed this first. Reload and try again.";
 
     private final JdbcTemplate jdbc;
@@ -114,7 +114,8 @@ public class PlatformConsole {
         return tx.execute(status -> jdbc.query("SELECT * FROM platform_announcement_list()", (rows, row) ->
                 new Announcement(rows.getObject("id", UUID.class), rows.getString("title"), rows.getString("message"),
                         rows.getString("severity"), rows.getString("audience"), rows.getDate("starts_on").toLocalDate(),
-                        rows.getDate("ends_on").toLocalDate(), rows.getBoolean("active"), rows.getLong("version"))));
+                        rows.getDate("ends_on").toLocalDate(), rows.getBoolean("active"), rows.getBoolean("email"),
+                        rows.getLong("version"))));
     }
 
     /** @param id empty to create one */
@@ -125,13 +126,13 @@ public class PlatformConsole {
         tx.executeWithoutResult(status -> {
             UUID saved = jdbc.queryForObject(SAVE_ANNOUNCEMENT, UUID.class, id, request.title().trim(),
                     request.message().trim(), request.severity(), request.audience(), Date.valueOf(request.startsOn()),
-                    Date.valueOf(request.endsOn()), request.active(), request.version());
+                    Date.valueOf(request.endsOn()), request.active(), request.emailed(), request.version());
             if (saved == null) {
                 throw new ConflictException(MOVED_ON);
             }
             audit.record(id == null ? "ANNOUNCEMENT_CREATED" : "ANNOUNCEMENT_UPDATED", "Announcement", saved, null,
                     Map.of("title", request.title(), "severity", request.severity(), "audience", request.audience(),
-                            "active", request.active(), "reason", request.reason()));
+                            "active", request.active(), "email", request.emailed(), "reason", request.reason()));
         });
     }
 

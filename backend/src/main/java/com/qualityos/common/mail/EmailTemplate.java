@@ -45,6 +45,7 @@ public enum EmailTemplate {
     PLAN_CHANGED("subscription/plan-changed"),
     INVOICE_OVERDUE("subscription/invoice-overdue"),
     PLAN_LIMIT("subscription/plan-limit"),
+    ANNOUNCEMENT("notification/announcement"),
     GENERAL("notification/general");
 
     private final String path;

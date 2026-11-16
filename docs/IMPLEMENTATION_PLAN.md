@@ -78,7 +78,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | The starting user and facility limits, grace period and annual prices are placeholders, editable under Plans. The trial length is under Settings | Owner to confirm before launch |
 | Which features each plan includes is an interpretation of the brief's table. Starter has no dashboards or reports | Owner to confirm before launch |
 | Account emails, such as reset links, cannot be retried, because a resent link would have expired. Failed ones show in the email log | By design |
-| Announcements are in-app banners for signed-in members. No email is sent, and people who are signed out do not see them | When a user needs it |
+| An emailed announcement goes once, to members active when it starts. Someone who joins later sees only the banner | Review after real use |
 | Support tickets are opened by operators. Customers cannot raise or see one, and nothing tells them a ticket's status | When a user needs it |
 | Support has no access to a customer's quality records. The separate time-limited approval the brief allows is not built | If support ever needs it |
 | Settings have no default currency, because only INR exists, and no notification defaults, because each person sets their own | When either is needed |

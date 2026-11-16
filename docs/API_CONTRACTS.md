@@ -338,7 +338,7 @@ may be sent again after `POST /reauthenticate`.
 | `GET /api/v1/platform/settings` | | Read settings |
 | `PUT /api/v1/platform/settings` | `PLATFORM_SETTINGS_MANAGE`, password | Save, with `version` and `reason` |
 | `GET /api/v1/platform/announcements` | | List |
-| `POST /api/v1/platform/announcements`, `PUT .../{id}` | `PLATFORM_CUSTOMER_MANAGE` | Create or save, with `version` and `reason` |
+| `POST /api/v1/platform/announcements`, `PUT .../{id}` | `PLATFORM_CUSTOMER_MANAGE` | Create or save, with `version` and `reason`. Optional `email: true` also emails every active member it reaches, once per organisation, on or after `startsOn` |
 | `GET /api/v1/platform/support/tickets` | | Filter by `tenantId`, `status` |
 | `POST /api/v1/platform/support/tickets` | `PLATFORM_CUSTOMER_MANAGE` | Open with `tenantId`, `subject`, `note` |
 | `PUT /api/v1/platform/support/tickets/{id}/status` | `PLATFORM_CUSTOMER_MANAGE` | Change status, with `version` |

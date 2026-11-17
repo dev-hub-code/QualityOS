@@ -90,23 +90,40 @@ public class TenantAccessService implements TenantAccessResolver {
             SELECT code FROM permissions WHERE code LIKE '%\\_VIEW' ESCAPE '\\' AND code <> 'PRODUCTION_COST_VIEW'
             """;
 
+    /** Whether the grant allows changes, or no row once it has ended. */
     private static final String OPEN_GRANT = """
-            SELECT EXISTS (SELECT 1 FROM support_access_grants g JOIN tenants t ON t.id = g.tenant_id
-                           WHERE g.id = ? AND g.tenant_id = ? AND g.revoked_at IS NULL AND g.expires_at > now()
-                             AND t.status = 'ACTIVE')
+            SELECT g.allow_changes FROM support_access_grants g JOIN tenants t ON t.id = g.tenant_id
+            WHERE g.id = ? AND g.tenant_id = ? AND g.revoked_at IS NULL AND g.expires_at > now()
+              AND t.status = 'ACTIVE'
+            """;
+
+    private static final String ALL_PERMISSIONS = "SELECT code FROM permissions";
+
+    /** Operators who made changes here in support sessions. */
+    private static final String SUPPORT_OPERATORS = """
+            SELECT DISTINCT ON (operator_id) operator_id, operator_name FROM support_access_events
+            WHERE tenant_id = ? AND kind = 'CHANGED' ORDER BY operator_id, occurred_at DESC
             """;
 
     @Override
     public Optional<Set<String>> resolveSupportPermissions(UUID tenantId, UUID operatorId, UUID grantId) {
         return TenantContext.callAs(tenantId, operatorId, () -> readOnly.execute(status -> {
-            boolean open = Boolean.TRUE.equals(jdbc.queryForObject(OPEN_GRANT, Boolean.class, grantId, tenantId));
+            List<Boolean> grant = jdbc.queryForList(OPEN_GRANT, Boolean.class, grantId, tenantId);
+            boolean open = !grant.isEmpty();
+            boolean changes = open && Boolean.TRUE.equals(grant.getFirst());
             boolean handlesCustomers = jdbc.queryForList(PLATFORM_ADMIN, String.class, operatorId).stream()
                     .anyMatch(role -> Permissions.PLATFORM_ROLES.getOrDefault(role, Set.of())
                             .contains(Permissions.PLATFORM_CUSTOMER_MANAGE));
             if (!open || !handlesCustomers || jdbc.queryForList(OPEN_ACCOUNT, Integer.class, operatorId).isEmpty()) {
                 return Optional.<Set<String>>empty();
             }
-            return Optional.of(plan.narrow(tenantId, Set.copyOf(jdbc.queryForList(SUPPORT_PERMISSIONS, String.class))));
+            if (!changes) {
+                return Optional.of(plan.narrow(tenantId, Set.copyOf(jdbc.queryForList(SUPPORT_PERMISSIONS, String.class))));
+            }
+            Set<String> granted = new HashSet<>(plan.narrow(tenantId, jdbc.queryForList(ALL_PERMISSIONS, String.class)
+                    .stream().filter(Permissions::supportMayHold).collect(Collectors.toSet())));
+            granted.add(SUPPORT_CHANGES);
+            return Optional.of(Set.copyOf(granted));
         }));
     }
 
@@ -115,6 +132,14 @@ public class TenantAccessService implements TenantAccessResolver {
         TenantContext.runAs(tenantId, operatorId, () -> writable.executeWithoutResult(status -> jdbc.update("""
                 INSERT INTO support_access_events (id, tenant_id, grant_id, operator_id, operator_name, kind, detail)
                 SELECT ?, ?, ?, u.id, u.full_name, 'VIEWED', ? FROM users u WHERE u.id = ?
+                """, UuidV7.generate(), tenantId, grantId, left(detail), operatorId)));
+    }
+
+    @Override
+    public void recordSupportChange(UUID tenantId, UUID operatorId, UUID grantId, String detail) {
+        TenantContext.runAs(tenantId, operatorId, () -> writable.executeWithoutResult(status -> jdbc.update("""
+                INSERT INTO support_access_events (id, tenant_id, grant_id, operator_id, operator_name, kind, detail)
+                SELECT ?, ?, ?, u.id, u.full_name, 'CHANGED', ? FROM users u WHERE u.id = ?
                 """, UuidV7.generate(), tenantId, grantId, left(detail), operatorId)));
     }
 
@@ -188,6 +213,18 @@ public class TenantAccessService implements TenantAccessResolver {
     }
 
     public record MemberContact(String email, String fullName) {
+    }
+
+    /**
+     * Who someone is, for showing beside work they did: the current tenant's active members, and support operators
+     * who made changes here, as "Support (name)". Not for choosing people; use {@link #activeMembers()} for that.
+     */
+    public Map<UUID, String> names() {
+        Map<UUID, String> names = activeMembers();
+        jdbc.query(SUPPORT_OPERATORS, rs -> {
+            names.putIfAbsent(rs.getObject(1, UUID.class), "Support (" + rs.getString(2) + ")");
+        }, TenantContext.getCurrentTenantId());
+        return names;
     }
 
     /** Names of the current tenant's active members. Runs in the caller's transaction. */

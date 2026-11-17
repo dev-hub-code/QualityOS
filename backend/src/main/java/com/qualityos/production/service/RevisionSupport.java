@@ -120,7 +120,7 @@ class RevisionSupport {
     }
 
     Map<UUID, String> members() {
-        return access.activeMembers();
+        return access.names();
     }
 
     static RevisionResponse toResponse(

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { ACCESS_COOKIE, backendUrl, forwardedHeaders, isTrustedOrigin, setSupportSessionCookie } from "@/lib/bff";
 
 /**
- * Opens a read-only support session in an organisation that granted support access. The session's token replaces the
+ * Opens a support session in an organisation that granted support access. The session's token replaces the
  * access cookie only; the operator's own refresh cookie stays, so their own session returns when this one ends.
  */
 export async function POST(request: NextRequest) {

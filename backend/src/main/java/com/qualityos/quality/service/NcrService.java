@@ -159,7 +159,7 @@ public class NcrService implements AttachmentPolicy {
                 .and(Searches.equalTo("severity", severity))
                 .and(Searches.equalTo("inspectionId", inspectionId));
         Page<NonConformance> page = ncrs.findAll(scope.limit(filter, "facilityId"), pageable);
-        Map<UUID, String> members = access.activeMembers();
+        Map<UUID, String> members = access.names();
         Map<UUID, String> supplierNames = supplierNames(page.map(NonConformance::getSupplierId).toSet());
         Map<UUID, String> materialNames = materialNames(page.map(NonConformance::getMaterialId).toSet());
         return PageResponse.from(page, ncr -> new NcrSummary(
@@ -618,7 +618,7 @@ public class NcrService implements AttachmentPolicy {
     }
 
     private NcrDetail toDetail(NonConformance ncr) {
-        Map<UUID, String> members = access.activeMembers();
+        Map<UUID, String> members = access.names();
         List<LinkedCapa> linked = capas.findByNcrIdOrderByCapaNumber(ncr.getId()).stream()
                 .map(capa -> new LinkedCapa(capa.getId(), capa.getCapaNumber(), capa.getTitle(), capa.getStatus().name()))
                 .toList();

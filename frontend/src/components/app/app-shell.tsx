@@ -312,7 +312,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <main className="min-w-0 flex-1 p-4 md:py-4 md:pr-4 md:pl-0">
-        {me.support && <SupportSessionBanner organizationName={me.support.organizationName} expiresAt={me.support.expiresAt} />}
+        {me.support && <SupportSessionBanner organizationName={me.support.organizationName} expiresAt={me.support.expiresAt} allowChanges={me.support.allowChanges} />}
         {!me.user.emailVerified && <VerifyEmailBanner email={me.user.email} />}
         {!controlCenter && <PlatformNotices />}
         {me.hasSubscription && <SubscriptionBanner />}

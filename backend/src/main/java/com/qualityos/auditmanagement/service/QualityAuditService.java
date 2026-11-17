@@ -129,7 +129,7 @@ public class QualityAuditService implements AttachmentPolicy {
         if (restriction.isPresent()) {
             filter = filter.and((root, query, cb) -> root.get("facilityId").in(restriction.get()));
         }
-        Map<UUID, String> members = access.activeMembers();
+        Map<UUID, String> members = access.names();
         LocalDate today = today();
         return PageResponse.from(audits.findAll(filter, pageable), row -> new AuditSummary(
                 row.getId(),
@@ -455,7 +455,7 @@ public class QualityAuditService implements AttachmentPolicy {
     }
 
     private AuditDetail toDetail(QualityAudit row) {
-        Map<UUID, String> members = access.activeMembers();
+        Map<UUID, String> members = access.names();
         List<AuditItem> questions = items.findByAuditIdOrderByPosition(row.getId());
         List<AuditFinding> recorded = findings.findByAuditIdOrderByCreatedAt(row.getId());
         Map<UUID, NcrOutcome> outcomes = outcomes(row.getId());

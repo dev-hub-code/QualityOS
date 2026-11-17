@@ -104,6 +104,83 @@ class SupportAccessIT extends MasterDataFixture {
                 .andExpect(jsonPath("$.data.items.length()").value(1));
     }
 
+    private ResultActions grantChanges(int hours) throws Exception {
+        return as(owner, postJson("/api/v1/support-access",
+                Map.of("durationHours", hours, "note", "Fix the batch numbers", "allowChanges", true)));
+    }
+
+    @Test
+    void changesAreGrantedOnPurposeAndForADayAtMost() throws Exception {
+        grantChanges(72).andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.message").value("Support can be let make changes for at most 24 hours."));
+        grant(owner, 72).andExpect(jsonPath("$.data.current.allowChanges").value(false));
+        as(operator, get("/api/v1/platform/organisations/" + owner.tenantId() + "/support-access"))
+                .andExpect(jsonPath("$.data.allowChanges").value(false));
+
+        grantChanges(24).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.current.allowChanges").value(true));
+        as(operator, get("/api/v1/platform/organisations/" + owner.tenantId() + "/support-access"))
+                .andExpect(jsonPath("$.data.allowChanges").value(true));
+        // The database holds the limit too.
+        assertThat(asDatabaseSuperuser().queryForObject("""
+                SELECT count(*) FROM support_access_grants
+                WHERE allow_changes AND expires_at > granted_at + INTERVAL '24 hours'
+                """, Integer.class)).isZero();
+    }
+
+    @Test
+    void supportMakesChangesAsSupportButNeverDecidesOrManagesAccess() throws Exception {
+        grantChanges(24).andExpect(status().isOk());
+        String token = supportToken();
+        String operatorName = JsonPath.read(body(as(operator, get("/api/v1/auth/me"))), "$.data.user.fullName");
+
+        String me = body(withToken(token, get("/api/v1/auth/me")).andExpect(status().isOk()));
+        assertThat(JsonPath.<Boolean>read(me, "$.data.support.allowChanges")).isTrue();
+        List<String> permissions = JsonPath.read(me, "$.data.permissions");
+        assertThat(permissions).contains("NCR_CREATE", "NCR_VIEW")
+                .doesNotContain("NCR_CLOSE", "CAPA_APPROVE", "INSPECTION_APPROVE", "DISPOSITION_RECORD",
+                        "USER_MANAGE", "ROLE_MANAGE", "TENANT_MANAGE", "SUBSCRIPTION_MANAGE", "PRODUCTION_COST_VIEW",
+                        "PLATFORM_ADMIN");
+
+        // An ordinary change goes through, and is support's in the audit trail, never a member's.
+        String made = idOf(body(withToken(token, postJson("/api/v1/ncrs", Map.of("title", "Wrong batch number",
+                "description", "Entered for the customer", "severity", "MINOR"))).andExpect(status().isCreated())));
+        String audit = body(as(owner, get("/api/v1/audit-logs").param("q", made)).andExpect(status().isOk()));
+        assertThat(JsonPath.<List<Boolean>>read(audit, "$.data.items[*].bySupport")).isNotEmpty().containsOnly(true);
+        assertThat(JsonPath.<List<String>>read(audit, "$.data.items[*].actor"))
+                .containsOnly("Support (" + operatorName + ")");
+        // Nor do records the members did themselves get marked.
+        String own = body(as(owner, get("/api/v1/audit-logs").param("q", ncr)));
+        assertThat(JsonPath.<List<Boolean>>read(own, "$.data.items[*].bySupport")).containsOnly(false);
+
+        // Decisions, access, billing and support access stay with the organisation.
+        withToken(token, postJson("/api/v1/ncrs/" + ncr + "/close", Map.of("note", "Closed by support")))
+                .andExpect(status().isForbidden());
+        withToken(token, postJson("/api/v1/invitations", Map.of("email", "x@example.com", "roleIds", List.of())))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.message")
+                        .value("Support cannot change this, even with access to make changes."));
+        withToken(token, postJson("/api/v1/support-access", Map.of("durationHours", 168)))
+                .andExpect(status().isForbidden());
+
+        // The administrators were told, and the support log lists the change.
+        String inbox = body(as(owner, get("/api/v1/notifications")).andExpect(status().isOk()));
+        assertThat(JsonPath.<List<String>>read(inbox, "$.data.items[*].type")).contains("SUPPORT_CHANGES_STARTED");
+        String overview = body(as(owner, get("/api/v1/support-access")));
+        assertThat(JsonPath.<List<String>>read(overview, "$.data.events[?(@.kind == 'CHANGED')].detail"))
+                .containsExactly("POST /ncrs");
+    }
+
+    @Test
+    void aReadOnlySessionTellsNoOne() throws Exception {
+        grant(owner, 24).andExpect(status().isOk());
+        String token = supportToken();
+        withToken(token, get("/api/v1/auth/me")).andExpect(jsonPath("$.data.support.allowChanges").value(false));
+        String inbox = body(as(owner, get("/api/v1/notifications")).andExpect(status().isOk()));
+        assertThat(JsonPath.<List<String>>read(inbox, "$.data.items[*].type"))
+                .doesNotContain("SUPPORT_CHANGES_STARTED");
+    }
+
     @Test
     void withdrawingAccessEndsASessionAlreadyOpen() throws Exception {
         grant(owner, 24).andExpect(status().isOk());

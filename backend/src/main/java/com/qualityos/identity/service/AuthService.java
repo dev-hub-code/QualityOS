@@ -365,7 +365,8 @@ public class AuthService {
                 permissions,
                 memberOf,
                 supportUntil == null ? null
-                        : new com.qualityos.identity.dto.AuthDtos.SupportView(organizations.getCurrent().name(), supportUntil));
+                        : new com.qualityos.identity.dto.AuthDtos.SupportView(organizations.getCurrent().name(), supportUntil,
+                                permissions.contains(com.qualityos.common.security.TenantAccessResolver.SUPPORT_CHANGES)));
     }
 
     private UUID chooseTenant(UUID userId, UUID preferred) {

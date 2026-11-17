@@ -120,7 +120,7 @@ public class CapaService implements AttachmentPolicy {
                 .and(Searches.equalTo("status", status))
                 .and(Searches.equalTo("ncrId", ncrId));
         Page<CorrectiveAction> page = capas.findAll(scope.limit(filter, "facilityId"), pageable);
-        Map<UUID, String> members = access.activeMembers();
+        Map<UUID, String> members = access.names();
         LocalDate today = today();
         return PageResponse.from(page, capa -> new CapaSummary(
                 capa.getId(),
@@ -385,7 +385,7 @@ public class CapaService implements AttachmentPolicy {
     }
 
     private CapaDetail toDetail(CorrectiveAction capa) {
-        Map<UUID, String> members = access.activeMembers();
+        Map<UUID, String> members = access.names();
         String formerMember = "System or former member";
         List<ActionResponse> planned = actions.findByCapaIdOrderByCreatedAt(capa.getId()).stream()
                 .map(action -> new ActionResponse(

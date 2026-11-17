@@ -446,7 +446,7 @@ public class DowntimeService implements AttachmentPolicy {
         Map<UUID, Integer> sequences = operations.findAllById(found.stream().map(DowntimeRecord::getOperationId)
                 .filter(Objects::nonNull).collect(Collectors.toSet())).stream()
                 .collect(Collectors.toMap(WorkOrderOperation::getId, WorkOrderOperation::getSequence));
-        Map<UUID, String> members = access.activeMembers();
+        Map<UUID, String> members = access.names();
         Instant now = Instant.now();
         return record -> new DowntimeResponse(record.getId(), record.getFacilityId(),
                 codes.get(record.getFacilityId()), record.getWorkCenterId(), centreCodes.get(record.getWorkCenterId()),

@@ -64,7 +64,7 @@ public class InspectionPdf {
                 .collect(Collectors.toMap(UnitResponse::id, UnitResponse::code, (a, b) -> a));
         Map<String, ParameterSpec> parameters = inspection.specification().parameters().stream()
                 .collect(Collectors.toMap(ParameterSpec::code, Function.identity(), (a, b) -> a));
-        Map<UUID, String> members = access.activeMembers();
+        Map<UUID, String> members = access.names();
 
         List<Map<String, Object>> results = inspection.results().stream().map(result -> {
             ParameterSpec parameter = parameters.get(result.parameterCode());

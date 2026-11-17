@@ -382,7 +382,7 @@ public class DispatchReturnService {
                         .distinct()
                         .toList())
                 .stream().collect(Collectors.toMap(ProductionBatchView::id, Function.identity()));
-        Map<UUID, String> names = access.activeMembers();
+        Map<UUID, String> names = access.names();
         Map<UUID, NcrOutcome> raised = ncrs.forCustomerReturns(found.stream().map(DispatchReversal::getId).toList());
         return found.stream()
                 .sorted(Comparator.comparing(DispatchReversal::getCreatedAt))

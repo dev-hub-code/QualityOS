@@ -1013,7 +1013,7 @@ public class ShopFloorService implements AttachmentPolicy {
                 rows.stream().map(WorkOrderOperation::getWorkCenterId).collect(Collectors.toSet()));
         Map<UUID, Machine> machineRefs = workCenters.machinesById(rows.stream()
                 .map(WorkOrderOperation::getMachineId).filter(Objects::nonNull).collect(Collectors.toSet()));
-        Map<UUID, String> members = access.activeMembers();
+        Map<UUID, String> members = access.names();
         return operation -> {
             WorkOrder order = orders.get(operation.getWorkOrderId());
             ProductReference product = productRefs.get(order.getProductId());

@@ -18,12 +18,13 @@ interface Grant {
   revokedAt: string | null;
   revokedByName: string | null;
   open: boolean;
+  allowChanges: boolean;
 }
 
 interface Overview {
   current: Grant | null;
   grants: Grant[];
-  events: { operatorName: string; kind: "STARTED" | "VIEWED"; detail: string; occurredAt: string }[];
+  events: { operatorName: string; kind: "STARTED" | "VIEWED" | "CHANGED"; detail: string; occurredAt: string }[];
 }
 
 const PATH = "/support-access";
@@ -35,12 +36,19 @@ const DURATIONS = [
 
 const when = (at: string) => new Date(at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 
-/** Settings: let ProductionOS support read the organisation's records for a while, and see what it read. */
+/** Changes are allowed for at most this long. */
+const CHANGES_MAX_HOURS = 24;
+
+/**
+ * Settings: let ProductionOS support read the organisation's records for a while, or also make changes for a day at
+ * most, and see what it read and changed.
+ */
 export function SupportAccessSettings() {
   const canManage = usePermission("TENANT_MANAGE");
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: [PATH], queryFn: () => api.get<Overview>(PATH), enabled: canManage });
   const [hours, setHours] = useState(24);
+  const [allowChanges, setAllowChanges] = useState(false);
   const [note, setNote] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -64,13 +72,16 @@ export function SupportAccessSettings() {
     <section className="space-y-3">
       <h2 className="text-base font-semibold text-[#1b2a55]">Support access</h2>
       <p className="text-sm text-muted-foreground">
-        ProductionOS support cannot see your records unless you let it. Access is read-only, ends by itself, and you
-        can withdraw it at any time. Every page support opens is listed below.
+        ProductionOS support cannot see your records unless you let it. Access is read-only unless you also let support
+        make changes, for 24 hours at most. Either way it ends by itself, and you can withdraw it at any time.
+        Approvals, sign-offs, closures, user access and billing always stay with your own people. Every page support
+        opens and every change it makes is listed below, and changes show as support&apos;s in the audit log.
       </p>
       {current ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
           <span>
-            Support can read your records until <strong>{when(current.expiresAt)}</strong>
+            Support can {current.allowChanges ? "read and change" : "read"} your records until{" "}
+            <strong>{when(current.expiresAt)}</strong>
             {current.grantedByName && `, as ${current.grantedByName} allowed`}
             {current.note && ` (${current.note})`}.
           </span>
@@ -90,11 +101,27 @@ export function SupportAccessSettings() {
             value={hours}
             onChange={(event) => setHours(Number(event.target.value))}
           >
-            {DURATIONS.map((duration) => (
+            {DURATIONS.filter((duration) => !allowChanges || duration.hours <= CHANGES_MAX_HOURS).map((duration) => (
               <option key={duration.hours} value={duration.hours}>
                 {duration.label}
               </option>
             ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="support-level">Support may</Label>
+          <select
+            id="support-level"
+            className="h-9 rounded-md border bg-white px-2 text-sm"
+            value={allowChanges ? "changes" : "view"}
+            onChange={(event) => {
+              const changes = event.target.value === "changes";
+              setAllowChanges(changes);
+              if (changes) setHours(Math.min(hours, CHANGES_MAX_HOURS));
+            }}
+          >
+            <option value="view">View only</option>
+            <option value="changes">View and make changes (24 hours at most)</option>
           </select>
         </div>
         <div className="min-w-48 flex-1 space-y-1">
@@ -103,7 +130,7 @@ export function SupportAccessSettings() {
         </div>
         <Button
           disabled={pending}
-          onClick={() => run(() => api.post<Overview>(PATH, { durationHours: hours, note: note || null }))}
+          onClick={() => run(() => api.post<Overview>(PATH, { durationHours: hours, note: note || null, allowChanges }))}
         >
           Allow support access
         </Button>
@@ -119,6 +146,10 @@ export function SupportAccessSettings() {
                   {event.kind === "STARTED" ? (
                     <>
                       {event.operatorName} opened a support session: <em>{event.detail}</em>
+                    </>
+                  ) : event.kind === "CHANGED" ? (
+                    <>
+                      {event.operatorName} changed <code className="text-xs">{event.detail}</code>
                     </>
                   ) : (
                     <>

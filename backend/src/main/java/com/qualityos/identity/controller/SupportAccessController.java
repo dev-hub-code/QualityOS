@@ -21,7 +21,8 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("hasAuthority('" + Permissions.TENANT_MANAGE + "')")
 public class SupportAccessController {
 
-    public record GrantRequest(@NotNull Integer durationHours, @Size(max = 500) String note) {
+    /** @param allowChanges let support make changes too, for at most 24 hours; read-only when left out */
+    public record GrantRequest(@NotNull Integer durationHours, @Size(max = 500) String note, Boolean allowChanges) {
     }
 
     private final SupportAccessService support;
@@ -37,7 +38,7 @@ public class SupportAccessController {
 
     @PostMapping
     public ApiResponse<SupportAccessService.Overview> grant(@Valid @RequestBody GrantRequest request) {
-        return ApiResponse.ok(support.grant(request.durationHours(), request.note()));
+        return ApiResponse.ok(support.grant(request.durationHours(), request.note(), Boolean.TRUE.equals(request.allowChanges())));
     }
 
     @PostMapping("/revoke")

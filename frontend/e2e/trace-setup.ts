@@ -35,7 +35,14 @@ export async function prepare(page: Page) {
   });
   await call("POST", "/products", { code: "SHAFT", name: "Drive Shaft", productType: "FINISHED", uomId });
   await call("POST", "/customers", { code: "TATA", name: "Tata Motors" });
-  const created = await call("POST", "/inspection-templates", { code: "FINAL", name: "Final check", inspectionType: "FQC" });
+  await publishTemplate(page, "FINAL", "Final check", "FQC");
+}
+
+/** A published template measuring a shaft's diameter, through the API. */
+export async function publishTemplate(page: Page, code: string, name: string, inspectionType: string) {
+  const call = apiCaller(page);
+  const today = new Date().toISOString().slice(0, 10);
+  const created = await call("POST", "/inspection-templates", { code, name, inspectionType });
   const template = created.template.id;
   const draft = created.versions[0].id;
   await call("PUT", `/inspection-templates/${template}/versions/${draft}`, {

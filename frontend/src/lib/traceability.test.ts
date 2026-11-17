@@ -9,15 +9,19 @@ describe("parseSerials", () => {
 
 describe("inspectionTypeFor", () => {
   it("follows the batch's stage", () => {
-    expect(inspectionTypeFor({ status: "IN_PROGRESS", producedQuantity: null })).toBe("IPQC");
-    expect(inspectionTypeFor({ status: "COMPLETED", producedQuantity: "5" })).toBe("FQC");
-    expect(inspectionTypeFor({ status: "ON_HOLD", producedQuantity: null })).toBe("IPQC");
-    expect(inspectionTypeFor({ status: "ON_HOLD", producedQuantity: "5" })).toBe("FQC");
+    expect(inspectionTypeFor({ status: "IN_PROGRESS", producedQuantity: null, availableQuantity: "0" })).toBe("IPQC");
+    expect(inspectionTypeFor({ status: "COMPLETED", producedQuantity: "5", availableQuantity: "5" })).toBe("FQC");
+    expect(inspectionTypeFor({ status: "ON_HOLD", producedQuantity: null, availableQuantity: "0" })).toBe("IPQC");
+    expect(inspectionTypeFor({ status: "ON_HOLD", producedQuantity: "5", availableQuantity: "5" })).toBe("FQC");
   });
 
-  it("offers nothing once the batch has a final outcome", () => {
-    expect(inspectionTypeFor({ status: "RELEASED", producedQuantity: "5" })).toBeNull();
-    expect(inspectionTypeFor({ status: "REJECTED", producedQuantity: "5" })).toBeNull();
+  it("offers an outgoing check while a released batch has stock to ship", () => {
+    expect(inspectionTypeFor({ status: "RELEASED", producedQuantity: "5", availableQuantity: "5" })).toBe("OQC");
+    expect(inspectionTypeFor({ status: "RELEASED", producedQuantity: "5", availableQuantity: "0" })).toBeNull();
+  });
+
+  it("offers nothing once the batch is rejected", () => {
+    expect(inspectionTypeFor({ status: "REJECTED", producedQuantity: "5", availableQuantity: "5" })).toBeNull();
   });
 });
 

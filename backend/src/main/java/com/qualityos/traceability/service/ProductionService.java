@@ -387,7 +387,7 @@ public class ProductionService {
         return detail(id);
     }
 
-    /** @return IPQC or FQC, whichever the batch is ready for, or empty when it takes no inspection now */
+    /** @return IPQC, FQC or OQC, whichever the batch is ready for, or empty when it takes no inspection now */
     @Transactional(readOnly = true)
     public Optional<String> dueInspection(UUID id) {
         return load(id).dueInspection();

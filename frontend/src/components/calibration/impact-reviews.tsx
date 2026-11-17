@@ -1,5 +1,6 @@
 "use client";
 
+import { NcrStatusBadge } from "@/components/records/ncr-status-badge";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { RecordLink, StatusBadge, useRefresh } from "@/components/records/parts";
@@ -44,7 +45,7 @@ export function ImpactReviews({ path, canManage }: { path: string; canManage: bo
               <>
                 {" · "}
                 <RecordLink href={`/ncrs/${group.ncrId}`}>{group.ncrNumber}</RecordLink>
-                {group.ncrStatus && <span className="ml-2"><StatusBadge status={group.ncrStatus} /></span>}
+                {group.ncrStatus && <span className="ml-2"><NcrStatusBadge status={group.ncrStatus} /></span>}
               </>
             )}
             {group.reviews.length > 0 && (

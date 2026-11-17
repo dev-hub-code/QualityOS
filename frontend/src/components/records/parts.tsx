@@ -25,9 +25,10 @@ import type {
 const NEGATIVE = new Set(["REJECTED", "REJECT", "BLOCKED", "CANCELLED", "VOIDED", "FAIL", "HOLD", "CRITICAL", "OVERDUE", "ON_HOLD", "REVERSED", "REINSPECT"]);
 const POSITIVE = new Set(["APPROVED", "RECEIVED", "CLOSED", "NOT_REQUIRED", "PASS", "ACCEPT", "PUBLISHED", "COMPLETED", "MINOR", "RELEASED", "APPLIED", "ACCEPTED", "SHIPPED", "PAID"]);
 
-export function StatusBadge({ status }: { status: string }) {
+/** @param label shown instead of the status itself, which still decides the colour */
+export function StatusBadge({ status, label }: { status: string; label?: string }) {
   const variant = NEGATIVE.has(status) ? "destructive" : POSITIVE.has(status) ? "default" : "secondary";
-  return <Badge variant={variant}>{status.replaceAll("_", " ").toLowerCase()}</Badge>;
+  return <Badge variant={variant}>{label ?? status.replaceAll("_", " ").toLowerCase()}</Badge>;
 }
 
 export function PageHeader({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children?: ReactNode }) {

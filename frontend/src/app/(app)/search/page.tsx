@@ -1,5 +1,6 @@
 "use client";
 
+import { NcrStatusBadge } from "@/components/records/ncr-status-badge";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
@@ -135,7 +136,7 @@ function Results() {
                   href: `/ncrs/${ncr.id}`,
                   label: ncr.ncrNumber,
                   description: ncr.title,
-                  detail: <StatusBadge status={ncr.status} />,
+                  detail: <NcrStatusBadge status={ncr.status} />,
                 }))
               }
             />

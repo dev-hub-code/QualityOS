@@ -1,5 +1,6 @@
 "use client";
 
+import { NcrStatusBadge } from "@/components/records/ncr-status-badge";
 import { createColumnHelper } from "@tanstack/react-table";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -30,7 +31,7 @@ const columns = [
   }),
   column.accessor("title", { header: "Title" }),
   column.accessor("severity", { header: "Severity", cell: (info) => <StatusBadge status={info.getValue()} /> }),
-  column.accessor("status", { header: "Status", cell: (info) => <StatusBadge status={info.getValue()} /> }),
+  column.accessor("status", { header: "Status", cell: (info) => <NcrStatusBadge status={info.getValue()} /> }),
   column.accessor("supplierName", { header: "Supplier", cell: (info) => info.getValue() ?? "—" }),
   column.accessor("assigneeName", { header: "Assigned to", cell: (info) => info.getValue() ?? "—" }),
 ];

@@ -400,6 +400,7 @@ export const DOC_PAGES: DocPage[] = [
           ["Rejected", "A reviewer found it was not a real non-conformance."],
           ["Cancelled", "Withdrawn while still Open. One raised by an inspection can only be rejected."],
         ],
+        text: "These are the standard names. An administrator can give them your own under Settings, NCR status names, such as Quarantine for Containment. The steps and their rules stay the same.",
       },
       {
         title: "Closing rules",

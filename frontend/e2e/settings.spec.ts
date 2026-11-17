@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { signUp } from "./helpers";
+import { apiCaller, signUp } from "./helpers";
 
 test("an administrator sets the organisation's review and NCR rules", async ({ page }) => {
   await signUp(page);
@@ -46,4 +46,31 @@ test("an administrator uploads the organisation's logo, which the menu shows", a
   await page.getByRole("button", { name: "Remove logo" }).click();
   await expect(page.getByText("No logo yet.")).toBeVisible();
   await expect(page.locator("aside").getByRole("img", { name: / logo$/ })).toHaveCount(0);
+});
+
+test("an administrator renames NCR statuses, and NCRs show the new names", async ({ page }) => {
+  await signUp(page);
+  await page.goto("/settings");
+  await page.getByLabel("Open", { exact: true }).fill("Raised");
+  await page.getByLabel("Containment", { exact: true }).fill("Quarantine");
+  await page.getByRole("button", { name: "Save status names" }).click();
+  await expect(page.getByText("Saved.")).toBeVisible();
+
+  // Two statuses may not look alike.
+  await page.getByLabel("Containment", { exact: true }).fill("closed");
+  await page.getByRole("button", { name: "Save status names" }).click();
+  await expect(page.getByText('Two statuses cannot share the name "Closed".')).toBeVisible();
+
+  const raised = await apiCaller(page)("POST", "/ncrs", {
+    title: "Burr on flange",
+    description: "Found at final check",
+    severity: "MINOR",
+  });
+  await page.goto("/ncrs");
+  await expect(page.getByRole("row", { name: new RegExp(raised.ncrNumber) }).getByText("Raised", { exact: true })).toBeVisible();
+  await page.goto(`/ncrs/${raised.id}`);
+  await expect(page.getByText("Raised", { exact: true }).first()).toBeVisible();
+
+  await page.goto("/settings");
+  await expect(page.getByLabel("Containment", { exact: true })).toHaveValue("Quarantine");
 });

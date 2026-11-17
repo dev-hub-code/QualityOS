@@ -31,6 +31,17 @@ public class ReworkOrder extends TenantOwnedEntity {
         }
     }
 
+    /** Reinspection decisions that let reworked goods carry on. */
+    public static final java.util.Set<String> ACCEPTED = java.util.Set.of("ACCEPT", "CONDITIONAL_ACCEPTANCE");
+
+    /**
+     * Closed and accepted, from an operation's rejects: the reworked goods go on into the next operation, or into the
+     * order's output when that operation was the last.
+     */
+    public boolean goesBackOnRoute() {
+        return getStatus() == Status.CLOSED && operationId != null && ACCEPTED.contains(finalDisposition);
+    }
+
     private String reworkNumber;
     private UUID workOrderId;
     private UUID productionBatchId;

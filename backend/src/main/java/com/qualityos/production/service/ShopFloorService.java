@@ -133,6 +133,7 @@ public class ShopFloorService implements AttachmentPolicy {
     private final NcrService ncrs;
     private final InstrumentService instruments;
     private final MachineInstrumentRepository machineInstruments;
+    private final com.qualityos.production.repository.ReworkOrderRepository reworks;
 
     @SuppressWarnings("java:S107")
     ShopFloorService(
@@ -156,7 +157,9 @@ public class ShopFloorService implements AttachmentPolicy {
             ProductionAlerts alerts,
             NcrService ncrs,
             InstrumentService instruments,
-            MachineInstrumentRepository machineInstruments) {
+            MachineInstrumentRepository machineInstruments,
+            com.qualityos.production.repository.ReworkOrderRepository reworks) {
+        this.reworks = reworks;
         this.alerts = alerts;
         this.ncrs = ncrs;
         this.instruments = instruments;
@@ -338,6 +341,18 @@ public class ShopFloorService implements AttachmentPolicy {
                     throw new BusinessRuleException("Operation %d is not complete yet, so operation %d cannot be."
                             .formatted(open.getSequence(), operation.getSequence()));
                 });
+        // Goods reworked from an earlier operation come back through this one.
+        Map<UUID, Integer> earlier = locked.siblings().stream()
+                .filter(other -> other.getSequence() < operation.getSequence())
+                .collect(Collectors.toMap(WorkOrderOperation::getId, WorkOrderOperation::getSequence));
+        reworks.findByWorkOrderIdOrderByCreatedAtAscIdAsc(order.getId()).stream()
+                .filter(rework -> rework.getStatus().isOpen() && earlier.containsKey(rework.getOperationId()))
+                .findFirst()
+                .ifPresent(open -> {
+                    throw new BusinessRuleException(("Rework order %s, from operation %d, is still open. Its goods "
+                            + "come back through operation %d, so close it first.").formatted(open.getReworkNumber(),
+                            earlier.get(open.getOperationId()), operation.getSequence()));
+                });
         Instant now = Instant.now();
         BigDecimal setup = request == null ? null : request.setupMinutes();
         if (setup != null && setup.multiply(BigDecimal.valueOf(60))
@@ -348,7 +363,7 @@ public class ShopFloorService implements AttachmentPolicy {
         }
         qualityGates.requirePassed(order, operation, EnumSet.of(Stage.IN_PROCESS, Stage.OPERATION_COMPLETION),
                 "completed");
-        BigDecimal input = inputs(order, locked.siblings()).get(operation.getId());
+        BigDecimal input = inputs(order, locked.siblings(), reworkedBack(List.of(order.getId()))).get(operation.getId());
         String reason = request == null ? null : blankToNull(request.reason());
         if (operation.processed().compareTo(input) < 0 && reason == null) {
             throw new BusinessRuleException("Only %s of %s went through operation %d. Say why it is complete."
@@ -783,17 +798,34 @@ public class ShopFloorService implements AttachmentPolicy {
         workCenters.moveMachine(machine, target, why);
     }
 
-    /** What can come into each operation: the order quantity first, then what the one before turned out good. */
-    private static Map<UUID, BigDecimal> inputs(WorkOrder order, List<WorkOrderOperation> siblings) {
+    /**
+     * What can come into each operation: the order quantity first, then what the one before turned out good, with
+     * its rejects that were reworked and accepted.
+     *
+     * @param reworkedBack accepted rework by the operation it came from
+     */
+    private static Map<UUID, BigDecimal> inputs(
+            WorkOrder order, List<WorkOrderOperation> siblings, Map<UUID, BigDecimal> reworkedBack) {
         Map<UUID, BigDecimal> inputs = new HashMap<>();
         BigDecimal coming = order.getQuantity();
         for (WorkOrderOperation operation : siblings) {
             inputs.put(operation.getId(), coming);
             if (operation.getStatus() != Status.CANCELLED) {
-                coming = operation.getGoodQuantity();
+                coming = operation.getGoodQuantity().add(reworkedBack.getOrDefault(operation.getId(), BigDecimal.ZERO));
             }
         }
         return inputs;
+    }
+
+    /** Accepted rework from the orders' operations, by the operation it came from, in one query. */
+    private Map<UUID, BigDecimal> reworkedBack(java.util.Collection<UUID> orderIds) {
+        if (orderIds.isEmpty()) {
+            return Map.of();
+        }
+        return reworks.findByWorkOrderIdInOrderByCreatedAtAscIdAsc(orderIds).stream()
+                .filter(com.qualityos.production.entity.ReworkOrder::goesBackOnRoute)
+                .collect(Collectors.toMap(com.qualityos.production.entity.ReworkOrder::getOperationId,
+                        com.qualityos.production.entity.ReworkOrder::getReworkedQuantity, BigDecimal::add));
     }
 
     private boolean first(List<WorkOrderOperation> siblings, WorkOrderOperation operation) {
@@ -803,7 +835,7 @@ public class ShopFloorService implements AttachmentPolicy {
 
     private BigDecimal ceiling(WorkOrder order, List<WorkOrderOperation> siblings, WorkOrderOperation operation) {
         if (!first(siblings, operation)) {
-            return inputs(order, siblings).get(operation.getId());
+            return inputs(order, siblings, reworkedBack(List.of(order.getId()))).get(operation.getId());
         }
         BigDecimal allowance = settings.rules().overReportPercent();
         return order.getQuantity().multiply(BigDecimal.ONE.add(
@@ -1004,7 +1036,8 @@ public class ShopFloorService implements AttachmentPolicy {
         Map<UUID, List<WorkOrderOperation>> byOrder = operations.findByWorkOrderIdInOrderBySequence(orderIds).stream()
                 .collect(Collectors.groupingBy(WorkOrderOperation::getWorkOrderId));
         Map<UUID, BigDecimal> inputs = new HashMap<>();
-        byOrder.forEach((orderId, siblings) -> inputs.putAll(inputs(orders.get(orderId), siblings)));
+        Map<UUID, BigDecimal> reworkedBack = reworkedBack(orderIds);
+        byOrder.forEach((orderId, siblings) -> inputs.putAll(inputs(orders.get(orderId), siblings, reworkedBack)));
         Map<UUID, ProductReference> productRefs = products.references(
                 orders.values().stream().map(WorkOrder::getProductId).collect(Collectors.toSet()));
         Set<UUID> facilityIds = orders.values().stream().map(WorkOrder::getFacilityId).collect(Collectors.toSet());

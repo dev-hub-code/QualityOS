@@ -29,4 +29,7 @@ public interface WorkOrderOperationRepository
 
     List<WorkOrderOperation> findByWorkCenterIdInAndCompletedAtGreaterThanEqualAndCompletedAtLessThan(
             Collection<UUID> workCenterIds, Instant from, Instant to);
+
+    List<WorkOrderOperation> findByWorkCenterIdInAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+            Collection<UUID> workCenterIds, Instant from, Instant to);
 }

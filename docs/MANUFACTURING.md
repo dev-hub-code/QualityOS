@@ -70,7 +70,7 @@ Status: **Built** (in this branch, tested), **Phase n** (planned), **Reused** (a
 | Rework | Rework orders from an operation's rejects, an inspection disposed of as rework, or an NCR; approved by an authorised person (separately, when configured); steps; reinspection; closed on its decision | Built (Phase 5) |
 | Quality | Completion blocked by open mandatory gates and open rework, and by a batch on hold or awaiting final inspection | Built (Phase 6) |
 | Completion | Finished-goods receipt into existing inventory: the order's production batch completed through traceability, never a separate balance | Built (Phase 6) |
-| Completion | Quantity reconciliation (operations' good output plus accepted rework), short and excess output, material variance per line, serial numbers | Built (Phase 6) |
+| Completion | Quantity reconciliation (the last operation's good output plus its own accepted rework), short and excess output, material variance per line, serial numbers | Built (Phase 6) |
 | Completion | Production record of a batch: work order, definition revisions, operations with operators and machines, gates, rework, receipt | Built (Phase 6) |
 | Downtime | One record per stop: from the shop floor (pause, block, hold, quality hold), from machine status (breakdown, maintenance) and by hand; categories, reason, responsible department, comments, evidence; summaries by machine, work centre, line, facility and category | Built (Phase 7) |
 | Scheduling | Capacity from facility shifts (days, break) × active machines (or the centre's own capacity), less planned maintenance; load from routings' standard times; conflicts and warnings; manual reschedule with priority. No optimisation engine | Built (Phase 7) |
@@ -362,6 +362,10 @@ a pointer from a work order to inspections that the existing engine carries out 
   The reinspection is a new inspection of the batch (template chosen, or the one that fits). One under way cannot be
   replaced; a cancelled one can. A closed or cancelled rework order is frozen by a database trigger, a done step
   cannot change, and its status history is append-only.
+- **Back on the route.** Goods reworked from an operation and accepted on reinspection go back into the next
+  operation's input, and pass the rest of the route like the rest. From the last operation they go straight into the
+  order's output. So the next operation cannot complete while rework from an earlier one is still open, and rework
+  cannot be raised from an operation whose next operation is already complete.
 - **On the work order.** The quality view shows the gates, NCRs and CAPAs on the batch, rework orders, the rejected
   summary (rejected, to rework, in rework, reworked and accepted, and scrapped on operations and in rework), and one
   sentence for each mandatory gate not passed and each rework order still open: the list completion checks.
@@ -469,9 +473,13 @@ guessed: a missing price or rate is listed and the cost marked incomplete.
 
 - **Per machine.** Shift time from the facility's shifts; planned production time = shift time less planned downtime;
   running time from the operation timeline (in progress on that machine), clipped to the period.
-  Availability = running / planned production time (capped at 100%, with a note when work ran outside shifts);
-  Performance = Σ(ideal cycle × units reported) / running, the ideal cycle being the routing's run time per unit;
-  Quality = good / reported; OEE = A × P × Q; Utilisation = running / shift time. An overall row uses the same sums.
+  Setup is the setup minutes recorded when each operation completed, on its machine, for operations started in the
+  period. Operating time = running less setup.
+  Availability = operating / planned production time (capped at 100%, with a note when work ran outside shifts);
+  Performance = Σ(ideal cycle × units reported) / operating, the ideal cycle being the routing's run time per unit;
+  Quality = good / reported; OEE = A × P × Q; Utilisation = running / shift time, setup included, since setup still
+  occupies the machine. Setup is an availability loss, one of the six big losses, not slow running; OEE itself is the
+  same either way. An overall row uses the same sums.
 - **Production.** Finished goods received by product; orders closed with ordered against received; completed, closed
   short and on time; every order by status.
 - **Rates.** Rejection, scrap and rework rates from operation reports (reversals netted out); efficiency = planned

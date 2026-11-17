@@ -164,6 +164,16 @@ public class ProductionAnalyticsService {
                 : facilityId != null ? downtime.overlapping(facilityId, start, end)
                         : facilityIds.stream().flatMap(id -> downtime.overlapping(id, start, end).stream()).toList();
         Map<UUID, Double> running = runningMinutes(timeline, start, until);
+        // Setup, as recorded when each operation completed, on the machine it ran on, for operations started in
+        // the period: setup comes at the start, so it falls in the same period as the running time it is part of.
+        Map<UUID, Double> setup = new HashMap<>();
+        if (!centreById.isEmpty()) {
+            operations.findByWorkCenterIdInAndStartedAtGreaterThanEqualAndStartedAtLessThan(centreById.keySet(), start,
+                            until).stream()
+                    .filter(step -> step.getMachineId() != null && step.getActualSetupMinutes() != null)
+                    .forEach(step -> setup.merge(step.getMachineId(), step.getActualSetupMinutes().doubleValue(),
+                            Double::sum));
+        }
         Map<UUID, double[]> units = new HashMap<>();
         for (OperationReport report : reported) {
             WorkOrderOperation step = operationById.get(report.getOperationId());
@@ -206,14 +216,15 @@ public class ProductionAnalyticsService {
             }
             double[] made = units.getOrDefault(machine.getId(), new double[3]);
             double ran = running.getOrDefault(machine.getId(), 0.0);
-            machineRows.add(oee(machine.getId(), machine.getCode(), centre.getCode(), shift, planned, ran, unplanned,
-                    made));
-            double[] row = {shift, planned, ran, unplanned, made[0], made[1], made[2], 0};
-            for (int i = 0; i < 7; i++) {
+            double setUp = Math.min(setup.getOrDefault(machine.getId(), 0.0), ran);
+            machineRows.add(oee(machine.getId(), machine.getCode(), centre.getCode(), shift, planned, ran, setUp,
+                    unplanned, made));
+            double[] row = {shift, planned, ran, unplanned, made[0], made[1], made[2], setUp};
+            for (int i = 0; i < 8; i++) {
                 all[i] += row[i];
             }
         }
-        MachineOee overall = oee(null, null, null, all[0], all[1], all[2], all[3],
+        MachineOee overall = oee(null, null, null, all[0], all[1], all[2], all[7], all[3],
                 new double[] {all[4], all[5], all[6]});
 
         // Orders: output, planned against actual, status, material variance
@@ -326,11 +337,20 @@ public class ProductionAnalyticsService {
         }
     }
 
-    /** @param made units reported, good units, and ideal minutes for them */
+    /**
+     * Availability is the time it made things, running less setup, against planned production time; performance is
+     * the ideal time for what it made against that same time. Setup is a loss of availability, as one of the six big
+     * losses, and the machine is still occupied by it, so it counts in utilisation.
+     *
+     * @param ran minutes it ran, setup included
+     * @param setup of those, minutes spent setting up
+     * @param made units reported, good units, and ideal minutes for them
+     */
     static MachineOee oee(UUID id, String code, String centre, double shift, double plannedDown, double ran,
-            double unplannedDown, double[] made) {
+            double setup, double unplannedDown, double[] made) {
         List<String> notes = new ArrayList<>();
         double plannedProduction = Math.max(shift - plannedDown, 0);
+        double operating = Math.max(ran - setup, 0);
         BigDecimal availability = null;
         BigDecimal utilisation = null;
         if (shift <= 0) {
@@ -338,8 +358,8 @@ public class ProductionAnalyticsService {
         } else {
             utilisation = percent(ran, shift);
             if (plannedProduction > 0) {
-                double ratio = Math.min(ran / plannedProduction, 1);
-                if (ran > plannedProduction) {
+                double ratio = Math.min(operating / plannedProduction, 1);
+                if (operating > plannedProduction) {
                     notes.add("It ran longer than its planned production time; availability is shown as 100%.");
                 }
                 availability = percent(ratio, 1);
@@ -350,10 +370,12 @@ public class ProductionAnalyticsService {
         BigDecimal performance = null;
         if (ran <= 0) {
             notes.add("It did not run in the period.");
+        } else if (operating <= 0) {
+            notes.add("All its running time was setup, so performance cannot be worked out.");
         } else if (made[0] <= 0) {
             notes.add("Nothing was reported on it, so performance cannot be worked out.");
         } else {
-            performance = percent(made[2], ran);
+            performance = percent(made[2], operating);
         }
         BigDecimal quality = made[0] > 0 ? percent(made[1], made[0]) : null;
         if (made[0] > 0 && made[2] <= 0) {
@@ -362,10 +384,11 @@ public class ProductionAnalyticsService {
         }
         // From the unrounded ratios, so the rounding of each factor does not carry into the product.
         BigDecimal oee = availability == null || performance == null || quality == null ? null
-                : BigDecimal.valueOf(Math.min(ran / plannedProduction, 1) * (made[2] / ran) * (made[1] / made[0]) * 100)
+                : BigDecimal.valueOf(Math.min(operating / plannedProduction, 1) * (made[2] / operating)
+                        * (made[1] / made[0]) * 100)
                         .setScale(1, RoundingMode.HALF_UP);
         return new MachineOee(id, code, centre, DowntimeService.minutes(shift), DowntimeService.minutes(plannedDown),
-                DowntimeService.minutes(plannedProduction), DowntimeService.minutes(ran),
+                DowntimeService.minutes(plannedProduction), DowntimeService.minutes(ran), DowntimeService.minutes(setup),
                 DowntimeService.minutes(unplannedDown), utilisation, availability, performance, quality, oee, notes);
     }
 

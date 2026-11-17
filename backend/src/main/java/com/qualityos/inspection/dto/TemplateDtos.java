@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.qualityos.inspection.entity.InspectionParameter.Criticality;
 import com.qualityos.inspection.entity.InspectionParameter.DataType;
 import com.qualityos.inspection.entity.InspectionTemplate;
+import com.qualityos.inspection.entity.AqlTable;
 import com.qualityos.inspection.entity.TemplateVersion.SamplingType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
@@ -70,6 +71,10 @@ public final class TemplateDtos {
             @DecimalMin(value = "0", inclusive = false) @DecimalMax("100") @Digits(integer = 3, fraction = 2)
             BigDecimal samplePercent,
             @Min(0) int acceptanceNumber,
+            /* For AQL sampling, a value from the standard table, such as 1.0 or 2.5. */
+            BigDecimal aql,
+            /* For AQL sampling: I, II or III. */
+            AqlTable.Level inspectionLevel,
             @NotNull List<@Valid ParameterRequest> parameters) {
     }
 
@@ -104,6 +109,8 @@ public final class TemplateDtos {
             Integer sampleSize,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal samplePercent,
             int acceptanceNumber,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal aql,
+            String inspectionLevel,
             LocalDate effectiveFrom,
             LocalDate effectiveTo,
             Instant publishedAt,
@@ -130,7 +137,10 @@ public final class TemplateDtos {
             String remarks) {
     }
 
-    /** The specification frozen into an inspection. */
+    /**
+     * The specification frozen into an inspection. Under AQL sampling, the acceptance number is the one the lot's plan
+     * gave, and it counts nonconforming samples rather than failures of each parameter.
+     */
     public record SpecSnapshot(
             String templateCode,
             String templateName,

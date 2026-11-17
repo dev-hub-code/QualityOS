@@ -14,6 +14,8 @@ import { templateDraftSchema, type TemplateDraftValues } from "@/lib/schemas";
 import type { ParameterSpec, TemplateVersion } from "@/lib/types";
 
 const SELECT_CLASS = "h-9 w-full rounded-xl border border-input bg-white/70 px-2 text-sm";
+/** The AQL columns of the ISO 2859-1 tables. The server refuses any other value. */
+const AQLS = ["0.010", "0.015", "0.025", "0.040", "0.065", "0.10", "0.15", "0.25", "0.40", "0.65", "1.0", "1.5", "2.5", "4.0", "6.5", "10"];
 
 const blankParameter: TemplateDraftValues["parameters"][number] = {
   code: "",
@@ -67,6 +69,8 @@ export function TemplateDraftForm({ templateId, draft }: { templateId: string; d
       samplingType: draft.samplingType,
       sampleSize: draft.sampleSize === null ? "1" : String(draft.sampleSize),
       samplePercent: draft.samplePercent ?? "",
+      aql: AQLS.find((aql) => draft.aql !== null && Number(aql) === Number(draft.aql)) ?? "2.5",
+      inspectionLevel: draft.inspectionLevel ?? "II",
       acceptanceNumber: String(draft.acceptanceNumber),
       parameters: draft.parameters.map(toParameterValues),
     },
@@ -83,6 +87,8 @@ export function TemplateDraftForm({ templateId, draft }: { templateId: string; d
         samplingType: values.samplingType,
         sampleSize: values.samplingType === "FIXED" ? Number(values.sampleSize) : null,
         samplePercent: values.samplingType === "PERCENTAGE" ? values.samplePercent : null,
+        aql: values.samplingType === "AQL" ? values.aql : null,
+        inspectionLevel: values.samplingType === "AQL" ? values.inspectionLevel : null,
         acceptanceNumber: Number(values.acceptanceNumber),
         parameters: values.parameters.map((parameter) => ({
           ...parameter,
@@ -113,6 +119,7 @@ export function TemplateDraftForm({ templateId, draft }: { templateId: string; d
               <option value="FIXED">Fixed number of samples</option>
               <option value="PERCENTAGE">Percentage of the lot</option>
               <option value="FULL">Every unit</option>
+              <option value="AQL">AQL (ISO 2859-1)</option>
             </select>
           </div>
           {samplingType === "FIXED" && (
@@ -121,16 +128,43 @@ export function TemplateDraftForm({ templateId, draft }: { templateId: string; d
           {samplingType === "PERCENTAGE" && (
             <Field label="Sample percent" id="samplePercent" inputMode="decimal" error={errors.samplePercent} {...register("samplePercent")} />
           )}
-          <Field
-            label="Failures allowed per parameter"
-            id="acceptanceNumber"
-            inputMode="numeric"
-            error={errors.acceptanceNumber}
-            {...register("acceptanceNumber")}
-          />
+          {samplingType === "AQL" ? (
+            <>
+              <div className="space-y-1.5">
+                <Label htmlFor="aql">AQL (% nonconforming)</Label>
+                <select id="aql" className={SELECT_CLASS} {...register("aql")}>
+                  {AQLS.map((aql) => (
+                    <option key={aql} value={aql}>
+                      {aql}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="inspectionLevel">Inspection level</Label>
+                <select id="inspectionLevel" className={SELECT_CLASS} {...register("inspectionLevel")}>
+                  <option value="I">I (smaller samples)</option>
+                  <option value="II">II (usual)</option>
+                  <option value="III">III (larger samples)</option>
+                </select>
+              </div>
+            </>
+          ) : (
+            <Field
+              label="Failures allowed per parameter"
+              id="acceptanceNumber"
+              inputMode="numeric"
+              error={errors.acceptanceNumber}
+              {...register("acceptanceNumber")}
+            />
+          )}
           <Field label="Change note" id="changeNote" {...register("changeNote")} />
         </div>
-        <p className="mt-3 text-sm text-muted-foreground">Critical parameters always fail on one bad sample.</p>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Critical parameters always fail on one bad sample.
+          {samplingType === "AQL" &&
+            " Under AQL, each lot's size sets the sample size and how many nonconforming samples it accepts, normal inspection, single sampling. A sample failing several parameters counts once."}
+        </p>
       </Section>
       {fields.map((field, index) => {
         // eslint-disable-next-line react-hooks/incompatible-library -- nothing here is memoized

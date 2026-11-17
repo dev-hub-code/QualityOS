@@ -207,3 +207,32 @@ test("a template is published, and a failed critical measurement never releases 
   await expect(manager.getByText("closed", { exact: true }).first()).toBeVisible();
   await expect(manager.getByRole("button", { name: "Raise CAPA" })).toHaveCount(0);
 });
+
+test("a template can sample by AQL, set from the lot size each time", async ({ page }) => {
+  await signUp(page);
+  await page.goto("/inspection-templates");
+  await dialogAdd(page, "Add template", async (dialog) => {
+    await dialog.getByLabel("Code", { exact: true }).fill("BAR-AQL");
+    await dialog.getByLabel("Name", { exact: true }).fill("Bar by AQL");
+    await dialog.getByLabel("Type").selectOption("IQC");
+  });
+  await expect(page).toHaveURL(/inspection-templates\//);
+
+  await page.getByLabel("Sampling").selectOption("AQL");
+  await expect(page.getByLabel("Failures allowed per parameter")).toHaveCount(0);
+  await page.getByLabel("AQL (% nonconforming)").selectOption("1.0");
+  await page.getByLabel("Inspection level").selectOption("III");
+  await page.getByRole("button", { name: "Add parameter" }).click();
+  await page.getByLabel("Parameter code").fill("DIA");
+  await page.getByLabel("Parameter name").fill("Diameter");
+  await page.getByLabel("Minimum").fill("19.9");
+  await page.getByLabel("Maximum").fill("20.1");
+  await page.getByRole("button", { name: "Save draft" }).click();
+  await expect(page.getByText("Saved")).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("AQL (% nonconforming)")).toHaveValue("1.0");
+  await expect(page.getByLabel("Inspection level")).toHaveValue("III");
+  await page.getByRole("button", { name: "Publish" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("AQL 1, inspection level III, with sample size and acceptance set by each lot's size")).toBeVisible();
+});

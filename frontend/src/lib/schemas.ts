@@ -118,9 +118,11 @@ const wholeNumber = z.string().trim().regex(/^\d{1,3}$/, "Enter a whole number")
 
 export const templateDraftSchema = z.object({
   changeNote: z.string().trim().max(1000),
-  samplingType: z.enum(["FIXED", "PERCENTAGE", "FULL"]),
+  samplingType: z.enum(["FIXED", "PERCENTAGE", "FULL", "AQL"]),
   sampleSize: wholeNumber,
   samplePercent: optionalDecimal,
+  aql: z.string(),
+  inspectionLevel: z.enum(["I", "II", "III"]),
   acceptanceNumber: wholeNumber,
   parameters: z.array(
     z.object({

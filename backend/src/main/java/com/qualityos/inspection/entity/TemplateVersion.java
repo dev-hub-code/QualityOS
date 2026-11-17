@@ -29,7 +29,11 @@ public class TemplateVersion extends TenantOwnedEntity {
 
     public enum Status { DRAFT, PUBLISHED, SUPERSEDED }
 
-    public enum SamplingType { FIXED, PERCENTAGE, FULL }
+    public enum SamplingType { FIXED, PERCENTAGE, FULL, AQL }
+
+    /** What one inspection takes: how many samples, and how many nonconforming ones it tolerates. */
+    public record SamplingPlan(int sampleSize, int acceptanceNumber) {
+    }
 
     /** Above this, entering every sample by hand is not realistic, and a fixed plan fits better. */
     public static final int MAX_SAMPLES = 500;
@@ -55,6 +59,15 @@ public class TemplateVersion extends TenantOwnedEntity {
 
     @Setter
     private int acceptanceNumber;
+
+    /** For AQL sampling: the acceptable quality limit, in percent nonconforming, from the standard's columns. */
+    @Setter
+    private BigDecimal aql;
+
+    /** For AQL sampling: the general inspection level. */
+    @Setter
+    @Enumerated(EnumType.STRING)
+    private AqlTable.Level inspectionLevel;
 
     private LocalDate effectiveFrom;
     private LocalDate effectiveTo;
@@ -92,19 +105,36 @@ public class TemplateVersion extends TenantOwnedEntity {
         this.effectiveTo = effectiveTo;
     }
 
-    /** Samples are counted whole, so a fraction always rounds up. */
     public int samplesFor(BigDecimal quantity) {
+        return planFor(quantity).sampleSize();
+    }
+
+    /**
+     * The plan for a lot of this quantity. Samples are counted whole, so a fraction always rounds up, and so does the
+     * lot size an AQL plan looks up. Other plans keep the version's own acceptance number.
+     */
+    public SamplingPlan planFor(BigDecimal quantity) {
+        if (samplingType == SamplingType.AQL) {
+            long lot = quantity.setScale(0, RoundingMode.CEILING).longValueExact();
+            AqlTable.Plan plan = AqlTable.plan(lot, inspectionLevel, aql);
+            return new SamplingPlan(checked(plan.sampleSize()), plan.acceptanceNumber());
+        }
         int samples = switch (samplingType) {
             case FIXED -> sampleSize;
             case PERCENTAGE -> quantity.multiply(samplePercent).movePointLeft(2)
                     .setScale(0, RoundingMode.CEILING).min(BigDecimal.valueOf(MAX_SAMPLES + 1L)).intValue();
             case FULL -> quantity.setScale(0, RoundingMode.CEILING)
                     .min(BigDecimal.valueOf(MAX_SAMPLES + 1L)).intValue();
+            case AQL -> throw new IllegalStateException();
         };
+        return new SamplingPlan(Math.max(checked(samples), 1), acceptanceNumber);
+    }
+
+    private static int checked(int samples) {
         if (samples > MAX_SAMPLES) {
             throw new BusinessRuleException(
                     "This plan needs over %d samples. Use a fixed sample size.".formatted(MAX_SAMPLES));
         }
-        return Math.max(samples, 1);
+        return samples;
     }
 }

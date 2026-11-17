@@ -246,6 +246,10 @@ export const DOC_PAGES: DocPage[] = [
           ["Fixed", "A set number of samples, such as 5."],
           ["Percentage", "A share of the received quantity."],
           ["Full", "Every unit."],
+          [
+            "AQL",
+            "ISO 2859-1 single sampling for normal inspection. Choose an AQL and an inspection level. Each lot's size then sets the sample size and how many nonconforming samples it accepts. A sample failing several parameters counts once, and a plan over 500 samples is refused.",
+          ],
         ],
       },
       {

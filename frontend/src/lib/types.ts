@@ -348,10 +348,13 @@ export interface TemplateVersion {
   versionNumber: number;
   status: string;
   changeNote: string | null;
-  samplingType: "FIXED" | "PERCENTAGE" | "FULL";
+  samplingType: "FIXED" | "PERCENTAGE" | "FULL" | "AQL";
   sampleSize: number | null;
   samplePercent: string | null;
   acceptanceNumber: number;
+  /** For AQL sampling, the AQL in percent, such as "2.500". */
+  aql: string | null;
+  inspectionLevel: "I" | "II" | "III" | null;
   effectiveFrom: string | null;
   effectiveTo: string | null;
   parameters: ParameterSpec[];

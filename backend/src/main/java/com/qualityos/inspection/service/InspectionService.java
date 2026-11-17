@@ -207,7 +207,8 @@ public class InspectionService implements AttachmentPolicy {
 
     /**
      * The published templates that fit an inspection, and the one it gets when none is chosen. A lot takes any type,
-     * preferring IQC. A production batch takes the type due at its stage. Returned goods take FQC or OQC.
+     * preferring IQC. A production batch takes the type due at its stage: IPQC, FQC, or OQC once released. Returned goods take FQC or
+     * OQC.
      */
     @Transactional(readOnly = true)
     public ApplicableTemplates applicableTemplates(UUID receiptItemId, UUID productionBatchId, UUID returnItemId) {
@@ -303,7 +304,9 @@ public class InspectionService implements AttachmentPolicy {
         InspectionTemplate template = templates.requireUsableForProduct(request.templateId(), batch.productId());
         production.requireInspectable(batch.id(), template.getInspectionType().name());
         TemplateVersion version = templates.versionInForce(template.getId());
-        BigDecimal quantity = batch.producedQuantity() != null ? batch.producedQuantity() : batch.plannedQuantity();
+        // An outgoing check covers what is left to ship. Earlier checks cover the whole batch.
+        BigDecimal quantity = template.getInspectionType() == InspectionTemplate.Type.OQC ? batch.availableQuantity()
+                : batch.producedQuantity() != null ? batch.producedQuantity() : batch.plannedQuantity();
         return save(new Inspection(
                 numbers.next("INS"),
                 template.getInspectionType(),

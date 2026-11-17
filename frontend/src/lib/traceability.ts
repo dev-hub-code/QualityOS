@@ -5,11 +5,17 @@ export function parseSerials(text: string): string[] {
   return [...new Set(text.split(/[\n,]/).map((serial) => serial.trim()).filter(Boolean))];
 }
 
-/** A batch's stage decides which inspection it can take. Null means it can take none. */
-export function inspectionTypeFor(batch: Pick<ProductionBatch, "status" | "producedQuantity">): "IPQC" | "FQC" | null {
+/**
+ * A batch's stage decides which inspection it can take. Null means it can take none. A released batch with stock left
+ * to ship can take an optional outgoing check.
+ */
+export function inspectionTypeFor(
+  batch: Pick<ProductionBatch, "status" | "producedQuantity" | "availableQuantity">,
+): "IPQC" | "FQC" | "OQC" | null {
   if (batch.status === "IN_PROGRESS") return "IPQC";
   if (batch.status === "COMPLETED") return "FQC";
   if (batch.status === "ON_HOLD") return batch.producedQuantity === null ? "IPQC" : "FQC";
+  if (batch.status === "RELEASED" && Number(batch.availableQuantity) > 0) return "OQC";
   return null;
 }
 

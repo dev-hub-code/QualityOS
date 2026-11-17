@@ -24,6 +24,7 @@ public class ProductionBatch extends TenantOwnedEntity {
 
     private static final String IN_PROCESS = "IPQC";
     private static final String FINAL = "FQC";
+    private static final String OUTGOING = "OQC";
 
     private String batchNumber;
     private UUID productId;
@@ -58,13 +59,18 @@ public class ProductionBatch extends TenantOwnedEntity {
         status = Status.COMPLETED;
     }
 
-    /** The inspection this batch is ready for at its stage, if any: in-process on the line, final once complete. */
+    /**
+     * The inspection this batch is ready for at its stage, if any: in-process on the line, final once complete, and
+     * outgoing once released while it has stock left to ship. The outgoing check is optional.
+     */
     public java.util.Optional<String> dueInspection() {
         return switch (status) {
             case IN_PROGRESS -> java.util.Optional.of(IN_PROCESS);
             case COMPLETED -> java.util.Optional.of(FINAL);
             case ON_HOLD -> java.util.Optional.of(producedQuantity == null ? IN_PROCESS : FINAL);
-            case RELEASED, REJECTED -> java.util.Optional.empty();
+            case RELEASED -> availableQuantity().signum() > 0
+                    ? java.util.Optional.of(OUTGOING) : java.util.Optional.empty();
+            case REJECTED -> java.util.Optional.empty();
         };
     }
 
@@ -79,8 +85,12 @@ public class ProductionBatch extends TenantOwnedEntity {
             if (producedQuantity == null || (status != Status.COMPLETED && status != Status.ON_HOLD)) {
                 throw new BusinessRuleException("Final inspection needs a completed batch.");
             }
+        } else if (OUTGOING.equals(inspectionType)) {
+            if (status != Status.RELEASED || availableQuantity().signum() <= 0) {
+                throw new BusinessRuleException("Outgoing inspection needs a released batch with stock left to ship.");
+            }
         } else {
-            throw new BusinessRuleException("A production batch takes in-process or final inspection templates.");
+            throw new BusinessRuleException("A production batch takes in-process, final or outgoing inspection templates.");
         }
     }
 
@@ -92,7 +102,8 @@ public class ProductionBatch extends TenantOwnedEntity {
         }
         switch (disposition) {
             case "ACCEPT", "CONDITIONAL_ACCEPTANCE" -> {
-                if (FINAL.equals(inspectionType)) {
+                // An outgoing check starts on a released batch, so passing it, even after a hold, leaves it released.
+                if (FINAL.equals(inspectionType) || OUTGOING.equals(inspectionType)) {
                     status = Status.RELEASED;
                 } else {
                     resume();

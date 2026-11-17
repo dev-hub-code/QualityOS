@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { apiCaller, PASSWORD, signUp, unique } from "./helpers";
 import { acceptInvitation, inviteUser } from "./mail";
-import { dispatchedBatch, prepare, step } from "./trace-setup";
+import { dispatchedBatch, prepare, publishTemplate, step } from "./trace-setup";
 
 test("raw material is traced through production and inspection to the customer", async ({ page, browser }) => {
   test.setTimeout(90_000);
@@ -50,6 +50,25 @@ test("raw material is traced through production and inspection to the customer",
     dialog.getByLabel("Disposition", { exact: true }).selectOption("ACCEPT"),
   );
 
+  await page.goto(batchUrl);
+  await expect(page.getByText("released", { exact: true }).first()).toBeVisible();
+
+  // Released stock can take an outgoing check before it ships.
+  await publishTemplate(page, "OUT", "Outgoing check", "OQC");
+  await page.reload();
+  await page.getByRole("button", { name: "Inspect" }).click();
+  await expect(page.getByRole("dialog").getByText(/^OQC inspection of PB-/)).toBeVisible();
+  await expect(page.getByLabel("Template").locator("option:checked")).toHaveText("OUT – Outgoing check");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page).toHaveURL(/inspections\//);
+  await page.getByLabel("DIA sample 1").fill("20.0");
+  await page.getByRole("button", { name: "Submit for approval" }).click();
+  await manager.goto(page.url());
+  await manager.getByRole("button", { name: "Approve" }).click();
+  await manager.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await step(manager, "Record disposition", (dialog) =>
+    dialog.getByLabel("Disposition", { exact: true }).selectOption("ACCEPT"),
+  );
   await page.goto(batchUrl);
   await expect(page.getByText("released", { exact: true }).first()).toBeVisible();
 

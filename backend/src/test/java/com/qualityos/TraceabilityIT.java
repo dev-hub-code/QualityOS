@@ -59,6 +59,37 @@ class TraceabilityIT extends TraceabilityFixture {
     }
 
     @Test
+    void aReleasedBatchTakesAnOutgoingInspectionOfWhatIsLeftToShip() throws Exception {
+        String batch = startBatch(product());
+        consumeLot(batch, releasedLot("10").id(), "10").andExpect(status().isOk());
+        complete(batch, "10").andExpect(status().isOk());
+        // Not before it is released.
+        inspect("productionBatchId", batch, "OQC").andExpect(status().isUnprocessableContent());
+        inspectBatch(batch, "FQC", "20.0", "ACCEPT");
+        dispatch(customer(), batch, "4", List.of()).andExpect(status().isCreated());
+
+        as(owner, get("/api/v1/inspections/applicable-templates").param("productionBatchId", batch))
+                .andExpect(jsonPath("$.data.templates[*].inspectionType").value(org.hamcrest.Matchers.everyItem(
+                        org.hamcrest.Matchers.is("OQC"))));
+        String accepted = inspectBatch(batch, "OQC", "20.0", "ACCEPT");
+        as(owner, get("/api/v1/inspections/" + accepted))
+                .andExpect(jsonPath("$.data.inspectionType").value("OQC"))
+                .andExpect(jsonPath("$.data.quantity").value("6.000000"));
+        as(owner, get("/api/v1/production-batches/" + batch)).andExpect(jsonPath("$.data.batch.status").value("RELEASED"));
+
+        // A hold stops shipping until the outgoing check is decided; a rejection stops what is left for good.
+        String held = inspectBatch(batch, "OQC", "20.0", "HOLD");
+        as(owner, get("/api/v1/production-batches/" + batch)).andExpect(jsonPath("$.data.batch.status").value("ON_HOLD"));
+        dispatch(customer(), batch, "1", List.of()).andExpect(status().isUnprocessableContent());
+        as(manager, postJson("/api/v1/inspections/" + held + "/disposition", Map.of("disposition", "ACCEPT")))
+                .andExpect(status().isOk());
+        as(owner, get("/api/v1/production-batches/" + batch)).andExpect(jsonPath("$.data.batch.status").value("RELEASED"));
+        inspectBatch(batch, "OQC", "20.0", "REJECT");
+        as(owner, get("/api/v1/production-batches/" + batch)).andExpect(jsonPath("$.data.batch.status").value("REJECTED"));
+        dispatch(customer(), batch, "1", List.of()).andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
     void anotherLotOfTheSameBatchIsNotDraggedIntoAForwardTrace() throws Exception {
         Lot traced = releasedLot("10");
         Lot other = releasedLot("10");

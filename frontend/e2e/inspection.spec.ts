@@ -167,6 +167,17 @@ test("a template is published, and a failed critical measurement never releases 
     await dialog.getByLabel("Target date").fill("2036-01-10");
   });
   await page.getByRole("button", { name: "Start implementation" }).click();
+  // The organisation requires evidence on every action before it is completed.
+  await page.goto("/settings");
+  await page.getByLabel("A CAPA action needs evidence attached before it can be completed").click();
+  await expect(page.getByLabel("A CAPA action needs evidence attached before it can be completed")).toBeChecked();
+  await page.goto(capaUrl);
+  await expect(page.getByText("Evidence (required before it can be completed)")).toBeVisible();
+  await page.getByRole("button", { name: "Complete", exact: true }).click();
+  await page.getByRole("dialog").getByLabel("What was done").fill("Replaced and calibrated");
+  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("dialog").getByText("Attach evidence to this action before completing it.")).toBeVisible();
+  await page.keyboard.press("Escape");
   // Evidence belongs to the action it proves.
   await page.getByLabel("Upload evidence for: Replace thermocouple").setInputFiles({
     name: "thermocouple-cert.pdf",

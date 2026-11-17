@@ -138,8 +138,8 @@ unverified sign-in is off. Local Docker Compose enforces it too. Integration tes
 | Endpoint | Access | Result |
 |---|---|---|
 | `PUT /organizations/{id}` | `TENANT_MANAGE` | The profile: `name`, `legalName`, `gstin`, `industry`, `countryCode`, `timezone`, `currency`, `locale` (always `en-IN`; the app and its email are English only), `address`, `contactPhone` (optional, digits with an optional `+`, spaces, brackets or dashes, 6 to 20 characters), `version`. The Control Center's organisation page shows the contact number |
-| `GET /organizations/current/settings` | Any member | `singlePersonReview`, `selfReviewInEffect`, `activeMembers`, `capaRequiredFrom`, `effectivenessRequiredFrom`, `version` (null until first saved) |
-| `PUT /organizations/current/settings` | `TENANT_MANAGE` | Takes every rule (`singlePersonReview`, `capaRequiredFrom`, `effectivenessRequiredFrom`) and the `version` last read. A missing rule is `400`, a stale version `409`. Audited as `TENANT_SETTINGS_UPDATED` with before and after |
+| `GET /organizations/current/settings` | Any member | `singlePersonReview`, `selfReviewInEffect`, `activeMembers`, `capaRequiredFrom`, `effectivenessRequiredFrom`, `actionEvidenceRequired`, `version` (null until first saved) |
+| `PUT /organizations/current/settings` | `TENANT_MANAGE` | Takes every rule (`singlePersonReview`, `capaRequiredFrom`, `effectivenessRequiredFrom`, `actionEvidenceRequired`) and the `version` last read. A missing rule is `400`, except `actionEvidenceRequired`, which stays as it is when left out, a stale version `409`. Audited as `TENANT_SETTINGS_UPDATED` with before and after |
 
 `selfReviewInEffect` is true while `singlePersonReview` is on and the organisation has one active member. Then that
 person may approve or send back their own inspection, close an NCR whose verification they requested, and verify or
@@ -149,6 +149,8 @@ correction, which then needs no second approval. Each of those needs a note (`no
 `INSPECTION_SEND_BACK`, `NCR_CLOSE`, `CAPA_VERIFY`, `CAPA_CLOSE`, `RECALL_CLOSE`, `AUDIT_CLOSE`,
 `MATERIAL_CORRECTION_APPROVE`) and the reason. Once a second
 member is active, the usual rule returns without anyone changing the setting.
+
+With `actionEvidenceRequired` on, `POST /capas/{id}/actions/{actionId}/complete` is refused (`422`) until a file is attached to that action (`CAPA_ACTION`). A file on the CAPA as a whole does not count. It is off by default.
 
 `capaRequiredFrom` and `effectivenessRequiredFrom` each name the least severe NCR a rule covers: `MINOR` (every NCR),
 `MAJOR` (critical and major, the default), `CRITICAL`, or `NEVER`. The first decides which NCRs need a closed CAPA

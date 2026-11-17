@@ -17,6 +17,7 @@ public class TenantSettingsService {
             boolean singlePersonReview,
             SeverityThreshold capaRequiredFrom,
             SeverityThreshold effectivenessRequiredFrom,
+            boolean actionEvidenceRequired,
             Long version) {
 
         static final Settings DEFAULTS = view(new TenantSettings());
@@ -47,6 +48,7 @@ public class TenantSettingsService {
         row.setSinglePersonReview(desired.singlePersonReview());
         row.setCapaRequiredFrom(desired.capaRequiredFrom());
         row.setEffectivenessRequiredFrom(desired.effectivenessRequiredFrom());
+        row.setActionEvidenceRequired(desired.actionEvidenceRequired());
         Settings saved = view(settings.saveAndFlush(row));
         audit.record("TENANT_SETTINGS_UPDATED", "Organization", TenantContext.getCurrentTenantId(),
                 previous, snapshot(saved));
@@ -55,13 +57,14 @@ public class TenantSettingsService {
 
     private static Settings view(TenantSettings row) {
         return new Settings(row.isSinglePersonReview(), row.getCapaRequiredFrom(), row.getEffectivenessRequiredFrom(),
-                row.getVersion());
+                row.isActionEvidenceRequired(), row.getVersion());
     }
 
     private static Map<String, Object> snapshot(Settings settings) {
         return Map.of(
                 "singlePersonReview", settings.singlePersonReview(),
                 "capaRequiredFrom", settings.capaRequiredFrom(),
-                "effectivenessRequiredFrom", settings.effectivenessRequiredFrom());
+                "effectivenessRequiredFrom", settings.effectivenessRequiredFrom(),
+                "actionEvidenceRequired", settings.actionEvidenceRequired());
     }
 }

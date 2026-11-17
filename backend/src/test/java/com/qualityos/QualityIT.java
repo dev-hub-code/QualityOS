@@ -442,6 +442,45 @@ class QualityIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void anOrganisationCanRequireEvidenceBeforeAnActionIsCompleted() throws Exception {
+        String capa = capa(null, owner);
+        analyse(capa);
+        String action = addAction(capa, "CORRECTIVE");
+        act(owner, "/capas/" + capa + "/start-implementation", Map.of()).andExpect(status().isOk());
+        updateSettings(owner, Map.of("actionEvidenceRequired", true));
+        as(owner, get("/api/v1/organizations/current/settings"))
+                .andExpect(jsonPath("$.data.actionEvidenceRequired").value(true));
+
+        act(owner, "/capas/" + capa + "/actions/" + action + "/complete", Map.of("note", "Done"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value("Attach evidence to this action before completing it."));
+        // A file on the CAPA as a whole does not count for the action.
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "summary.pdf", "application/pdf", "%PDF-1.4 sum".getBytes(StandardCharsets.UTF_8));
+        mvc.perform(multipart("/api/v1/attachments").file(file).param("entityType", "CAPA").param("entityId", capa)
+                        .header(HttpHeaders.AUTHORIZATION, owner.bearer()))
+                .andExpect(status().isCreated());
+        act(owner, "/capas/" + capa + "/actions/" + action + "/complete", Map.of("note", "Done"))
+                .andExpect(status().isUnprocessableContent());
+
+        uploadEvidence(owner, action).andExpect(status().isCreated());
+        act(owner, "/capas/" + capa + "/actions/" + action + "/complete", Map.of("note", "Done"))
+                .andExpect(status().isOk());
+
+        // A client that leaves the rule out keeps it as it is.
+        Map<String, Object> older = new java.util.HashMap<>(Map.of("singlePersonReview", false,
+                "capaRequiredFrom", "MAJOR", "effectivenessRequiredFrom", "MAJOR"));
+        older.put("version", JsonPath.read(as(owner, get("/api/v1/organizations/current/settings")).andReturn()
+                .getResponse().getContentAsString(),
+                "$.data.version"));
+        as(owner, put("/api/v1/organizations/current/settings")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(older)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.actionEvidenceRequired").value(true));
+    }
+
+    @Test
     void eachActionKeepsItsOwnEvidenceUntilTheCapaIsFinished() throws Exception {
         String capa = capa(null, owner);
         analyse(capa);

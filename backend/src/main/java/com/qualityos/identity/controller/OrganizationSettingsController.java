@@ -38,10 +38,14 @@ public class OrganizationSettingsController {
     @PutMapping
     @PreAuthorize("hasAuthority('" + Permissions.TENANT_MANAGE + "')")
     public ApiResponse<OrganizationSettings> update(@Valid @RequestBody UpdateOrganizationSettingsRequest request) {
+        boolean evidence = request.actionEvidenceRequired() != null
+                ? request.actionEvidenceRequired()
+                : settings.get().actionEvidenceRequired();
         return ApiResponse.ok(view(settings.update(new TenantSettingsService.Settings(
                 request.singlePersonReview(),
                 request.capaRequiredFrom(),
                 request.effectivenessRequiredFrom(),
+                evidence,
                 request.version()))));
     }
 
@@ -53,6 +57,7 @@ public class OrganizationSettingsController {
                 members,
                 saved.capaRequiredFrom(),
                 saved.effectivenessRequiredFrom(),
+                saved.actionEvidenceRequired(),
                 saved.version());
     }
 }

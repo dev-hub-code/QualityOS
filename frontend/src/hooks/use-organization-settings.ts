@@ -6,7 +6,10 @@ import type { OrganizationSettings } from "@/lib/types";
 
 export const ORGANIZATION_SETTINGS_PATH = "/organizations/current/settings";
 
-type Rules = Pick<OrganizationSettings, "singlePersonReview" | "capaRequiredFrom" | "effectivenessRequiredFrom">;
+type Rules = Pick<
+  OrganizationSettings,
+  "singlePersonReview" | "capaRequiredFrom" | "effectivenessRequiredFrom" | "actionEvidenceRequired"
+>;
 
 export function useOrganizationSettings() {
   return useQuery({
@@ -22,11 +25,12 @@ export function useSaveOrganizationSettings() {
   return useMutation({
     mutationFn: (changes: Partial<Rules>) => {
       if (!data) throw new Error("Settings are still loading.");
-      const { singlePersonReview, capaRequiredFrom, effectivenessRequiredFrom, version } = data;
+      const { singlePersonReview, capaRequiredFrom, effectivenessRequiredFrom, actionEvidenceRequired, version } = data;
       return api.put(ORGANIZATION_SETTINGS_PATH, {
         singlePersonReview,
         capaRequiredFrom,
         effectivenessRequiredFrom,
+        actionEvidenceRequired,
         version,
         ...changes,
       });

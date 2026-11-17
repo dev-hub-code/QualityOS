@@ -1,6 +1,7 @@
 package com.qualityos.quality.service;
 
 import com.qualityos.common.attachment.AttachmentPolicy;
+import com.qualityos.common.attachment.AttachmentService;
 import com.qualityos.common.audit.AuditService;
 import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ResourceNotFoundException;
@@ -41,6 +42,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -73,6 +75,7 @@ public class CapaService implements AttachmentPolicy {
     private final FacilityService facilities;
     private final ReviewPolicy reviewPolicy;
     private final QualityRules rules;
+    private final AttachmentService attachments;
 
     CapaService(
             CorrectiveActionRepository capas,
@@ -89,7 +92,9 @@ public class CapaService implements AttachmentPolicy {
             FacilityScope scope,
             FacilityService facilities,
             ReviewPolicy reviewPolicy,
-            QualityRules rules) {
+            QualityRules rules,
+            @Lazy AttachmentService attachments) {
+        this.attachments = attachments;
         this.rules = rules;
         this.reviewPolicy = reviewPolicy;
         this.facilities = facilities;
@@ -215,9 +220,12 @@ public class CapaService implements AttachmentPolicy {
     public CapaDetail completeAction(UUID id, UUID actionId, String note) {
         CorrectiveAction capa = lock(id);
         capa.requireImplementation();
-        actions.findByIdAndCapaId(actionId, id)
-                .orElseThrow(() -> new ResourceNotFoundException("Action", actionId))
-                .complete(note.trim(), Instant.now());
+        CapaAction action = actions.findByIdAndCapaId(actionId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Action", actionId));
+        if (!action.isDone() && rules.actionEvidenceRequired() && !attachments.hasAny("CAPA_ACTION", actionId)) {
+            throw new BusinessRuleException("Attach evidence to this action before completing it.");
+        }
+        action.complete(note.trim(), Instant.now());
         audit.record("CAPA_ACTION_COMPLETED", ENTITY, id, null, Map.of("action", actionId));
         return toDetail(capa);
     }

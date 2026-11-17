@@ -29,4 +29,7 @@ public class TenantSettings extends TenantOwnedEntity {
     /** CAPAs raised on NCRs at least this severe must have their fix verified as effective. */
     @Enumerated(EnumType.STRING)
     private SeverityThreshold effectivenessRequiredFrom = SeverityThreshold.MAJOR;
+
+    /** A CAPA action needs a file attached to it before it can be completed. */
+    private boolean actionEvidenceRequired;
 }

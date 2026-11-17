@@ -9,5 +9,7 @@ public interface MaterialMovementRepository extends JpaRepository<MaterialMoveme
 
     List<MaterialMovement> findByWorkOrderIdOrderByCreatedAtAscIdAsc(UUID workOrderId);
 
+    List<MaterialMovement> findByWorkOrderIdInOrderByCreatedAtAscIdAsc(java.util.Collection<UUID> workOrderIds);
+
     boolean existsByWorkOrderIdAndRequestKey(UUID workOrderId, String requestKey);
 }

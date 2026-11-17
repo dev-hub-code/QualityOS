@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface WorkOrderMaterialRepository extends JpaRepository<WorkOrderMaterial, UUID> {
 
     List<WorkOrderMaterial> findByWorkOrderIdOrderByLineNumber(UUID workOrderId);
+
+    List<WorkOrderMaterial> findByWorkOrderIdInOrderByLineNumber(java.util.Collection<UUID> workOrderIds);
 }

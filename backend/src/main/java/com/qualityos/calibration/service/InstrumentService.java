@@ -50,6 +50,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -448,9 +449,11 @@ public class InstrumentService implements AttachmentPolicy {
     /** Each instrument on the inspection, and where the inspection stands if that instrument later failed. */
     @Transactional(readOnly = true)
     public List<UsedInstrument> usedBy(UUID inspectionId) {
-        List<Instrument> used = usages.findByInspectionId(inspectionId).stream()
-                .flatMap(use -> instruments.findById(use.getInstrumentId()).stream())
-                .toList();
+        // One query for the instruments, in the order they were used.
+        List<UUID> usedIds = usages.findByInspectionId(inspectionId).stream().map(use -> use.getInstrumentId()).toList();
+        Map<UUID, Instrument> byId = instruments.findAllById(usedIds).stream()
+                .collect(Collectors.toMap(Instrument::getId, Function.identity()));
+        List<Instrument> used = usedIds.stream().map(byId::get).filter(java.util.Objects::nonNull).toList();
         Map<UUID, List<CalibrationImpactReview>> reviewed = reviews.findByInspectionIdAndInstrumentIdIn(
                         inspectionId, used.stream().map(Instrument::getId).toList()).stream()
                 .collect(Collectors.groupingBy(CalibrationImpactReview::getInstrumentId));

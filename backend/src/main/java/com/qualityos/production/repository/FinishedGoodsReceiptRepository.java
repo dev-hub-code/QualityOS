@@ -11,6 +11,8 @@ public interface FinishedGoodsReceiptRepository extends JpaRepository<FinishedGo
 
     Optional<FinishedGoodsReceipt> findByWorkOrderId(UUID workOrderId);
 
+    List<FinishedGoodsReceipt> findByWorkOrderIdIn(java.util.Collection<UUID> workOrderIds);
+
     boolean existsByWorkOrderId(UUID workOrderId);
 
     List<FinishedGoodsReceipt> findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(Instant from, Instant to);

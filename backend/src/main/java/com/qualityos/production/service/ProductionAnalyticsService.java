@@ -227,8 +227,10 @@ public class ProductionAnalyticsService {
         List<WorkOrder> closed = workOrders.findByStatusInAndCompletedAtGreaterThanEqualAndCompletedAtLessThan(CLOSED,
                 start, end).stream().filter(order -> facilitySet.contains(order.getFacilityId())).toList();
         Map<UUID, BigDecimal> receivedByOrder = new HashMap<>();
-        closed.forEach(order -> receipts.findByWorkOrderId(order.getId())
-                .ifPresent(receipt -> receivedByOrder.put(order.getId(), receipt.getQuantity())));
+        if (!closed.isEmpty()) {
+            receipts.findByWorkOrderIdIn(closed.stream().map(WorkOrder::getId).toList())
+                    .forEach(receipt -> receivedByOrder.put(receipt.getWorkOrderId(), receipt.getQuantity()));
+        }
         Set<UUID> productIds = new HashSet<>();
         receiptOrders.values().forEach(order -> productIds.add(order.getProductId()));
         closed.forEach(order -> productIds.add(order.getProductId()));

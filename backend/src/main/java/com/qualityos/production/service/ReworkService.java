@@ -192,6 +192,12 @@ public class ReworkService {
         return reworks.findByWorkOrderIdOrderByCreatedAtAscIdAsc(workOrderId);
     }
 
+    /** Several orders' rework orders, in one query. */
+    @Transactional(readOnly = true)
+    public List<ReworkOrder> ofOrders(java.util.Collection<UUID> workOrderIds) {
+        return workOrderIds.isEmpty() ? List.of() : reworks.findByWorkOrderIdInOrderByCreatedAtAscIdAsc(workOrderIds);
+    }
+
     @Transactional(readOnly = true)
     public List<ReworkSummary> summariesOf(List<ReworkOrder> rows) {
         return rows.isEmpty() ? List.of() : rows.stream().map(summaries(rows)).toList();

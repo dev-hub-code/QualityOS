@@ -79,8 +79,10 @@ public class UserManagementService {
                 .collect(Collectors.groupingBy(
                         UserRole::getMembershipId,
                         Collectors.mapping(a -> rolesById.get(a.getRoleId()), Collectors.toList())));
+        Map<UUID, Set<UUID>> facilitiesByMembership = facilitiesOf(membershipIds);
         return PageResponse.from(page, m -> toResponse(m, usersById.get(m.getUserId()),
-                rolesByMembership.getOrDefault(m.getId(), List.of()), facilitiesOf(m.getId())));
+                rolesByMembership.getOrDefault(m.getId(), List.of()),
+                facilitiesByMembership.getOrDefault(m.getId(), Set.of())));
     }
 
     @Transactional
@@ -124,6 +126,21 @@ public class UserManagementService {
                 roles.findVisibleByIds(roleIds, TenantContext.getCurrentTenantId()).stream()
                         .map(roleMapper::toSummary).toList(),
                 facilityIds);
+    }
+
+    /** A page of members' facilities, in one query. */
+    private Map<UUID, Set<UUID>> facilitiesOf(List<UUID> membershipIds) {
+        if (membershipIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, Set<UUID>> byMembership = new java.util.HashMap<>();
+        jdbc.query("SELECT membership_id, facility_id FROM membership_facilities WHERE membership_id = ANY (?)",
+                (java.sql.ResultSet row) -> {
+                    byMembership.computeIfAbsent(row.getObject(1, UUID.class), key -> new java.util.HashSet<>())
+                            .add(row.getObject(2, UUID.class));
+                },
+                (Object) membershipIds.toArray(UUID[]::new));
+        return byMembership;
     }
 
     private Set<UUID> facilitiesOf(UUID membershipId) {

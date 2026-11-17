@@ -14,6 +14,8 @@ public interface TemplateVersionRepository extends JpaRepository<TemplateVersion
     @EntityGraph(attributePaths = "parameters")
     List<TemplateVersion> findByTemplateIdOrderByVersionNumberDesc(UUID templateId);
 
+    List<TemplateVersion> findByTemplateIdInOrderByVersionNumberDesc(java.util.Collection<UUID> templateIds);
+
     @EntityGraph(attributePaths = "parameters")
     @Query("select v from TemplateVersion v where v.id = :id")
     Optional<TemplateVersion> findWithParameters(UUID id);

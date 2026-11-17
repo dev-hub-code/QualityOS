@@ -116,7 +116,7 @@ public class CostingService {
             throw new BusinessRuleException("Work order %s is not released, so its materials and operations are not "
                     + "fixed yet.".formatted(order.getWorkOrderNumber()));
         }
-        return cost(order, calendar.currency());
+        return cost(order, calendar.currency(), load(List.of(order)));
     }
 
     /** Orders closed in the period, in one facility or every facility the caller may see. */
@@ -140,8 +140,9 @@ public class CostingService {
         BigDecimal planned = BigDecimal.ZERO;
         BigDecimal actual = BigDecimal.ZERO;
         boolean complete = true;
+        Loaded loaded = load(closed);
         for (WorkOrder order : closed) {
-            WorkOrderCost cost = cost(order, currency);
+            WorkOrderCost cost = cost(order, currency, loaded);
             ProductReference product = productRefs.get(order.getProductId());
             rows.add(new CostSummaryRow(order.getId(), order.getWorkOrderNumber(),
                     product == null ? null : product.code(), order.getStatus(), order.getCompletedAt(),
@@ -156,28 +157,71 @@ public class CostingService {
 
     // Working it out
 
-    private WorkOrderCost cost(WorkOrder order, String currency) {
-        Set<String> missing = new LinkedHashSet<>();
-        Instant now = Instant.now();
-        List<WorkOrderOperation> steps = operations.findByWorkOrderIdOrderBySequence(order.getId()).stream()
-                .filter(step -> step.getStatus() != WorkOrderOperation.Status.CANCELLED).toList();
-        Map<UUID, WorkCenter> centreById = centres.findAllById(steps.stream().map(WorkOrderOperation::getWorkCenterId)
-                .collect(Collectors.toSet())).stream().collect(Collectors.toMap(WorkCenter::getId, c -> c));
+    /**
+     * Everything the orders' costs are worked out from, in one query per kind of record however many orders there
+     * are.
+     */
+    private record Loaded(
+            Map<UUID, List<WorkOrderOperation>> steps,
+            Map<UUID, WorkCenter> centreById,
+            Map<UUID, List<WorkOrderMaterial>> required,
+            Map<UUID, List<MaterialMovement>> moved,
+            Map<UUID, UnitPrice> lotPrices,
+            Map<UUID, List<UnitPrice>> averages,
+            Map<UUID, MaterialReference> materialRefs,
+            Map<UUID, ProductReference> productRefs,
+            Map<UUID, FinishedGoodsReceipt> receipts,
+            Map<UUID, List<ReworkOrder>> reworks) {
+    }
 
-        // Material
-        List<WorkOrderMaterial> required = lines.findByWorkOrderIdOrderByLineNumber(order.getId());
-        List<MaterialMovement> moved = movements.findByWorkOrderIdOrderByCreatedAtAscIdAsc(order.getId()).stream()
+    private Loaded load(List<WorkOrder> orders) {
+        if (orders.isEmpty()) {
+            return new Loaded(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(),
+                    Map.of());
+        }
+        List<UUID> ids = orders.stream().map(WorkOrder::getId).toList();
+        Map<UUID, List<WorkOrderOperation>> steps = operations.findByWorkOrderIdInOrderBySequence(ids).stream()
+                .filter(step -> step.getStatus() != WorkOrderOperation.Status.CANCELLED)
+                .collect(Collectors.groupingBy(WorkOrderOperation::getWorkOrderId));
+        Map<UUID, WorkCenter> centreById = centres.findAllById(steps.values().stream().flatMap(List::stream)
+                .map(WorkOrderOperation::getWorkCenterId).collect(Collectors.toSet())).stream()
+                .collect(Collectors.toMap(WorkCenter::getId, c -> c));
+        List<WorkOrderMaterial> allLines = lines.findByWorkOrderIdInOrderByLineNumber(ids);
+        List<MaterialMovement> allMoved = movements.findByWorkOrderIdInOrderByCreatedAtAscIdAsc(ids).stream()
                 .filter(m -> m.getMovementType() == MaterialMovement.Type.ISSUED
                         || m.getMovementType() == MaterialMovement.Type.RETURNED)
                 .toList();
-        Map<UUID, UnitPrice> lotPrices = lots.lotPrices(moved.stream().map(MaterialMovement::getLotId)
-                .filter(Objects::nonNull).collect(Collectors.toSet()));
-        Map<UUID, List<UnitPrice>> averages = purchaseOrders.averagePrices(required.stream()
-                .map(WorkOrderMaterial::getMaterialId).filter(Objects::nonNull).collect(Collectors.toSet()));
-        Map<UUID, MaterialReference> materialRefs = materials.references(required.stream()
-                .map(WorkOrderMaterial::getMaterialId).filter(Objects::nonNull).collect(Collectors.toSet()));
-        Map<UUID, ProductReference> productRefs = products.references(required.stream()
-                .map(WorkOrderMaterial::getComponentProductId).filter(Objects::nonNull).collect(Collectors.toSet()));
+        Set<UUID> materialIds = allLines.stream().map(WorkOrderMaterial::getMaterialId).filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        return new Loaded(
+                steps,
+                centreById,
+                allLines.stream().collect(Collectors.groupingBy(WorkOrderMaterial::getWorkOrderId)),
+                allMoved.stream().collect(Collectors.groupingBy(MaterialMovement::getWorkOrderId)),
+                lots.lotPrices(allMoved.stream().map(MaterialMovement::getLotId).filter(Objects::nonNull)
+                        .collect(Collectors.toSet())),
+                purchaseOrders.averagePrices(materialIds),
+                materials.references(materialIds),
+                products.references(allLines.stream().map(WorkOrderMaterial::getComponentProductId)
+                        .filter(Objects::nonNull).collect(Collectors.toSet())),
+                receipts.findByWorkOrderIdIn(ids).stream()
+                        .collect(Collectors.toMap(FinishedGoodsReceipt::getWorkOrderId, r -> r)),
+                reworks.ofOrders(ids).stream().collect(Collectors.groupingBy(ReworkOrder::getWorkOrderId)));
+    }
+
+    private WorkOrderCost cost(WorkOrder order, String currency, Loaded loaded) {
+        Set<String> missing = new LinkedHashSet<>();
+        Instant now = Instant.now();
+        List<WorkOrderOperation> steps = loaded.steps().getOrDefault(order.getId(), List.of());
+        Map<UUID, WorkCenter> centreById = loaded.centreById();
+
+        // Material
+        List<WorkOrderMaterial> required = loaded.required().getOrDefault(order.getId(), List.of());
+        List<MaterialMovement> moved = loaded.moved().getOrDefault(order.getId(), List.of());
+        Map<UUID, UnitPrice> lotPrices = loaded.lotPrices();
+        Map<UUID, List<UnitPrice>> averages = loaded.averages();
+        Map<UUID, MaterialReference> materialRefs = loaded.materialRefs();
+        Map<UUID, ProductReference> productRefs = loaded.productRefs();
         List<MaterialCost> materialCosts = new ArrayList<>();
         BigDecimal plannedMaterial = BigDecimal.ZERO;
         BigDecimal actualMaterial = BigDecimal.ZERO;
@@ -261,9 +305,9 @@ public class CostingService {
         }
 
         // Totals, and what scrap and rework cost of them
-        Optional<FinishedGoodsReceipt> receipt = receipts.findByWorkOrderId(order.getId());
+        Optional<FinishedGoodsReceipt> receipt = Optional.ofNullable(loaded.receipts().get(order.getId()));
         BigDecimal received = receipt.map(FinishedGoodsReceipt::getQuantity).orElse(null);
-        List<ReworkOrder> closedRework = reworks.ofOrder(order.getId()).stream()
+        List<ReworkOrder> closedRework = loaded.reworks().getOrDefault(order.getId(), List.of()).stream()
                 .filter(rework -> rework.getStatus() == ReworkOrder.Status.CLOSED).toList();
         BigDecimal scrapped = steps.stream().map(WorkOrderOperation::getScrapQuantity)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)

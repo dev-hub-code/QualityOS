@@ -264,6 +264,19 @@ public final class TraceabilityDtos {
     }
 
     /** @param status NOT_REVERSED, PARTIALLY_REVERSED or FULLY_REVERSED */
+    /**
+     * A complaint about a dispatch with nothing sent back, such as a phone call.
+     *
+     * @param dispatchItemId the line it is about, or null for the whole dispatch
+     */
+    public record CreateComplaintRequest(
+            @NotBlank @Size(max = 100) String reference,
+            @NotNull LocalDate receivedOn,
+            @NotNull @jakarta.validation.constraints.Pattern(regexp = "CRITICAL|MAJOR|MINOR") String severity,
+            @NotBlank @Size(max = 3000) String description,
+            UUID dispatchItemId) {
+    }
+
     public record ReversalSummary(
             UUID dispatchId,
             String status,

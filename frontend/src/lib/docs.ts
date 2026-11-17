@@ -385,6 +385,7 @@ export const DOC_PAGES: DocPage[] = [
           ["Calibration", "Raised automatically when an instrument fails calibration."],
           ["Production", "Raised from a shop-floor report of rejected or scrapped goods, when Manufacturing settings ask for it."],
           ["Customer return", "Raised when a return is recorded as a quality complaint. One NCR covers the whole return, as major."],
+          ["Customer complaint", "Raised from a dispatch's page when a customer complains about goods they kept, such as by phone."],
           ["Manual", "Raised by hand, for anything else you notice."],
         ],
       },

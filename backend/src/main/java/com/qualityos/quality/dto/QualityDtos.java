@@ -111,6 +111,21 @@ public final class QualityDtos {
             UUID facilityId) {
     }
 
+    /** What a customer reported about a dispatch, with nothing sent back. */
+    public record CustomerComplaint(
+            UUID dispatchId,
+            String dispatchNumber,
+            String customerName,
+            String reference,
+            java.time.LocalDate receivedOn,
+            /* CRITICAL, MAJOR or MINOR. */
+            String severity,
+            String description,
+            String batchNumber,
+            List<String> lines,
+            UUID facilityId) {
+    }
+
     /** How the correction of an audit finding stands. */
     public record NcrOutcome(UUID id, String ncrNumber, String status, boolean finished, List<LinkedCapa> capas) {
     }
@@ -181,6 +196,7 @@ public final class QualityDtos {
             UUID instrumentId,
             UUID workOrderId,
             UUID dispatchReversalId,
+            UUID dispatchId,
             UUID supplierId,
             String supplierName,
             UUID materialId,

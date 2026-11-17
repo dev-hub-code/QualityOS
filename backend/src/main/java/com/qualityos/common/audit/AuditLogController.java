@@ -84,13 +84,15 @@ public class AuditLogController {
         List<AuditLogEntry> items = jdbc.query("""
                 SELECT a.id, a.user_id, u.full_name, a.action, a.entity_type, a.entity_id, a.occurred_at,
                        a.ip_address, a.correlation_id, a.previous_state::text AS before, a.new_state::text AS after,
-                       a.new_state ->> 'reason' AS reason
+                       a.new_state ->> 'reason' AS reason,
+                       (a.support_grant_id IS NOT NULL OR a.action = 'SUPPORT_SESSION_STARTED') AS by_support
                 """ + FROM + " ORDER BY a.occurred_at DESC, a.id DESC LIMIT :limit OFFSET :offset",
                 params,
                 (rs, row) -> new AuditLogEntry(
                         rs.getObject("id", UUID.class),
                         rs.getObject("user_id", UUID.class),
-                        rs.getString("full_name"),
+                        rs.getBoolean("by_support") && rs.getString("full_name") != null
+                                ? "Support (" + rs.getString("full_name") + ")" : rs.getString("full_name"),
                         rs.getString("action"),
                         rs.getString("entity_type"),
                         rs.getString("entity_id"),
@@ -99,7 +101,8 @@ public class AuditLogController {
                         rs.getString("correlation_id"),
                         rs.getString("reason"),
                         parse(rs.getString("before")),
-                        parse(rs.getString("after"))));
+                        parse(rs.getString("after")),
+                        rs.getBoolean("by_support")));
         return ApiResponse.ok(new PageResponse<>(items, page, size, total, (int) Math.ceil((double) total / size)));
     }
 
@@ -149,6 +152,8 @@ public class AuditLogController {
             String correlationId,
             String reason,
             Map<String, Object> before,
-            Map<String, Object> after) {
+            Map<String, Object> after,
+            /* Done by ProductionOS support in a session the organisation granted, not by a member. */
+            boolean bySupport) {
     }
 }

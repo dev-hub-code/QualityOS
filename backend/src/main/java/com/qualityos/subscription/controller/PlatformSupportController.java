@@ -24,8 +24,11 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize(Require.PLATFORM_ADMIN)
 public class PlatformSupportController {
 
-    /** @param openUntil when the organisation's grant ends, or null when it has not granted access */
-    public record SupportAccessStatus(Instant openUntil) {
+    /**
+     * @param openUntil when the organisation's grant ends, or null when it has not granted access
+     * @param allowChanges the grant lets support make changes, not only read
+     */
+    public record SupportAccessStatus(Instant openUntil, boolean allowChanges) {
     }
 
     private final SupportAccessService support;
@@ -38,7 +41,9 @@ public class PlatformSupportController {
 
     @GetMapping("/support-access")
     public ApiResponse<SupportAccessStatus> status(@PathVariable UUID tenantId) {
-        return ApiResponse.ok(new SupportAccessStatus(support.openUntil(tenantId).orElse(null)));
+        return ApiResponse.ok(support.openGrant(tenantId)
+                .map(grant -> new SupportAccessStatus(grant.expiresAt(), grant.allowChanges()))
+                .orElse(new SupportAccessStatus(null, false)));
     }
 
     /**

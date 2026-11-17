@@ -20,8 +20,8 @@ public class AuditService {
 
     private static final String INSERT = """
             INSERT INTO audit_logs (id, tenant_id, user_id, action, entity_type, entity_id, ip_address,
-                                    correlation_id, previous_state, new_state)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb)
+                                    correlation_id, previous_state, new_state, support_grant_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?)
             """;
 
     private final JdbcTemplate jdbc;
@@ -52,12 +52,21 @@ public class AuditService {
                 clientAddress(),
                 MDC.get(CorrelationIdFilter.MDC_KEY),
                 toJson(previousState),
-                toJson(newState));
+                toJson(newState),
+                supportGrant());
         TenantContext.findCurrentTenantId().map(TenantDataChanged::new).ifPresent(events::publishEvent);
     }
 
     private String toJson(Object state) {
         return state == null ? null : json.writeValueAsString(state);
+    }
+
+    /** The support grant the current request makes changes under, if it is a support session's. */
+    private static Object supportGrant() {
+        return RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes
+                ? attributes.getRequest().getAttribute(
+                        com.qualityos.common.security.TenantJwtAuthenticationConverter.SUPPORT_GRANT_ATTRIBUTE)
+                : null;
     }
 
     private static String clientAddress() {

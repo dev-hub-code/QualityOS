@@ -92,11 +92,12 @@ public final class AuthDtos {
             boolean hasSubscription,
             Set<String> permissions,
             List<OrganizationSummary> organizations,
-            /* Set in a read-only support session, which belongs to none of the user's own organisations. */
+            /* Set in a support session, which belongs to none of the user's own organisations. */
             SupportView support) {
     }
 
-    public record SupportView(String organizationName, java.time.Instant expiresAt) {
+    /** @param allowChanges the session can make changes, not only read */
+    public record SupportView(String organizationName, java.time.Instant expiresAt, boolean allowChanges) {
     }
 
     public record PasswordResetRequest(@NotBlank @Email @Size(max = 254) String email) {

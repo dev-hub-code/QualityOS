@@ -269,7 +269,7 @@ public class WorkCenterService {
     @Transactional(readOnly = true)
     public MachineDetail getMachine(UUID id) {
         Machine machine = loadMachine(id);
-        Map<UUID, String> names = access.activeMembers();
+        Map<UUID, String> names = access.names();
         List<StatusEventResponse> history = events.findTop100ByMachineIdOrderByCreatedAtDesc(id).stream()
                 .map(event -> new StatusEventResponse(event.getFromStatus(), event.getToStatus(), event.getReason(),
                         event.getCreatedBy(), names.get(event.getCreatedBy()), event.getCreatedAt()))

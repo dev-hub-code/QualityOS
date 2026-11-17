@@ -32,7 +32,10 @@ public class TenantJwtAuthenticationConverter implements Converter<Jwt, Abstract
      */
     public static final String SUPPORT_CLAIM = "sup";
 
-    /** Held by a support session, which can only read. */
+    /** Request attribute naming the support grant a change is made under, for the audit trail. */
+    public static final String SUPPORT_GRANT_ATTRIBUTE = "qualityos.supportGrant";
+
+    /** Held by a support session, which reads only, unless its grant lets it make changes. */
     public static final String SUPPORT_SESSION = "SUPPORT_SESSION";
 
     /** Held by every token that belongs to an organisation. Permissions are additional to this. */

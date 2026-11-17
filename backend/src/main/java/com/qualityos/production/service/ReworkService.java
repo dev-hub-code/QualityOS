@@ -478,7 +478,7 @@ public class ReworkService {
 
     private ReworkDetail detail(ReworkOrder rework) {
         ReworkSummary summary = summaries(List.of(rework)).apply(rework);
-        Map<UUID, String> members = access.activeMembers();
+        Map<UUID, String> members = access.names();
         Map<UUID, InspectionHistory> batchInspections = inspections
                 .history(List.of(), List.of(rework.getProductionBatchId())).stream()
                 .collect(Collectors.toMap(InspectionHistory::id, Function.identity()));

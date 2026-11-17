@@ -120,6 +120,12 @@ or bank details are replaced with `[hidden]` when shown or exported, and each ex
   every request, so withdrawing access or losing the role ends it at once. It carries only the `*_VIEW` permissions
   the organisation's plan allows (not production costs), any request other than a read is refused, and it lasts at
   most 30 minutes. The organisation sees each session's reason and every page read, which cannot be changed.
+- Support changes: the administrator can instead let support view and make changes, for 24 hours at most. The
+  session then holds the plan's permissions except approvals, closures and sign-offs (every `*_APPROVE` and
+  `*_CLOSE`, dispositions, template publishing), user and role management, organisation settings, billing and
+  production costs, and it can never change access, billing or support access itself. Starting it notifies the
+  organisation's administrators. Every change is in the organisation's support log, and its audit entries show
+  "Support (name)", never a member.
 - Sensitive actions need the password again, and each operator has a role. See Re-authentication and Operator roles.
 - Operators sign in with an authenticator code as well as their password, and the Control Center is closed to an
   operator who has not set one up. See Signing in.

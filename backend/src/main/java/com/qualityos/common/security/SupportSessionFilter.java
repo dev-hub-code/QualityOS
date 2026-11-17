@@ -19,8 +19,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Keeps a support session read-only, whatever an endpoint itself allows, and records each record it reads in the
- * organisation's own support log.
+ * Keeps a support session read-only unless the organisation let support make changes, and even then away from
+ * access, billing and support access itself, whatever an endpoint allows. Records each record read and each change
+ * made in the organisation's own support log.
  */
 class SupportSessionFilter extends OncePerRequestFilter {
 
@@ -28,6 +29,14 @@ class SupportSessionFilter extends OncePerRequestFilter {
 
     /** Signing out must still work. */
     private static final Set<String> WRITES_ALLOWED = Set.of("/api/v1/auth/logout");
+
+    /**
+     * Never changed in a support session, beside what the session's permissions leave out: the operator's own
+     * account, who has access, billing, support access itself, and the organisation's support requests.
+     */
+    private static final List<String> NEVER_CHANGED = List.of("/api/v1/auth/", "/api/v1/users", "/api/v1/roles",
+            "/api/v1/invitations", "/api/v1/support-access", "/api/v1/support/", "/api/v1/subscription",
+            "/api/v1/billing", "/api/v1/organizations/current", "/api/v1/notification");
 
     /** What the app shell asks on every page, which says nothing about the organisation's records. */
     private static final List<String> NOT_LOGGED = List.of("/api/v1/auth/", "/api/v1/notifications",
@@ -55,11 +64,29 @@ class SupportSessionFilter extends OncePerRequestFilter {
             return;
         }
         String path = request.getRequestURI();
-        if (!READS.contains(request.getMethod()) && !WRITES_ALLOWED.contains(path)) {
-            response.setStatus(ErrorCode.FORBIDDEN.status().value());
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            response.getWriter().write(json.writeValueAsString(ApiResponse.failure(new ApiError(
-                    ErrorCode.FORBIDDEN.name(), "Support access is read-only."))));
+        JwtAuthenticationToken session = (JwtAuthenticationToken) authentication;
+        boolean write = !READS.contains(request.getMethod()) && !WRITES_ALLOWED.contains(path);
+        if (write) {
+            boolean changes = session.getAuthorities().stream()
+                    .anyMatch(held -> TenantAccessResolver.SUPPORT_CHANGES.equals(held.getAuthority()));
+            if (!changes) {
+                refuse(response, "Support access is read-only.");
+                return;
+            }
+            if (NEVER_CHANGED.stream().anyMatch(path::startsWith)) {
+                refuse(response, "Support cannot change this, even with access to make changes.");
+                return;
+            }
+            // Audit entries made in this request are marked as support's.
+            request.setAttribute(TenantJwtAuthenticationConverter.SUPPORT_GRANT_ATTRIBUTE, UUID.fromString(grant));
+            chain.doFilter(request, response);
+            if (response.getStatus() < 400) {
+                access.recordSupportChange(
+                        UUID.fromString(session.getToken().getClaimAsString(TenantJwtAuthenticationConverter.TENANT_CLAIM)),
+                        UUID.fromString(session.getToken().getSubject()),
+                        UUID.fromString(grant),
+                        request.getMethod() + " " + path.replaceFirst("^/api/v1", ""));
+            }
             return;
         }
         if ("GET".equals(request.getMethod()) && NOT_LOGGED.stream().noneMatch(path::startsWith)) {
@@ -72,5 +99,12 @@ class SupportSessionFilter extends OncePerRequestFilter {
                     path.replaceFirst("^/api/v1", "") + (query == null ? "" : "?" + query));
         }
         chain.doFilter(request, response);
+    }
+
+    private void refuse(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(ErrorCode.FORBIDDEN.status().value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.getWriter().write(json.writeValueAsString(ApiResponse.failure(new ApiError(
+                ErrorCode.FORBIDDEN.name(), message))));
     }
 }

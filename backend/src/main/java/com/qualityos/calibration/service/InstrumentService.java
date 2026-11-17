@@ -131,7 +131,7 @@ public class InstrumentService implements AttachmentPolicy {
         if (restriction.isPresent()) {
             filter = filter.and((root, query, cb) -> root.get("facilityId").in(restriction.get()));
         }
-        Map<UUID, String> members = access.activeMembers();
+        Map<UUID, String> members = access.names();
         return PageResponse.from(instruments.findAll(filter, pageable), i -> toResponse(i, members, today));
     }
 
@@ -276,7 +276,7 @@ public class InstrumentService implements AttachmentPolicy {
         Map<UUID, NcrOutcome> raised = ncrs.forCalibrations(elsewhere.keySet());
         Map<UUID, CalibrationRecord> calibrations = history.stream()
                 .collect(Collectors.toMap(CalibrationRecord::getId, record -> record));
-        Map<UUID, String> members = access.activeMembers();
+        Map<UUID, String> members = access.names();
         return elsewhere.entrySet().stream().map(entry -> {
             NcrOutcome ncr = raised.get(entry.getKey());
             List<ImpactReviewResponse> items = byCalibration.getOrDefault(entry.getKey(), List.of()).stream()
@@ -307,7 +307,7 @@ public class InstrumentService implements AttachmentPolicy {
         if (review.getDecision() == CalibrationImpactReview.Decision.REINSPECT) {
             events.publishEvent(new ReinspectionRequired(review.getInspectionId(), instrument.getInstrumentCode()));
         }
-        return toResponse(review, access.activeMembers());
+        return toResponse(review, access.names());
     }
 
     private static ImpactReviewResponse toResponse(CalibrationImpactReview review, Map<UUID, String> members) {
@@ -547,7 +547,7 @@ public class InstrumentService implements AttachmentPolicy {
     }
 
     private InstrumentResponse toResponse(Instrument instrument) {
-        return toResponse(instrument, access.activeMembers(), today());
+        return toResponse(instrument, access.names(), today());
     }
 
     private static InstrumentResponse toResponse(Instrument i, Map<UUID, String> members, LocalDate today) {

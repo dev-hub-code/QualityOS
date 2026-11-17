@@ -54,7 +54,7 @@ Phase 11 is on hold until you ask for it.
 - [ ] Proration and auto-debit renewals
 - [ ] Enforce every plan feature, or label it as not enforced. Today only NCR_CAPA, REPORTS and ADVANCED are enforced
 - [ ] Customer support portal: customers raise and track tickets
-- [x] Support access to a customer's data only with their consent, for a limited time, and audited (read-only)
+- [x] Support access to a customer's data only with their consent, for a limited time, and audited (read-only, or with changes for at most 24 hours if the customer allows, never approvals, access or billing)
 - [x] MFA for platform operators (V20, authenticator app)
 
 ### P2: experience and scale

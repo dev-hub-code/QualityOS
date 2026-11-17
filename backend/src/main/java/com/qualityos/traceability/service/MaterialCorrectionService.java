@@ -123,7 +123,7 @@ public class MaterialCorrectionService {
                 .<MaterialCorrection>where(Searches.contains(search, "correctionNumber"))
                 .and(Searches.equalTo("status", status));
         Page<MaterialCorrection> page = corrections.findAll(scope.limit(filter, "facilityId"), pageable);
-        Map<UUID, String> names = access.activeMembers();
+        Map<UUID, String> names = access.names();
         return PageResponse.from(page, correction -> new CorrectionSummary(
                 correction.getId(),
                 correction.getCorrectionNumber(),
@@ -444,7 +444,7 @@ public class MaterialCorrectionService {
     }
 
     private CorrectionDetail toDetail(MaterialCorrection correction) {
-        Map<UUID, String> names = access.activeMembers();
+        Map<UUID, String> names = access.names();
         boolean open = correction.getStatus() == Status.DRAFT || correction.getStatus() == Status.PENDING_APPROVAL;
         return new CorrectionDetail(
                 correction.getId(),

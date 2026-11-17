@@ -47,6 +47,19 @@ public final class Permissions {
             "BILLING_ADMIN", Set.of(PLATFORM_BILLING_MANAGE),
             "SUPPORT_ADMIN", Set.of(PLATFORM_CUSTOMER_MANAGE),
             "READ_ONLY_AUDITOR", Set.of(PLATFORM_AUDIT_VIEW));
+    /**
+     * Never held in a support session, even one the organisation lets make changes: who has access, billing, costs,
+     * and every approval, closure and sign-off. Those are the organisation's own people's decisions.
+     */
+    private static final Set<String> NEVER_BY_SUPPORT = Set.of(TENANT_MANAGE, USER_MANAGE, ROLE_MANAGE,
+            SUBSCRIPTION_MANAGE, "PRODUCTION_COST_VIEW", DISPOSITION_RECORD, "TEMPLATE_PUBLISH");
+
+    /** Whether a support session that may make changes holds this permission. A new approval is left out by its name. */
+    public static boolean supportMayHold(String code) {
+        return !NEVER_BY_SUPPORT.contains(code) && !code.endsWith("_APPROVE") && !code.endsWith("_CLOSE")
+                && !code.startsWith("PLATFORM_");
+    }
+
     public static final String CALIBRATION_MANAGE = "CALIBRATION_MANAGE";
     public static final String CALIBRATION_VIEW = "CALIBRATION_VIEW";
     public static final String AUDIT_VIEW = "AUDIT_VIEW";

@@ -25,8 +25,8 @@ export interface Me {
   hasSubscription: boolean;
   permissions: string[];
   organizations: OrganizationSummary[];
-  /** Set in a read-only support session, in an organisation the user does not belong to. */
-  support: { organizationName: string; expiresAt: string } | null;
+  /** Set in a support session, in an organisation the user does not belong to. */
+  support: { organizationName: string; expiresAt: string; allowChanges: boolean } | null;
 }
 
 export interface Organization {

@@ -156,7 +156,7 @@ public class CompletionService {
         Bom definition = order.getBomId() == null ? null : boms.findById(order.getBomId()).orElse(null);
         Integer routingRevision = order.getRoutingId() == null ? null
                 : routings.findById(order.getRoutingId()).map(routing -> routing.getRevision()).orElse(null);
-        Map<UUID, String> members = access.activeMembers();
+        Map<UUID, String> members = access.names();
         List<WorkOrderOperation> steps = operations.findByWorkOrderIdOrderBySequence(order.getId());
         Map<UUID, WorkCenter> centres = workCenters.byId(steps.stream().map(WorkOrderOperation::getWorkCenterId)
                 .collect(Collectors.toSet()));
@@ -462,7 +462,7 @@ public class CompletionService {
     // Responses
 
     private CompletionResponse view(WorkOrder order) {
-        Map<UUID, String> members = access.activeMembers();
+        Map<UUID, String> members = access.names();
         SettingsResponse rules = settings.rules();
         Optional<FinishedGoodsReceipt> receipt = receipts.findByWorkOrderId(order.getId());
         Totals totals = totals(order);

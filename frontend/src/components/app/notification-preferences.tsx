@@ -46,6 +46,7 @@ const LABELS: Record<string, string> = {
   PLAN_LINE_OVERDUE: "A production plan line is past its due date",
   ANNOUNCEMENT: "ProductionOS sends an announcement",
   SUPPORT_TICKET_UPDATED: "Support replies to my request or changes its status",
+  SUPPORT_CHANGES_STARTED: "Support starts a session that can make changes in our organisation",
 };
 const PATH = "/notifications/preferences";
 

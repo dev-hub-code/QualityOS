@@ -2,6 +2,7 @@ package com.qualityos.common.mail;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import org.springframework.core.io.ByteArrayResource;
 import java.nio.charset.StandardCharsets;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
@@ -29,6 +30,10 @@ class SmtpMailGateway implements MailGateway {
             mail.setTo(message.to());
             mail.setSubject(message.subject());
             mail.setText(message.text(), message.html());
+            if (message.logo() != null) {
+                // Added after the body, as the multipart helper requires.
+                mail.addInline("logo", new ByteArrayResource(message.logo().data()), message.logo().contentType());
+            }
             sender.send(mime);
         } catch (MailException | MessagingException ex) {
             throw new MailDeliveryException(ex);

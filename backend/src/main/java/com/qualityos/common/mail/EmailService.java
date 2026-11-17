@@ -55,12 +55,32 @@ public class EmailService {
     }
 
     public RenderedEmail render(EmailRequest request) {
+        return render(request, logoOf(request));
+    }
+
+    private RenderedEmail render(EmailRequest request, MailMessage.InlineImage logo) {
         Map<String, Object> variables = new HashMap<>();
         request.variables().forEach((name, value) ->
                 variables.put(name, value instanceof LocalDate date ? DATES.format(date) : value));
         Object organization = variables.get("organizationName");
         variables.put("brandName", organization != null ? organization : DEFAULT_BRAND);
+        if (logo != null) {
+            variables.put("hasLogo", true);
+        }
         return renderer.render(request.template(), variables);
+    }
+
+    /**
+     * The logo of the organisation an email is for. Account emails belong to none, and one that does not name its
+     * organisation carries none either.
+     */
+    private MailMessage.InlineImage logoOf(EmailRequest request) {
+        if (request.tenantId() == null || request.variables().get("organizationName") == null) {
+            return null;
+        }
+        return jdbc.query("SELECT content_type, data FROM tenant_logo(?)", (rows, row) ->
+                new MailMessage.InlineImage(rows.getString("content_type"), rows.getBytes("data")),
+                request.tenantId()).stream().findFirst().orElse(null);
     }
 
     /**
@@ -99,8 +119,9 @@ public class EmailService {
 
     private void attempt(EmailRequest request, int attempt) {
         try {
-            RenderedEmail email = render(request);
-            gateway.send(new MailMessage(request.to(), email.subject(), email.text(), email.html()));
+            MailMessage.InlineImage logo = logoOf(request);
+            RenderedEmail email = render(request, logo);
+            gateway.send(new MailMessage(request.to(), email.subject(), email.text(), email.html(), logo));
             record(request, "SENT", attempt, null);
         } catch (MailDeliveryException | EmailTemplateException ex) {
             Throwable cause = ex.getCause() != null ? ex.getCause() : ex;

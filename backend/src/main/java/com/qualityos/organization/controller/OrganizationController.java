@@ -1,5 +1,16 @@
 package com.qualityos.organization.controller;
 
+import com.qualityos.organization.service.OrganizationLogoService;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.MultipartFile;
 import com.qualityos.common.response.ApiResponse;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.organization.dto.OrganizationResponse;
@@ -22,9 +33,50 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrganizationController {
 
     private final OrganizationService organizations;
+    private final OrganizationLogoService logos;
 
-    OrganizationController(OrganizationService organizations) {
+    OrganizationController(OrganizationService organizations, OrganizationLogoService logos) {
         this.organizations = organizations;
+        this.logos = logos;
+    }
+
+    /**
+     * Any member: the app shows it. The browser revalidates each time, and the version is the time it was last changed,
+     * so a new logo shows at once.
+     */
+    @GetMapping("/current/logo")
+    public ResponseEntity<byte[]> logo(WebRequest request) {
+        return logos.current()
+                .map(logo -> {
+                    String version = String.valueOf(logo.updatedAt().toEpochMilli());
+                    if (request.checkNotModified(version)) {
+                        return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(version).<byte[]>build();
+                    }
+                    return ResponseEntity.ok()
+                            .contentType(MediaType.parseMediaType(logo.contentType()))
+                            .cacheControl(CacheControl.noCache().cachePrivate())
+                            .eTag(version)
+                            .header("X-Content-Type-Options", "nosniff")
+                            .body(logo.data());
+                })
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @PostMapping(path = "/current/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('" + Permissions.TENANT_MANAGE + "')")
+    public ApiResponse<LogoResponse> uploadLogo(@RequestPart MultipartFile file) {
+        OrganizationLogoService.Logo saved = logos.save(file);
+        return ApiResponse.ok(new LogoResponse(saved.contentType(), saved.data().length, saved.updatedAt()));
+    }
+
+    @DeleteMapping("/current/logo")
+    @PreAuthorize("hasAuthority('" + Permissions.TENANT_MANAGE + "')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeLogo() {
+        logos.remove();
+    }
+
+    public record LogoResponse(String contentType, int sizeBytes, java.time.Instant updatedAt) {
     }
 
     @GetMapping("/{id}")

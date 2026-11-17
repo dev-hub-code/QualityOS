@@ -139,6 +139,9 @@ unverified sign-in is off. Local Docker Compose enforces it too. Integration tes
 |---|---|---|
 | `PUT /organizations/{id}` | `TENANT_MANAGE` | The profile: `name`, `legalName`, `gstin`, `industry`, `countryCode`, `timezone`, `currency`, `locale` (always `en-IN`; the app and its email are English only), `address`, `contactPhone` (optional, digits with an optional `+`, spaces, brackets or dashes, 6 to 20 characters), `version`. The Control Center's organisation page shows the contact number |
 | `GET /organizations/current/settings` | Any member | `singlePersonReview`, `selfReviewInEffect`, `activeMembers`, `capaRequiredFrom`, `effectivenessRequiredFrom`, `actionEvidenceRequired`, `version` (null until first saved) |
+| `GET /organizations/current/logo` | Any member | The organisation's logo as `image/png` or `image/jpeg`, with an `ETag` (a matching `If-None-Match` is `304`) and `nosniff`. `404` when there is none |
+| `POST /organizations/current/logo` | `TENANT_MANAGE` | Multipart `file`, up to 256 KB. Only PNG and JPEG are taken, recognised by their content whatever name or type is claimed, so an SVG is `422`. Replaces any earlier logo. Returns `contentType`, `sizeBytes`, `updatedAt`. Every email for the organisation then shows it, attached inline as `cid:logo`; account emails carry none. Audited as `ORGANIZATION_LOGO_UPDATED` |
+| `DELETE /organizations/current/logo` | `TENANT_MANAGE` | `204`. Audited as `ORGANIZATION_LOGO_REMOVED` |
 | `PUT /organizations/current/settings` | `TENANT_MANAGE` | Takes every rule (`singlePersonReview`, `capaRequiredFrom`, `effectivenessRequiredFrom`, `actionEvidenceRequired`) and the `version` last read. A missing rule is `400`, except `actionEvidenceRequired`, which stays as it is when left out, a stale version `409`. Audited as `TENANT_SETTINGS_UPDATED` with before and after |
 
 `selfReviewInEffect` is true while `singlePersonReview` is on and the organisation has one active member. Then that

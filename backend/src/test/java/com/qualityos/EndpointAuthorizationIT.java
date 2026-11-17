@@ -61,6 +61,8 @@ class EndpointAuthorizationIT extends AbstractIntegrationTest {
             // The caller's own organisations.
             "GET /api/v1/organizations",
             "GET /api/v1/organizations/{id}",
+            // Any member: the menu shows the organisation's logo.
+            "GET /api/v1/organizations/current/logo",
             // Any member: the organisation's working rules decide which actions their screens offer.
             "GET /api/v1/organizations/current/settings",
             "POST /api/v1/organizations");

@@ -1168,6 +1168,7 @@ export const DOC_PAGES: DocPage[] = [
           "Critical actions are written to the audit log, with members' sign-in and password events from the day they joined.",
           "Ten failed sign-ins lock an account for 15 minutes, and a reset link unlocks it.",
           "Change your own password under Settings.",
+          "An administrator can upload a logo under Settings. It shows in the menu and at the top of your organisation's emails. Only PNG and JPEG images up to 256 KB are taken, checked by their content.",
         ],
       },
       {

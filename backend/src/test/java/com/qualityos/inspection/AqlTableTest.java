@@ -118,4 +118,40 @@ class AqlTableTest {
         assertThatThrownBy(() -> plan(100, Level.II, "2.0")).isInstanceOf(BusinessRuleException.class);
         assertThat(plan(100, Level.II, "2.50").acceptanceNumber()).isEqualTo(plan(100, Level.II, "2.5").acceptanceNumber());
     }
+
+    private static java.util.Optional<AqlTable.DoublePlan> twice(long lot, Level level, String aql,
+            AqlTable.Severity severity) {
+        return AqlTable.doublePlan(lot, level, new BigDecimal(aql), severity);
+    }
+
+    @Test
+    void doubleSamplingFollowsTablesIIIAToIIIC() {
+        // Published example: a lot of 2,000 at level II and AQL 0.65 is letter K; two samples of 80, accepting 0 and
+        // rejecting from 3 on the first, then accepting 3 and rejecting from 4 on both.
+        assertThat(twice(2_000, Level.II, "0.65", AqlTable.Severity.NORMAL))
+                .contains(new AqlTable.DoublePlan('K', 80, 0, 3, 3, 4));
+        assertThat(twice(2_000, Level.II, "1.0", AqlTable.Severity.NORMAL))
+                .contains(new AqlTable.DoublePlan('K', 80, 1, 4, 4, 5));
+        assertThat(twice(10_000, Level.II, "2.5", AqlTable.Severity.NORMAL))
+                .contains(new AqlTable.DoublePlan('L', 125, 5, 9, 12, 13));
+        // Tightened keeps the samples and lowers the numbers; reduced takes smaller samples, with a gap after both.
+        assertThat(twice(2_000, Level.II, "1.0", AqlTable.Severity.TIGHTENED))
+                .contains(new AqlTable.DoublePlan('K', 80, 0, 3, 3, 4));
+        assertThat(twice(2_000, Level.II, "4.0", AqlTable.Severity.TIGHTENED))
+                .contains(new AqlTable.DoublePlan('K', 80, 3, 7, 11, 12));
+        assertThat(twice(2_000, Level.II, "1.0", AqlTable.Severity.REDUCED))
+                .contains(new AqlTable.DoublePlan('K', 32, 0, 4, 1, 5));
+        assertThat(twice(2_000, Level.II, "4.0", AqlTable.Severity.REDUCED))
+                .contains(new AqlTable.DoublePlan('K', 32, 2, 7, 6, 9));
+    }
+
+    @Test
+    void doubleSamplingFallsBackToSingleWhereTheTableHasNoPlanOrTheLotIsTooSmall() {
+        // Where single sampling accepts none, the standard gives no double plan.
+        assertThat(twice(2_000, Level.II, "0.10", AqlTable.Severity.NORMAL)).isEmpty();
+        // Nine units at level III are letter C, whose two samples of 5 need ten.
+        assertThat(twice(9, Level.III, "6.5", AqlTable.Severity.NORMAL)).isEmpty();
+        assertThat(twice(15, Level.III, "6.5", AqlTable.Severity.NORMAL))
+                .contains(new AqlTable.DoublePlan('C', 5, 0, 2, 1, 2));
+    }
 }

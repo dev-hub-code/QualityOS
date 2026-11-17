@@ -222,6 +222,7 @@ test("a template can sample by AQL at a special level, set from the lot size eac
   await expect(page.getByLabel("Failures allowed per parameter")).toHaveCount(0);
   await page.getByLabel("AQL (% nonconforming)").selectOption("1.0");
   await page.getByLabel("Inspection level").selectOption("S3");
+  await page.getByLabel("Double sampling", { exact: false }).check();
   await page.getByRole("button", { name: "Add parameter" }).click();
   await page.getByLabel("Parameter code").fill("DIA");
   await page.getByLabel("Parameter name").fill("Diameter");
@@ -232,10 +233,59 @@ test("a template can sample by AQL at a special level, set from the lot size eac
   await page.reload();
   await expect(page.getByLabel("AQL (% nonconforming)")).toHaveValue("1.0");
   await expect(page.getByLabel("Inspection level")).toHaveValue("S3");
+  await expect(page.getByLabel("Double sampling", { exact: false })).toBeChecked();
   await page.getByRole("button", { name: "Publish" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
-  await expect(page.getByText("AQL 1, inspection level S-3, with sample size and acceptance set by each lot's size")).toBeVisible();
+  await expect(
+    page.getByText("AQL 1, inspection level S-3, double sampling, with sample size and acceptance set by each lot's size"),
+  ).toBeVisible();
   // Every series starts on normal inspection; the switching rules take it from there.
   await expect(page.getByText("AQL switching", { exact: true })).toBeVisible();
   await expect(page.getByText("No lot has been decided under this template yet", { exact: false })).toBeVisible();
+});
+
+test("under double sampling an inconclusive first sample asks for a second, counted with it", async ({ page }) => {
+  await signUp(page);
+  await receiveMaterial(page);
+  await page.goto("/inspection-templates");
+  await dialogAdd(page, "Add template", async (dialog) => {
+    await dialog.getByLabel("Code", { exact: true }).fill("BAR-DBL");
+    await dialog.getByLabel("Name", { exact: true }).fill("Bar by double sampling");
+    await dialog.getByLabel("Type").selectOption("IQC");
+  });
+  await expect(page).toHaveURL(/inspection-templates\//);
+  // A lot of 100 at level II and AQL 4.0 is letter F: two samples of 13, the first accepting none.
+  await page.getByLabel("Sampling").selectOption("AQL");
+  await page.getByLabel("AQL (% nonconforming)").selectOption("4.0");
+  await page.getByLabel("Inspection level").selectOption("II");
+  await page.getByLabel("Double sampling", { exact: false }).check();
+  await page.getByRole("button", { name: "Add parameter" }).click();
+  await page.getByLabel("Parameter code").fill("DIA");
+  await page.getByLabel("Parameter name").fill("Diameter");
+  await page.getByLabel("Minimum").fill("19.9");
+  await page.getByLabel("Maximum").fill("20.1");
+  await page.getByRole("button", { name: "Save draft" }).click();
+  await expect(page.getByText("Saved")).toBeVisible();
+  await page.getByRole("button", { name: "Publish" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("button", { name: "New version" })).toBeVisible();
+
+  await page.goto("/inspections");
+  await page.getByRole("button", { name: "Inspect" }).click();
+  await page.getByLabel("Template").selectOption({ label: "BAR-DBL – Bar by double sampling" });
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page).toHaveURL(/inspections\//);
+  await expect(page.getByText(/double sampling\. First sample: accept up to 0 nonconforming, reject from 3/)).toBeVisible();
+  await expect(page.getByLabel("DIA sample 14")).toHaveCount(0);
+
+  for (let sample = 1; sample <= 13; sample++) {
+    await page.getByLabel(`DIA sample ${sample}`, { exact: true }).fill(sample === 1 ? "25" : "20.0");
+  }
+  await page.getByRole("button", { name: "Submit for approval" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "a second sample of 13 is" })).toBeVisible();
+  for (let sample = 14; sample <= 26; sample++) {
+    await page.getByLabel(`DIA sample ${sample}`, { exact: true }).fill("20.0");
+  }
+  await page.getByRole("button", { name: "Submit for approval" }).click();
+  await expect(page.getByText("submitted", { exact: true }).first()).toBeVisible();
 });

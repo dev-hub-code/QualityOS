@@ -357,6 +357,8 @@ export interface TemplateVersion {
   /** For AQL sampling, the AQL in percent, such as "2.500". */
   aql: string | null;
   inspectionLevel: "I" | "II" | "III" | "S1" | "S2" | "S3" | "S4" | null;
+  /** For AQL sampling: a second sample when the first is inconclusive, where the standard has a double plan. */
+  doubleSampling: boolean;
   effectiveFrom: string | null;
   effectiveTo: string | null;
   parameters: ParameterSpec[];
@@ -422,6 +424,8 @@ export interface Inspection {
   batchNumber: string;
   quantity: string;
   sampleSize: number;
+  /** Under double sampling: the first sample was inconclusive, and the sample size now counts both. */
+  secondSampleDrawn: boolean;
   status: string;
   evaluatedResult: string | null;
   finalResult: string | null;
@@ -441,6 +445,8 @@ export interface Inspection {
     codeLetter: string | null;
     aql: string | null;
     inspectionLevel: string | null;
+    /** Under double sampling, the second sample; its numbers count both samples together. */
+    secondSample?: { sampleSize: number; acceptanceNumber: number; rejectionNumber: number } | null;
   };
   results: InspectionResult[];
   instruments: UsedInstrument[];

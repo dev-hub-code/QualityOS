@@ -12,7 +12,8 @@ import java.util.List;
  * <p>The plans below are the tables with every arrow already followed, so a cell holds the plan actually used, its
  * sample size included. Under normal and tightened inspection Re is always Ac + 1. Under reduced inspection it can be
  * higher: a lot with more than Ac but fewer than Re nonconforming units is accepted, and inspection returns to normal.
- * Values transcribed from the AQLSchemes package's tables and checked against published examples in the tests.
+ * Values transcribed from the AQLSchemes package's tables and checked against published examples in the tests. The
+ * double sampling tables, III-A to III-C, follow the same source.
  */
 public final class AqlTable {
 
@@ -27,6 +28,19 @@ public final class AqlTable {
 
     /** How hard a series of lots is being inspected, which the switching rules move between. */
     public enum Severity { NORMAL, TIGHTENED, REDUCED }
+
+    /**
+     * A double sampling plan. A first sample is taken: up to Ac1 nonconforming accepts the lot, Re1 or more rejects it,
+     * and in between a second sample of the same size is taken, after which both are counted together against Ac2 and
+     * Re2. Under reduced inspection Re2 can sit above Ac2 + 1, and a count between them accepts the lot but returns
+     * inspection to normal.
+     *
+     * @param codeLetter the letter Table I gives the lot, before any arrow is followed
+     * @param sampleSize the size of each sample
+     */
+    public record DoublePlan(char codeLetter, int sampleSize, int firstAcceptance, int firstRejection,
+            int secondAcceptance, int secondRejection) {
+    }
 
     /** @param codeLetter the letter Table I gives the lot, before any arrow is followed */
     public record Plan(char codeLetter, int sampleSize, int acceptanceNumber, int rejectionNumber) {
@@ -103,7 +117,83 @@ public final class AqlTable {
             "500/0/1 315/0/1 800/0/2 500/0/2 500/1/3 500/1/4 500/2/5 500/3/6 500/5/8 500/7/10 500/10/13 315/10/13 200/10/13 125/10/13 80/10/13 50/10/13" + "|" +
             "500/0/1 315/0/1 800/0/2 800/1/3 800/1/4 800/2/5 800/3/6 800/5/8 800/7/10 800/10/13 500/10/13 315/10/13 200/10/13 125/10/13 80/10/13 50/10/13");
 
+
+    /**
+     * Double sampling, Tables III-A, III-B and III-C: each cell is "sample size/Ac1/Re1/Ac2/Re2", the sample size being
+     * that of each of the two samples, and Ac2 and Re2 counting both together. "-" is where the standard gives no double
+     * plan and the single plan is used instead.
+     */
+    private static final int[][][] DOUBLE_NORMAL = parseDouble(
+            "- - - - - - - - - - - - - - - -" + "|" +
+            "- - - - - - - - - - - - - - - 3/0/2/1/2" + "|" +
+            "- - - - - - - - - - - - - - 5/0/2/1/2 3/0/2/1/2" + "|" +
+            "- - - - - - - - - - - - - 8/0/2/1/2 5/0/2/1/2 5/0/3/3/4" + "|" +
+            "- - - - - - - - - - - - 13/0/2/1/2 8/0/2/1/2 8/0/3/3/4 8/1/4/4/5" + "|" +
+            "- - - - - - - - - - - 20/0/2/1/2 13/0/2/1/2 13/0/3/3/4 13/1/4/4/5 13/2/5/6/7" + "|" +
+            "- - - - - - - - - - 32/0/2/1/2 20/0/2/1/2 20/0/3/3/4 20/1/4/4/5 20/2/5/6/7 20/3/7/8/9" + "|" +
+            "- - - - - - - - - 50/0/2/1/2 32/0/2/1/2 32/0/3/3/4 32/1/4/4/5 32/2/5/6/7 32/3/7/8/9 32/5/9/12/13" + "|" +
+            "- - - - - - - - 80/0/2/1/2 50/0/2/1/2 50/0/3/3/4 50/1/4/4/5 50/2/5/6/7 50/3/7/8/9 50/5/9/12/13 50/7/11/18/19" + "|" +
+            "- - - - - - - 125/0/2/1/2 80/0/2/1/2 80/0/3/3/4 80/1/4/4/5 80/2/5/6/7 80/3/7/8/9 80/5/9/12/13 80/7/11/18/19 80/11/16/26/27" + "|" +
+            "- - - - - - 200/0/2/1/2 125/0/2/1/2 125/0/3/3/4 125/1/4/4/5 125/2/5/6/7 125/3/7/8/9 125/5/9/12/13 125/7/11/18/19 125/11/16/26/27 80/11/16/26/27" + "|" +
+            "- - - - - 315/0/2/1/2 200/0/2/1/2 200/0/3/3/4 200/1/4/4/5 200/2/5/6/7 200/3/7/8/9 200/5/9/12/13 200/7/11/18/19 200/11/16/26/27 125/11/16/26/27 80/11/16/26/27" + "|" +
+            "- - - - 500/0/2/1/2 315/0/2/1/2 315/0/3/3/4 315/1/4/4/5 315/2/5/6/7 315/3/7/8/9 315/5/9/12/13 315/7/11/18/19 315/11/16/26/27 200/11/16/26/27 125/11/16/26/27 80/11/16/26/27" + "|" +
+            "- - - 800/0/2/1/2 500/0/2/1/2 500/0/3/3/4 500/1/4/4/5 500/2/5/6/7 500/3/7/8/9 500/5/9/12/13 500/7/11/18/19 500/11/16/26/27 315/11/16/26/27 200/11/16/26/27 125/11/16/26/27 80/11/16/26/27" + "|" +
+            "- - 1250/0/2/1/2 800/0/2/1/2 800/0/3/3/4 800/1/4/4/5 800/2/5/6/7 800/3/7/8/9 800/5/9/12/13 800/7/11/18/19 800/11/16/26/27 500/11/16/26/27 315/11/16/26/27 200/11/16/26/27 125/11/16/26/27 80/11/16/26/27" + "|" +
+            "- - 1250/0/2/1/2 1250/0/3/3/4 1250/1/4/4/5 1250/2/5/6/7 1250/3/7/8/9 1250/5/9/12/13 1250/7/11/18/19 1250/11/16/26/27 800/11/16/26/27 500/11/16/26/27 315/11/16/26/27 200/11/16/26/27 125/11/16/26/27 80/11/16/26/27");
+
+    private static final int[][][] DOUBLE_TIGHTENED = parseDouble(
+            "- - - - - - - - - - - - - - - 5/0/2/1/2" + "|" +
+            "- - - - - - - - - - - - - - - 5/0/2/1/2" + "|" +
+            "- - - - - - - - - - - - - - 8/0/2/1/2 5/0/2/1/2" + "|" +
+            "- - - - - - - - - - - - - 13/0/2/1/2 8/0/2/1/2 5/0/2/1/2" + "|" +
+            "- - - - - - - - - - - - 20/0/2/1/2 13/0/2/1/2 8/0/2/1/2 8/0/3/3/4" + "|" +
+            "- - - - - - - - - - - 32/0/2/1/2 20/0/2/1/2 13/0/2/1/2 13/0/3/3/4 13/1/4/4/5" + "|" +
+            "- - - - - - - - - - 50/0/2/1/2 32/0/2/1/2 20/0/2/1/2 20/0/3/3/4 20/1/4/4/5 20/2/5/6/7" + "|" +
+            "- - - - - - - - - 80/0/2/1/2 50/0/2/1/2 32/0/2/1/2 32/0/3/3/4 32/1/4/4/5 32/2/5/6/7 32/3/7/11/12" + "|" +
+            "- - - - - - - - 125/0/2/1/2 80/0/2/1/2 50/0/2/1/2 50/0/3/3/4 50/1/4/4/5 50/2/5/6/7 50/3/7/11/12 50/6/10/15/16" + "|" +
+            "- - - - - - - 200/0/2/1/2 125/0/2/1/2 80/0/2/1/2 80/0/3/3/4 80/1/4/4/5 80/2/5/6/7 80/3/7/11/12 80/6/10/15/16 80/9/14/23/24" + "|" +
+            "- - - - - - 315/0/2/1/2 200/0/2/1/2 125/0/2/1/2 125/0/3/3/4 125/1/4/4/5 125/2/5/6/7 125/3/7/11/12 125/6/10/15/16 125/9/14/23/24 80/9/14/23/24" + "|" +
+            "- - - - - 500/0/2/1/2 315/0/2/1/2 200/0/2/1/2 200/0/3/3/4 200/1/4/4/5 200/2/5/6/7 200/3/7/11/12 200/6/10/15/16 200/9/14/23/24 125/9/14/23/24 80/9/14/23/24" + "|" +
+            "- - - - 800/0/2/1/2 500/0/2/1/2 315/0/2/1/2 315/0/3/3/4 315/1/4/4/5 315/2/5/6/7 315/3/7/11/12 315/6/10/15/16 315/9/14/23/24 200/9/14/23/24 125/9/14/23/24 80/9/14/23/24" + "|" +
+            "- - - 1250/0/2/1/2 800/0/2/1/2 500/0/2/1/2 500/0/3/3/4 500/1/4/4/5 500/2/5/6/7 500/3/7/11/12 500/6/10/15/16 500/9/14/23/24 315/9/14/23/24 200/9/14/23/24 125/9/14/23/24 80/9/14/23/24" + "|" +
+            "- - 2000/0/2/1/2 1250/0/2/1/2 800/0/2/1/2 800/0/3/3/4 800/1/4/4/5 800/2/5/6/7 800/3/7/11/12 800/6/10/15/16 800/9/14/23/24 500/9/14/23/24 315/9/14/23/24 200/9/14/23/24 125/9/14/23/24 80/9/14/23/24" + "|" +
+            "- - 2000/0/2/1/2 1250/0/2/1/2 1250/0/3/3/4 1250/1/4/4/5 1250/2/5/6/7 1250/3/7/11/12 1250/6/10/15/16 1250/9/14/23/24 800/9/14/23/24 500/9/14/23/24 315/9/14/23/24 200/9/14/23/24 125/9/14/23/24 80/9/14/23/24");
+
+    private static final int[][][] DOUBLE_REDUCED = parseDouble(
+            "- - - - - - - - - - - - - - - -" + "|" +
+            "- - - - - - - - - - - - - - - -" + "|" +
+            "- - - - - - - - - - - - - - 2/0/2/0/2 -" + "|" +
+            "- - - - - - - - - - - - - 3/0/2/0/2 2/0/2/0/2 2/0/3/0/4" + "|" +
+            "- - - - - - - - - - - - 5/0/2/0/2 3/0/2/0/2 3/0/3/0/4 3/0/4/1/5" + "|" +
+            "- - - - - - - - - - - 8/0/2/0/2 5/0/2/0/2 5/0/3/0/4 5/0/4/1/5 5/0/4/3/6" + "|" +
+            "- - - - - - - - - - 13/0/2/0/2 8/0/2/0/2 8/0/3/0/4 8/0/4/1/5 8/0/4/3/6 8/1/5/4/7" + "|" +
+            "- - - - - - - - - 20/0/2/0/2 13/0/2/0/2 13/0/3/0/4 13/0/4/1/5 13/0/4/3/6 13/1/5/4/7 13/2/7/6/9" + "|" +
+            "- - - - - - - - 32/0/2/0/2 20/0/2/0/2 20/0/3/0/4 20/0/4/1/5 20/0/4/3/6 20/1/5/4/7 20/2/7/6/9 20/3/8/8/12" + "|" +
+            "- - - - - - - 50/0/2/0/2 32/0/2/0/2 32/0/3/0/4 32/0/4/1/5 32/0/4/3/6 32/1/5/4/7 32/2/7/6/9 32/3/8/8/12 32/5/10/12/16" + "|" +
+            "- - - - - - 80/0/2/0/2 50/0/2/0/2 50/0/3/0/4 50/0/4/1/5 50/0/4/3/6 50/1/5/4/7 50/2/7/6/9 50/3/8/8/12 50/5/10/12/16 32/5/10/12/16" + "|" +
+            "- - - - - 125/0/2/0/2 80/0/2/0/2 80/0/3/0/4 80/0/4/1/5 80/0/4/3/6 80/1/5/4/7 80/2/7/6/9 80/3/8/8/12 80/5/10/12/16 50/5/10/12/16 32/5/10/12/16" + "|" +
+            "- - - - 200/0/2/0/2 125/0/2/0/2 125/0/3/0/4 125/0/4/1/5 125/0/4/3/6 125/1/5/4/7 125/2/7/6/9 125/3/8/8/12 125/5/10/12/16 80/5/10/12/16 50/5/10/12/16 32/5/10/12/16" + "|" +
+            "- - - 315/0/2/0/2 200/0/2/0/2 200/0/3/0/4 200/0/4/1/5 200/0/4/3/6 200/1/5/4/7 200/2/7/6/9 200/3/8/8/12 200/5/10/12/16 125/5/10/12/16 80/5/10/12/16 50/5/10/12/16 32/5/10/12/16" + "|" +
+            "- - 500/0/2/0/2 315/0/2/0/2 315/0/3/0/4 315/0/4/1/5 315/0/4/3/6 315/1/5/4/7 315/2/7/6/9 315/3/8/8/12 315/5/10/12/16 200/5/10/12/16 125/5/10/12/16 80/5/10/12/16 50/5/10/12/16 32/5/10/12/16" + "|" +
+            "- - 500/0/2/0/2 500/0/3/0/4 500/0/4/1/5 500/0/4/3/6 500/1/5/4/7 500/2/7/6/9 500/3/8/8/12 500/5/10/12/16 315/5/10/12/16 200/5/10/12/16 125/5/10/12/16 80/5/10/12/16 50/5/10/12/16 32/5/10/12/16");
+
     private AqlTable() {
+    }
+
+    private static int[][][] parseDouble(String table) {
+        String[] rows = table.split("\\|");
+        int[][][] plans = new int[rows.length][][];
+        for (int row = 0; row < rows.length; row++) {
+            String[] cells = rows[row].trim().split(" ");
+            plans[row] = new int[cells.length][];
+            for (int column = 0; column < cells.length; column++) {
+                if (!cells[column].equals("-")) {
+                    plans[row][column] = java.util.Arrays.stream(cells[column].split("/"))
+                            .mapToInt(Integer::parseInt).toArray();
+                }
+            }
+        }
+        return plans;
     }
 
     private static int[][][] parse(String table) {
@@ -149,6 +239,25 @@ public final class AqlTable {
         int[] cell = table[letter][column(aql)];
         int sampleSize = (int) Math.min(cell[0], Math.max(lotSize, 1));
         return new Plan(LETTERS[letter], sampleSize, cell[1], cell[2]);
+    }
+
+    /**
+     * The double plan for a lot, or empty where the standard gives none, or where the lot is too small for both samples;
+     * the single plan is used then.
+     */
+    public static java.util.Optional<DoublePlan> doublePlan(long lotSize, Level level, BigDecimal aql,
+            Severity severity) {
+        int letter = letterFor(lotSize, level);
+        int[][][] table = switch (severity) {
+            case NORMAL -> DOUBLE_NORMAL;
+            case TIGHTENED -> DOUBLE_TIGHTENED;
+            case REDUCED -> DOUBLE_REDUCED;
+        };
+        int[] cell = table[letter][column(aql)];
+        if (cell == null || 2L * cell[0] > lotSize) {
+            return java.util.Optional.empty();
+        }
+        return java.util.Optional.of(new DoublePlan(LETTERS[letter], cell[0], cell[1], cell[2], cell[3], cell[4]));
     }
 
     /** @return the AQL one column tighter, or null when this is the tightest */

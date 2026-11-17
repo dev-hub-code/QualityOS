@@ -497,12 +497,26 @@ public class InspectionService implements AttachmentPolicy {
         Map<String, List<Evaluation>> byParameter = recorded.stream().collect(Collectors.groupingBy(
                 InspectionResult::getParameterCode,
                 Collectors.mapping(InspectionResult::getEvaluation, Collectors.toList())));
+        TemplateVersion.SecondSample second = specification.secondSample();
+        boolean firstOfTwo = second != null && !inspection.isSecondSampleDrawn();
+        int acceptanceNumber = second != null && inspection.isSecondSampleDrawn()
+                ? second.acceptanceNumber() : specification.acceptanceNumber();
+        int rejectsFrom = second != null && inspection.isSecondSampleDrawn()
+                ? second.rejectionNumber() : specification.rejectsFrom();
         Outcome outcome = "AQL".equals(specification.samplingType())
                 ? EvaluationEngine.overallByUnits(specification.parameters(), recorded.stream()
                         .map(result -> new EvaluationEngine.SampleEvaluation(
                                 result.getParameterCode(), result.getSampleNumber(), result.getEvaluation()))
-                        .toList(), specification.acceptanceNumber(), specification.rejectsFrom())
+                        .toList(), acceptanceNumber, rejectsFrom)
                 : EvaluationEngine.overall(specification.parameters(), byParameter, specification.acceptanceNumber());
+        if (firstOfTwo && outcome.evaluation() != Evaluation.FAIL && outcome.nonconformingUnits() > acceptanceNumber) {
+            // Between Ac1 and Re1: the first sample decides nothing, and the second is inspected before submitting.
+            inspection.drawSecondSample(second.sampleSize());
+            inspections.saveAndFlush(inspection);
+            audit.record("INSPECTION_SECOND_SAMPLE", ENTITY, id, null, Map.of(
+                    "nonconformingInFirst", outcome.nonconformingUnits(), "moreSamples", second.sampleSize()));
+            return toDetail(inspection);
+        }
         if ("AQL".equals(specification.samplingType())) {
             inspection.countNonconforming(outcome.nonconformingUnits());
         }
@@ -663,9 +677,11 @@ public class InspectionService implements AttachmentPolicy {
                 AqlTable.Level.valueOf(specification.inspectionLevel()),
                 specification.aql(),
                 AqlTable.Severity.valueOf(specification.severity()),
-                specification.acceptanceNumber(),
+                specification.secondSample() != null && inspection.isSecondSampleDrawn()
+                        ? specification.secondSample().acceptanceNumber() : specification.acceptanceNumber(),
                 inspection.getNonconformingUnits(),
-                inspection.getFinalResult() == Inspection.Result.PASS));
+                inspection.getFinalResult() == Inspection.Result.PASS,
+                specification.secondSample() == null ? null : !inspection.isSecondSampleDrawn()));
     }
 
     private SpecSnapshot specificationOf(Inspection inspection) {
@@ -737,6 +753,7 @@ public class InspectionService implements AttachmentPolicy {
                 inspection.getBatchNumber(),
                 inspection.getQuantity(),
                 inspection.getSampleSize(),
+                inspection.isSecondSampleDrawn(),
                 inspection.getStatus().name(),
                 name(inspection.getEvaluatedResult()),
                 name(inspection.getFinalResult()),

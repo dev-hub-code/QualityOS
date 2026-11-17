@@ -248,7 +248,7 @@ export const DOC_PAGES: DocPage[] = [
           ["Full", "Every unit."],
           [
             "AQL",
-            "ISO 2859-1 / ANSI Z1.4 single sampling. Choose an AQL and an inspection level: I to III, or the special levels S-1 to S-4 for costly tests. Each lot's size then sets the sample size and how many nonconforming samples it accepts. Each supplier's lots move between normal, tightened and reduced inspection by the switching rules, shown on the template's page. A sample failing several parameters counts once, and a plan over 500 samples is refused.",
+            "ISO 2859-1 / ANSI Z1.4 single or double sampling. Choose an AQL and an inspection level: I to III, or the special levels S-1 to S-4 for costly tests. Each lot's size then sets the sample size and how many nonconforming samples it accepts. With double sampling, a lot takes a smaller first sample; when that neither accepts nor rejects it, submitting asks for a second sample of the same size, and both are counted together. Where the standard has no double plan, or the lot is too small for two samples, single sampling is used. Each supplier's lots move between normal, tightened and reduced inspection by the switching rules, shown on the template's page. A sample failing several parameters counts once, and a plan over 500 samples is refused.",
           ],
         ],
       },

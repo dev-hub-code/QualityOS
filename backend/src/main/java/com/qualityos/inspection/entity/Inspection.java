@@ -62,6 +62,9 @@ public class Inspection extends TenantOwnedEntity {
     private int sampleSize;
     private Integer nonconformingUnits;
 
+    /** Under double sampling: the first sample was inconclusive, so the sample size now counts both. */
+    private boolean secondSampleDrawn;
+
     @Enumerated(EnumType.STRING)
     private Status status = Status.PENDING;
 
@@ -128,6 +131,16 @@ public class Inspection extends TenantOwnedEntity {
         if (!isOpenForResults()) {
             throw new BusinessRuleException("Results cannot be changed after submission.");
         }
+        status = Status.IN_PROGRESS;
+    }
+
+    /** The first sample neither accepted nor rejected the lot: results go on, with this many more samples. */
+    public void drawSecondSample(int samples) {
+        if (secondSampleDrawn || !isOpenForResults()) {
+            throw new BusinessRuleException("The second sample has already been drawn.");
+        }
+        secondSampleDrawn = true;
+        sampleSize += samples;
         status = Status.IN_PROGRESS;
     }
 

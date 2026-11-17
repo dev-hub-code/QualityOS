@@ -75,7 +75,9 @@ public final class TemplateDtos {
             BigDecimal aql,
             /* For AQL sampling: I, II or III. */
             AqlTable.Level inspectionLevel,
-            @NotNull List<@Valid ParameterRequest> parameters) {
+            @NotNull List<@Valid ParameterRequest> parameters,
+            /* For AQL sampling: take a second sample when the first is inconclusive. Absent means single sampling. */
+            Boolean doubleSampling) {
     }
 
     public record ParameterRequest(
@@ -114,7 +116,8 @@ public final class TemplateDtos {
             LocalDate effectiveFrom,
             LocalDate effectiveTo,
             Instant publishedAt,
-            List<ParameterSpec> parameters) {
+            List<ParameterSpec> parameters,
+            boolean doubleSampling) {
     }
 
     /** A parameter's full definition. This is also what an inspection's snapshot stores. */
@@ -153,7 +156,9 @@ public final class TemplateDtos {
             String severity,
             String codeLetter,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal aql,
-            String inspectionLevel) {
+            String inspectionLevel,
+            /* Under double sampling, the second sample the lot takes if the first is inconclusive; otherwise null. */
+            com.qualityos.inspection.entity.TemplateVersion.SecondSample secondSample) {
 
         /** A lot is rejected from this many nonconforming samples. */
         public int rejectsFrom() {

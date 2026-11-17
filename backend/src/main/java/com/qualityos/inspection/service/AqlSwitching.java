@@ -63,9 +63,20 @@ public class AqlSwitching {
             @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 500) String reason) {
     }
 
-    /** What decided a lot, from its inspection. */
+    /**
+     * What decided a lot, from its inspection.
+     *
+     * @param acceptanceNumber the one that decided the lot: under double sampling, the second sample's once it was drawn
+     * @param decidedByFirstSample under double sampling, whether the first sample decided the lot; null under single
+     */
     public record Lot(UUID templateId, UUID supplierId, long lotSize, AqlTable.Level level, BigDecimal aql,
-            AqlTable.Severity severity, int acceptanceNumber, int nonconforming, boolean accepted) {
+            AqlTable.Severity severity, int acceptanceNumber, int nonconforming, boolean accepted,
+            Boolean decidedByFirstSample) {
+
+        public Lot(UUID templateId, UUID supplierId, long lotSize, AqlTable.Level level, BigDecimal aql,
+                AqlTable.Severity severity, int acceptanceNumber, int nonconforming, boolean accepted) {
+            this(templateId, supplierId, lotSize, level, aql, severity, acceptanceNumber, nonconforming, accepted, null);
+        }
     }
 
     private final JdbcTemplate jdbc;
@@ -200,6 +211,10 @@ public class AqlSwitching {
     static int score(int score, Lot lot) {
         if (!lot.accepted()) {
             return 0;
+        }
+        // Under double sampling (ISO 2859-1): three for a lot accepted on its first sample, otherwise back to 0.
+        if (lot.decidedByFirstSample() != null) {
+            return lot.decidedByFirstSample() ? score + 3 : 0;
         }
         if (lot.acceptanceNumber() < 2) {
             return score + 2;

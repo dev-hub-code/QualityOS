@@ -258,6 +258,57 @@ class PlatformConsoleIT extends MasterDataFixture {
     }
 
     @Test
+    void aCustomerRaisesARequestAndSeesOnlyRepliesSharedWithThem() throws Exception {
+        Session viewer = addMember(owner, "VIEWER");
+        String subject = "Cannot print labels " + UUID.randomUUID();
+        String ticket = JsonPath.read(body(as(viewer, postJson("/api/v1/support/tickets",
+                        Map.of("subject", subject, "message", "The label printer shows nothing.")))
+                .andExpect(status().isCreated())), "$.data.id");
+        as(viewer, postJson("/api/v1/support/tickets", Map.of("subject", "", "message", "x")))
+                .andExpect(status().isBadRequest());
+
+        as(viewer, get("/api/v1/support/tickets")).andExpect(jsonPath("$.data[*].subject", hasItem(subject)));
+        as(owner, get("/api/v1/support/tickets")).andExpect(jsonPath("$.data[*].subject", hasItem(subject)));
+        Session stranger = register();
+        as(stranger, get("/api/v1/support/tickets")).andExpect(jsonPath("$.data.length()").value(0));
+        as(stranger, get("/api/v1/support/tickets/" + ticket + "/messages")).andExpect(status().isNotFound());
+        as(stranger, postJson("/api/v1/support/tickets/" + ticket + "/replies", Map.of("body", "Me too")))
+                .andExpect(status().isNotFound());
+
+        as(root, get(PLATFORM + "/support/tickets").param("tenantId", owner.tenantId().toString()))
+                .andExpect(jsonPath("$.data.items[?(@.id == '" + ticket + "')].raisedByCustomer", hasItem(true)));
+        String notes = PLATFORM + "/support/tickets/" + ticket + "/notes";
+        as(root, postJson(notes, Map.of("body", SECRET_NOTE))).andExpect(status().isNoContent());
+        as(root, postJson(notes, Map.of("body", "Please restart the printer.", "toCustomer", true)))
+                .andExpect(status().isNoContent());
+        as(root, get(notes)).andExpect(jsonPath("$.data[*].shared", org.hamcrest.Matchers.contains(true, false, true)));
+
+        String messages = body(as(viewer, get("/api/v1/support/tickets/" + ticket + "/messages"))
+                .andExpect(status().isOk()));
+        assertThat(messages).doesNotContain(SECRET_NOTE).doesNotContain(root.email());
+        assertThat(JsonPath.<List<String>>read(messages, "$.data[*].author")).last().isEqualTo("ProductionOS support");
+        assertThat(emailedSubjects(viewer)).contains("Your support request: " + subject);
+
+        putJson(root, PLATFORM + "/support/tickets/" + ticket + "/status",
+                Map.of("status", "WAITING_FOR_CUSTOMER", "version", 0)).andExpect(status().isNoContent());
+        as(viewer, postJson("/api/v1/support/tickets/" + ticket + "/replies", Map.of("body", "Restarted, it works.")))
+                .andExpect(status().isNoContent());
+        as(viewer, get("/api/v1/support/tickets/" + ticket)).andExpect(jsonPath("$.data.status").value("OPEN"));
+
+        Session other = addMember(owner, "VIEWER");
+        as(other, get("/api/v1/support/tickets/" + ticket)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void aTicketSupportOpenedStaysOutOfTheCustomersView() throws Exception {
+        String ticket = openTicket();
+        as(owner, get("/api/v1/support/tickets")).andExpect(jsonPath("$.data[*].id", not(hasItem(ticket))));
+        as(owner, get("/api/v1/support/tickets/" + ticket + "/messages")).andExpect(status().isNotFound());
+        as(root, postJson(PLATFORM + "/support/tickets/" + ticket + "/notes", Map.of("body", "Hi", "toCustomer", true)))
+                .andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
     void aStaleStatusChangeIsAConflictAndAnUnknownStatusIsRefused() throws Exception {
         String path = PLATFORM + "/support/tickets/" + openTicket() + "/status";
         putJson(root, path, Map.of("status", "RESOLVED", "version", 9)).andExpect(status().isConflict());
@@ -295,7 +346,7 @@ class PlatformConsoleIT extends MasterDataFixture {
         Session billing = register();
         operator(billing, "BILLING_ADMIN");
         assertThatThrownBy(() -> inside(billing, () -> jdbc.queryForObject(
-                "SELECT platform_support_note(?::uuid, 'No')", String.class, ticket)))
+                "SELECT platform_support_note(?::uuid, 'No', false)", String.class, ticket)))
                 .rootCause().hasMessageContaining("platform role required");
     }
 

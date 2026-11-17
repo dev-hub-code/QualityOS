@@ -1,0 +1,10 @@
+Subject: Your support request: {{subject}}
+
+Your support request has an update
+
+Hello {{recipientName}},
+{{update}}
+
+Request: {{subject}}
+
+Open the request: {{actionUrl}}

@@ -79,7 +79,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Which features each plan includes is an interpretation of the brief's table. Starter has no dashboards or reports | Owner to confirm before launch |
 | Account emails, such as reset links, cannot be retried, because a resent link would have expired. Failed ones show in the email log | By design |
 | An emailed announcement goes once, to members active when it starts. Someone who joins later sees only the banner | Review after real use |
-| Support tickets are opened by operators. Customers cannot raise or see one, and nothing tells them a ticket's status | When a user needs it |
+| Operators see a new customer request in the support console. Nothing emails them when one is raised | Review after real use |
 | Support has no access to a customer's quality records. The separate time-limited approval the brief allows is not built | If support ever needs it |
 | Settings have no default currency, because only INR exists, and no notification defaults, because each person sets their own | When either is needed |
 | Maintenance mode removes change permissions, so a member's action is refused. Signing in, reading, billing and account actions still work | Review after real use |

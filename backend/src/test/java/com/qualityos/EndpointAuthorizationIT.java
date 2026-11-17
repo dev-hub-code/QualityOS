@@ -47,6 +47,12 @@ class EndpointAuthorizationIT extends AbstractIntegrationTest {
             "PUT /api/v1/notifications/preferences",
             // Any member: only what the platform wants everyone to see.
             "GET /api/v1/platform-notices",
+            // Any member may ask support for help. Who sees which request is decided in CustomerSupport.
+            "GET /api/v1/support/tickets",
+            "GET /api/v1/support/tickets/{id}",
+            "GET /api/v1/support/tickets/{id}/messages",
+            "POST /api/v1/support/tickets",
+            "POST /api/v1/support/tickets/{id}/replies",
             // The parent record decides, in AttachmentService.
             "DELETE /api/v1/attachments/{id}",
             "GET /api/v1/attachments",

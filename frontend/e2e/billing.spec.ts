@@ -445,3 +445,48 @@ test("an operator posts an announcement and keeps a private support ticket", asy
   await expect(page.getByRole("row", { name: title })).toContainText("Inactive");
   await other.close();
 });
+
+test("a customer raises a support request and reads support's reply, never the internal note", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(60_000);
+  const other = await browser.newContext();
+  const customer = await other.newPage();
+  await signUp(customer);
+  const subject = `Labels missing ${unique()}`;
+  await customer.goto("/support");
+  await customer.getByRole("button", { name: "New request" }).click();
+  await customer.getByRole("dialog").getByLabel("Subject").fill(subject);
+  await customer.getByRole("dialog").getByLabel("How can we help?").fill("The label printer prints nothing.");
+  await customer.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await expect(customer.getByRole("heading", { name: subject })).toBeVisible();
+  const requestUrl = customer.url();
+
+  const email = `admin-${unique()}@example.com`;
+  await signUp(page, email);
+  makePlatformAdmin(email);
+  await page.goto("/platform/support");
+  const row = page.getByRole("row", { name: subject });
+  await expect(row).toContainText("from customer");
+  await row.getByRole("button", { name: "View" }).click();
+  await page.getByRole("button", { name: "Add note" }).click();
+  await page.getByLabel("Internal note", { exact: true }).fill("Probably the driver again");
+  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Reply to customer" }).click();
+  await page
+    .getByRole("dialog", { name: "Reply to the customer" })
+    .getByRole("textbox")
+    .fill("Please reinstall the printer driver.");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("· seen by the customer")).toHaveCount(2);
+
+  await customer.goto(requestUrl);
+  await expect(customer.getByText("Please reinstall the printer driver.")).toBeVisible();
+  await expect(customer.getByText("ProductionOS support", { exact: false })).toBeVisible();
+  await expect(customer.getByText("Probably the driver again")).toHaveCount(0);
+  await customer.getByLabel("Your reply").fill("That fixed it, thank you.");
+  await customer.getByRole("button", { name: "Send reply" }).click();
+  await expect(customer.getByText("That fixed it, thank you.")).toBeVisible();
+  await other.close();
+});

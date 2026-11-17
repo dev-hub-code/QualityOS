@@ -73,18 +73,24 @@ public final class PlatformConsoleDtos {
             long version) {
     }
 
-    public record AddNoteRequest(@NotBlank @Size(max = 4000) String body) {
+    /** @param toCustomer true to send it as a reply the customer sees; otherwise it stays among operators */
+    public record AddNoteRequest(@NotBlank @Size(max = 4000) String body, Boolean toCustomer) {
+
+        public boolean shared() {
+            return Boolean.TRUE.equals(toCustomer);
+        }
     }
 
     public record Ticket(
             UUID id, UUID tenantId, String organisation, String subject, String status, String openedBy,
-            Instant createdAt, Instant updatedAt, long version) {
+            boolean raisedByCustomer, Instant createdAt, Instant updatedAt, long version) {
     }
 
     public record TicketList(int total, List<Ticket> items) {
     }
 
-    public record TicketNote(UUID id, String author, String body, Instant createdAt) {
+    /** @param shared whether the customer sees it */
+    public record TicketNote(UUID id, String author, String body, boolean shared, Instant createdAt) {
     }
 
     public record SupportError(Instant occurredAt, String template, String errorType) {

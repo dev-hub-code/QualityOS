@@ -17,7 +17,6 @@ Not built yet:
 
 - Refunds. A refund is made in Cashfree or the bank, and nothing in ProductionOS records it.
 - Partial payments and automatic renewal. Each invoice is paid in full, and each renewal is a new invoice.
-- Tickets raised by customers. Operators open support tickets on a customer's behalf.
 
 ## Online payment
 
@@ -293,3 +292,10 @@ functions that check for an operator can reach them. Audit rows for tickets stay
 ids and states only, because an organisation can read its own trail.
 
 Super and Support Admins can change tickets. Other operators can read them.
+
+A customer raises a request from Support in the app. Any member may raise one and follows the requests they raised;
+someone with `TENANT_MANAGE` follows every request their organisation raised. On such a ticket an operator either adds
+an internal note, which stays among operators, or replies to the customer. The customer sees their own messages and
+the replies, signed "ProductionOS support", never internal notes. Each reply and status change tells the person who
+raised the request, in the app and by email. A reply from the customer puts a ticket that was waiting on them, or
+resolved, back to `OPEN`. A ticket that support opened stays private and cannot take a reply to the customer.

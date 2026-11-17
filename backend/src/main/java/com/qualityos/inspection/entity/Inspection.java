@@ -60,6 +60,7 @@ public class Inspection extends TenantOwnedEntity {
     private String batchNumber;
     private BigDecimal quantity;
     private int sampleSize;
+    private Integer nonconformingUnits;
 
     @Enumerated(EnumType.STRING)
     private Status status = Status.PENDING;
@@ -138,6 +139,11 @@ public class Inspection extends TenantOwnedEntity {
     }
 
     /** @param criticalFailure holds the material straight away, without waiting for anyone to notice */
+    /** For an AQL plan: how many sampled units were nonconforming. */
+    public void countNonconforming(int units) {
+        nonconformingUnits = units;
+    }
+
     public void submit(Evaluation evaluation, boolean criticalFailure, UUID actor) {
         if (!isOpenForResults()) {
             throw new BusinessRuleException("Only an inspection in progress can be submitted.");

@@ -22,7 +22,12 @@ public final class EvaluationEngine {
         }
     }
 
-    public record Outcome(Evaluation evaluation, boolean criticalFailure) {
+    /** @param nonconformingUnits under AQL sampling, the sampled units with a failure; otherwise 0 */
+    public record Outcome(Evaluation evaluation, boolean criticalFailure, int nonconformingUnits) {
+
+        public Outcome(Evaluation evaluation, boolean criticalFailure) {
+            this(evaluation, criticalFailure, 0);
+        }
     }
 
     private EvaluationEngine() {
@@ -109,6 +114,15 @@ public final class EvaluationEngine {
      */
     public static Outcome overallByUnits(
             List<ParameterSpec> parameters, List<SampleEvaluation> results, int acceptanceNumber) {
+        return overallByUnits(parameters, results, acceptanceNumber, acceptanceNumber + 1);
+    }
+
+    /**
+     * As above, with a rejection number that may sit above Ac + 1, as under reduced inspection: between the two the
+     * lot is still accepted.
+     */
+    public static Outcome overallByUnits(
+            List<ParameterSpec> parameters, List<SampleEvaluation> results, int acceptanceNumber, int rejectsFrom) {
         java.util.Map<String, ParameterSpec> specs = parameters.stream()
                 .collect(java.util.stream.Collectors.toMap(ParameterSpec::code, spec -> spec));
         boolean criticalFailure = false;
@@ -132,9 +146,9 @@ public final class EvaluationEngine {
                 lotFailure = true;
             }
         }
-        Evaluation evaluation = criticalFailure || lotFailure || nonconforming.size() > acceptanceNumber
+        Evaluation evaluation = criticalFailure || lotFailure || nonconforming.size() >= rejectsFrom
                 ? Evaluation.FAIL
                 : review ? Evaluation.PENDING_REVIEW : Evaluation.PASS;
-        return new Outcome(evaluation, criticalFailure);
+        return new Outcome(evaluation, criticalFailure, nonconforming.size());
     }
 }

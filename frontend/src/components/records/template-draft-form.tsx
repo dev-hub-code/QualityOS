@@ -146,6 +146,10 @@ export function TemplateDraftForm({ templateId, draft }: { templateId: string; d
                   <option value="I">I (smaller samples)</option>
                   <option value="II">II (usual)</option>
                   <option value="III">III (larger samples)</option>
+                  <option value="S1">S-1 (special, smallest samples)</option>
+                  <option value="S2">S-2 (special)</option>
+                  <option value="S3">S-3 (special)</option>
+                  <option value="S4">S-4 (special)</option>
                 </select>
               </div>
             </>
@@ -163,7 +167,7 @@ export function TemplateDraftForm({ templateId, draft }: { templateId: string; d
         <p className="mt-3 text-sm text-muted-foreground">
           Critical parameters always fail on one bad sample.
           {samplingType === "AQL" &&
-            " Under AQL, each lot's size sets the sample size and how many nonconforming samples it accepts, normal inspection, single sampling. A sample failing several parameters counts once."}
+            " Under AQL, each lot's size sets the sample size and how many nonconforming samples it accepts, single sampling. The switching rules move each supplier's lots between normal, tightened and reduced inspection. Special levels S-1 to S-4 suit costly or destructive tests. A sample failing several parameters counts once."}
         </p>
       </Section>
       {fields.map((field, index) => {

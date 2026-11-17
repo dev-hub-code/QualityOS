@@ -14,6 +14,7 @@ import {
   useProducts,
   useRefresh,
 } from "@/components/records/parts";
+import { AqlSwitching, levelLabel } from "@/components/records/aql-switching";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { TemplateDraftForm } from "@/components/records/template-draft-form";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,7 @@ const PUBLISH_FIELDS: FieldDef[] = [
 
 function sampling(version: TemplateVersion) {
   if (version.samplingType === "FULL") return "Every unit";
-  if (version.samplingType === "AQL") return `AQL ${Number(version.aql)}, inspection level ${version.inspectionLevel}`;
+  if (version.samplingType === "AQL") return `AQL ${Number(version.aql)}, inspection level ${levelLabel(version.inspectionLevel)}`;
   return version.samplingType === "FIXED" ? `${version.sampleSize} samples` : `${version.samplePercent}% of the lot`;
 }
 
@@ -104,6 +105,9 @@ export default function InspectionTemplatePage() {
         .map((version) => (
           <PublishedVersion key={version.id} version={version} />
         ))}
+      {versions.some((version) => version.status !== "DRAFT" && version.samplingType === "AQL") && (
+        <AqlSwitching templateId={id} />
+      )}
       {editing && (
         <RecordDialog
           title={`Edit ${template.code}`}

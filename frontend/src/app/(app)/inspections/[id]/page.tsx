@@ -1,5 +1,6 @@
 "use client";
 
+import { levelLabel } from "@/components/records/aql-switching";
 import { useNcrStatusLabel } from "@/hooks/use-ncr-status-labels";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -327,6 +328,14 @@ export default function InspectionPage() {
             ["Quantity", formatQuantity(inspection.quantity)],
             ["Samples", inspection.sampleSize],
             ["Template", `${inspection.specification.templateCode} v${inspection.specification.versionNumber}`],
+            ...(inspection.specification.severity
+              ? ([
+                  [
+                    "Sampling plan",
+                    `AQL ${Number(inspection.specification.aql)}, level ${levelLabel(inspection.specification.inspectionLevel)}, ${inspection.specification.severity.toLowerCase()} inspection, letter ${inspection.specification.codeLetter}: accept up to ${inspection.specification.acceptanceNumber} nonconforming, reject from ${inspection.specification.rejectionNumber}`,
+                  ],
+                ] as [string, string][])
+              : []),
           ]}
         />
       </Section>

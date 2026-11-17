@@ -122,7 +122,7 @@ export const templateDraftSchema = z.object({
   sampleSize: wholeNumber,
   samplePercent: optionalDecimal,
   aql: z.string(),
-  inspectionLevel: z.enum(["I", "II", "III"]),
+  inspectionLevel: z.enum(["I", "II", "III", "S1", "S2", "S3", "S4"]),
   acceptanceNumber: wholeNumber,
   parameters: z.array(
     z.object({

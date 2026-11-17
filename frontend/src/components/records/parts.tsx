@@ -22,7 +22,7 @@ import type {
   WorkCenter,
 } from "@/lib/types";
 
-const NEGATIVE = new Set(["REJECTED", "REJECT", "BLOCKED", "CANCELLED", "VOIDED", "FAIL", "HOLD", "CRITICAL", "OVERDUE", "ON_HOLD", "REVERSED", "REINSPECT"]);
+const NEGATIVE = new Set(["REJECTED", "DISCONTINUED", "REJECT", "BLOCKED", "CANCELLED", "VOIDED", "FAIL", "HOLD", "CRITICAL", "OVERDUE", "ON_HOLD", "REVERSED", "REINSPECT"]);
 const POSITIVE = new Set(["APPROVED", "RECEIVED", "CLOSED", "NOT_REQUIRED", "PASS", "ACCEPT", "PUBLISHED", "COMPLETED", "MINOR", "RELEASED", "APPLIED", "ACCEPTED", "SHIPPED", "PAID"]);
 
 /** @param label shown instead of the status itself, which still decides the colour */

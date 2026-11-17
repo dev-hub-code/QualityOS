@@ -356,7 +356,7 @@ export interface TemplateVersion {
   acceptanceNumber: number;
   /** For AQL sampling, the AQL in percent, such as "2.500". */
   aql: string | null;
-  inspectionLevel: "I" | "II" | "III" | null;
+  inspectionLevel: "I" | "II" | "III" | "S1" | "S2" | "S3" | "S4" | null;
   effectiveFrom: string | null;
   effectiveTo: string | null;
   parameters: ParameterSpec[];
@@ -435,6 +435,12 @@ export interface Inspection {
     samplingType: string;
     acceptanceNumber: number;
     parameters: ParameterSpec[];
+    /** The rest only under AQL sampling, and absent from inspections started before switching existed. */
+    rejectionNumber: number | null;
+    severity: "NORMAL" | "TIGHTENED" | "REDUCED" | null;
+    codeLetter: string | null;
+    aql: string | null;
+    inspectionLevel: string | null;
   };
   results: InspectionResult[];
   instruments: UsedInstrument[];

@@ -89,6 +89,20 @@ class OrganizationLogoIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void aSessionSignedInToAnotherOrganisationCannotReadTheLogo() throws Exception {
+        Session owner = register();
+        Session other = register();
+        upload(owner, "logo.png", "image/png", PNG).andExpect(status().isOk());
+        String lookup = "SELECT count(*) FROM tenant_logo(?)";
+        int[] seen = new int[3];
+        asAppRole(owner.tenantId(), jdbc -> seen[0] = jdbc.queryForObject(lookup, Integer.class, owner.tenantId()));
+        asAppRole(other.tenantId(), jdbc -> seen[1] = jdbc.queryForObject(lookup, Integer.class, owner.tenantId()));
+        // The email worker has no organisation set.
+        asAppRole(null, jdbc -> seen[2] = jdbc.queryForObject(lookup, Integer.class, owner.tenantId()));
+        assertThat(seen).containsExactly(1, 0, 1);
+    }
+
+    @Test
     void theOrganisationsReportsCarryItsLogo() throws Exception {
         Session owner = register();
         byte[] plain = as(owner, get("/api/v1/reports/ncr.pdf")).andExpect(status().isOk())

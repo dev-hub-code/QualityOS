@@ -160,6 +160,8 @@ correction, which then needs no second approval. Each of those needs a note (`no
 `MATERIAL_CORRECTION_APPROVE`) and the reason. Once a second
 member is active, the usual rule returns without anyone changing the setting.
 
+`POST /ncrs` takes an optional `source`: `MANUAL` (the default), `SUPPLIER` (needs `supplierId`) or `PROCESS` (needs at least one of `productionLineId`, `workCenterId`, `machineId`, all at one plant, which becomes the NCR's facility; a machine must be at the work centre given). Places on any other source are `422`, as is any source raised by its own record. The detail returns those ids and `place`, a label such as "Work centre WC-2 – Pressing · Machine M-7 – Press 7". `GET /ncrs/places` (`NCR_CREATE`) lists the lines, work centres and machines in the caller's plants, so raising one needs no manufacturing permission. Supplier issues and process incidents can be cancelled like any NCR raised by hand.
+
 With `actionEvidenceRequired` on, `POST /capas/{id}/actions/{actionId}/complete` is refused (`422`) until a file is attached to that action (`CAPA_ACTION`). A file on the CAPA as a whole does not count. It is off by default.
 
 `capaRequiredFrom` and `effectivenessRequiredFrom` each name the least severe NCR a rule covers: `MINOR` (every NCR),

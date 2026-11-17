@@ -82,6 +82,7 @@ public class NcrService implements AttachmentPolicy {
     private final ReviewPolicy reviewPolicy;
     private final QualityRules rules;
     private final CalibrationDecisions calibrationDecisions;
+    private final NcrPlaces places;
 
     NcrService(
             NonConformanceRepository ncrs,
@@ -98,7 +99,9 @@ public class NcrService implements AttachmentPolicy {
             FacilityService facilities,
             ReviewPolicy reviewPolicy,
             QualityRules rules,
-            CalibrationDecisions calibrationDecisions) {
+            CalibrationDecisions calibrationDecisions,
+            NcrPlaces places) {
+        this.places = places;
         this.rules = rules;
         this.calibrationDecisions = calibrationDecisions;
         this.reviewPolicy = reviewPolicy;
@@ -114,6 +117,12 @@ public class NcrService implements AttachmentPolicy {
         this.numbers = numbers;
         this.audit = audit;
         this.alerts = alerts;
+    }
+
+    /** Where a process incident can be said to have happened, in the caller's plants. */
+    @Transactional(readOnly = true)
+    public NcrPlaces.Options places() {
+        return places.options(scope::allows);
     }
 
     @Transactional(readOnly = true)
@@ -183,17 +192,36 @@ public class NcrService implements AttachmentPolicy {
 
     @Transactional
     public NcrDetail create(CreateNcrRequest request) {
-        scope.requirePlaced(request.facilityId());
-        if (request.facilityId() != null) {
-            facilities.requireActive(request.facilityId());
+        NonConformance.Source source = request.source() == null ? NonConformance.Source.MANUAL : request.source();
+        if (!source.byHand()) {
+            throw new BusinessRuleException("An NCR from this source is raised by its own record, not by hand.");
+        }
+        UUID facilityId = request.facilityId();
+        boolean placed = request.productionLineId() != null || request.workCenterId() != null
+                || request.machineId() != null;
+        if (source == NonConformance.Source.PROCESS) {
+            NcrPlaces.Place place = places.require(request.productionLineId(), request.workCenterId(), request.machineId());
+            if (facilityId != null && !facilityId.equals(place.facilityId())) {
+                throw new BusinessRuleException("Where it happened is at another plant than the one chosen.");
+            }
+            facilityId = place.facilityId();
+        } else if (placed) {
+            throw new BusinessRuleException("Only a process incident says which line, work centre or machine.");
+        }
+        if (source == NonConformance.Source.SUPPLIER && request.supplierId() == null) {
+            throw new BusinessRuleException("A supplier issue needs its supplier.");
+        }
+        scope.requirePlaced(facilityId);
+        if (facilityId != null) {
+            facilities.requireActive(facilityId);
         }
         requireReferences(request);
         if (request.defectCategoryId() != null) {
             requireCategory(request.defectCategoryId());
         }
-        return toDetail(raise(request.facilityId(), new NonConformance(
+        return toDetail(raise(facilityId, new NonConformance(
                 numbers.next(NUMBER_PREFIX),
-                NonConformance.Source.MANUAL,
+                source,
                 null,
                 request.supplierId(),
                 request.materialId(),
@@ -202,7 +230,8 @@ public class NcrService implements AttachmentPolicy {
                 request.severity(),
                 request.title().trim(),
                 request.description().trim(),
-                request.rejectedQuantity()).rejectedIn(rejectedUnit(request))));
+                request.rejectedQuantity()).rejectedIn(rejectedUnit(request))
+                .at(request.productionLineId(), request.workCenterId(), request.machineId())));
     }
 
     /** Joins the disposition's transaction, so a failure cannot be recorded without its NCR. Repeats do nothing. */
@@ -645,6 +674,10 @@ public class NcrService implements AttachmentPolicy {
                 ncr.getSupplierId() == null ? null : supplierNames(Set.of(ncr.getSupplierId())).get(ncr.getSupplierId()),
                 ncr.getMaterialId(),
                 ncr.getMaterialId() == null ? null : materialNames(Set.of(ncr.getMaterialId())).get(ncr.getMaterialId()),
+                ncr.getProductionLineId(),
+                ncr.getWorkCenterId(),
+                ncr.getMachineId(),
+                places.label(ncr.getProductionLineId(), ncr.getWorkCenterId(), ncr.getMachineId()),
                 ncr.getBatchNumber(),
                 ncr.getDefectCategoryId(),
                 category.map(DefectCategory::getName).orElse(null),

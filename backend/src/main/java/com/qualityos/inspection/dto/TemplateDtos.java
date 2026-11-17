@@ -147,6 +147,17 @@ public final class TemplateDtos {
             int versionNumber,
             String samplingType,
             int acceptanceNumber,
-            List<ParameterSpec> parameters) {
+            List<ParameterSpec> parameters,
+            /* The rest only for AQL sampling, and absent from inspections started before switching existed. */
+            Integer rejectionNumber,
+            String severity,
+            String codeLetter,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal aql,
+            String inspectionLevel) {
+
+        /** A lot is rejected from this many nonconforming samples. */
+        public int rejectsFrom() {
+            return rejectionNumber == null ? acceptanceNumber + 1 : rejectionNumber;
+        }
     }
 }

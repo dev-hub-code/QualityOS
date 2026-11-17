@@ -31,8 +31,16 @@ public class TemplateVersion extends TenantOwnedEntity {
 
     public enum SamplingType { FIXED, PERCENTAGE, FULL, AQL }
 
-    /** What one inspection takes: how many samples, and how many nonconforming ones it tolerates. */
-    public record SamplingPlan(int sampleSize, int acceptanceNumber) {
+    /**
+     * What one inspection takes: how many samples, how many nonconforming ones it tolerates, and from how many it is
+     * rejected. Only an AQL plan names its code letter and severity; elsewhere the rejection number is Ac + 1.
+     */
+    public record SamplingPlan(int sampleSize, int acceptanceNumber, int rejectionNumber, String codeLetter,
+            AqlTable.Severity severity) {
+
+        public SamplingPlan(int sampleSize, int acceptanceNumber) {
+            this(sampleSize, acceptanceNumber, acceptanceNumber + 1, null, null);
+        }
     }
 
     /** Above this, entering every sample by hand is not realistic, and a fixed plan fits better. */
@@ -114,10 +122,16 @@ public class TemplateVersion extends TenantOwnedEntity {
      * lot size an AQL plan looks up. Other plans keep the version's own acceptance number.
      */
     public SamplingPlan planFor(BigDecimal quantity) {
+        return planFor(quantity, AqlTable.Severity.NORMAL);
+    }
+
+    /** @param severity for an AQL plan, where its series stands under the switching rules */
+    public SamplingPlan planFor(BigDecimal quantity, AqlTable.Severity severity) {
         if (samplingType == SamplingType.AQL) {
             long lot = quantity.setScale(0, RoundingMode.CEILING).longValueExact();
-            AqlTable.Plan plan = AqlTable.plan(lot, inspectionLevel, aql);
-            return new SamplingPlan(checked(plan.sampleSize()), plan.acceptanceNumber());
+            AqlTable.Plan plan = AqlTable.plan(lot, inspectionLevel, aql, severity);
+            return new SamplingPlan(checked(plan.sampleSize()), plan.acceptanceNumber(), plan.rejectionNumber(),
+                    String.valueOf(plan.codeLetter()), severity);
         }
         int samples = switch (samplingType) {
             case FIXED -> sampleSize;

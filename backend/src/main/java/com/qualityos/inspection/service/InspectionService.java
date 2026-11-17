@@ -1,5 +1,6 @@
 package com.qualityos.inspection.service;
 
+import com.qualityos.inspection.entity.AqlTable;
 import com.qualityos.common.attachment.AttachmentPolicy;
 import com.qualityos.common.attachment.AttachmentService;
 import com.qualityos.common.audit.AuditService;
@@ -102,6 +103,7 @@ public class InspectionService implements AttachmentPolicy {
     private final JsonMapper json;
     private final FacilityScope scope;
     private final ReviewPolicy reviewPolicy;
+    private final AqlSwitching switching;
 
     /** Lazy because the attachment service collects every policy, and this class is one. */
     InspectionService(
@@ -123,7 +125,9 @@ public class InspectionService implements AttachmentPolicy {
             DispatchReturnService returns,
             JsonMapper json,
             FacilityScope scope,
-            ReviewPolicy reviewPolicy) {
+            ReviewPolicy reviewPolicy,
+            AqlSwitching switching) {
+        this.switching = switching;
         this.limits = limits;
         this.reviewPolicy = reviewPolicy;
         this.scope = scope;
@@ -283,7 +287,8 @@ public class InspectionService implements AttachmentPolicy {
         ReceivedBatch batch = receipts.batch(request.receiptItemId());
         InspectionTemplate template = templates.requireUsableFor(request.templateId(), batch.materialId());
         TemplateVersion version = templates.versionInForce(template.getId());
-        TemplateVersion.SamplingPlan plan = version.planFor(batch.quantity());
+        TemplateVersion.SamplingPlan plan = version.planFor(batch.quantity(),
+                severityFor(version, template.getId(), batch.supplierId()));
         receipts.startInspection(batch.itemId());
         return save(new Inspection(
                 numbers.next("INS"),
@@ -308,7 +313,7 @@ public class InspectionService implements AttachmentPolicy {
         // An outgoing check covers what is left to ship. Earlier checks cover the whole batch.
         BigDecimal quantity = template.getInspectionType() == InspectionTemplate.Type.OQC ? batch.availableQuantity()
                 : batch.producedQuantity() != null ? batch.producedQuantity() : batch.plannedQuantity();
-        TemplateVersion.SamplingPlan plan = version.planFor(quantity);
+        TemplateVersion.SamplingPlan plan = version.planFor(quantity, severityFor(version, template.getId(), null));
         return save(new Inspection(
                 numbers.next("INS"),
                 template.getInspectionType(),
@@ -322,6 +327,12 @@ public class InspectionService implements AttachmentPolicy {
                 batch.batchNumber(),
                 quantity,
                 plan.sampleSize()));
+    }
+
+    /** Where the series stands, for an AQL plan; a discontinued series is refused. Other plans have none. */
+    private AqlTable.Severity severityFor(TemplateVersion version, UUID templateId, UUID supplierId) {
+        return version.getSamplingType() == TemplateVersion.SamplingType.AQL
+                ? switching.severityFor(templateId, supplierId) : AqlTable.Severity.NORMAL;
     }
 
     private Inspection save(Inspection inspection) {
@@ -489,8 +500,11 @@ public class InspectionService implements AttachmentPolicy {
                 ? EvaluationEngine.overallByUnits(specification.parameters(), recorded.stream()
                         .map(result -> new EvaluationEngine.SampleEvaluation(
                                 result.getParameterCode(), result.getSampleNumber(), result.getEvaluation()))
-                        .toList(), specification.acceptanceNumber())
+                        .toList(), specification.acceptanceNumber(), specification.rejectsFrom())
                 : EvaluationEngine.overall(specification.parameters(), byParameter, specification.acceptanceNumber());
+        if ("AQL".equals(specification.samplingType())) {
+            inspection.countNonconforming(outcome.nonconformingUnits());
+        }
         inspection.submit(outcome.evaluation(), outcome.criticalFailure(), TenantContext.getCurrentUserId());
         inspections.saveAndFlush(inspection);
         decide(id, "SUBMITTED", outcome.evaluation().name());
@@ -512,6 +526,7 @@ public class InspectionService implements AttachmentPolicy {
                 actor, inspection.getSubmittedBy(), ENTITY, id, "INSPECTION_APPROVE", request.note());
         inspection.approve(request.result(), actor, selfReview);
         inspections.saveAndFlush(inspection);
+        countForSwitching(inspection);
         decide(id, "APPROVED", request.note());
         audit.record("INSPECTION_APPROVED", ENTITY, id, null, Map.of("result", inspection.getFinalResult()));
         inspectionAlerts.approved(inspection);
@@ -628,6 +643,28 @@ public class InspectionService implements AttachmentPolicy {
         }
         return inspection.getProductionBatchId() == null ? null
                 : production.batch(inspection.getProductionBatchId()).uomId();
+    }
+
+    /**
+     * A lot sampled by AQL counts toward its series once decided, when this is its original inspection: not a
+     * return's, nor a repeat of a lot already decided under the same template.
+     */
+    private void countForSwitching(Inspection inspection) {
+        SpecSnapshot specification = specificationOf(inspection);
+        if (specification.severity() == null || inspection.getReturnItemId() != null
+                || inspection.getNonconformingUnits() == null || !switching.isOriginal(inspection.getId())) {
+            return;
+        }
+        switching.record(new AqlSwitching.Lot(
+                switching.templateOf(inspection.getTemplateVersionId()),
+                inspection.getSupplierId(),
+                inspection.getQuantity().setScale(0, java.math.RoundingMode.CEILING).longValueExact(),
+                AqlTable.Level.valueOf(specification.inspectionLevel()),
+                specification.aql(),
+                AqlTable.Severity.valueOf(specification.severity()),
+                specification.acceptanceNumber(),
+                inspection.getNonconformingUnits(),
+                inspection.getFinalResult() == Inspection.Result.PASS));
     }
 
     private SpecSnapshot specificationOf(Inspection inspection) {

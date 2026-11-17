@@ -251,7 +251,12 @@ public class InspectionTemplateService {
                 version.getVersionNumber(),
                 version.getSamplingType().name(),
                 plan.acceptanceNumber(),
-                version.getParameters().stream().map(InspectionTemplateService::toSpec).toList());
+                version.getParameters().stream().map(InspectionTemplateService::toSpec).toList(),
+                plan.severity() == null ? null : plan.rejectionNumber(),
+                plan.severity() == null ? null : plan.severity().name(),
+                plan.codeLetter(),
+                plan.severity() == null ? null : version.getAql(),
+                plan.severity() == null ? null : version.getInspectionLevel().name());
     }
 
     @Transactional(readOnly = true)

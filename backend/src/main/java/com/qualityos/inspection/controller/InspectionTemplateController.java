@@ -1,5 +1,7 @@
 package com.qualityos.inspection.controller;
 
+import com.qualityos.inspection.service.AqlSwitching;
+import java.util.List;
 import com.qualityos.common.response.ApiResponse;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.response.Pages;
@@ -37,9 +39,28 @@ public class InspectionTemplateController {
     private static final Set<String> SORTABLE = Set.of("code", "name", "inspectionType");
 
     private final InspectionTemplateService templates;
+    private final AqlSwitching switching;
 
-    InspectionTemplateController(InspectionTemplateService templates) {
+    InspectionTemplateController(InspectionTemplateService templates, AqlSwitching switching) {
         this.templates = templates;
+        this.switching = switching;
+    }
+
+    /** Where each series of lots stands under the AQL switching rules. */
+    @GetMapping("/{id}/aql-switching")
+    @PreAuthorize(Require.TEMPLATE_VIEW)
+    public ApiResponse<List<AqlSwitching.SeriesView>> switching(@PathVariable UUID id) {
+        templates.get(id);
+        return ApiResponse.ok(switching.views(id));
+    }
+
+    @PostMapping("/{id}/aql-switching")
+    @PreAuthorize(Require.TEMPLATE_MANAGE)
+    public ApiResponse<List<AqlSwitching.SeriesView>> switchSeries(
+            @PathVariable UUID id, @Valid @RequestBody AqlSwitching.SwitchRequest request) {
+        templates.get(id);
+        switching.decide(id, request.supplierId(), request.state(), request.reason());
+        return ApiResponse.ok(switching.views(id));
     }
 
     @GetMapping

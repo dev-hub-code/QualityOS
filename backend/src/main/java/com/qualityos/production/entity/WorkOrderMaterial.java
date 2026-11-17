@@ -38,6 +38,14 @@ public class WorkOrderMaterial extends TenantOwnedEntity {
         this.uomId = uomId;
     }
 
+    /** A fixed line (a recipe's catalyst, say) needs the same whatever quantity the order makes. */
+    private boolean scales = true;
+
+    public WorkOrderMaterial fixed(boolean fixed) {
+        this.scales = !fixed;
+        return this;
+    }
+
     public WorkOrderMaterial withAlternates(java.util.List<UUID> alternates) {
         this.alternateMaterialIds = new java.util.ArrayList<>(alternates);
         return this;

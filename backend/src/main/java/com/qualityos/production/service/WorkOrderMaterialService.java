@@ -87,6 +87,7 @@ public class WorkOrderMaterialService {
     private final RevisionSupport support;
     private final AuditService audit;
     private final FinishedGoodsReceiptRepository finishedGoods;
+    private final com.qualityos.traceability.service.RecallHolds recallHolds;
 
     WorkOrderMaterialService(
             WorkOrderRepository workOrders,
@@ -101,7 +102,9 @@ public class WorkOrderMaterialService {
             FacilityScope scope,
             RevisionSupport support,
             AuditService audit,
-            FinishedGoodsReceiptRepository finishedGoods) {
+            FinishedGoodsReceiptRepository finishedGoods,
+            com.qualityos.traceability.service.RecallHolds recallHolds) {
+        this.recallHolds = recallHolds;
         this.workOrders = workOrders;
         this.requirements = requirements;
         this.reservations = reservations;
@@ -295,6 +298,11 @@ public class WorkOrderMaterialService {
                     .orElseThrow(() -> new BusinessRuleException("That batch is not of line %d's product."
                             .formatted(line.getLineNumber())));
             requireSameFacility(order, source.facilityId());
+            List<String> recalls = recallHolds.openRecalls(List.of(source.id())).get(source.id());
+            if (recalls != null) {
+                throw new BusinessRuleException("Batch %s is under open recall %s, so it cannot go into new production."
+                        .formatted(source.batchNumber(), String.join(", ", recalls)));
+            }
             BigDecimal inBatch = convert(request.quantity(), line.getUomId(), source.uomId());
             UUID entry = production.consumeEntry(batch, new ConsumeRequest(null, source.id(), inBatch, null));
             issue.record(null, source.id(), inBatch, source.uomId(), entry);
@@ -364,8 +372,10 @@ public class WorkOrderMaterialService {
                 .collect(Collectors.toMap(MaterialLine::lineNumber, Function.identity()));
         List<MaterialVariance> found = new ArrayList<>();
         for (WorkOrderMaterial line : requirements.findByWorkOrderIdOrderByLineNumber(order.getId())) {
-            BigDecimal expected = scaled(line.getRequiredQuantity().multiply(received)
-                    .divide(order.getQuantity(), 6, RoundingMode.HALF_UP));
+            // A fixed line is needed in full however much was made; the rest in proportion to it.
+            BigDecimal expected = !line.isScales() ? line.getRequiredQuantity()
+                    : scaled(line.getRequiredQuantity().multiply(received)
+                            .divide(order.getQuantity(), 6, RoundingMode.HALF_UP));
             BigDecimal issued = cover.get(line.getId()).issued();
             BigDecimal difference = issued.subtract(expected);
             BigDecimal percent = expected.signum() == 0
@@ -545,8 +555,13 @@ public class WorkOrderMaterialService {
                 .collect(Collectors.toSet());
         Map<UUID, List<LotView>> freeLots = receipts.freeLots(materialIds, order.getFacilityId()).stream()
                 .collect(Collectors.groupingBy(LotView::materialId));
-        Map<UUID, List<ProductionBatchView>> freeBatches = production.availableBatches(productIds, order.getFacilityId())
-                .stream().collect(Collectors.groupingBy(ProductionBatchView::productId));
+        // A batch under an open recall is not offered: it cannot go into new production.
+        List<ProductionBatchView> batchesFree = production.availableBatches(productIds, order.getFacilityId());
+        Map<UUID, List<String>> recalled = batchesFree.isEmpty() ? Map.of()
+                : recallHolds.openRecalls(batchesFree.stream().map(ProductionBatchView::id).toList());
+        Map<UUID, List<ProductionBatchView>> freeBatches = batchesFree.stream()
+                .filter(batch -> !recalled.containsKey(batch.id()))
+                .collect(Collectors.groupingBy(ProductionBatchView::productId));
         Map<UUID, MaterialReference> materialRefs = materials.references(materialIds);
         Map<UUID, ProductReference> productRefs = products.references(productIds);
 

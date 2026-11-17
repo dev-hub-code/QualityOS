@@ -242,7 +242,9 @@ batch.
   Sub-assemblies are not reserved: they are issued from their batches.
 - **Issue** needs the order in progress. From a lot, the order's own reservations on it are used first and any rest
   comes from free stock. Each part becomes a consumption entry on the order's production batch, so genealogy, recall
-  and traceability see it at once. More than the line needs is refused unless the organisation allows it.
+  and traceability see it at once. More than the line needs is refused unless the organisation allows it. A
+  sub-assembly batch under an open recall (started from it or from anything it was made from) is neither offered nor
+  issued, with no override: it cannot go into new production.
 - **Issued** is counted from the batch's consumption entries that still stand, however they were recorded, so
   consumption entered on the batch page counts too. Entries for components not on the list are shown separately.
 - **Return** gives back part or all of one consumption entry to its lot or batch, with a reason. The entry is closed
@@ -381,8 +383,9 @@ an order takes two steps, both needing WORK_ORDER_COMPLETE.
     given. It cannot pass the order quantity plus `overReportPercent` (excess output within that allowance is
     accepted). Counted units take whole numbers.
   - *Short output.* Below the order quantity less `completionTolerancePercent`, a `shortReason` is required.
-  - *Material.* For each material line, what the received quantity needed (scaled from the order's requirement) is
-    compared with what was issued, net of returns. A line off by more than `materialVariancePercent` needs a
+  - *Material.* For each material line, what the received quantity needed is compared with what was issued, net of
+    returns. A proportional line is scaled from the order's requirement to the quantity received; a fixed line (a
+    recipe's catalyst, say) is needed in full however much was made. A line off by more than `materialVariancePercent` needs a
     `varianceReason`. The comparison is stored with the receipt.
   - *Serials.* With `serialTracking` on, a discrete product (made from a BOM) is received with one distinct serial
     number per unit, registered through `ProductionService.addSerials`.

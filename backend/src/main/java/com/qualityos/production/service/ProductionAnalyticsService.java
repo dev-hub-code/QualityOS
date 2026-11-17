@@ -325,7 +325,7 @@ public class ProductionAnalyticsService {
     }
 
     /** @param made units reported, good units, and ideal minutes for them */
-    private static MachineOee oee(UUID id, String code, String centre, double shift, double plannedDown, double ran,
+    static MachineOee oee(UUID id, String code, String centre, double shift, double plannedDown, double ran,
             double unplannedDown, double[] made) {
         List<String> notes = new ArrayList<>();
         double plannedProduction = Math.max(shift - plannedDown, 0);
@@ -358,9 +358,10 @@ public class ProductionAnalyticsService {
             notes.add("Its operations have no run time per unit, so performance is not known.");
             performance = null;
         }
+        // From the unrounded ratios, so the rounding of each factor does not carry into the product.
         BigDecimal oee = availability == null || performance == null || quality == null ? null
-                : availability.multiply(performance).multiply(quality)
-                        .divide(HUNDRED.multiply(HUNDRED), 1, RoundingMode.HALF_UP);
+                : BigDecimal.valueOf(Math.min(ran / plannedProduction, 1) * (made[2] / ran) * (made[1] / made[0]) * 100)
+                        .setScale(1, RoundingMode.HALF_UP);
         return new MachineOee(id, code, centre, DowntimeService.minutes(shift), DowntimeService.minutes(plannedDown),
                 DowntimeService.minutes(plannedProduction), DowntimeService.minutes(ran),
                 DowntimeService.minutes(unplannedDown), utilisation, availability, performance, quality, oee, notes);

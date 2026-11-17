@@ -1852,7 +1852,8 @@ export interface ScaledRecipe {
   batchSize: string;
   uomId: string;
   factor: string;
-  lines: (Omit<BomLine, "id" | "scrapPercent" | "notes" | "alternates">)[];
+  /** withScrap: the quantity with the line's scrap allowance, which a work order of this size needs. */
+  lines: (Omit<BomLine, "id" | "scrapPercent" | "notes" | "alternates"> & { withScrap: string })[];
   parameters: ProcessParameter[];
 }
 

@@ -96,6 +96,9 @@ zero. Overall OEE adds the minutes and units of every machine before dividing, s
 
 ## Not covered
 
-- Process manufacturing and hybrid organisations end to end in the browser, and two organisations working side by
-  side there: the next item on the audit plan.
-- N+1 queries and query performance: the item after that.
+- N+1 queries and query performance: the next item on the audit plan.
+
+Process manufacturing, a hybrid organisation and two organisations working side by side are now run end to end in the
+browser (`e2e/process-hybrid.spec.ts`). Writing them found one more fault: receiving an order without operations asked
+for a variance reason, or left the field out, by comparing material with the ordered quantity rather than the quantity
+being entered. The reason is now offered whenever the quantity is entered, and the server decides whether it is needed.

@@ -208,7 +208,7 @@ test("a template is published, and a failed critical measurement never releases 
   await expect(manager.getByRole("button", { name: "Raise CAPA" })).toHaveCount(0);
 });
 
-test("a template can sample by AQL, set from the lot size each time", async ({ page }) => {
+test("a template can sample by AQL at a special level, set from the lot size each time", async ({ page }) => {
   await signUp(page);
   await page.goto("/inspection-templates");
   await dialogAdd(page, "Add template", async (dialog) => {
@@ -221,7 +221,7 @@ test("a template can sample by AQL, set from the lot size each time", async ({ p
   await page.getByLabel("Sampling").selectOption("AQL");
   await expect(page.getByLabel("Failures allowed per parameter")).toHaveCount(0);
   await page.getByLabel("AQL (% nonconforming)").selectOption("1.0");
-  await page.getByLabel("Inspection level").selectOption("III");
+  await page.getByLabel("Inspection level").selectOption("S3");
   await page.getByRole("button", { name: "Add parameter" }).click();
   await page.getByLabel("Parameter code").fill("DIA");
   await page.getByLabel("Parameter name").fill("Diameter");
@@ -231,8 +231,11 @@ test("a template can sample by AQL, set from the lot size each time", async ({ p
   await expect(page.getByText("Saved")).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("AQL (% nonconforming)")).toHaveValue("1.0");
-  await expect(page.getByLabel("Inspection level")).toHaveValue("III");
+  await expect(page.getByLabel("Inspection level")).toHaveValue("S3");
   await page.getByRole("button", { name: "Publish" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
-  await expect(page.getByText("AQL 1, inspection level III, with sample size and acceptance set by each lot's size")).toBeVisible();
+  await expect(page.getByText("AQL 1, inspection level S-3, with sample size and acceptance set by each lot's size")).toBeVisible();
+  // Every series starts on normal inspection; the switching rules take it from there.
+  await expect(page.getByText("AQL switching", { exact: true })).toBeVisible();
+  await expect(page.getByText("No lot has been decided under this template yet", { exact: false })).toBeVisible();
 });

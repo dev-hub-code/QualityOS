@@ -26,6 +26,15 @@ public class TenantJwtAuthenticationConverter implements Converter<Jwt, Abstract
     /** Marks a token that proves an operator's password while their authenticator code is still to come. */
     public static final String SECOND_FACTOR_CLAIM = "sfc";
 
+    /**
+     * Marks a support session: an operator reading an organisation that granted support access. Names the grant,
+     * which is checked on every request, so withdrawing it ends the session at once.
+     */
+    public static final String SUPPORT_CLAIM = "sup";
+
+    /** Held by a support session, which can only read. */
+    public static final String SUPPORT_SESSION = "SUPPORT_SESSION";
+
     /** Held by every token that belongs to an organisation. Permissions are additional to this. */
     public static final String MEMBER = "ORGANIZATION_MEMBER";
     public static final String PENDING_VERIFICATION = "PENDING_VERIFICATION";
@@ -47,10 +56,25 @@ public class TenantJwtAuthenticationConverter implements Converter<Jwt, Abstract
             return pendingVerification(jwt, userId);
         }
         UUID tenantId = UUID.fromString(tenant);
+        String grant = jwt.getClaimAsString(SUPPORT_CLAIM);
+        if (grant != null) {
+            return support(jwt, tenantId, userId, UUID.fromString(grant));
+        }
         List<SimpleGrantedAuthority> authorities = Stream.concat(
                         Stream.of(MEMBER),
                         accessResolver.resolvePermissions(tenantId, userId)
                                 .orElseThrow(() -> new InvalidBearerTokenException("Membership is not active"))
+                                .stream())
+                .map(SimpleGrantedAuthority::new)
+                .toList();
+        return new JwtAuthenticationToken(jwt, authorities, userId.toString());
+    }
+
+    private AbstractAuthenticationToken support(Jwt jwt, UUID tenantId, UUID userId, UUID grantId) {
+        List<SimpleGrantedAuthority> authorities = Stream.concat(
+                        Stream.of(MEMBER, SUPPORT_SESSION),
+                        accessResolver.resolveSupportPermissions(tenantId, userId, grantId)
+                                .orElseThrow(() -> new InvalidBearerTokenException("Support access has ended"))
                                 .stream())
                 .map(SimpleGrantedAuthority::new)
                 .toList();

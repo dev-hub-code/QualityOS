@@ -349,7 +349,8 @@ public class AuthService {
         });
     }
 
-    public MeResponse me(Set<String> permissions) {
+    /** @param supportUntil when a support session ends, or null for an ordinary session */
+    public MeResponse me(Set<String> permissions, java.time.Instant supportUntil) {
         UUID userId = TenantContext.getCurrentUserId();
         UUID tenantId = TenantContext.getCurrentTenantId();
         User user = tx.execute(status -> users.findById(userId).orElseThrow());
@@ -362,7 +363,9 @@ public class AuthService {
                 organizations.getCurrent().onboarded(),
                 hasSubscription,
                 permissions,
-                memberOf);
+                memberOf,
+                supportUntil == null ? null
+                        : new com.qualityos.identity.dto.AuthDtos.SupportView(organizations.getCurrent().name(), supportUntil));
     }
 
     private UUID chooseTenant(UUID userId, UUID preferred) {

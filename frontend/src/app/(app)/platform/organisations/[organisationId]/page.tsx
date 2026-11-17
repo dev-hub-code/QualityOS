@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { formatDate, formatMoney } from "@/components/billing/subscription-banner";
 import { EXTEND_FIELDS, ReasonDialog, RecordPaymentDialog } from "@/components/platform/billing-dialogs";
+import { SupportSessionControl } from "@/components/platform/support-session";
 import { Details, PageHeader, QueryState, Section, useRefresh } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -70,6 +71,11 @@ export default function PlatformOrganisationPage() {
           untouched.
         </p>
       )}
+      <Section title="Support access">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SupportSessionControl organisationId={organisationId} canOpen={support} />
+        </div>
+      </Section>
       <div className="grid gap-4 xl:grid-cols-2">
         <Section title="Profile">
           <Details

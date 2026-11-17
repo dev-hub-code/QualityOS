@@ -1169,6 +1169,7 @@ export const DOC_PAGES: DocPage[] = [
           "Critical actions are written to the audit log, with members' sign-in and password events from the day they joined.",
           "Ten failed sign-ins lock an account for 15 minutes, and a reset link unlocks it.",
           "Change your own password under Settings.",
+          "ProductionOS support cannot see your records unless an administrator allows it under Settings, Support access, for 24 hours, 3 days or 7 days. Support can only read, never change, and you can withdraw access at any time. Every page support opens is listed there.",
           "An administrator can upload a logo under Settings. It shows in the menu and at the top of your organisation's emails. Only PNG and JPEG images up to 256 KB are taken, checked by their content.",
         ],
       },

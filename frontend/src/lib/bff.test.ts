@@ -34,10 +34,12 @@ describe("isProxyablePath", () => {
 });
 
 describe("isTokenIssuingRequest", () => {
-  it("catches organisation creation only", () => {
+  it("catches organisation creation and support sessions only", () => {
     expect(isTokenIssuingRequest("POST", ["organizations"])).toBe(true);
     expect(isTokenIssuingRequest("GET", ["organizations"])).toBe(false);
     expect(isTokenIssuingRequest("PUT", ["organizations", "1"])).toBe(false);
+    expect(isTokenIssuingRequest("POST", ["platform", "organisations", "1", "support-session"])).toBe(true);
+    expect(isTokenIssuingRequest("GET", ["platform", "organisations", "1", "support-access"])).toBe(false);
   });
 });
 

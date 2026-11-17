@@ -10,6 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { GlobalSearch } from "@/components/app/global-search";
 import { OrganizationLogo } from "@/components/app/organization-logo";
 import { NotificationBell, useNotificationStream } from "@/components/app/notification-bell";
+import { SupportSessionBanner } from "@/components/app/support-session-banner";
 import { VerifyEmailBanner } from "@/components/app/verify-email-banner";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/hooks/use-me";
@@ -183,11 +184,15 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className={`flex ${hideWhenCollapsed}`}>
             <OrganizationLogo
               tenantId={me.tenantId}
-              name={me.organizations.find((organization) => organization.id === me.tenantId)?.name ?? "Organisation"}
+              name={me.support?.organizationName ?? me.organizations.find((organization) => organization.id === me.tenantId)?.name ?? "Organisation"}
             />
           </div>
         )}
-        {me.organizations.length > 1 ? (
+        {me.support ? (
+          <p className={`truncate rounded-xl bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 ring-1 ring-amber-200 ${hideWhenCollapsed}`}>
+            Support view: {me.support.organizationName}
+          </p>
+        ) : me.organizations.length > 1 ? (
           <select
             aria-label="Organisation"
             className={`h-9 w-full rounded-xl border bg-white/70 px-2 text-sm ${hideWhenCollapsed}`}
@@ -307,6 +312,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <main className="min-w-0 flex-1 p-4 md:py-4 md:pr-4 md:pl-0">
+        {me.support && <SupportSessionBanner organizationName={me.support.organizationName} expiresAt={me.support.expiresAt} />}
         {!me.user.emailVerified && <VerifyEmailBanner email={me.user.email} />}
         {!controlCenter && <PlatformNotices />}
         {me.hasSubscription && <SubscriptionBanner />}

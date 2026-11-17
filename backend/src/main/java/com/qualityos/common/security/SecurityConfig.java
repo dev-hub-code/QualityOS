@@ -43,6 +43,7 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             TenantJwtAuthenticationConverter jwtConverter,
+            TenantAccessResolver accessResolver,
             JsonMapper json,
             @Value("${qualityos.security.auth-rate-limit-per-minute}") int authRateLimit) throws Exception {
         AuthenticationEntryPoint unauthenticated = (request, response, ex) ->
@@ -75,6 +76,7 @@ public class SecurityConfig {
                         new AuthRateLimitFilter(authRateLimit, json, Clock.systemUTC()),
                         BearerTokenAuthenticationFilter.class)
                 .addFilterAfter(new TenantContextFilter(), BearerTokenAuthenticationFilter.class)
+                .addFilterAfter(new SupportSessionFilter(accessResolver, json), TenantContextFilter.class)
                 .build();
     }
 

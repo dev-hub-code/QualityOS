@@ -148,6 +148,17 @@ class CashfreePaymentsIT extends AbstractIntegrationTest {
     }
 
     @Test
+    void anOrdersOrganisationIsFoundOnlyBeforeAnyOrganisationIsKnown() throws Exception {
+        String order = checkout();
+        String lookup = "SELECT gateway_order_tenant('CASHFREE', ?)";
+        java.util.List<Object> found = new java.util.ArrayList<>();
+        asAppRole(null, jdbc -> found.add(jdbc.queryForObject(lookup, java.util.UUID.class, order)));
+        asAppRole(java.util.UUID.randomUUID(), jdbc -> found.add(jdbc.queryForObject(lookup, java.util.UUID.class, order)));
+        asAppRole(owner.tenantId(), jdbc -> found.add(jdbc.queryForObject(lookup, java.util.UUID.class, order)));
+        assertThat(found).containsExactly(owner.tenantId(), null, null);
+    }
+
+    @Test
     void aSignedWebhookPaysTheInvoiceOnceHoweverOftenItArrives() throws Exception {
         String order = checkout();
         cashfreeHolds(order, payment("SUCCESS", total));

@@ -291,6 +291,92 @@ class WorkOrderMaterialIT extends TraceabilityFixture {
     }
 
     @Test
+    void aFixedLineIsNeededInFullHoweverMuchIsMade() throws Exception {
+        // Two kilograms a unit, plus one kilogram of primer whatever the quantity.
+        String primer = material(owner, false, "KG");
+        String housing = idOf(body(as(owner, postJson("/api/v1/products", Map.of("code", code(), "name", "Housing",
+                        "productType", "FINISHED", "uomId", unitId(owner, "PCS"))))
+                .andExpect(status().isCreated())));
+        String bom = JsonPath.read(body(send(owner, "/boms", Map.of("productId", housing))
+                .andExpect(status().isCreated())), "$.data.revision.id");
+        send(owner, "/boms/" + bom + "/lines", Map.of("materialId", material, "quantity", "2",
+                "uomId", unitId(owner, "KG"))).andExpect(status().isOk());
+        send(owner, "/boms/" + bom + "/lines", Map.of("materialId", primer, "quantity", "1",
+                "uomId", unitId(owner, "KG"), "scales", false)).andExpect(status().isOk());
+        send(owner, "/boms/" + bom + "/submit", Map.of()).andExpect(status().isOk());
+        send(manager, "/boms/" + bom + "/approve", Map.of()).andExpect(status().isOk());
+        String bar = lotIn(facility, "100");
+        String primerLot = JsonPath.read(body(receiveExpiring(primer, "5", LocalDate.now(), null)
+                .andExpect(status().isCreated())), "$.data.items[0].id");
+
+        String order = released(housing, "10");
+        assertThat(asDatabaseSuperuser().queryForList("SELECT scales FROM work_order_materials WHERE work_order_id = "
+                + "?::uuid ORDER BY line_number", Boolean.class, order)).containsExactly(true, false);
+        String path = "/work-orders/" + order;
+        send(approver, path + "/start", Map.of()).andExpect(status().isOk());
+        sendWithKey(approver, path + "/issues", Map.of("lineNumber", 1, "lotId", bar, "quantity", "16"), "bar")
+                .andExpect(status().isOk());
+        sendWithKey(approver, path + "/issues", Map.of("lineNumber", 2, "lotId", primerLot, "quantity", "1"), "primer")
+                .andExpect(status().isOk());
+
+        // Eight made: sixteen kilograms of bar and the whole kilogram of primer were what they needed.
+        String received = body(sendWithKey(approver, path + "/receipt", Map.of("quantity", "8",
+                "shortReason", "Two housings were not cast"), "fg").andExpect(status().isOk()));
+        assertThat(new BigDecimal(JsonPath.<String>read(received, "$.data.materials[1].expected")))
+                .isEqualByComparingTo("1");
+        assertThat(JsonPath.<List<Boolean>>read(received, "$.data.materials[*].outside")).containsOnly(false);
+        assertThat(asDatabaseSuperuser().queryForObject("SELECT variance_reason FROM finished_goods_receipts "
+                + "WHERE work_order_id = ?::uuid", String.class, order)).isNull();
+        // A released line keeps how it scales.
+        assertThatThrownBy(() -> asDatabaseSuperuser().update("UPDATE work_order_materials SET scales = true "
+                + "WHERE work_order_id = ?::uuid AND line_number = 2", order))
+                .hasMessageContaining("was released and cannot be rewritten");
+    }
+
+    /** A released batch of the product made here, from some of the material. */
+    private String releasedHere(String productId) throws Exception {
+        String batch = JsonPath.read(body(as(owner, postJson("/api/v1/production-batches", Map.of(
+                        "productId", productId, "facilityId", facility, "plannedQuantity", "20")))
+                .andExpect(status().isCreated())), "$.data.batch.id");
+        consumeLot(batch, lotIn(facility, "10"), "5").andExpect(status().isOk());
+        complete(batch, "20").andExpect(status().isOk());
+        inspectBatch(batch, "FQC", "20.0", "ACCEPT");
+        return batch;
+    }
+
+    @Test
+    void aSubAssemblyUnderAnOpenRecallIsNotOfferedNorIssued() throws Exception {
+        String shaft = product();
+        String recalled = releasedHere(shaft);
+        String clean = releasedHere(shaft);
+        as(owner, postJson("/api/v1/recalls", Map.of("batchNumbers", List.of(numberOf(recalled)),
+                "recallDate", TODAY, "reason", "Cracks found in the shaft", "instructions", "Stop use")))
+                .andExpect(status().isCreated());
+        String housing = idOf(body(as(owner, postJson("/api/v1/products", Map.of("code", code(), "name", "Housing",
+                        "productType", "FINISHED", "uomId", unitId(owner, "PCS"))))
+                .andExpect(status().isCreated())));
+        String bom = JsonPath.read(body(send(owner, "/boms", Map.of("productId", housing))
+                .andExpect(status().isCreated())), "$.data.revision.id");
+        send(owner, "/boms/" + bom + "/lines", Map.of("componentProductId", shaft, "quantity", "2",
+                "uomId", unitId(owner, "PCS"))).andExpect(status().isOk());
+        send(owner, "/boms/" + bom + "/submit", Map.of()).andExpect(status().isOk());
+        send(manager, "/boms/" + bom + "/approve", Map.of()).andExpect(status().isOk());
+
+        String order = released(housing, "5");
+        String view = materials(order);
+        assertThat(JsonPath.<List<String>>read(view, "$.data.lines[0].sources[*].id")).containsExactly(clean);
+        assertThat(new BigDecimal(JsonPath.<String>read(view, "$.data.lines[0].available")))
+                .isEqualByComparingTo("20");
+        String path = "/work-orders/" + order;
+        send(approver, path + "/start", Map.of()).andExpect(status().isOk());
+        sendWithKey(approver, path + "/issues", Map.of("lineNumber", 1, "sourceBatchId", recalled, "quantity", "10"),
+                "recalled").andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(containsString("is under open recall")));
+        sendWithKey(approver, path + "/issues", Map.of("lineNumber", 1, "sourceBatchId", clean, "quantity", "10"),
+                "clean").andExpect(status().isOk());
+    }
+
+    @Test
     void aSubstituteNamedOnTheBomStandsInForTheLineMaterial() throws Exception {
         String substitute = material(owner, false, "KG");
         String counted = material(owner, false, "PCS");

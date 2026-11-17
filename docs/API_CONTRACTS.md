@@ -401,7 +401,7 @@ Both are audited (`HOLIDAY_ADDED`, `HOLIDAY_REMOVED`).
 | `POST /boms/{id}/submit` | `BOM_MANAGE` | Needs at least one line |
 | `POST /boms/{id}/send-back`, `/approve`, `/retire` | `BOM_APPROVE` | `approve` takes optional `effectiveFrom` (today or later) and `note` |
 | `GET /boms/{id}/explosion?quantity=&on=` | | Every level, in each component's unit, with scrap, and leaf totals |
-| `/recipes/...` | `RECIPE_MANAGE`, `RECIPE_APPROVE` | As `/boms`, plus `POST`/`DELETE /recipes/{id}/parameters` and `GET /recipes/{id}/scaled?batchSize=` |
+| `/recipes/...` | `RECIPE_MANAGE`, `RECIPE_APPROVE` | As `/boms`, plus `POST`/`DELETE /recipes/{id}/parameters` and `GET /recipes/{id}/scaled?batchSize=` (each line's `quantity`, and `withScrap` with its scrap allowance, which a work order of that size needs) |
 | `/routings/...` | `ROUTING_MANAGE`, `ROUTING_APPROVE` | As `/boms` without lines, with `POST`/`PUT`/`DELETE /routings/{id}/operations[/{operationId}]` and `.../operations/{operationId}/parameters` |
 
 Refusals are `422` with a message: a BOM for a process product, a circular structure, a unit that does not convert, a

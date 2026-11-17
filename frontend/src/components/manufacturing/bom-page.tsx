@@ -118,6 +118,12 @@ function Scale({ path, unit }: { path: string; unit: string }) {
                 </span>
                 <span>
                   {formatQuantity(line.quantity)} {units.label(line.uomId)}
+                  {Number(line.withScrap) !== Number(line.quantity) && (
+                    <span className="text-muted-foreground">
+                      {" "}
+                      ({formatQuantity(line.withScrap)} with scrap allowance)
+                    </span>
+                  )}
                 </span>
               </li>
             ))}

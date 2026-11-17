@@ -338,7 +338,7 @@ class ManufacturingIT extends TraceabilityFixture {
         String catalyst = material(owner, false, "KG");
         String recipe = revisionId(body(send(owner, "/recipes", Map.of("productId", product, "baseQuantity", "100"))
                 .andExpect(status().isCreated())));
-        line("/recipes", recipe, "materialId", resin, "95", "KG").andExpect(status().isOk());
+        line("/recipes", recipe, "materialId", resin, "95", "KG", Map.of("scrapPercent", "2")).andExpect(status().isOk());
         line("/recipes", recipe, "materialId", catalyst, "500", "GM", Map.of("scales", false))
                 .andExpect(status().isOk());
 
@@ -359,6 +359,11 @@ class ManufacturingIT extends TraceabilityFixture {
         assertThat(new BigDecimal(JsonPath.<String>read(scaled, "$.data.lines[0].quantity")))
                 .isEqualByComparingTo("237.5");
         assertThat(new BigDecimal(JsonPath.<String>read(scaled, "$.data.lines[1].quantity")))
+                .isEqualByComparingTo("500");
+        // With the scrap allowance a work order of that size adds: 237.5 × 1.02.
+        assertThat(new BigDecimal(JsonPath.<String>read(scaled, "$.data.lines[0].withScrap")))
+                .isEqualByComparingTo("242.25");
+        assertThat(new BigDecimal(JsonPath.<String>read(scaled, "$.data.lines[1].withScrap")))
                 .isEqualByComparingTo("500");
         assertThat(JsonPath.<String>read(scaled, "$.data.parameters[0].code")).isEqualTo("TEMP");
 

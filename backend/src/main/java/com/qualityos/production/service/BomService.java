@@ -339,11 +339,16 @@ public class BomService {
         BigDecimal factor = batchSize.divide(recipe.getBaseQuantity(), 6, RoundingMode.HALF_UP);
         BomDetail detail = detail(recipe);
         List<ScaledLine> scaled = detail.lines().stream()
-                .map(line -> new ScaledLine(line.lineNumber(), line.componentType(), line.componentId(),
-                        line.componentCode(), line.componentName(),
-                        line.scales() ? scaledQuantity(line.quantity(), batchSize, recipe.getBaseQuantity())
-                                : line.quantity(),
-                        line.uomId(), line.scales()))
+                .map(line -> {
+                    BigDecimal quantity = line.scales()
+                            ? scaledQuantity(line.quantity(), batchSize, recipe.getBaseQuantity()) : line.quantity();
+                    // The same allowance a work order adds when it is released.
+                    BigDecimal withScrap = round(quantity.multiply(BigDecimal.ONE.add(
+                            line.scrapPercent().divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP))));
+                    return new ScaledLine(line.lineNumber(), line.componentType(), line.componentId(),
+                            line.componentCode(), line.componentName(), quantity, line.uomId(), line.scales(),
+                            withScrap);
+                })
                 .toList();
         return new ScaledRecipe(batchSize, detail.revision().productUomId(), factor, scaled, detail.parameters());
     }

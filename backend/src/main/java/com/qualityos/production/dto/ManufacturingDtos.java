@@ -300,7 +300,9 @@ public final class ManufacturingDtos {
             String componentName,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
             UUID uomId,
-            boolean scales) {
+            boolean scales,
+            /* With the line's scrap allowance: what a work order of this batch size needs. */
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal withScrap) {
     }
 
     public record ScaledRecipe(

@@ -128,14 +128,15 @@ export const DOC_PAGES: DocPage[] = [
         terms: [
           ["Department", "A part of the plant, such as Stores."],
           ["Production line", "Where batches are made."],
-          ["Shift", "A working period, such as Morning."],
+          ["Shift", "A working period, such as Morning. A work centre can be set to work only some shifts."],
+          ["Holiday", "A day the whole facility does not work, whatever its shifts say."],
         ],
       },
       {
         title: "Good to know",
         list: [
           "Your plan sets how many facilities you can have.",
-          "Open a facility from the list to add its departments, lines and shifts.",
+          "Open a facility from the list to add its departments, lines, shifts and holidays.",
         ],
       },
     ],

@@ -335,6 +335,14 @@ public class WorkCenterService {
         centre.setLabourRate(request.labourRate());
         centre.setMachineRate(request.machineRate());
         centre.setOverheadRate(request.overheadRate());
+        List<UUID> chosen = request.shiftIds() == null ? List.of() : List.copyOf(new java.util.LinkedHashSet<>(
+                request.shiftIds()));
+        Set<UUID> offered = new HashSet<>();
+        facilities.shiftsOf(List.of(request.facilityId())).forEach(shift -> offered.add(shift.id()));
+        if (!offered.containsAll(chosen)) {
+            throw new BusinessRuleException("Choose shifts of the work centre's own facility.");
+        }
+        centre.setShiftIds(new java.util.ArrayList<>(chosen));
     }
 
     private static void applyMachine(Machine machine, SaveMachineRequest request) {
@@ -382,7 +390,7 @@ public class WorkCenterService {
                 centre.getFacilityId(), codes.get(centre.getFacilityId()), centre.getProductionLineId(),
                 centre.getProductionLineId() == null ? null : codes.get(centre.getProductionLineId()),
                 centre.getArchivedAt() != null, centre.getCapacityUnits(), centre.getLabourRate(),
-                centre.getMachineRate(), centre.getOverheadRate());
+                centre.getMachineRate(), centre.getOverheadRate(), List.copyOf(centre.getShiftIds()));
     }
 
     private static MachineResponse toResponse(Machine machine, WorkCenter centre) {

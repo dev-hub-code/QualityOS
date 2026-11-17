@@ -5,7 +5,13 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
-import { machineFields, workCenterFields, workCenterRecord } from "@/components/manufacturing/work-center-fields";
+import {
+  machineFields,
+  shiftFields,
+  workCenterFields,
+  workCenterRecord,
+  workCenterRequest,
+} from "@/components/manufacturing/work-center-fields";
 import {
   Details,
   PageHeader,
@@ -93,6 +99,15 @@ export default function WorkCenterPage() {
             ["Labour per hour", rate(workCenter.labourRate)],
             ["Machine per hour", rate(workCenter.machineRate)],
             ["Overhead per hour", rate(workCenter.overheadRate)],
+            [
+              "Shifts",
+              workCenter.shiftIds.length === 0
+                ? "All of the facility's shifts"
+                : (facility?.shifts ?? [])
+                    .filter((shift) => workCenter.shiftIds.includes(shift.id))
+                    .map((shift) => shift.name)
+                    .join(", ") || "None still active",
+            ],
           ]}
         />
       </Section>
@@ -112,13 +127,16 @@ export default function WorkCenterPage() {
       {dialog === "edit" && (
         <RecordDialog
           title="Edit work centre"
-          fields={workCenterFields(facilities, lines).map((field) =>
-            // A work centre stays in its facility.
-            field.name === "facilityId" ? { ...field, options: facilities.filter((f) => f.value === workCenter.facilityId) } : field,
-          )}
+          fields={[
+            ...workCenterFields(facilities, lines).map((field) =>
+              // A work centre stays in its facility.
+              field.name === "facilityId" ? { ...field, options: facilities.filter((f) => f.value === workCenter.facilityId) } : field,
+            ),
+            ...shiftFields(facility?.shifts ?? []),
+          ]}
           record={workCenterRecord(workCenter)}
           onClose={() => setDialog(null)}
-          onSubmit={(values) => api.put(path, values).then(refresh)}
+          onSubmit={(values) => api.put(path, workCenterRequest(values)).then(refresh)}
         />
       )}
       {dialog === "machine" && (

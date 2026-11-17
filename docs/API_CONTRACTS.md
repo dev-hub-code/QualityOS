@@ -385,7 +385,12 @@ every permission below; after a downgrade only `MANUFACTURING_VIEW` stays. See [
 | `GET /work-centers`, `POST /work-centers` | `POST`: `MANUFACTURING_MANAGE` | Filter by `q`, `facilityId`. Limited members see their facilities only |
 | `GET /work-centers/{id}`, `PUT ...`, `DELETE ...` | `MANUFACTURING_MANAGE` to change | Detail with machines. `DELETE` archives, and is refused while a machine is not inactive |
 
-Since phase 7 a work centre also takes `capacityUnits` (1 to 1000, default 1; used only when it has no active machines) and optional `labourRate`, `machineRate` and `overheadRate` per hour, in the organisation's currency; a `PUT` without a rate clears it. Facility shifts (`POST /api/v1/facilities/{id}/shifts`) take optional `breakMinutes` (default 0) and `daysOfWeek` (Monday 1, Tuesday 2 … Sunday 64, added together; default 127, every day).
+Since phase 7 a work centre also takes `capacityUnits` (1 to 1000, default 1; used only when it has no active machines) and optional `labourRate`, `machineRate` and `overheadRate` per hour, in the organisation's currency; a `PUT` without a rate clears it. Facility shifts (`POST /api/v1/facilities/{id}/shifts`) take optional `breakMinutes` (default 0) and `daysOfWeek` (Monday 1, Tuesday 2 … Sunday 64, added together; default 127, every day). A work centre's `shiftIds` lists the facility shifts it works (at most 20, all
+active shifts of its own facility; empty or left out, it works all of them); only those count toward its capacity and
+machine availability. `POST /api/v1/facilities/{id}/holidays` (`date`, `name`; `409` when the day is already one) and
+`DELETE /api/v1/facilities/{id}/holidays/{holidayId}` keep the facility's holidays, returned from the start of this
+year on as `holidays` in the facility detail; no shift works on a holiday, for scheduling, OEE and availability alike.
+Both are audited (`HOLIDAY_ADDED`, `HOLIDAY_REMOVED`).
 | `GET /machines`, `POST /machines` | `POST`: `MANUFACTURING_MANAGE` | Filter by `q`, `workCenterId`, `status` |
 | `GET /machines/{id}`, `PUT ...` | `PUT`: `MANUFACTURING_MANAGE` | Detail with the last 100 status changes |
 | `GET /machines/{id}/instruments`, `POST ...` (`instrumentId`), `DELETE .../{instrumentId}` | `MANUFACTURING_MANAGE` to change | Instruments kept at the machine. Only instruments of the machine's facility that are not retired. Each change returns the list |

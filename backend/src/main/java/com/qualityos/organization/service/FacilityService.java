@@ -10,6 +10,8 @@ import com.qualityos.common.response.PageResponse;
 import com.qualityos.organization.dto.FacilityDtos.DepartmentOption;
 import com.qualityos.organization.dto.FacilityDtos.FacilityDetail;
 import com.qualityos.organization.dto.FacilityDtos.FacilityResponse;
+import com.qualityos.organization.dto.FacilityDtos.HolidayResponse;
+import com.qualityos.organization.dto.FacilityDtos.SaveHolidayRequest;
 import com.qualityos.organization.dto.FacilityDtos.SaveFacilityRequest;
 import com.qualityos.organization.dto.FacilityDtos.SaveShiftRequest;
 import com.qualityos.organization.dto.FacilityDtos.SaveUnitRequest;
@@ -49,6 +51,7 @@ public class FacilityService {
     private final AuditService audit;
     private final List<ArchiveGuard> archiveGuards;
     private final PlanLimits limits;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     FacilityService(
             FacilityRepository facilities,
@@ -58,7 +61,9 @@ public class FacilityService {
             FacilityMapper mapper,
             PlanLimits limits,
             AuditService audit,
-            List<ArchiveGuard> archiveGuards) {
+            List<ArchiveGuard> archiveGuards,
+            org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
         this.limits = limits;
         this.facilities = facilities;
         this.departments = departments;
@@ -86,7 +91,61 @@ public class FacilityService {
                 lines.findByFacilityIdAndArchivedAtIsNullOrderByName(id).stream()
                         .<UnitResponse>map(mapper::toResponse).toList(),
                 shifts.findByFacilityIdAndArchivedAtIsNullOrderByStartsAt(id).stream()
-                        .map(mapper::toResponse).toList());
+                        .map(mapper::toResponse).toList(),
+                jdbc.query("""
+                        SELECT id, holiday_on, name FROM facility_holidays
+                        WHERE facility_id = ? AND holiday_on >= ? ORDER BY holiday_on
+                        """, (rows, row) -> new HolidayResponse(rows.getObject("id", UUID.class),
+                        rows.getObject("holiday_on", java.time.LocalDate.class), rows.getString("name")),
+                        id, java.time.LocalDate.now().withDayOfYear(1)));
+    }
+
+    @Transactional
+    public HolidayResponse addHoliday(UUID facilityId, SaveHolidayRequest request) {
+        load(facilityId);
+        String name = request.name().trim();
+        UUID id = com.qualityos.common.util.UuidV7.generate();
+        int added = jdbc.update("""
+                INSERT INTO facility_holidays (id, tenant_id, facility_id, holiday_on, name, created_by)
+                VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING
+                """, id, com.qualityos.common.tenant.TenantContext.getCurrentTenantId(), facilityId, request.date(),
+                name, com.qualityos.common.tenant.TenantContext.getCurrentUserId());
+        if (added == 0) {
+            throw new ConflictException("%s is already a holiday here.".formatted(request.date()));
+        }
+        audit.record("HOLIDAY_ADDED", "Facility", facilityId, null,
+                Map.of("date", request.date().toString(), "name", name));
+        return new HolidayResponse(id, request.date(), name);
+    }
+
+    @Transactional
+    public void removeHoliday(UUID facilityId, UUID holidayId) {
+        load(facilityId);
+        List<java.time.LocalDate> removed = jdbc.queryForList(
+                "DELETE FROM facility_holidays WHERE id = ? AND facility_id = ? RETURNING holiday_on",
+                java.time.LocalDate.class, holidayId, facilityId);
+        if (removed.isEmpty()) {
+            throw new ResourceNotFoundException("Holiday", holidayId);
+        }
+        audit.record("HOLIDAY_REMOVED", "Facility", facilityId, Map.of("date", removed.getFirst().toString()), null);
+    }
+
+    /** Each facility's holidays between the two days, both included. */
+    @Transactional(readOnly = true)
+    public Map<UUID, java.util.Set<java.time.LocalDate>> holidaysOf(Collection<UUID> facilityIds,
+            java.time.LocalDate from, java.time.LocalDate to) {
+        Map<UUID, java.util.Set<java.time.LocalDate>> found = new java.util.HashMap<>();
+        if (facilityIds.isEmpty()) {
+            return found;
+        }
+        jdbc.query("""
+                SELECT facility_id, holiday_on FROM facility_holidays
+                WHERE facility_id = ANY (?) AND holiday_on BETWEEN ? AND ?
+                """, rows -> {
+            found.computeIfAbsent(rows.getObject("facility_id", UUID.class), ignored -> new java.util.HashSet<>())
+                    .add(rows.getObject("holiday_on", java.time.LocalDate.class));
+        }, facilityIds.toArray(UUID[]::new), from, to);
+        return found;
     }
 
     @Transactional
@@ -210,7 +269,7 @@ public class FacilityService {
         return shifts.findAll().stream()
                 .filter(shift -> shift.getArchivedAt() == null && facilityIds.contains(shift.getFacilityId()))
                 .map(shift -> new ShiftCalendar(shift.getFacilityId(), shift.getName(), shift.getStartsAt(),
-                        shift.getEndsAt(), shift.getBreakMinutes(), shift.getDaysOfWeek()))
+                        shift.getEndsAt(), shift.getBreakMinutes(), shift.getDaysOfWeek(), shift.getId()))
                 .toList();
     }
 

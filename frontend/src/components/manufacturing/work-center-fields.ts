@@ -14,9 +14,34 @@ export function workCenterFields(facilities: FieldOption[], lines: FieldOption[]
   ];
 }
 
-/** A work centre as the form holds it: numbers as text. */
-export function workCenterRecord(workCenter: { capacityUnits: number } & object) {
-  return { ...workCenter, capacityUnits: String(workCenter.capacityUnits) };
+const SHIFT_FIELD = "worksShift_";
+
+/** One box per facility shift; none ticked means the centre works them all. */
+export function shiftFields(shifts: { id: string; name: string }[]): FieldDef[] {
+  return shifts.map((shift) => ({ name: SHIFT_FIELD + shift.id, label: `Works the ${shift.name} shift`, type: "checkbox" }));
+}
+
+/** A work centre as the form holds it: numbers as text, and a box ticked for each shift it names. */
+export function workCenterRecord(workCenter: { capacityUnits: number; shiftIds?: string[] } & object) {
+  return {
+    ...workCenter,
+    capacityUnits: String(workCenter.capacityUnits),
+    ...Object.fromEntries((workCenter.shiftIds ?? []).map((id) => [SHIFT_FIELD + id, true])),
+  };
+}
+
+/** The form's values as the API takes them: the ticked shifts become shiftIds. */
+export function workCenterRequest(values: Record<string, unknown>) {
+  const request: Record<string, unknown> = {};
+  const shiftIds: string[] = [];
+  for (const [name, value] of Object.entries(values)) {
+    if (name.startsWith(SHIFT_FIELD)) {
+      if (value === true) shiftIds.push(name.slice(SHIFT_FIELD.length));
+    } else {
+      request[name] = value;
+    }
+  }
+  return { ...request, shiftIds };
 }
 
 export function machineFields(workCenters: FieldOption[]): FieldDef[] {

@@ -6,6 +6,8 @@ import com.qualityos.common.response.Pages;
 import com.qualityos.common.security.Permissions.Require;
 import com.qualityos.organization.dto.FacilityDtos.FacilityDetail;
 import com.qualityos.organization.dto.FacilityDtos.FacilityResponse;
+import com.qualityos.organization.dto.FacilityDtos.HolidayResponse;
+import com.qualityos.organization.dto.FacilityDtos.SaveHolidayRequest;
 import com.qualityos.organization.dto.FacilityDtos.SaveFacilityRequest;
 import com.qualityos.organization.dto.FacilityDtos.SaveShiftRequest;
 import com.qualityos.organization.dto.FacilityDtos.SaveUnitRequest;
@@ -121,6 +123,20 @@ public class FacilityController {
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<ShiftResponse> addShift(@PathVariable UUID id, @Valid @RequestBody SaveShiftRequest request) {
         return ApiResponse.ok(facilities.addShift(id, request));
+    }
+
+    @PostMapping("/{id}/holidays")
+    @PreAuthorize(Require.FACILITY_MANAGE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<HolidayResponse> addHoliday(@PathVariable UUID id, @Valid @RequestBody SaveHolidayRequest request) {
+        return ApiResponse.ok(facilities.addHoliday(id, request));
+    }
+
+    @DeleteMapping("/{id}/holidays/{holidayId}")
+    @PreAuthorize(Require.FACILITY_MANAGE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeHoliday(@PathVariable UUID id, @PathVariable UUID holidayId) {
+        facilities.removeHoliday(id, holidayId);
     }
 
     @DeleteMapping("/{id}/shifts/{shiftId}")

@@ -33,6 +33,12 @@ test("capacity, downtime, cost and OEE come from what was planned and recorded",
     await dialog.getByLabel("Break, in minutes").fill("30");
   });
   await expect(page.getByText("Day (08:00–16:00, every day, 30 min break)")).toBeVisible();
+  // A holiday well after the dates planned here.
+  await step(page, "Add holiday", async (dialog) => {
+    await dialog.getByLabel("Date").fill(day(200));
+    await dialog.getByLabel("Name").fill("Plant shutdown");
+  });
+  await expect(page.getByText(`${day(200)} – Plant shutdown`)).toBeVisible();
 
   const bom = await call("POST", "/manufacturing/boms", { productId: product.id });
   await call("POST", `/manufacturing/boms/${bom.revision.id}/lines`, { materialId: material.id, quantity: "1", uomId: unit("KG") });
@@ -47,8 +53,10 @@ test("capacity, downtime, cost and OEE come from what was planned and recorded",
   await step(page, "Edit", async (dialog) => {
     await dialog.getByLabel("Labour cost per hour").fill("600");
     await dialog.getByLabel("Overhead per hour").fill("120");
+    await dialog.getByLabel("Works the Day shift").check();
   });
   await expect(page.getByText("One operation per active machine")).toBeVisible();
+  await expect(page.getByRole("definition").filter({ hasText: /^Day$/ })).toBeVisible();
   await expect(page.getByText("Not set")).toBeVisible();
 
   const routing = await call("POST", "/manufacturing/routings", { productId: product.id });

@@ -555,7 +555,9 @@ Phase 7:
 
 - Scheduling checks capacity and warns; it does not sequence operations or move orders itself. Load is spread evenly
   over an order's working days, and operation dependencies are reflected only through the order's dates.
-- Shifts are per facility, not per work centre, and there is no holiday calendar.
+- Shifts are defined per facility; a work centre may work only some of them (none chosen: all). A holiday is a whole
+  day off for the whole facility: there are no part-day holidays, no shift overrides for one date, and no shared
+  calendar across facilities. A centre whose chosen shifts are all archived has no capacity.
 - Purchase prices are taken as they are on the purchase order, in the organisation's currency; there is no exchange
   rate handling or standard cost. Material without a priced purchase order is listed as missing.
 - Rates are per work centre, not per operator or machine. Labour time is running time; setup is not split out.

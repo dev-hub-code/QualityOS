@@ -57,8 +57,25 @@ public class ProductionCalendar {
         return facilities.shiftsOf(facilityIds).stream().collect(Collectors.groupingBy(ShiftCalendar::facilityId));
     }
 
-    /** Working minutes on a day from these shifts; a shift past midnight counts on the day it starts. */
-    public static long workingMinutes(List<ShiftCalendar> shifts, LocalDate day) {
+    /** Each facility's holidays between the two days, both included. */
+    public Map<UUID, java.util.Set<LocalDate>> holidays(Collection<UUID> facilityIds, LocalDate from, LocalDate to) {
+        return facilities.holidaysOf(facilityIds, from, to);
+    }
+
+    /** The shifts a work centre works: those of its facility it names, or all of them when it names none. */
+    public static List<ShiftCalendar> worked(List<ShiftCalendar> facilityShifts, List<UUID> chosen) {
+        return chosen == null || chosen.isEmpty() ? facilityShifts
+                : facilityShifts.stream().filter(shift -> chosen.contains(shift.id())).toList();
+    }
+
+    /**
+     * Working minutes on a day from these shifts, none on a holiday; a shift past midnight counts on the day it
+     * starts.
+     */
+    public static long workingMinutes(List<ShiftCalendar> shifts, java.util.Set<LocalDate> holidays, LocalDate day) {
+        if (holidays.contains(day)) {
+            return 0;
+        }
         return shifts.stream().filter(shift -> shift.worksOn(day.getDayOfWeek()))
                 .mapToLong(ShiftCalendar::workingMinutes).sum();
     }

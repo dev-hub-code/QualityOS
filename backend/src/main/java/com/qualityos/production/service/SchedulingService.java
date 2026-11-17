@@ -123,6 +123,9 @@ public class SchedulingService {
                 machineCount.getOrDefault(centre.getId(), 0L) > 0 ? machineCount.get(centre.getId()).intValue()
                         : centre.getCapacityUnits()));
         List<ShiftCalendar> shifts = calendar.shifts(List.of(facilityId)).getOrDefault(facilityId, List.of());
+        Map<UUID, List<ShiftCalendar>> centreShifts = new HashMap<>();
+        centreById.values().forEach(centre -> centreShifts.put(centre.getId(),
+                ProductionCalendar.worked(shifts, centre.getShiftIds())));
 
         // Planned downtime known ahead takes time out of capacity.
         Map<UUID, Map<LocalDate, Double>> plannedDown = new HashMap<>();
@@ -146,6 +149,10 @@ public class SchedulingService {
                 SCHEDULED, to).stream()
                 .filter(order -> !order.getPlannedEnd().isBefore(from) || order.getPlannedEnd().isBefore(today))
                 .toList();
+        // Holidays over the board and every open order's remaining dates.
+        LocalDate lastDay = open.stream().map(WorkOrder::getPlannedEnd).reduce(to, (a, b) -> a.isAfter(b) ? a : b);
+        Set<LocalDate> holidays = calendar.holidays(List.of(facilityId), from.isBefore(today) ? from : today, lastDay)
+                .getOrDefault(facilityId, Set.of());
         Map<UUID, List<WorkOrderOperation>> released = operations.findByWorkOrderIdInOrderBySequence(
                 open.stream().filter(order -> order.getReleasedAt() != null).map(WorkOrder::getId).toList())
                 .stream().collect(Collectors.groupingBy(WorkOrderOperation::getWorkOrderId));
@@ -174,7 +181,7 @@ public class SchedulingService {
             }
             List<LocalDate> window = windowStart.datesUntil(windowEnd.plusDays(1)).toList();
             List<LocalDate> working = window.stream()
-                    .filter(day -> ProductionCalendar.workingMinutes(shifts, day) > 0).toList();
+                    .filter(day -> ProductionCalendar.workingMinutes(shifts, holidays, day) > 0).toList();
             if (working.isEmpty()) {
                 if (shifts.isEmpty()) {
                     notes.add("The facility has no shifts, so there is no capacity to plan against.");
@@ -188,7 +195,8 @@ public class SchedulingService {
                     continue;
                 }
                 WorkCenter centre = centreById.get(entry.getKey());
-                double available = working.stream().mapToDouble(day -> capacity(shifts, day,
+                double available = working.stream().mapToDouble(day -> capacity(centreShifts.get(centre.getId()),
+                        holidays, day,
                         units.get(centre.getId()), plannedDown.getOrDefault(centre.getId(), Map.of()))).sum();
                 if (entry.getValue() > available + SLACK_MINUTES) {
                     notes.add("It needs %s h at %s, which has %s h in its planned dates.".formatted(
@@ -214,7 +222,8 @@ public class SchedulingService {
             List<DayLoad> dayLoads = new ArrayList<>();
             for (LocalDate day : days) {
                 double down = plannedDown.getOrDefault(centre.getId(), Map.of()).getOrDefault(day, 0.0);
-                double capacity = capacity(shifts, day, units.get(centre.getId()),
+                double capacity = capacity(centreShifts.get(centre.getId()), holidays, day,
+                        units.get(centre.getId()),
                         plannedDown.getOrDefault(centre.getId(), Map.of()));
                 double booked = load.getOrDefault(centre.getId(), Map.of()).getOrDefault(day, 0.0);
                 boolean over = booked > capacity + SLACK_MINUTES;
@@ -323,9 +332,9 @@ public class SchedulingService {
         return remaining;
     }
 
-    private static double capacity(List<ShiftCalendar> shifts, LocalDate day, int units,
+    private static double capacity(List<ShiftCalendar> shifts, Set<LocalDate> holidays, LocalDate day, int units,
             Map<LocalDate, Double> plannedDown) {
-        return Math.max(ProductionCalendar.workingMinutes(shifts, day) * (double) units
+        return Math.max(ProductionCalendar.workingMinutes(shifts, holidays, day) * (double) units
                 - plannedDown.getOrDefault(day, 0.0), 0);
     }
 

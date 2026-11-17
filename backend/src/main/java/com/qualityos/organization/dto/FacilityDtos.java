@@ -42,7 +42,16 @@ public final class FacilityDtos {
             FacilityResponse facility,
             List<UnitResponse> departments,
             List<UnitResponse> productionLines,
-            List<ShiftResponse> shifts) {
+            List<ShiftResponse> shifts,
+            /* From the start of this year on. */
+            List<HolidayResponse> holidays) {
+    }
+
+    public record SaveHolidayRequest(@NotNull java.time.LocalDate date, @NotBlank @Size(max = 200) String name) {
+    }
+
+    /** A day the facility does not work, whatever its shifts say. */
+    public record HolidayResponse(UUID id, java.time.LocalDate date, String name) {
     }
 
     public record SaveUnitRequest(@NotBlank @Size(max = 30) String code, @NotBlank @Size(max = 200) String name) {
@@ -71,7 +80,7 @@ public final class FacilityDtos {
 
     /** A facility's active shift, for working out capacity. */
     public record ShiftCalendar(UUID facilityId, String name, LocalTime startsAt, LocalTime endsAt, int breakMinutes,
-            int daysOfWeek) {
+            int daysOfWeek, UUID id) {
 
         public boolean worksOn(java.time.DayOfWeek day) {
             return (daysOfWeek & (1 << (day.getValue() - 1))) != 0;

@@ -34,7 +34,12 @@ function shiftRequest(values: Record<string, unknown>) {
 
 const SHIFT_DEFAULTS = { breakMinutes: "0", ...Object.fromEntries(WEEKDAYS.map((day) => [`day${day}`, true])) };
 
-type Dialog = "edit" | "department" | "line" | "shift" | null;
+type Dialog = "edit" | "department" | "line" | "shift" | "holiday" | null;
+
+const HOLIDAY_FIELDS: FieldDef[] = [
+  { name: "date", label: "Date", type: "date", required: true },
+  { name: "name", label: "Name", required: true },
+];
 
 function UnitList({
   items,
@@ -71,7 +76,7 @@ export default function FacilityPage() {
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<FacilityDetail>(path) });
   if (!data) return <QueryState error={error} />;
 
-  const { facility, departments, productionLines, shifts } = data;
+  const { facility, departments, productionLines, shifts, holidays } = data;
   const add = (button: string, target: Dialog) =>
     canManage && (
       <Button variant="outline" size="sm" onClick={() => setDialog(target)}>
@@ -133,6 +138,15 @@ export default function FacilityPage() {
           />
         </Section>
       </div>
+      <Section title="Holidays" action={add("Add holiday", "holiday")}>
+        <p className="mb-2 text-sm text-muted-foreground">
+          No shift works on a holiday, so scheduling and machine availability give it no working time.
+        </p>
+        <UnitList
+          items={holidays.map((holiday) => ({ id: holiday.id, label: `${holiday.date} – ${holiday.name}` }))}
+          onRemove={remover("holidays")}
+        />
+      </Section>
       {dialog === "edit" && (
         <RecordDialog
           title="Edit facility"
@@ -152,6 +166,14 @@ export default function FacilityPage() {
               .post(`${path}/${dialog === "line" ? "production-lines" : "departments"}`, values)
               .then(refresh)
           }
+        />
+      )}
+      {dialog === "holiday" && (
+        <RecordDialog
+          title="Add holiday"
+          fields={HOLIDAY_FIELDS}
+          onClose={() => setDialog(null)}
+          onSubmit={(values) => api.post(`${path}/holidays`, values).then(refresh)}
         />
       )}
       {dialog === "shift" && (

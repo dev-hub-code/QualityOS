@@ -2,31 +2,8 @@ import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { apiCaller, PASSWORD, signUp, unique } from "./helpers";
-import { fromBase32, sealedForSql, TEST_SECRET, totp } from "./second-factor";
-
-/**
- * Being a platform administrator can only be granted in the database, on purpose. The operator gets an
- * authenticator app already set up, unless a test wants to watch that happen.
- */
-function makePlatformAdmin(email: string, recentlyConfirmed = true, enrolled = true) {
-  const statements = [
-    `INSERT INTO platform_admins (user_id, reauthenticated_until) SELECT id, ${recentlyConfirmed ? "now() + INTERVAL '1 hour'" : "NULL"} FROM users WHERE email = '${email}'`,
-  ];
-  if (enrolled) {
-    statements.push(
-      `INSERT INTO platform_second_factors (user_id, secret, confirmed_at) SELECT id, ${sealedForSql(TEST_SECRET)}, now() FROM users WHERE email = '${email}'`,
-    );
-  }
-  execFileSync("docker", [
-    "compose", "exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "qualityos", "-c", statements.join("; "),
-  ]);
-}
-
-/** The second step of an operator's sign-in, with the code the test's authenticator would show. */
-async function enterSecondFactor(page: Page, secret = TEST_SECRET) {
-  await page.getByLabel("Six-digit code").fill(totp(secret));
-  await page.getByRole("button", { name: "Continue" }).click();
-}
+import { enterSecondFactor, makePlatformAdmin } from "./operators";
+import { fromBase32, totp } from "./second-factor";
 
 /**
  * A plan of the test's own. Plans are shared by every organisation and test, so a test that edits the seeded ones

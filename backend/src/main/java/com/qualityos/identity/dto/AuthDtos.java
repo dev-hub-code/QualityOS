@@ -91,7 +91,12 @@ public final class AuthDtos {
             boolean onboarded,
             boolean hasSubscription,
             Set<String> permissions,
-            List<OrganizationSummary> organizations) {
+            List<OrganizationSummary> organizations,
+            /* Set in a read-only support session, which belongs to none of the user's own organisations. */
+            SupportView support) {
+    }
+
+    public record SupportView(String organizationName, java.time.Instant expiresAt) {
     }
 
     public record PasswordResetRequest(@NotBlank @Email @Size(max = 254) String email) {

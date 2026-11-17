@@ -143,6 +143,10 @@ public class AuthController {
                 .map(GrantedAuthority::getAuthority)
                 .filter(authority -> !authority.equals(TenantJwtAuthenticationConverter.MEMBER))
                 .toList());
-        return ApiResponse.ok(auth.me(permissions));
+        java.time.Instant supportUntil = authentication instanceof
+                org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken token
+                && token.getToken().getClaimAsString(TenantJwtAuthenticationConverter.SUPPORT_CLAIM) != null
+                ? token.getToken().getExpiresAt() : null;
+        return ApiResponse.ok(auth.me(permissions, supportUntil));
     }
 }

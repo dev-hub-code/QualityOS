@@ -80,7 +80,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Account emails, such as reset links, cannot be retried, because a resent link would have expired. Failed ones show in the email log | By design |
 | An emailed announcement goes once, to members active when it starts. Someone who joins later sees only the banner | Review after real use |
 | Operators see a new customer request in the support console. Nothing emails them when one is raised | Review after real use |
-| Support has no access to a customer's quality records. The separate time-limited approval the brief allows is not built | If support ever needs it |
+| Support sees a customer's records only after the customer's administrator grants access for 24 hours, 3 days or 7 days, which they can withdraw at any time. A session is read-only (any write is refused, whatever the endpoint allows), lasts at most 30 minutes, needs an operator who handles customers and their password again, and is checked against the grant on every request. The customer sees each session's reason and every page read. Support cannot act on the customer's behalf | If support ever needs to change records |
 | Settings have no default currency, because only INR exists, and no notification defaults, because each person sets their own | When either is needed |
 | Maintenance mode removes change permissions, so a member's action is refused. Signing in, reading, billing and account actions still work | Review after real use |
 | Operators sign in with a password only. There is no second factor | Before customer launch |

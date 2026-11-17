@@ -146,5 +146,13 @@ export function isProxyablePath(segments: string[]): boolean {
 }
 
 export function isTokenIssuingRequest(method: string, segments: string[]): boolean {
-  return method === "POST" && segments.length === 1 && segments[0] === "organizations";
+  if (method !== "POST") return false;
+  if (segments.length === 1 && segments[0] === "organizations") return true;
+  // A support session: its token is set by /api/auth/support-session, never shown to the page.
+  return segments.length === 4 && segments[0] === "platform" && segments[1] === "organisations" && segments[3] === "support-session";
+}
+
+/** A support session's token alone: the operator's own refresh cookie stays, and takes over when it ends. */
+export function setSupportSessionCookie(response: NextResponse, token: { accessToken: string; expiresIn: number }) {
+  response.cookies.set(ACCESS_COOKIE, token.accessToken, { ...cookieOptions(), maxAge: token.expiresIn });
 }

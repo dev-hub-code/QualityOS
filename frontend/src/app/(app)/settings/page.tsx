@@ -10,6 +10,7 @@ import { OrganizationForm } from "@/components/app/organization-form";
 import { OrganizationLogoSettings } from "@/components/app/organization-logo";
 import { QualityRulesSettings } from "@/components/app/quality-rules";
 import { ReviewPolicySettings } from "@/components/app/review-policy";
+import { SupportAccessSettings } from "@/components/app/support-access";
 import { applyServerErrors } from "@/components/forms/apply-server-errors";
 import { Field, FormError } from "@/components/forms/field";
 import { Button } from "@/components/ui/button";
@@ -91,6 +92,7 @@ export default function SettingsPage() {
       <ReviewPolicySettings />
       <QualityRulesSettings />
       <NcrStatusLabelSettings />
+      <SupportAccessSettings />
       <section className="space-y-4">
         <h2 className="text-base font-semibold text-[#1b2a55]">Your password</h2>
         <ChangePasswordForm />

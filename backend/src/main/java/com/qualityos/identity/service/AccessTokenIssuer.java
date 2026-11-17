@@ -32,6 +32,16 @@ class AccessTokenIssuer {
                 .claim(TenantJwtAuthenticationConverter.TENANT_CLAIM, tenantId.toString()));
     }
 
+    /**
+     * A read-only session for an operator in an organisation that granted support access. No refresh token comes
+     * with it: when it ends, the operator's own session takes over again.
+     */
+    String issueSupport(UUID operatorId, UUID tenantId, UUID grantId, Instant expiresAt) {
+        return encode(claims(operatorId, Duration.between(Instant.now(), expiresAt))
+                .claim(TenantJwtAuthenticationConverter.TENANT_CLAIM, tenantId.toString())
+                .claim(TenantJwtAuthenticationConverter.SUPPORT_CLAIM, grantId.toString()));
+    }
+
     /** Has no tenant, and security allows it nothing beyond asking about its own verification. */
     String issuePendingVerification(UUID userId) {
         return encode(claims(userId, properties.accessTokenTtl())

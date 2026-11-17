@@ -1,5 +1,6 @@
 package com.qualityos.identity.service;
 
+import com.qualityos.common.util.UuidV7;
 import com.qualityos.common.security.TenantAccessResolver;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.dto.AuthDtos.OrganizationSummary;
@@ -74,12 +75,51 @@ public class TenantAccessService implements TenantAccessResolver {
     private final JdbcTemplate jdbc;
     private final PlanAccess plan;
     private final TransactionTemplate readOnly;
+    private final TransactionTemplate writable;
 
     TenantAccessService(JdbcTemplate jdbc, PlanAccess plan, PlatformTransactionManager transactionManager) {
         this.jdbc = jdbc;
         this.plan = plan;
         this.readOnly = new TransactionTemplate(transactionManager);
         this.readOnly.setReadOnly(true);
+        this.writable = new TransactionTemplate(transactionManager);
+    }
+
+    /** Reading, nothing more. Production costs stay private: they are commercial, not quality, records. */
+    private static final String SUPPORT_PERMISSIONS = """
+            SELECT code FROM permissions WHERE code LIKE '%\\_VIEW' ESCAPE '\\' AND code <> 'PRODUCTION_COST_VIEW'
+            """;
+
+    private static final String OPEN_GRANT = """
+            SELECT EXISTS (SELECT 1 FROM support_access_grants g JOIN tenants t ON t.id = g.tenant_id
+                           WHERE g.id = ? AND g.tenant_id = ? AND g.revoked_at IS NULL AND g.expires_at > now()
+                             AND t.status = 'ACTIVE')
+            """;
+
+    @Override
+    public Optional<Set<String>> resolveSupportPermissions(UUID tenantId, UUID operatorId, UUID grantId) {
+        return TenantContext.callAs(tenantId, operatorId, () -> readOnly.execute(status -> {
+            boolean open = Boolean.TRUE.equals(jdbc.queryForObject(OPEN_GRANT, Boolean.class, grantId, tenantId));
+            boolean handlesCustomers = jdbc.queryForList(PLATFORM_ADMIN, String.class, operatorId).stream()
+                    .anyMatch(role -> Permissions.PLATFORM_ROLES.getOrDefault(role, Set.of())
+                            .contains(Permissions.PLATFORM_CUSTOMER_MANAGE));
+            if (!open || !handlesCustomers || jdbc.queryForList(OPEN_ACCOUNT, Integer.class, operatorId).isEmpty()) {
+                return Optional.<Set<String>>empty();
+            }
+            return Optional.of(plan.narrow(tenantId, Set.copyOf(jdbc.queryForList(SUPPORT_PERMISSIONS, String.class))));
+        }));
+    }
+
+    @Override
+    public void recordSupportView(UUID tenantId, UUID operatorId, UUID grantId, String detail) {
+        TenantContext.runAs(tenantId, operatorId, () -> writable.executeWithoutResult(status -> jdbc.update("""
+                INSERT INTO support_access_events (id, tenant_id, grant_id, operator_id, operator_name, kind, detail)
+                SELECT ?, ?, ?, u.id, u.full_name, 'VIEWED', ? FROM users u WHERE u.id = ?
+                """, UuidV7.generate(), tenantId, grantId, left(detail), operatorId)));
+    }
+
+    private static String left(String detail) {
+        return detail.length() <= 500 ? detail : detail.substring(0, 500);
     }
 
     @Override

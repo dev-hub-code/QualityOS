@@ -397,15 +397,10 @@ public class ProductionService {
         return load(id).dueInspection();
     }
 
-    /** Joins the inspection's transaction: an inspection cannot be recorded without its effect on the batch. */
-    @Transactional(propagation = Propagation.MANDATORY)
-    public void requireInspectable(UUID id, String inspectionType) {
-        lock(id).requireInspectable(inspectionType);
-    }
-
     /**
-     * As {@link #requireInspectable}, returning the batch as it stands under the lock, so that an inspection is sized
-     * from quantities no dispatch can change until it is saved.
+     * Locks the batch for an inspection and checks it may have one. Joins the inspection's transaction, so an
+     * inspection cannot be recorded without its effect on the batch, and returns the batch as it stands under the
+     * lock, so the inspection is sized from quantities no dispatch can change until it is saved.
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public ProductionBatchView lockForInspection(UUID id, String inspectionType) {

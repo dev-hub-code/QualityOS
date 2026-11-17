@@ -207,6 +207,31 @@ class WorkOrderMaterialIT extends TraceabilityFixture {
     }
 
     @Test
+    void ordersIssuingFromTheSameLotAtOnceNeverTakeMoreThanItHas() throws Exception {
+        String lot = lotIn(facility, "20");
+        List<String> orders = List.of(released("10"), released("10"));
+        for (String order : orders) {
+            send(approver, "/work-orders/" + order + "/start", Map.of()).andExpect(status().isOk());
+        }
+        java.util.concurrent.CyclicBarrier together = new java.util.concurrent.CyclicBarrier(orders.size());
+        List<Callable<Integer>> attempts = new ArrayList<>();
+        orders.forEach(order -> attempts.add(() -> {
+            together.await();
+            return send(approver, "/work-orders/" + order + "/issues",
+                    Map.of("lineNumber", 1, "lotId", lot, "quantity", "15")).andReturn().getResponse().getStatus();
+        }));
+        List<Integer> statuses = new ArrayList<>();
+        try (ExecutorService pool = Executors.newFixedThreadPool(orders.size())) {
+            for (Future<Integer> result : pool.invokeAll(attempts)) {
+                statuses.add(result.get());
+            }
+        }
+        // Twenty in the lot: one issue of fifteen goes through, the other finds only five.
+        assertThat(statuses).containsExactlyInAnyOrder(200, 422);
+        assertThat(lotColumn(lot, "consumed_quantity")).isEqualByComparingTo("15");
+    }
+
+    @Test
     void ordersCompetingForTheSameLotNeverReserveMoreThanItHas() throws Exception {
         String lot = lotIn(facility, "30");
         List<String> orders = List.of(released("10"), released("10"), released("10"));

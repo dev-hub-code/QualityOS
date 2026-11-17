@@ -104,7 +104,13 @@ export function WorkOrderCompletionPanel({
   const receiveFields: FieldDef[] = [
     ...(data.expectedQuantity === null ? [{ name: "quantity", label: `Quantity made (${unit})`, type: "decimal" as const, required: true }] : []),
     ...(mayBeShort ? [{ name: "shortReason", label: "Why it is short (needed when less was made than ordered)", type: "textarea" as const }] : []),
-    ...(outside ? [{ name: "varianceReason", label: "Why material use was off", type: "textarea" as const, required: true }] : []),
+    // Without operations the quantity made is only known once entered, so whether material use is off is the server's
+    // to say: the reason is offered, not required.
+    ...(data.expectedQuantity === null
+      ? [{ name: "varianceReason", label: "Why material use was off (needed when it is off for the quantity made)", type: "textarea" as const }]
+      : outside
+        ? [{ name: "varianceReason", label: "Why material use was off", type: "textarea" as const, required: true }]
+        : []),
     ...(data.serialsRequired
       ? [{ name: "serialNumbers", label: "Serial numbers, one per line", type: "textarea" as const, required: true }]
       : []),

@@ -39,6 +39,8 @@ class EndpointAuthorizationIT extends AbstractIntegrationTest {
             // Cashfree holds no session. Each request is checked by its signature instead.
             "POST /api/v1/public/webhooks/cashfree",
             // The caller's own notifications.
+            // Any member: an NCR's status shows outside the NCR pages too.
+            "GET /api/v1/ncr-status-labels",
             "GET /api/v1/notifications",
             "GET /api/v1/notifications/preferences",
             "GET /api/v1/notifications/stream",

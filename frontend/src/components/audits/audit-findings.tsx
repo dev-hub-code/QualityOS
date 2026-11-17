@@ -1,5 +1,6 @@
 "use client";
 
+import { NcrStatusBadge } from "@/components/records/ncr-status-badge";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
 import { AttachmentPanel } from "@/components/records/attachment-panel";
@@ -38,7 +39,7 @@ export function AuditFindings({
             {finding.ncr && (
               <p className="flex flex-wrap items-center gap-2">
                 <RecordLink href={`/ncrs/${finding.ncr.id}`}>{finding.ncr.ncrNumber}</RecordLink>
-                <StatusBadge status={finding.ncr.status} />
+                <NcrStatusBadge status={finding.ncr.status} />
                 {finding.ncr.capas.map((capa) => (
                   <RecordLink key={capa.id} href={`/capas/${capa.id}`}>
                     {capa.capaNumber}

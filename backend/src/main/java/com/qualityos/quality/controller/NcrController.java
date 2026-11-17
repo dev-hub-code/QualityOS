@@ -1,5 +1,9 @@
 package com.qualityos.quality.controller;
 
+import com.qualityos.common.security.Permissions;
+import com.qualityos.quality.entity.NonConformance;
+import com.qualityos.quality.service.NcrStatusLabelService;
+import org.springframework.web.bind.annotation.PutMapping;
 import com.qualityos.common.response.ApiResponse;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.response.Pages;
@@ -42,9 +46,29 @@ public class NcrController {
     private static final Set<String> SORTABLE = Set.of("ncrNumber", "status", "severity", "createdAt");
 
     private final NcrService ncrs;
+    private final NcrStatusLabelService statusLabels;
 
-    NcrController(NcrService ncrs) {
+    NcrController(NcrService ncrs, NcrStatusLabelService statusLabels) {
         this.ncrs = ncrs;
+        this.statusLabels = statusLabels;
+    }
+
+    /** Any member: an NCR's status shows on audits, work orders and search results as well as on NCR pages. */
+    @GetMapping("/ncr-status-labels")
+    public ApiResponse<List<NcrStatusLabelService.StatusLabel>> statusLabels() {
+        return ApiResponse.ok(statusLabels.labels());
+    }
+
+    /** Only the names change. A status left out or left blank goes back to its standard name. */
+    @PutMapping("/ncr-status-labels")
+    @PreAuthorize("hasAuthority('" + Permissions.TENANT_MANAGE + "')")
+    public ApiResponse<List<NcrStatusLabelService.StatusLabel>> saveStatusLabels(
+            @Valid @RequestBody SaveStatusLabelsRequest request) {
+        return ApiResponse.ok(statusLabels.save(request.labels()));
+    }
+
+    public record SaveStatusLabelsRequest(
+            @jakarta.validation.constraints.NotNull java.util.Map<NonConformance.Status, String> labels) {
     }
 
     @GetMapping("/quality/assignees")

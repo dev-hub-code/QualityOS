@@ -1,5 +1,6 @@
 "use client";
 
+import { useNcrStatusLabel } from "@/hooks/use-ncr-status-labels";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -273,11 +274,12 @@ function LinkedNcr({ inspectionId }: { inspectionId: string }) {
     queryFn: () => api.get<PageResponse<NcrSummary>>(query),
     enabled: allowed,
   });
+  const ncrStatus = useNcrStatusLabel();
   const ncr = data?.items[0];
   if (!ncr) return null;
   return (
     <p className="text-sm">
-      Raised <RecordLink href={`/ncrs/${ncr.id}`}>{ncr.ncrNumber}</RecordLink> ({ncr.status.replaceAll("_", " ").toLowerCase()})
+      Raised <RecordLink href={`/ncrs/${ncr.id}`}>{ncr.ncrNumber}</RecordLink> ({ncrStatus(ncr.status)})
     </p>
   );
 }

@@ -192,11 +192,12 @@ public class ReportService {
                             text("Source", 9), text("Facility", 12), text("Raised", 9), text("Closed", 9),
                             number("Age (days)", 6)),
                     """
-                    SELECT n.ncr_number, n.title, n.severity, n.status, n.source, f.name, %s, %s,
+                    SELECT n.ncr_number, n.title, n.severity, COALESCE(sl.label, n.status), n.source, f.name, %s, %s,
                            (COALESCE((n.closed_at AT TIME ZONE CAST(:zone AS text))::date, :today)
                                - (n.created_at AT TIME ZONE CAST(:zone AS text))::date)::text
                     FROM %s
                     LEFT JOIN facilities f ON f.tenant_id = n.tenant_id AND f.id = %s
+                    LEFT JOIN ncr_status_labels sl ON sl.tenant_id = n.tenant_id AND sl.status = n.status
                     WHERE n.created_at >= :start AND n.created_at < :end%s ORDER BY n.created_at DESC
                     """.formatted(date("n.created_at"), date("n.closed_at"), AnalyticsService.NCRS,
                             AnalyticsService.NCR_FACILITY, scope.facility(AnalyticsService.NCR_FACILITY)),

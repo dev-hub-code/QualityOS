@@ -1,5 +1,6 @@
 "use client";
 
+import { NcrStatusBadge } from "@/components/records/ncr-status-badge";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
@@ -177,7 +178,7 @@ export function WorkOrderQualityPanel({
                     <span>
                       <RecordLink href={`/ncrs/${ncr.id}`}>{ncr.ncrNumber}</RecordLink> {ncr.title}
                     </span>
-                    <StatusBadge status={ncr.status} />
+                    <NcrStatusBadge status={ncr.status} />
                   </span>
                   {data.capas
                     .filter((capa) => capa.ncrId === ncr.id)

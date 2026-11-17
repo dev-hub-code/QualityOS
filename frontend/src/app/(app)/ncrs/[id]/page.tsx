@@ -1,5 +1,7 @@
 "use client";
 
+import { NcrStatusBadge } from "@/components/records/ncr-status-badge";
+import { useNcrStatusLabel } from "@/hooks/use-ncr-status-labels";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -49,6 +51,7 @@ export default function NcrPage() {
   const assignees = useAssignees();
   const categories = useDefectCategories();
   const units = useUnits();
+  const statusLabel = useNcrStatusLabel();
   const [step, setStep] = useState<Step | null>(null);
   const [raisingCapa, setRaisingCapa] = useState(false);
   const { data: ncr, error } = useQuery({ queryKey: [path], queryFn: () => api.get<Ncr>(path) });
@@ -110,7 +113,7 @@ export default function NcrPage() {
         title={ncr.ncrNumber}
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={status} />
+            <NcrStatusBadge status={status} />
             <StatusBadge status={ncr.severity} />
             {ncr.title}
           </span>
@@ -180,7 +183,7 @@ export default function NcrPage() {
         </ul>
       </Section>
       <AttachmentPanel entityType="NCR" entityId={id} canManage={canCreate && !finished} />
-      <StatusHistory changes={ncr.history} />
+      <StatusHistory changes={ncr.history} label={statusLabel} />
       {step && (
         <RecordDialog
           title={step.label}

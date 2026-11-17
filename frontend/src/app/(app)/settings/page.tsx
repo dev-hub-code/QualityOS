@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { NcrStatusLabelSettings } from "@/components/app/ncr-status-labels";
 import { NotificationPreferences } from "@/components/app/notification-preferences";
 import { OrganizationForm } from "@/components/app/organization-form";
 import { OrganizationLogoSettings } from "@/components/app/organization-logo";
@@ -89,6 +90,7 @@ export default function SettingsPage() {
       {me && <OrganizationLogoSettings tenantId={me.tenantId} canManage={canManage} />}
       <ReviewPolicySettings />
       <QualityRulesSettings />
+      <NcrStatusLabelSettings />
       <section className="space-y-4">
         <h2 className="text-base font-semibold text-[#1b2a55]">Your password</h2>
         <ChangePasswordForm />

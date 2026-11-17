@@ -57,6 +57,15 @@ export function QualityRulesSettings() {
           </select>
         </div>
       ))}
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={data.actionEvidenceRequired}
+          disabled={!canManage || update.isPending}
+          onChange={(event) => update.mutate({ actionEvidenceRequired: event.target.checked })}
+        />
+        A CAPA action needs evidence attached before it can be completed
+      </label>
     </section>
   );
 }

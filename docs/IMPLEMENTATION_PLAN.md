@@ -43,7 +43,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A change to the CAPA rule applies to open NCRs at once. A CAPA keeps the verification rule it was raised under | By design |
 | An NCR raised on a held lot has no rejected quantity, and a later reject does not fill it in | Review after real use |
 | Completing a CAPA action needs `CAPA_MANAGE`, so an action owner without it must ask someone who has it | Review after real use |
-| Only inspection failures raise NCRs automatically. Evidence can be attached to the CAPA as a whole or to each action (`CAPA_ACTION`); both follow the CAPA's permissions and lock when it is finished. Evidence is not required to complete an action | When a user needs it |
+| Only inspection failures raise NCRs automatically. Evidence can be attached to the CAPA as a whole or to each action (`CAPA_ACTION`); both follow the CAPA's permissions and lock when it is finished. An administrator can require evidence on each action before it is completed | When a user needs it |
 | An inspection takes the one published template that fits when none is chosen: the material's or product's own before a general one, of IQC for a lot, the type due at a batch's stage, or FQC/OQC for returns. When several or none fit, the person chooses, and the start dialogs list only fitting templates with that one preselected | Review after real use |
 | Production batches take IPQC and FQC inspections only. OQC and the other template types have no production flow | When a user needs it |
 | Material used can be entered in any unit of the same kind as its lot or batch, and is converted to that unit. The dialog lists every unit and the server refuses one that does not convert. A correction can be entered in another unit too, and is converted the same way. Units are added through the API alone, as before | When a user needs it |
@@ -64,7 +64,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Recording an instrument on an inspection is optional, and applies to the whole inspection, not each measurement | Review after real use |
 | A decision to reinspect after a failed calibration holds the goods that are left, but does not recall what was already used or dispatched, nor start the new inspection | Review after real use |
 | A recorded audit finding cannot be edited. A wrong one is handled by cancelling its NCR, and it stays on the report | Review after real use |
-| `tenant_settings` holds the review rule and the two NCR and CAPA rules so far | Grows as rules are added |
+| `tenant_settings` holds the review rule, the two NCR and CAPA rules and the action evidence rule so far | Grows as rules are added |
 | Dashboard figures are kept for 60 seconds per organisation, period and facility scope. Anything written to the audit log clears them at once on the same instance. Other changes, and changes on another instance, show within 60 seconds | With production work: use a shared cache if the figures must agree across instances |
 | Key figures and charts show to anyone with `REPORT_VIEW`, as totals, even without the view permission for each kind of record. Lists and reports need that permission too | Review after real use |
 | The material rejection rate converts quantities to the base unit of their kind. Kinds that cannot be added together, such as kilograms and pieces, each get a rate, and the figure weighs those rates by their lots. The material rejection report shows each material in its own unit | Review after real use |

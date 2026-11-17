@@ -28,6 +28,12 @@ class QualityRules {
         return covers(settings.get().effectivenessRequiredFrom(), severity);
     }
 
+    /** A CAPA action needs a file attached before it can be completed. */
+    @Transactional(readOnly = true)
+    boolean actionEvidenceRequired() {
+        return settings.get().actionEvidenceRequired();
+    }
+
     static boolean covers(SeverityThreshold threshold, Severity severity) {
         return switch (threshold) {
             case NEVER -> false;

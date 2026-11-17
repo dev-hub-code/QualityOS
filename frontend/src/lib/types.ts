@@ -54,6 +54,8 @@ export interface OrganizationSettings {
   activeMembers: number;
   capaRequiredFrom: SeverityThreshold;
   effectivenessRequiredFrom: SeverityThreshold;
+  /** A CAPA action needs a file attached before it can be completed. */
+  actionEvidenceRequired: boolean;
   version: number | null;
 }
 

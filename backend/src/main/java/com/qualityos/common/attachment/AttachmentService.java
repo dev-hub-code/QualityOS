@@ -114,6 +114,13 @@ public class AttachmentService {
                 Map.of("file", attachment.getFileName()), null);
     }
 
+    /** Whether a record has at least one current file, for a rule that needs evidence. Checks no permission. */
+    @Transactional(readOnly = true)
+    public boolean hasAny(String entityType, UUID entityId) {
+        return !attachments.findByEntityTypeAndEntityIdAndDeletedAtIsNullOrderByCreatedAtDesc(entityType, entityId)
+                .isEmpty();
+    }
+
     /** @return the categories of a record's current attachments, one entry per file */
     @Transactional(readOnly = true)
     public List<String> categories(String entityType, UUID entityId) {

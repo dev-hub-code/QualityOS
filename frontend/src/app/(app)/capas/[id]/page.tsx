@@ -22,7 +22,7 @@ import { StatusHistory } from "@/components/records/status-history";
 import { Button } from "@/components/ui/button";
 import { SelfReviewNotice } from "@/components/app/review-policy";
 import { useMe, usePermission } from "@/hooks/use-me";
-import { useSelfReviewInEffect } from "@/hooks/use-organization-settings";
+import { useOrganizationSettings, useSelfReviewInEffect } from "@/hooks/use-organization-settings";
 import { api } from "@/lib/api";
 import { FISHBONE_BRANCHES, isReadyForVerification } from "@/lib/capa";
 import type { FieldDef } from "@/lib/record-form";
@@ -43,6 +43,7 @@ export default function CapaPage() {
   const refresh = useRefresh();
   const { data: me } = useMe();
   const selfReviewInEffect = useSelfReviewInEffect();
+  const evidenceRequired = useOrganizationSettings().data?.actionEvidenceRequired ?? false;
   const canManage = usePermission("CAPA_MANAGE");
   const canApprove = usePermission("CAPA_APPROVE");
   const assignees = useAssignees();
@@ -214,7 +215,9 @@ export default function CapaPage() {
                 )}
               </div>
               <div className="border-l-2 pl-3">
-                <p className="text-xs font-medium text-muted-foreground">Evidence</p>
+                <p className="text-xs font-medium text-muted-foreground">
+                  Evidence{evidenceRequired && !action.completedAt && " (required before it can be completed)"}
+                </p>
                 <AttachmentList
                   entityType="CAPA_ACTION"
                   entityId={action.id}

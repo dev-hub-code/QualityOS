@@ -218,7 +218,8 @@ public abstract class AbstractIntegrationTest {
                         .MockMvcRequestBuilders.get(path)).andReturn().getResponse().getContentAsString(), "$.data");
         Map<String, Object> body = new java.util.HashMap<>();
         for (String key : java.util.List.of(
-                "singlePersonReview", "capaRequiredFrom", "effectivenessRequiredFrom", "version")) {
+                "singlePersonReview", "capaRequiredFrom", "effectivenessRequiredFrom", "actionEvidenceRequired",
+                "version")) {
             body.put(key, current.get(key));
         }
         body.putAll(changes);

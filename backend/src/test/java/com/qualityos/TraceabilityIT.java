@@ -2,6 +2,7 @@ package com.qualityos;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -87,6 +88,34 @@ class TraceabilityIT extends TraceabilityFixture {
         inspectBatch(batch, "OQC", "20.0", "REJECT");
         as(owner, get("/api/v1/production-batches/" + batch)).andExpect(jsonPath("$.data.batch.status").value("REJECTED"));
         dispatch(customer(), batch, "1", List.of()).andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void aDispatchAndACustomerEachOpenOnTheirOwn() throws Exception {
+        String batch = startBatch(product());
+        consumeLot(batch, releasedLot("10").id(), "10").andExpect(status().isOk());
+        complete(batch, "10").andExpect(status().isOk());
+        inspectBatch(batch, "FQC", "20.0", "ACCEPT");
+        String buyer = customer();
+        String other = customer();
+        String shipped = idOf(body(dispatch(buyer, batch, "3", List.of()).andExpect(status().isCreated())));
+        dispatch(other, batch, "2", List.of()).andExpect(status().isCreated());
+
+        as(owner, get("/api/v1/dispatches/" + shipped))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.customerId").value(buyer))
+                .andExpect(jsonPath("$.data.lines[0].quantity").value("3.000000"));
+        as(owner, get("/api/v1/customers/" + buyer))
+                .andExpect(jsonPath("$.data.name").value("Tata Motors"));
+        as(owner, get("/api/v1/dispatches").param("customerId", buyer))
+                .andExpect(jsonPath("$.data.totalItems").value(1))
+                .andExpect(jsonPath("$.data.items[0].id").value(shipped));
+
+        // Still found after the customer is archived: the dispatch names them.
+        as(owner, delete("/api/v1/customers/" + buyer)).andExpect(status().isNoContent());
+        as(owner, get("/api/v1/customers/" + buyer)).andExpect(status().isOk());
+        as(owner, get("/api/v1/dispatches/" + UUID.randomUUID())).andExpect(status().isNotFound());
+        as(register(), get("/api/v1/dispatches/" + shipped)).andExpect(status().isNotFound());
     }
 
     @Test

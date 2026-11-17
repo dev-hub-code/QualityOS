@@ -57,6 +57,12 @@ public class DispatchController {
         return ApiResponse.ok(dispatches.customers());
     }
 
+    @GetMapping("/customers/{id}")
+    @PreAuthorize(Require.TRACEABILITY_VIEW)
+    public ApiResponse<CustomerResponse> customer(@PathVariable UUID id) {
+        return ApiResponse.ok(dispatches.customer(id));
+    }
+
     @PostMapping("/customers")
     @PreAuthorize(Require.TRACEABILITY_MANAGE)
     @ResponseStatus(HttpStatus.CREATED)
@@ -75,10 +81,17 @@ public class DispatchController {
     @PreAuthorize(Require.TRACEABILITY_VIEW)
     public ApiResponse<PageResponse<DispatchResponse>> list(
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) UUID customerId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size,
             @RequestParam(required = false) String sort) {
-        return ApiResponse.ok(dispatches.list(q, Pages.of(page, size, sort, SORTABLE, "dispatchNumber")));
+        return ApiResponse.ok(dispatches.list(q, customerId, Pages.of(page, size, sort, SORTABLE, "dispatchNumber")));
+    }
+
+    @GetMapping("/dispatches/{id}")
+    @PreAuthorize(Require.TRACEABILITY_VIEW)
+    public ApiResponse<DispatchResponse> dispatch(@PathVariable UUID id) {
+        return ApiResponse.ok(dispatches.get(id));
     }
 
     @PostMapping("/dispatches")

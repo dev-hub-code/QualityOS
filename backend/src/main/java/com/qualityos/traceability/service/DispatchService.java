@@ -156,11 +156,36 @@ public class DispatchService {
 
     @Transactional(readOnly = true)
     public PageResponse<DispatchResponse> list(String search, Pageable pageable) {
+        return list(search, null, pageable);
+    }
+
+    /** @param customerId only this customer's dispatches, or null for every customer's */
+    @Transactional(readOnly = true)
+    public PageResponse<DispatchResponse> list(String search, UUID customerId, Pageable pageable) {
         String pattern = Searches.pattern(search);
-        Page<DispatchRecord> page = scope.restriction()
-                .map(allowed -> dispatches.findWithin(allowed, pattern, pageable))
-                .orElseGet(() -> dispatches.findMatching(pattern, pageable));
+        Page<DispatchRecord> page = customerId == null
+                ? scope.restriction()
+                        .map(allowed -> dispatches.findWithin(allowed, pattern, pageable))
+                        .orElseGet(() -> dispatches.findMatching(pattern, pageable))
+                : scope.restriction()
+                        .map(allowed -> dispatches.findWithinFor(customerId, allowed, pattern, pageable))
+                        .orElseGet(() -> dispatches.findMatchingFor(customerId, pattern, pageable));
         return PageResponse.from(page, responses(page.getContent())::get);
+    }
+
+    /** One dispatch, when every plant it shipped from is open to the caller. */
+    @Transactional(readOnly = true)
+    public DispatchResponse get(UUID id) {
+        DispatchRecord record = dispatches.findById(id).orElseThrow(() -> new ResourceNotFoundException("Dispatch", id));
+        scope.require(items.facilitiesOf(id), "Dispatch", id.toString());
+        return responses(List.of(record)).get(record);
+    }
+
+    /** One customer, archived or not, since their past dispatches still name them. */
+    @Transactional(readOnly = true)
+    public CustomerResponse customer(UUID id) {
+        return customers.findById(id).map(DispatchService::toResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer", id));
     }
 
     /**

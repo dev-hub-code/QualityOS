@@ -72,6 +72,7 @@ public class DispatchService {
     private final DispatchItemRepository items;
     private final CustomerRepository customers;
     private final ProductionBatchRepository batches;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private final FinishedProductRepository finishedProducts;
     private final TraceCorrectionRepository corrections;
     private final NotificationService notifications;
@@ -88,6 +89,7 @@ public class DispatchService {
     private final ApplicationEventPublisher events;
 
     DispatchService(
+            org.springframework.jdbc.core.JdbcTemplate jdbc,
             DispatchRecordRepository dispatches,
             DispatchItemRepository items,
             CustomerRepository customers,
@@ -113,6 +115,7 @@ public class DispatchService {
         this.items = items;
         this.customers = customers;
         this.batches = batches;
+        this.jdbc = jdbc;
         this.finishedProducts = finishedProducts;
         this.corrections = corrections;
         this.notifications = notifications;
@@ -286,6 +289,7 @@ public class DispatchService {
         ProductionBatch batch = batches.findForUpdate(line.productionBatchId())
                 .orElseThrow(() -> new BusinessRuleException("This batch does not exist."));
         scope.requireAllowed(batch.getFacilityId(), "Batch", batch.getId().toString());
+        requireNoOutgoingInspection(batch);
         batch.dispatch(line.quantity());
         DispatchItem item = items.saveAndFlush(new DispatchItem(dispatch.getId(), batch.getId(), line.quantity()));
         List<String> serials = line.serialNumbers() == null ? List.of() : line.serialNumbers();
@@ -302,6 +306,22 @@ public class DispatchService {
             throw new BusinessRuleException("A serial number is unknown, already shipped, or from another batch.");
         }
         units.forEach(unit -> unit.setDispatchItemId(item.getId()));
+    }
+
+    /**
+     * An outgoing inspection checks what is left to ship, so nothing leaves while one is open. The batch is locked
+     * first, so a dispatch and the start of an inspection cannot pass each other.
+     */
+    private void requireNoOutgoingInspection(ProductionBatch batch) {
+        List<String> open = jdbc.queryForList("""
+                SELECT inspection_number FROM inspections
+                WHERE production_batch_id = ? AND return_item_id IS NULL AND inspection_type = 'OQC'
+                  AND status NOT IN ('COMPLETED', 'CANCELLED')
+                """, String.class, batch.getId());
+        if (!open.isEmpty()) {
+            throw new BusinessRuleException("Batch " + batch.getBatchNumber() + " is in outgoing inspection "
+                    + open.getFirst() + ". Dispatch it once that inspection is decided.");
+        }
     }
 
     /** Everything shipped from these batches. */

@@ -119,6 +119,26 @@ class TraceabilityIT extends TraceabilityFixture {
     }
 
     @Test
+    void nothingShipsWhileAnOutgoingInspectionIsOpen() throws Exception {
+        String batch = startBatch(product());
+        consumeLot(batch, releasedLot("10").id(), "10").andExpect(status().isOk());
+        complete(batch, "10").andExpect(status().isOk());
+        inspectBatch(batch, "FQC", "20.0", "ACCEPT");
+
+        String open = idOf(body(inspect("productionBatchId", batch, "OQC").andExpect(status().isCreated())));
+        String number = JsonPath.read(body(as(owner, get("/api/v1/inspections/" + open))), "$.data.inspectionNumber");
+        dispatch(customer(), batch, "1", List.of())
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString(
+                        "is in outgoing inspection " + number + ". Dispatch it once that inspection is decided.")));
+
+        // Cancelled, it no longer holds anything back.
+        as(owner, postJson("/api/v1/inspections/" + open + "/cancel", Map.of("reason", "Started by mistake")))
+                .andExpect(status().isOk());
+        dispatch(customer(), batch, "1", List.of()).andExpect(status().isCreated());
+    }
+
+    @Test
     void anotherLotOfTheSameBatchIsNotDraggedIntoAForwardTrace() throws Exception {
         Lot traced = releasedLot("10");
         Lot other = releasedLot("10");

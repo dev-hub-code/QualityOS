@@ -62,7 +62,11 @@ class CalibrationIT extends TraceabilityFixture {
 
     /** Inspects and accepts the goods, measured with {@code instrument} when there is one. */
     private String accepted(String subjectKey, String subject, String type, String instrument) throws Exception {
-        String inspection = idOf(body(inspect(subjectKey, subject, type).andExpect(status().isCreated())));
+        return pass(idOf(body(inspect(subjectKey, subject, type).andExpect(status().isCreated()))), instrument);
+    }
+
+    /** Records a good result on an inspection already started, and accepts the goods. */
+    private String pass(String inspection, String instrument) throws Exception {
         String path = "/api/v1/inspections/" + inspection;
         if (instrument != null) {
             use(inspection, instrument).andExpect(status().isOk());
@@ -93,6 +97,16 @@ class CalibrationIT extends TraceabilityFixture {
                 "$.data[0].reviews[?(@.inspectionId == '" + inspection + "')].id");
         return as(owner, postJson(path + "/" + ids.getFirst() + "/decision",
                 Map.of("decision", decision, "note", "Checked against the reference gauge")));
+    }
+
+    /** The inspection started on its own to check again what {@code earlier} released. */
+    private String reinspectionOf(String earlier) throws Exception {
+        String detail = body(as(owner, get("/api/v1/inspections/" + earlier)));
+        String later = JsonPath.read(detail, "$.data.reinspectedBy.id");
+        as(owner, get("/api/v1/inspections/" + later))
+                .andExpect(jsonPath("$.data.status").value("PENDING"))
+                .andExpect(jsonPath("$.data.reinspectionOf.id").value(earlier));
+        return later;
     }
 
     private static String days(int offset) {
@@ -239,7 +253,7 @@ class CalibrationIT extends TraceabilityFixture {
         as(manager, postJson(ncr + "/close", Map.of("note", "Done")))
                 .andExpect(jsonPath("$.data.status").value("CLOSED"));
 
-        accepted("productionBatchId", doubted, "FQC", null);
+        pass(reinspectionOf(doubtedBatch.inspection()), null);
         assertThat(statusOf(doubted)).isEqualTo("RELEASED");
         dispatch(customer, doubted, "1", List.of()).andExpect(status().isCreated());
     }
@@ -257,8 +271,101 @@ class CalibrationIT extends TraceabilityFixture {
         decide(id, inspection, "REINSPECT").andExpect(status().isOk());
         consumeLot(batch, lot.id(), "1").andExpect(status().isUnprocessableEntity());
 
-        accepted("receiptItemId", lot.id(), "IQC", null);
+        pass(reinspectionOf(inspection), null);
         consumeLot(batch, lot.id(), "1").andExpect(status().isOk());
+    }
+
+    @Test
+    void reinspectStartsTheNewInspectionWithTheSameTemplateOnlyOnce() throws Exception {
+        String id = instrument(days(30));
+        calibrate(id, days(-10), "PASS").andExpect(status().isCreated());
+        Lot lot = lot(material(owner, true), "10");
+        String inspection = accepted("receiptItemId", lot.id(), "IQC", id);
+        calibrate(id, days(0), "FAIL").andExpect(status().isCreated());
+        decide(id, inspection, "REINSPECT").andExpect(status().isOk());
+
+        String later = reinspectionOf(inspection);
+        String earlierBody = body(as(owner, get("/api/v1/inspections/" + inspection)));
+        as(owner, get("/api/v1/inspections/" + later))
+                .andExpect(jsonPath("$.data.inspectionType").value("IQC"))
+                .andExpect(jsonPath("$.data.receiptItemId").value(lot.id()))
+                .andExpect(jsonPath("$.data.specification.templateName")
+                        .value((String) JsonPath.read(earlierBody, "$.data.specification.templateName")));
+        assertThat(inTransactionAs(owner.tenantId(), null, () -> jdbc.queryForObject(
+                "SELECT count(*) FROM audit_logs WHERE action = 'INSPECTION_REINSPECTION_STARTED'", Long.class)))
+                .isEqualTo(1);
+        // Starting it by hand as well is refused: the lot is already being inspected.
+        inspect("receiptItemId", lot.id(), "IQC").andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void aReinspectionThatCannotStartLeavesTheDecisionAndTheHoldInPlace() throws Exception {
+        String id = instrument(days(30));
+        calibrate(id, days(-10), "PASS").andExpect(status().isCreated());
+        Lot lot = lot(material(owner, true), "10");
+        String inspection = accepted("receiptItemId", lot.id(), "IQC", id);
+        calibrate(id, days(0), "FAIL").andExpect(status().isCreated());
+        // The template the lot was inspected with is no longer usable.
+        asAppRole(owner.tenantId(), sql -> sql.update(
+                "UPDATE inspection_templates SET archived_at = now() WHERE id = (SELECT v.template_id FROM inspections i"
+                        + " JOIN inspection_template_versions v ON v.id = i.template_version_id WHERE i.id = ?::uuid)",
+                inspection));
+
+        decide(id, inspection, "REINSPECT").andExpect(status().isOk());
+        as(owner, get("/api/v1/inspections/" + inspection)).andExpect(jsonPath("$.data.reinspectedBy").doesNotExist());
+        String batch = startBatch(product());
+        consumeLot(batch, lot.id(), "1").andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void theReviewShowsWhatTheDoubtedGoodsAlreadyBecameAndWhoHoldsThem() throws Exception {
+        String id = instrument(days(30));
+        calibrate(id, days(-10), "PASS").andExpect(status().isCreated());
+        Lot lot = lot(material(owner, true), "10");
+        String inspection = accepted("receiptItemId", lot.id(), "IQC", id);
+        String batch = startBatch(product());
+        consumeLot(batch, lot.id(), "4").andExpect(status().isOk());
+        complete(batch, "4").andExpect(status().isOk());
+        accepted("productionBatchId", batch, "FQC", null);
+        dispatch(customer(), batch, "2", List.of()).andExpect(status().isCreated());
+
+        as(owner, get("/api/v1/traceability/inspections/" + inspection + "/reach"))
+                .andExpect(jsonPath("$.data.usedIn[0]").value(numberOf(batch)))
+                .andExpect(jsonPath("$.data.customers[0]").value("Tata Motors"))
+                .andExpect(jsonPath("$.data.recallable[0]").value(numberOf(batch)));
+        as(register(), get("/api/v1/traceability/inspections/" + inspection + "/reach"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void eachMeasurementNamesItsInstrumentAndAFailureNamesTheMeasurementsInDoubt() throws Exception {
+        String caliper = instrument(days(30));
+        calibrate(caliper, days(-10), "PASS").andExpect(status().isCreated());
+        String overdue = instrument(days(-1));
+        Lot lot = lot(material(owner, true), "10");
+        String inspection = idOf(body(inspect("receiptItemId", lot.id(), "IQC").andExpect(status().isCreated())));
+        String path = "/api/v1/inspections/" + inspection;
+
+        // Naming an instrument on a result records its use, with the same checks.
+        as(owner, postJson(path + "/execute", Map.of("results", List.of(Map.of(
+                        "parameterCode", "DIA", "sampleNumber", 1, "valueNumeric", "20.0", "instrumentId", overdue)))))
+                .andExpect(status().isUnprocessableEntity());
+        as(owner, postJson(path + "/execute", Map.of("results", List.of(Map.of(
+                        "parameterCode", "DIA", "sampleNumber", 1, "valueNumeric", "20.0", "instrumentId", caliper)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].instrumentId").value(caliper))
+                .andExpect(jsonPath("$.data.instruments[0].id").value(caliper))
+                .andExpect(jsonPath("$.data.instruments[0].parameters[0]").value("DIA"));
+        // Saving the value again without naming one keeps the instrument named before.
+        as(owner, postJson(path + "/execute", Map.of("results", List.of(Map.of(
+                        "parameterCode", "DIA", "sampleNumber", 1, "valueNumeric", "20.1")))))
+                .andExpect(jsonPath("$.data.results[0].instrumentId").value(caliper));
+        pass(inspection, null);
+
+        calibrate(caliper, days(0), "FAIL").andExpect(status().isCreated());
+        as(owner, get(INSTRUMENTS + "/" + caliper + "/impact-reviews"))
+                .andExpect(jsonPath("$.data[0].reviews[0].inspectionId").value(inspection))
+                .andExpect(jsonPath("$.data[0].reviews[0].parameters[0]").value("DIA"));
     }
 
     @Test

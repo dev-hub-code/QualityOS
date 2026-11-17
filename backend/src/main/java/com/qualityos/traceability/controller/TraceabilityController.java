@@ -48,6 +48,13 @@ public class TraceabilityController {
         this.serials = serials;
     }
 
+    /** For a failed calibration's review: what an inspection's goods already became, and who holds them. */
+    @GetMapping("/inspections/{inspectionId}/reach")
+    public ApiResponse<com.qualityos.traceability.dto.TraceabilityDtos.InspectionReach> inspectionReach(
+            @PathVariable java.util.UUID inspectionId) {
+        return ApiResponse.ok(traceability.inspectionReach(inspectionId));
+    }
+
     @GetMapping("/search")
     public ApiResponse<List<SearchHit>> search(@RequestParam String q) {
         return ApiResponse.ok(traceability.search(q));

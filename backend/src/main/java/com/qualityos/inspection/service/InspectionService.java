@@ -16,6 +16,7 @@ import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.inspection.dto.InspectionDtos.ApproveRequest;
 import com.qualityos.inspection.dto.InspectionDtos.CreateInspectionRequest;
 import com.qualityos.inspection.dto.InspectionDtos.DecisionResponse;
+import com.qualityos.inspection.dto.InspectionDtos.InspectionLink;
 import com.qualityos.inspection.dto.InspectionDtos.DispositionRequest;
 import com.qualityos.calibration.service.InstrumentService;
 import com.qualityos.inspection.dto.InspectionDtos.ExecuteRequest;
@@ -53,6 +54,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -408,6 +410,36 @@ public class InspectionService implements AttachmentPolicy {
         }
     }
 
+    /**
+     * Starts the inspection that checks again what an earlier one released, with the same template, once a failed
+     * calibration has held its goods. An outgoing inspection's batch is held, so it takes the inspection due for a
+     * held batch instead. Nothing happens when the goods were not released, or a re-inspection is already open.
+     */
+    @Transactional
+    public void startReinspection(UUID earlierId) {
+        Inspection earlier = inspections.findById(earlierId)
+                .orElseThrow(() -> new ResourceNotFoundException(ENTITY, earlierId));
+        Disposition disposition = earlier.getDisposition();
+        if (disposition != Disposition.ACCEPT && disposition != Disposition.CONDITIONAL_ACCEPTANCE) {
+            return;
+        }
+        boolean open = inspections.findByReinspectionOfOrderByCreatedAtDesc(earlierId).stream()
+                .anyMatch(later -> later.getStatus() != Inspection.Status.COMPLETED
+                        && later.getStatus() != Inspection.Status.CANCELLED);
+        if (open || earlier.getReturnItemId() != null) {
+            return;
+        }
+        UUID template = earlier.getInspectionType() == InspectionTemplate.Type.OQC ? null
+                : templates.templateOf(earlier.getTemplateVersionId());
+        InspectionDetail started = create(new CreateInspectionRequest(
+                earlier.getReceiptItemId(), earlier.getProductionBatchId(), null, template));
+        Inspection later = inspections.findForUpdate(started.id()).orElseThrow();
+        later.reinspects(earlierId);
+        inspections.saveAndFlush(later);
+        audit.record("INSPECTION_REINSPECTION_STARTED", ENTITY, later.getId(), null,
+                Map.of("reinspects", earlier.getInspectionNumber()));
+    }
+
     private void recordOutcome(Inspection inspection, String disposition, boolean finalDecision) {
         if (inspection.getReturnItemId() != null) {
             returns.recordInspectionOutcome(inspection.getReturnItemId(), disposition, finalDecision);
@@ -453,6 +485,11 @@ public class InspectionService implements AttachmentPolicy {
         SpecSnapshot specification = specificationOf(inspection);
         Map<String, ParameterSpec> parameters =
                 specification.parameters().stream().collect(Collectors.toMap(ParameterSpec::code, Function.identity()));
+        Set<UUID> measuredWith = request.results().stream().map(ResultRequest::instrumentId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        if (!measuredWith.isEmpty()) {
+            instruments.recordUse(id, inspection.getInspectionNumber(), measuredWith);
+        }
         Map<String, InspectionResult> existing = new HashMap<>();
         results.findByInspectionIdOrderByParameterCodeAscSampleNumberAsc(id)
                 .forEach(result -> existing.put(key(result.getParameterCode(), result.getSampleNumber()), result));
@@ -475,6 +512,7 @@ public class InspectionService implements AttachmentPolicy {
             }
             result.record(value.numeric(), value.text(), value.bool(), value.date(),
                     EvaluationEngine.evaluate(parameter, value), entry.remarks());
+            result.measuredWith(entry.instrumentId());
             results.save(result);
             if (previous != null && !previous.equals(result.displayValue())) {
                 audit.record("INSPECTION_RESULT_CHANGED", ENTITY, id,
@@ -770,7 +808,8 @@ public class InspectionService implements AttachmentPolicy {
                                 result.getValueBoolean(),
                                 result.getValueDate(),
                                 result.getEvaluation().name(),
-                                result.getRemarks()))
+                                result.getRemarks(),
+                                result.getInstrumentId()))
                         .toList(),
                 approvals.findByInspectionIdOrderByCreatedAtAsc(inspection.getId()).stream()
                         .map(decision -> new DecisionResponse(
@@ -779,7 +818,16 @@ public class InspectionService implements AttachmentPolicy {
                                 decision.getCreatedBy(),
                                 decision.getCreatedAt()))
                         .toList(),
-                instruments.usedBy(inspection.getId()));
+                instruments.usedBy(inspection.getId()),
+                Optional.ofNullable(inspection.getReinspectionOf()).flatMap(inspections::findById)
+                        .map(InspectionService::link).orElse(null),
+                inspections.findByReinspectionOfOrderByCreatedAtDesc(inspection.getId()).stream()
+                        .filter(later -> later.getStatus() != Inspection.Status.CANCELLED)
+                        .findFirst().map(InspectionService::link).orElse(null));
+    }
+
+    private static InspectionLink link(Inspection inspection) {
+        return new InspectionLink(inspection.getId(), inspection.getInspectionNumber(), inspection.getStatus().name());
     }
 
     private static String name(Enum<?> value) {

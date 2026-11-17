@@ -31,6 +31,8 @@ public class InspectionResult extends TenantOwnedEntity {
     private Inspection.Evaluation evaluation;
 
     private String remarks;
+    /* The instrument that took this measurement, when the inspector said which. */
+    private UUID instrumentId;
 
     public InspectionResult(UUID inspectionId, String parameterCode, int sampleNumber) {
         this.inspectionId = inspectionId;
@@ -51,6 +53,13 @@ public class InspectionResult extends TenantOwnedEntity {
         this.valueDate = date;
         this.evaluation = evaluation;
         this.remarks = remarks;
+    }
+
+    /** Names the instrument that took the measurement. Null leaves the one named before. */
+    public void measuredWith(UUID instrumentId) {
+        if (instrumentId != null) {
+            this.instrumentId = instrumentId;
+        }
     }
 
     public String displayValue() {

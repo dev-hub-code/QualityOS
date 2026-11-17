@@ -14,6 +14,7 @@ import com.qualityos.quality.dto.QualityDtos.CapaHistory;
 import com.qualityos.quality.dto.QualityDtos.NcrHistory;
 import com.qualityos.quality.service.NcrService;
 import com.qualityos.traceability.dto.TraceabilityDtos.CorrectionImpact;
+import com.qualityos.traceability.dto.TraceabilityDtos.InspectionReach;
 import com.qualityos.traceability.dto.TraceabilityDtos.DispatchLine;
 import com.qualityos.traceability.dto.TraceabilityDtos.DispatchResponse;
 import com.qualityos.traceability.dto.TraceabilityDtos.ProductionBatchView;
@@ -368,6 +369,23 @@ public class TraceabilityService {
         });
         events.sort(Comparator.comparing(TimelineEvent::at));
         return events;
+    }
+
+    /** For an inspection put in doubt: whatever its goods already went into, or reached. */
+    @Transactional(readOnly = true)
+    public InspectionReach inspectionReach(UUID inspectionId) {
+        var inspection = inspections.get(inspectionId);
+        if (inspection.receiptItemId() != null) {
+            CorrectionImpact impact = lotImpact(inspection.receiptItemId(), true);
+            return new InspectionReach(inspection.batchNumber(), impact.batches(), impact.customers(), impact.batches());
+        }
+        CorrectionImpact impact = batchImpact(inspection.productionBatchId());
+        List<String> recallable = new ArrayList<>();
+        if (!impact.customers().isEmpty() || !impact.batches().isEmpty()) {
+            recallable.add(inspection.batchNumber());
+        }
+        recallable.addAll(impact.batches());
+        return new InspectionReach(inspection.batchNumber(), impact.batches(), impact.customers(), recallable);
     }
 
     /** How far a lot has gone: the batches it reached, and the customers who still hold what was made from it. */

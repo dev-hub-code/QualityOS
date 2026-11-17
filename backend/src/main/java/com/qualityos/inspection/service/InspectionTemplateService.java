@@ -48,6 +48,12 @@ public class InspectionTemplateService {
 
     private final InspectionTemplateRepository templates;
     private final TemplateVersionRepository versions;
+
+    /** @return the template a version belongs to */
+    @Transactional(readOnly = true)
+    public UUID templateOf(UUID versionId) {
+        return versions.findById(versionId).orElseThrow().getTemplateId();
+    }
     private final MaterialService materials;
     private final ProductService products;
     private final AuditService audit;

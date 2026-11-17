@@ -111,18 +111,22 @@ test("a wrong lot on a completed batch is corrected with approval", async ({ pag
   });
   await call("POST", `/production-batches/${created.batch.id}/consume`, { receiptItemId: lots[0].itemId, quantity: "5" });
   await call("POST", `/production-batches/${created.batch.id}/complete`, { producedQuantity: "5" });
+  // The lot is counted in pieces. The correction is entered in dozens and converted.
+  await call("POST", "/units", { code: "DOZ", name: "Dozen", dimension: "Count", toBase: "12" });
   const managerEmail = `manager-${unique()}@example.com`;
   await inviteUser(page, managerEmail, "Quality Manager");
   const manager = await acceptInvitation(browser, managerEmail, "Meera Iyer", PASSWORD);
 
   await page.goto(`/production-batches/${created.batch.id}`);
   await page.getByRole("button", { name: "Request correction" }).click();
-  await page.getByRole("dialog").getByLabel("Quantity actually used").fill("6");
+  await page.getByRole("dialog").getByLabel("Quantity actually used").fill("0.5");
+  await page.getByRole("dialog").getByLabel("Unit, if not that lot's or batch's own").selectOption({ label: "DOZ – Dozen" });
   await page.getByRole("dialog").getByLabel("Why this entry is wrong").fill("Weighed twice");
   await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
   await expect(page).toHaveURL(/material-corrections\/.+/);
   await page.getByRole("button", { name: "Submit for approval" }).click();
   await expect(page.getByText("Someone other than you must approve this.")).toBeVisible();
+  await expect(page.getByText("6 PCS (entered as 0.5 DOZ)")).toBeVisible();
 
   await manager.goto(page.url());
   await step(manager, "Approve", (dialog) => dialog.getByLabel("Note").fill("Checked the scale log"));

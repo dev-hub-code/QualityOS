@@ -113,6 +113,48 @@ class MaterialCorrectionIT extends TraceabilityFixture {
     }
 
     @Test
+    void aCorrectionOfMaterialUsedCanBeEnteredInAnotherUnit() throws Exception {
+        Lot lot = releasedLot("10");
+        String batch = completedBatch(lot);
+
+        String id = submitted(Map.of("consumptionId", entry(batch, 0), "quantity", "3500", "uomId", unitId(owner, "GM")));
+        as(owner, get(PATH + "/" + id))
+                .andExpect(jsonPath("$.data.changes[0].field").value("QUANTITY"))
+                .andExpect(jsonPath("$.data.changes[0].originalValue").value("4 KG"))
+                .andExpect(jsonPath("$.data.changes[0].correctedValue").value("3.5 KG (entered as 3500 GM)"));
+        approve(manager, id, true).andExpect(jsonPath("$.data.status").value("APPLIED"));
+        assertRemaining(lot, "6.500000");
+
+        // A unit of another kind is refused before anything is requested.
+        request(owner, Map.of("consumptionId", entry(batch, 1), "quantity", "3", "uomId", unitId(owner, "PCS")))
+                .andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void aLotKeptInAnotherUnitGivesTheSameAmountInItsOwn() throws Exception {
+        Lot wrong = releasedLot("10");
+        Lot inGrams = lot(material(owner, false, "GM"), "10000");
+        String batch = completedBatch(wrong);
+
+        String id = submitted(Map.of("consumptionId", entry(batch, 0), "correctedLotId", inGrams.id()));
+        as(owner, get(PATH + "/" + id))
+                .andExpect(jsonPath("$.data.changes[?(@.field == 'QUANTITY')].correctedValue").value(hasItem("4000 GM")));
+        approve(manager, id, true).andExpect(jsonPath("$.data.status").value("APPLIED"));
+        assertRemaining(wrong, "10.000000");
+        assertRemaining(inGrams, "6000.000000");
+    }
+
+    @Test
+    void aLotsQuantityCanBeCorrectedInAnotherUnit() throws Exception {
+        Lot lot = releasedLot("10");
+        String id = submitted(Map.of("receiptItemId", lot.id(), "quantity", "8000", "uomId", unitId(owner, "GM")));
+        as(owner, get(PATH + "/" + id))
+                .andExpect(jsonPath("$.data.changes[0].correctedValue").value("8 KG (entered as 8000 GM)"));
+        approve(manager, id, false).andExpect(jsonPath("$.data.status").value("APPLIED"));
+        assertRemaining(lot, "8.000000");
+    }
+
+    @Test
     void aRejectedCorrectionChangesNothing() throws Exception {
         Lot lot = releasedLot("10");
         String id = submitted(Map.of("receiptItemId", lot.id(), "supplierBatch", "HEAT-99"));

@@ -78,11 +78,13 @@ function CorrectLotDialog({ lot, onClose }: { lot: TraceNode; onClose: () => voi
   const router = useRouter();
   const materials = useMaterials();
   const suppliers = useApprovedSuppliers();
+  const units = useUnits();
   const fields: FieldDef[] = [
     { name: "materialId", label: "Correct material", type: "select", options: materials },
     { name: "supplierId", label: "Correct supplier (changes the whole receipt)", type: "select", options: suppliers },
     { name: "supplierBatch", label: "Correct supplier batch" },
     { name: "quantity", label: "Correct quantity", type: "decimal" },
+    { name: "uomId", label: "Unit, if not the lot's own", type: "select", options: units.options },
     { name: "reason", label: "Why this record is wrong", type: "textarea", required: true },
   ];
   return (

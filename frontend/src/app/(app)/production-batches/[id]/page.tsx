@@ -94,8 +94,9 @@ function CorrectConsumptionDialog({ consumptionId, onClose }: { consumptionId: s
         label: `${lot.internalBatch} – ${lot.materialCode} (${withUnit(freeQuantity(lot), units.label(lot.uomId))} free)`,
       })),
     },
-    // A correction takes no unit of its own: it is in the unit of the lot or batch it draws on.
-    { name: "quantity", label: "Quantity actually used, in that lot's own unit", type: "decimal" },
+    { name: "quantity", label: "Quantity actually used", type: "decimal" },
+    // Left blank, the quantity is in the unit of the lot or batch it draws on, and is converted from any other.
+    { name: "uomId", label: "Unit, if not that lot's or batch's own", type: "select", options: units.options },
     { name: "reason", label: "Why this entry is wrong", type: "textarea", required: true },
   ];
   return (

@@ -17,6 +17,11 @@ function expiring(expiryDate: string | null): string {
   return expiryDate ? `, expires ${expiryDate}` : "";
 }
 
+/** A substitute's lot names its material, since it is not the line's own. */
+function substituting(substituteCode: string | null): string {
+  return substituteCode ? `, substitute ${substituteCode}` : "";
+}
+
 type Line = WorkOrderMaterials["lines"][number];
 type Consumption = WorkOrderMaterials["consumptions"][number];
 type Dialog =
@@ -96,7 +101,14 @@ export function WorkOrderMaterialsPanel({ orderId, status }: { orderId: string; 
                   <td className={cell}>{amount(line.issued, line.uomId)}</td>
                   <td className={cell}>{line.componentType === "MATERIAL" ? amount(line.reserved, line.uomId) : "–"}</td>
                   <td className={cell}>{amount(line.outstanding, line.uomId)}</td>
-                  <td className={cell}>{amount(line.available, line.uomId)}</td>
+                  <td className={cell}>
+                    {amount(line.available, line.uomId)}
+                    {Number(line.substituteAvailable) > 0 && (
+                      <span className="block text-xs text-muted-foreground">
+                        + {amount(line.substituteAvailable, line.uomId)} substitutes
+                      </span>
+                    )}
+                  </td>
                   <td className="py-2 text-right whitespace-nowrap">
                     {reservable && line.componentType === "MATERIAL" && Number(line.outstanding) > 0 && line.sources.length > 0 && (
                       <Button size="sm" variant="ghost" onClick={() => setDialog({ kind: "reserve", line, key: newRequestKey() })}>
@@ -187,7 +199,7 @@ export function WorkOrderMaterialsPanel({ orderId, status }: { orderId: string; 
               required: true,
               options: dialog.line.sources.map((source) => ({
                 value: source.id,
-                label: `${source.number}${expiring(source.expiryDate)} (${amount(source.freeQuantity, source.uomId)} free)`,
+                label: `${source.number}${substituting(source.substituteCode)}${expiring(source.expiryDate)} (${amount(source.freeQuantity, source.uomId)} free)`,
               })),
             },
             { name: "quantity", label: `Quantity, in ${units.label(dialog.line.uomId)}`, type: "decimal", required: true },
@@ -221,7 +233,7 @@ export function WorkOrderMaterialsPanel({ orderId, status }: { orderId: string; 
                   .filter((source) => !data.reservations.some((r) => r.lotId === source.id && Number(r.openQuantity) > 0))
                   .map((source) => ({
                     value: source.id,
-                    label: `${source.number}${expiring(source.expiryDate)} (${amount(source.freeQuantity, source.uomId)} free)`,
+                    label: `${source.number}${substituting(source.substituteCode)}${expiring(source.expiryDate)} (${amount(source.freeQuantity, source.uomId)} free)`,
                   })),
               ],
             },

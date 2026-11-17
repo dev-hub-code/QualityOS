@@ -57,7 +57,9 @@ public final class WorkOrderMaterialDtos {
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal freeQuantity,
             UUID uomId,
             /* A lot's last day of use, or null; expired lots are not offered. */
-            LocalDate expiryDate) {
+            LocalDate expiryDate,
+            /* A lot of an approved substitute rather than the line's own material: its code, else null. */
+            String substituteCode) {
     }
 
     /**
@@ -79,7 +81,9 @@ public final class WorkOrderMaterialDtos {
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal outstanding,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal available,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal shortage,
-            List<SourceOption> sources) {
+            List<SourceOption> sources,
+            /* Free stock of the line's approved substitutes, in the line's unit; not counted in available. */
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal substituteAvailable) {
     }
 
     public record ReservationResponse(

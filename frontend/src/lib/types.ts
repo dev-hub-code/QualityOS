@@ -26,7 +26,11 @@ export interface Me {
   permissions: string[];
   organizations: OrganizationSummary[];
   /** Set in a support session, in an organisation the user does not belong to. */
-  support: { organizationName: string; expiresAt: string; allowChanges: boolean } | null;
+  support: {
+    organizationName: string;
+    expiresAt: string;
+    allowChanges: boolean;
+  } | null;
 }
 
 export interface Organization {
@@ -459,7 +463,11 @@ export interface Inspection {
     aql: string | null;
     inspectionLevel: string | null;
     /** Under double sampling, the second sample; its numbers count both samples together. */
-    secondSample?: { sampleSize: number; acceptanceNumber: number; rejectionNumber: number } | null;
+    secondSample?: {
+      sampleSize: number;
+      acceptanceNumber: number;
+      rejectionNumber: number;
+    } | null;
   };
   results: InspectionResult[];
   instruments: UsedInstrument[];
@@ -589,7 +597,13 @@ export interface Capa extends CapaSummary {
   outcomeNote: string | null;
   closedAt: string | null;
   actions: CapaAction[];
-  verifications: { effective: boolean; method: string; note: string; verifiedBy: string; at: string }[];
+  verifications: {
+    effective: boolean;
+    method: string;
+    note: string;
+    verifiedBy: string;
+    at: string;
+  }[];
   history: StatusChange[];
 }
 
@@ -758,7 +772,11 @@ export interface CorrectionDetail extends CorrectionSummary {
   requestedBy: string;
   additionalApproval: boolean;
   approvalsNeeded: number;
-  changes: { field: string; originalValue: string | null; correctedValue: string }[];
+  changes: {
+    field: string;
+    originalValue: string | null;
+    correctedValue: string;
+  }[];
   approvals: { approverName: string | null; note: string | null; at: string }[];
   impact: { inspected: boolean; batches: string[]; customers: string[] } | null;
   decisionNote: string | null;
@@ -879,6 +897,12 @@ export interface RecallDetail {
   closedBy: string | null;
   closedAt: string | null;
   review: ClosureReview;
+  hazardClass: "CLASS_I" | "CLASS_II" | "CLASS_III" | null;
+  regulator: string | null;
+  regulatorReference: string | null;
+  regulatorNotifiedOn: string | null;
+  /** Days after the recall date that customers have to acknowledge it before its approvers are told. */
+  responseDays: number;
 }
 
 export interface RecallDashboard {
@@ -940,7 +964,12 @@ export interface RecallReport {
   organizationGstin: string | null;
   generatedLabel: string;
   recall: RecallDetail;
-  products: { code: string; name: string; batchNumber: string; status: string }[];
+  products: {
+    code: string;
+    name: string;
+    batchNumber: string;
+    status: string;
+  }[];
   customers: {
     code: string;
     name: string;
@@ -967,7 +996,13 @@ export interface RecallReport {
     finalResult: string | null;
     disposition: string | null;
   }[];
-  ncrs: { id: string; ncrNumber: string; title: string; severity: string; status: string }[];
+  ncrs: {
+    id: string;
+    ncrNumber: string;
+    title: string;
+    severity: string;
+    status: string;
+  }[];
   history: RecallHistoryEntry[];
 }
 
@@ -1060,7 +1095,11 @@ export interface ChecklistSummary {
 }
 
 export interface Checklist extends ChecklistSummary {
-  items: { position: number; question: string; clauseReference: string | null }[];
+  items: {
+    position: number;
+    question: string;
+    clauseReference: string | null;
+  }[];
 }
 
 export interface AuditSummary {
@@ -1114,7 +1153,13 @@ export interface Audit {
   plannedOn: string;
   leadAuditorId: string;
   leadAuditorName: string | null;
-  status: "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "PENDING_CLOSURE" | "CLOSED" | "CANCELLED";
+  status:
+    | "PLANNED"
+    | "IN_PROGRESS"
+    | "COMPLETED"
+    | "PENDING_CLOSURE"
+    | "CLOSED"
+    | "CANCELLED";
   summary: string | null;
   closureRequestedBy: string | null;
   closureRequestedByName: string | null;
@@ -1181,15 +1226,35 @@ export interface Overview {
   from: string;
   to: string;
   kpis: Kpis;
-  inspectionTrend: { month: string; passed: number; failed: number; rejectedLots: number }[];
+  inspectionTrend: {
+    month: string;
+    passed: number;
+    failed: number;
+    rejectedLots: number;
+  }[];
   suppliers: SupplierScore[];
-  defects: { category: string; ncrs: number; share: number; cumulativeShare: number }[];
+  defects: {
+    category: string;
+    ncrs: number;
+    share: number;
+    cumulativeShare: number;
+  }[];
   products: QualityShare[];
   facilities: QualityShare[];
   ncrAgeing: { label: string; ncrs: number }[];
   capaTrend: { month: string; opened: number; closed: number }[];
-  pending: { inspectionsAwaitingApproval: number; ncrsAwaitingClosure: number; auditsAwaitingClosure: number };
-  recent: { kind: string; reference: string; link: string; status: string; on: string }[];
+  pending: {
+    inspectionsAwaitingApproval: number;
+    ncrsAwaitingClosure: number;
+    auditsAwaitingClosure: number;
+  };
+  recent: {
+    kind: string;
+    reference: string;
+    link: string;
+    status: string;
+    on: string;
+  }[];
   production: ProductionFigures;
 }
 
@@ -1293,7 +1358,13 @@ export interface OrganisationDetail {
   suspendedAt: string | null;
   suspensionReason: string | null;
   subscription: Subscription;
-  usage: { inspections: number; ncrs: number; capas: number; attachments: number; attachmentBytes: number };
+  usage: {
+    inspections: number;
+    ncrs: number;
+    capas: number;
+    attachments: number;
+    attachmentBytes: number;
+  };
   invoices: Invoice[];
   payments: Payment[];
   activity: { action: string; entityType: string; occurredAt: string }[];
@@ -1631,7 +1702,12 @@ export interface PlatformAnnouncement {
 export interface CustomerNotices {
   maintenance: boolean;
   supportEmail: string | null;
-  announcements: { id: string; title: string; message: string; severity: string }[];
+  announcements: {
+    id: string;
+    title: string;
+    message: string;
+    severity: string;
+  }[];
 }
 
 export interface SupportTicket {
@@ -1742,7 +1818,8 @@ export interface WorkCenter {
   shiftIds: string[];
 }
 
-export type MachineStatus = "AVAILABLE" | "RUNNING" | "IDLE" | "MAINTENANCE" | "BREAKDOWN" | "INACTIVE";
+export type MachineStatus =
+  "AVAILABLE" | "RUNNING" | "IDLE" | "MAINTENANCE" | "BREAKDOWN" | "INACTIVE";
 
 export interface Machine {
   id: string;
@@ -1853,7 +1930,9 @@ export interface ScaledRecipe {
   uomId: string;
   factor: string;
   /** withScrap: the quantity with the line's scrap allowance, which a work order of this size needs. */
-  lines: (Omit<BomLine, "id" | "scrapPercent" | "notes" | "alternates"> & { withScrap: string })[];
+  lines: (Omit<BomLine, "id" | "scrapPercent" | "notes" | "alternates"> & {
+    withScrap: string;
+  })[];
   parameters: ProcessParameter[];
 }
 
@@ -1907,7 +1986,12 @@ export interface PlanLine {
   orderedQuantity: string;
   remainingQuantity: string;
   overOrdered: boolean;
-  workOrders: { id: string; workOrderNumber: string; status: WorkOrderStatus; quantity: string }[];
+  workOrders: {
+    id: string;
+    workOrderNumber: string;
+    status: WorkOrderStatus;
+    quantity: string;
+  }[];
 }
 
 export interface PlanDetail {
@@ -2084,7 +2168,14 @@ export interface WorkOrderMaterials {
   shortages: string[];
 }
 
-export type OperationStatus = "PENDING" | "READY" | "IN_PROGRESS" | "PAUSED" | "COMPLETED" | "BLOCKED" | "CANCELLED";
+export type OperationStatus =
+  | "PENDING"
+  | "READY"
+  | "IN_PROGRESS"
+  | "PAUSED"
+  | "COMPLETED"
+  | "BLOCKED"
+  | "CANCELLED";
 
 export type LossCategory =
   | "MACHINE_BREAKDOWN"
@@ -2186,7 +2277,17 @@ export interface OperationDetail {
   }[];
   events: {
     id: string;
-    eventType: "READY" | "STARTED" | "PAUSED" | "RESUMED" | "COMPLETED" | "BLOCKED" | "UNBLOCKED" | "CANCELLED" | "ASSIGNED" | "COMMENT";
+    eventType:
+      | "READY"
+      | "STARTED"
+      | "PAUSED"
+      | "RESUMED"
+      | "COMPLETED"
+      | "BLOCKED"
+      | "UNBLOCKED"
+      | "CANCELLED"
+      | "ASSIGNED"
+      | "COMMENT";
     fromStatus: OperationStatus | null;
     toStatus: OperationStatus | null;
     lossCategory: LossCategory | null;
@@ -2197,7 +2298,13 @@ export interface OperationDetail {
     byName: string | null;
     at: string;
   }[];
-  machines: { id: string; code: string; name: string; status: string; busy: boolean }[];
+  machines: {
+    id: string;
+    code: string;
+    name: string;
+    status: string;
+    busy: boolean;
+  }[];
   operators: { id: string; name: string }[];
   /** Instruments that can measure here now, the machines' own first. */
   instruments: InstrumentOption[];
@@ -2206,7 +2313,8 @@ export interface OperationDetail {
   gates: QualityGate[];
 }
 
-export type CheckpointStage = "OPERATION_START" | "IN_PROCESS" | "OPERATION_COMPLETION" | "FINAL_RELEASE";
+export type CheckpointStage =
+  "OPERATION_START" | "IN_PROCESS" | "OPERATION_COMPLETION" | "FINAL_RELEASE";
 
 export interface QualityCheckpoint {
   id: string;
@@ -2225,7 +2333,8 @@ export interface QualityCheckpoint {
   archived: boolean;
 }
 
-export type GateStatus = "PENDING" | "IN_INSPECTION" | "ON_HOLD" | "PASSED" | "FAILED";
+export type GateStatus =
+  "PENDING" | "IN_INSPECTION" | "ON_HOLD" | "PASSED" | "FAILED";
 
 export interface GateInspection {
   id: string;
@@ -2252,7 +2361,13 @@ export interface QualityGate {
   inspections: GateInspection[];
 }
 
-export type ReworkStatus = "OPEN" | "APPROVED" | "IN_PROGRESS" | "AWAITING_INSPECTION" | "CLOSED" | "CANCELLED";
+export type ReworkStatus =
+  | "OPEN"
+  | "APPROVED"
+  | "IN_PROGRESS"
+  | "AWAITING_INSPECTION"
+  | "CLOSED"
+  | "CANCELLED";
 
 export interface ReworkSummary {
   id: string;
@@ -2318,10 +2433,28 @@ export interface WorkOrderQuality {
   onHold: boolean;
   gates: QualityGate[];
   /** Empty without permission to see NCRs. */
-  ncrs: { id: string; ncrNumber: string; title: string; status: string; severity: string }[];
-  capas: { id: string; capaNumber: string; title: string; status: string; ncrId: string }[];
+  ncrs: {
+    id: string;
+    ncrNumber: string;
+    title: string;
+    status: string;
+    severity: string;
+  }[];
+  capas: {
+    id: string;
+    capaNumber: string;
+    title: string;
+    status: string;
+    ncrId: string;
+  }[];
   reworkOrders: ReworkSummary[];
-  rejected: { rejected: string; toRework: string; scrapped: string; inRework: string; reworkedAccepted: string };
+  rejected: {
+    rejected: string;
+    toRework: string;
+    scrapped: string;
+    inRework: string;
+    reworkedAccepted: string;
+  };
   /** What completion waits for. */
   unresolved: string[];
 }
@@ -2440,7 +2573,13 @@ export interface DepartmentOption {
   name: string;
 }
 
-export type DowntimeGroupBy = "MACHINE" | "WORK_CENTER" | "PRODUCTION_LINE" | "FACILITY" | "CATEGORY" | "DEPARTMENT";
+export type DowntimeGroupBy =
+  | "MACHINE"
+  | "WORK_CENTER"
+  | "PRODUCTION_LINE"
+  | "FACILITY"
+  | "CATEGORY"
+  | "DEPARTMENT";
 
 export interface DowntimeSummaryRow {
   key: string;
@@ -2627,8 +2766,18 @@ export interface ProductionAnalytics {
     scrapRate: string | null;
     reworkRate: string | null;
   };
-  efficiency: { operations: number; plannedMinutes: string; actualMinutes: string; percent: string | null };
-  materialVariance: { receipts: number; lines: number; linesOutside: number; averageAbsolutePercent: string | null };
+  efficiency: {
+    operations: number;
+    plannedMinutes: string;
+    actualMinutes: string;
+    percent: string | null;
+  };
+  materialVariance: {
+    receipts: number;
+    lines: number;
+    linesOutside: number;
+    averageAbsolutePercent: string | null;
+  };
   machines: MachineOee[];
   overall: MachineOee;
   downtimeByCategory: DowntimeSummaryRow[];

@@ -26,7 +26,7 @@ class EmailRendererTest {
                 "instrumentName", "auditNumber", "amount", "title", "body", "recordNumber", "summary", "note",
                 "where", "reason", "receiptNumber", "lots", "supplierName", "actionDescription", "disposition",
                 "correctionNumber", "outcome", "count", "impact", "auditTitle", "planName", "invoiceNumber", "headline",
-                "usage", "advice", "message", "subject", "update")) {
+                "usage", "advice", "message", "subject", "update", "recallNumber")) {
             values.put(name, "value-" + name);
         }
         values.put("actionUrl", "https://app.example/path");

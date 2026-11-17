@@ -41,8 +41,8 @@ Phase 11 is on hold until you ask for it.
   and a new action needed after an ineffective verification
 - [ ] **More NCR sources**, remaining: supplier issues and process incidents as sources of their own (today they are
   raised by hand). Done: customer complaints and quality returns (#104, #113), and production rejects
-- [ ] **Recall**, remaining: a regulatory report pack, and escalation when customers do not respond. Done: one recall
-  for several batches, and linking its CAPA later (#57)
+- [x] **Recall**: one recall for several batches, and linking its CAPA later (#57), a report for the regulator with the
+  hazard class and their reference, and escalation to recall approvers when customers do not acknowledge in time (#131)
 - [ ] **Calibration, remaining**:
   - recall goods that were already used or dispatched;
   - start the new inspection automatically after *Reinspect*;

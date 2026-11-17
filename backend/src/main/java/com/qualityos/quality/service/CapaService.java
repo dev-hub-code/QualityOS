@@ -318,6 +318,17 @@ public class CapaService implements AttachmentPolicy {
         return due.size();
     }
 
+    /**
+     * What another record's report shows of a CAPA it links to. The caller decides who may see it.
+     *
+     * @return number, title, status and root cause, or empty when it does not exist
+     */
+    @Transactional(readOnly = true)
+    public Optional<List<String>> brief(UUID id) {
+        return capas.findById(id).map(capa -> java.util.Arrays.asList(capa.getCapaNumber(), capa.getTitle(),
+                capa.getStatus().name(), capa.getRootCause()));
+    }
+
     /** @return whether this CAPA has been closed, or empty when it does not exist */
     @Transactional(readOnly = true)
     public Optional<Boolean> isClosed(UUID id) {

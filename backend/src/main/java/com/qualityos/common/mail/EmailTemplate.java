@@ -34,6 +34,7 @@ public enum EmailTemplate {
     NCR_AWAITING_CLOSURE("ncr/awaiting-closure"),
     CAPA_ACTION_ASSIGNED("capa/action-assigned"),
     CAPA_ACTION_OVERDUE("capa/action-overdue"),
+    RECALL_UNANSWERED("recall/unanswered"),
     CAPA_VERIFICATION("capa/verification"),
     INSPECTION_SENT_BACK("inspection/sent-back"),
     INSPECTION_DISPOSITION("inspection/disposition"),

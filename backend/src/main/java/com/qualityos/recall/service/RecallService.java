@@ -26,6 +26,9 @@ import com.qualityos.recall.dto.RecallDtos.RecallDashboard;
 import com.qualityos.recall.dto.RecallDtos.RecallDetail;
 import com.qualityos.recall.dto.RecallDtos.RecallReport;
 import com.qualityos.recall.dto.RecallDtos.RecallSummary;
+import com.qualityos.recall.dto.RecallDtos.RegulatoryReport;
+import com.qualityos.recall.dto.RecallDtos.RegulatoryRequest;
+import com.qualityos.recall.dto.RecallDtos.ReportCapa;
 import com.qualityos.recall.dto.RecallDtos.ReportCustomer;
 import com.qualityos.recall.dto.RecallDtos.ReportProduct;
 import com.qualityos.recall.dto.RecallDtos.RequestClosureRequest;
@@ -97,6 +100,7 @@ public class RecallService implements AttachmentPolicy {
     private final FacilityScope scope;
     private final DocumentNumberService numbers;
     private final AuditService audit;
+    private final com.qualityos.notification.service.NotificationService notifications;
 
     RecallService(
             RecallRepository recalls,
@@ -113,7 +117,9 @@ public class RecallService implements AttachmentPolicy {
             ReviewPolicy reviewPolicy,
             FacilityScope scope,
             DocumentNumberService numbers,
-            AuditService audit) {
+            AuditService audit,
+            com.qualityos.notification.service.NotificationService notifications) {
+        this.notifications = notifications;
         this.recalls = recalls;
         this.batches = batches;
         this.contacts = contacts;
@@ -376,6 +382,119 @@ public class RecallService implements AttachmentPolicy {
         return detail(recall, permissions);
     }
 
+    /** Records what the regulator is told. Audited with before and after. */
+    @Transactional
+    public RecallDetail describeForRegulator(UUID id, RegulatoryRequest request, Set<String> permissions) {
+        Recall recall = lock(id);
+        Map<String, Object> before = regulatorySnapshot(recall);
+        recall.describeForRegulator(request.hazardClass(), blankToNull(request.regulator()),
+                blankToNull(request.regulatorReference()), request.regulatorNotifiedOn(), request.responseDays());
+        audit.record("RECALL_REGULATORY_UPDATED", ENTITY, id, before, regulatorySnapshot(recall));
+        return detail(recall, permissions);
+    }
+
+    private static Map<String, Object> regulatorySnapshot(Recall recall) {
+        Map<String, Object> values = new HashMap<>();
+        values.put("hazardClass", recall.getHazardClass());
+        values.put("regulator", recall.getRegulator());
+        values.put("regulatorReference", recall.getRegulatorReference());
+        values.put("regulatorNotifiedOn", recall.getRegulatorNotifiedOn());
+        values.put("responseDays", recall.getResponseDays());
+        return values;
+    }
+
+    private static String blankToNull(String text) {
+        return text == null || text.isBlank() ? null : text.trim();
+    }
+
+    /**
+     * Tells each open recall's approvers, and whoever is assigned the customer, once, which customers have not
+     * acknowledged it within the recall's response days. A customer settled by exception is not chased.
+     */
+    @Transactional
+    public int escalateUnanswered() {
+        LocalDate today = LocalDate.now(ZoneId.of(organizations.getCurrent().timezone()));
+        List<RecallContact> candidates = contacts.findEscalationCandidates();
+        Set<UUID> acknowledged = acknowledgements.findByContactRecordIdInOrderByAcknowledgedOn(
+                        candidates.stream().map(RecallContact::getId).toList()).stream()
+                .map(RecallAcknowledgement::getContactRecordId).collect(Collectors.toSet());
+        Map<UUID, Recall> open = recalls.findAllById(candidates.stream().map(RecallContact::getRecallId)
+                        .collect(Collectors.toSet())).stream()
+                .collect(Collectors.toMap(Recall::getId, recall -> recall));
+        Map<UUID, List<RecallContact>> late = candidates.stream()
+                .filter(contact -> !acknowledged.contains(contact.getId()))
+                .filter(contact -> {
+                    Recall recall = open.get(contact.getRecallId());
+                    return today.isAfter(recall.getRecallDate().plusDays(recall.getResponseDays()));
+                })
+                .collect(Collectors.groupingBy(RecallContact::getRecallId));
+        Instant now = Instant.now();
+        Set<UUID> approvers = access.holdersOf(Permissions.RECALL_CLOSE);
+        late.forEach((recallId, silent) -> {
+            Recall recall = open.get(recallId);
+            Map<UUID, CustomerResponse> known = dispatches.customersById(
+                    silent.stream().map(RecallContact::getCustomerId).toList());
+            List<String> names = silent.stream().map(contact -> known.get(contact.getCustomerId()).name()).sorted()
+                    .toList();
+            Set<UUID> recipients = new java.util.HashSet<>(approvers);
+            silent.stream().map(RecallContact::getAssignedTo).filter(java.util.Objects::nonNull).forEach(recipients::add);
+            String title = recall.getRecallNumber() + ": " + (names.size() == 1 ? "a customer has"
+                    : names.size() + " customers have") + " not acknowledged the recall";
+            String body = String.join(", ", names.size() > 10 ? names.subList(0, 10) : names)
+                    + (names.size() > 10 ? " and " + (names.size() - 10) + " more" : "")
+                    + ". They had " + recall.getResponseDays() + " days from " + recall.getRecallDate() + ".";
+            notifications.notify(recipients, com.qualityos.notification.service.NotificationType.RECALL_UNANSWERED,
+                    title, body, "/recalls/" + recallId,
+                    new com.qualityos.common.mail.EmailContent(com.qualityos.common.mail.EmailTemplate.RECALL_UNANSWERED,
+                            Map.of("recallNumber", recall.getRecallNumber(), "summary", body,
+                                    "count", Integer.toString(names.size()))));
+            silent.forEach(contact -> contact.escalated(now));
+            audit.record("RECALL_CUSTOMERS_ESCALATED", ENTITY, recallId, null,
+                    Map.of("customers", names, "responseDays", recall.getResponseDays()));
+        });
+        return late.size();
+    }
+
+    /**
+     * The recall report with what a regulator asks besides: its class and reference, how much was recovered, who has
+     * not answered, and the root cause. Interim while the recall is open, final once it is closed.
+     */
+    @Transactional(readOnly = true)
+    public RegulatoryReport regulatoryReport(UUID id, Set<String> permissions) {
+        RecallReport report = report(id, permissions);
+        Recall recall = load(id);
+        List<RecallContact> found = contacts.findByRecallId(id);
+        ClosureReview review = report.recall().review();
+        int total = found.size();
+        ReportCapa capa = Optional.ofNullable(recall.getCapaId()).flatMap(capas::brief)
+                .map(brief -> new ReportCapa(brief.get(0), brief.get(1), brief.get(2), brief.get(3)))
+                .orElse(null);
+        Set<String> answered = Set.of("ACKNOWLEDGED", "RESOLVED");
+        List<ReportCustomer> unanswered = report.customers().stream()
+                .filter(customer -> customer.acknowledgedOn() == null && customer.exceptionReason() == null
+                        && !answered.contains(customer.status()))
+                .toList();
+        return new RegulatoryReport(report, capa, recall.getStatus() == Recall.Status.CLOSED,
+                review.contacted(), review.acknowledged(),
+                (int) found.stream().filter(contact -> contact.getStatus() == RecallContact.Status.RESOLVED).count(),
+                (int) found.stream().filter(contact -> contact.getStatus() == RecallContact.Status.UNREACHABLE).count(),
+                review.exceptions(),
+                percent(review.contacted(), total), percent(review.acknowledged(), total),
+                percent(review.returnedQuantity(), review.dispatchedQuantity()), unanswered);
+    }
+
+    private static String percent(long part, long whole) {
+        return whole == 0 ? "–" : percent(BigDecimal.valueOf(part), BigDecimal.valueOf(whole));
+    }
+
+    private static String percent(BigDecimal part, BigDecimal whole) {
+        if (whole.signum() == 0) {
+            return "–";
+        }
+        return part.multiply(BigDecimal.valueOf(100)).divide(whole, 1, java.math.RoundingMode.HALF_UP)
+                .stripTrailingZeros().toPlainString() + "%";
+    }
+
     @Transactional(readOnly = true)
     public RecallReport report(UUID id, Set<String> permissions) {
         Recall recall = load(id);
@@ -442,7 +561,9 @@ public class RecallService implements AttachmentPolicy {
                 recall.getInstructions(), recall.getCapaId(), recall.getStatus().name(), names, recall.getClosureNote(),
                 recall.getClosureRequestedBy(), memberName(recall.getClosureRequestedBy()),
                 recall.getClosureRequestedAt(),
-                memberName(recall.getClosedBy()), recall.getClosedAt(), review(recall, covered, true));
+                memberName(recall.getClosedBy()), recall.getClosedAt(), review(recall, covered, true),
+                recall.getHazardClass() == null ? null : recall.getHazardClass().name(), recall.getRegulator(),
+                recall.getRegulatorReference(), recall.getRegulatorNotifiedOn(), recall.getResponseDays());
     }
 
     private ClosureReview review(Recall recall, RecallScope covered, boolean outstandingAccepted) {

@@ -202,6 +202,24 @@ public class RecallController {
                 .body(pdf.render(report));
     }
 
+    /** The hazard class, the regulator told, its reference and date, and how long customers have to answer. */
+    @PutMapping("/{id}/regulatory")
+    @PreAuthorize(Require.RECALL_MANAGE)
+    public ApiResponse<RecallDetail> regulatory(@PathVariable UUID id,
+            @Valid @RequestBody com.qualityos.recall.dto.RecallDtos.RegulatoryRequest request, Authentication caller) {
+        return ApiResponse.ok(recalls.describeForRegulator(id, request, permissions(caller)));
+    }
+
+    /** For the regulator: interim while the recall is open, final once it is closed. */
+    @GetMapping(value = "/{id}/regulatory-report.pdf", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> regulatoryReportPdf(@PathVariable UUID id, Authentication caller) {
+        var report = recalls.regulatoryReport(id, permissions(caller));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(report.report().recall().recallNumber() + "-regulatory.pdf").build().toString())
+                .body(pdf.renderRegulatory(report));
+    }
+
     private static Set<String> permissions(Authentication caller) {
         return caller.getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(Collectors.toSet());
     }

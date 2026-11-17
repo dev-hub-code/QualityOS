@@ -8,25 +8,43 @@ test("a recall runs from the report through contact, acknowledgement and approve
 }) => {
   test.setTimeout(120_000);
   const serial = `SN-${unique()}`;
-  const { batchNumber, manager } = await dispatchedBatch(page, browser, [serial]);
+  const { batchNumber, manager } = await dispatchedBatch(page, browser, [
+    serial,
+  ]);
   const today = new Date().toISOString().slice(0, 10);
 
   await page.goto(`/traceability/${encodeURIComponent(batchNumber)}/recall`);
   await step(page, "Start a recall", async (dialog: Locator) => {
     await dialog.getByLabel("Recall date").fill(today);
-    await dialog.getByLabel("Reason for recall").fill("Cracks found in the shaft");
-    await dialog.getByLabel("What customers must do").fill("Stop use and return all units");
+    await dialog
+      .getByLabel("Reason for recall")
+      .fill("Cracks found in the shaft");
+    await dialog
+      .getByLabel("What customers must do")
+      .fill("Stop use and return all units");
   });
   await expect(page.getByRole("heading", { name: /^RCL-/ })).toBeVisible();
   await expect(page.getByText("Affected customers")).toBeVisible();
-  await expect(page.getByRole("listitem").getByText("Tata Motors")).toBeVisible();
+  await expect(
+    page.getByRole("listitem").getByText("Tata Motors"),
+  ).toBeVisible();
   const recallUrl = page.url();
 
   await page.getByRole("button", { name: "Add batches" }).click();
-  await page.getByRole("dialog").getByLabel(/Batch numbers/).fill(batchNumber);
-  await page.getByRole("dialog").getByLabel("Why they belong to this recall").fill("Same heat of steel");
+  await page
+    .getByRole("dialog")
+    .getByLabel(/Batch numbers/)
+    .fill(batchNumber);
+  await page
+    .getByRole("dialog")
+    .getByLabel("Why they belong to this recall")
+    .fill("Same heat of steel");
   await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("dialog").getByText("These batches are already in this recall.")).toBeVisible();
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByText("These batches are already in this recall."),
+  ).toBeVisible();
   await page.keyboard.press("Escape");
 
   await step(page, "Log attempt", async (dialog: Locator) => {
@@ -34,7 +52,9 @@ test("a recall runs from the report through contact, acknowledgement and approve
     await dialog.getByLabel("Date").fill(today);
     await dialog.getByLabel("Outcome").selectOption("NO_REPLY");
   });
-  await expect(page.getByRole("list").getByText("contact attempted")).toBeVisible();
+  await expect(
+    page.getByRole("list").getByText("contact attempted"),
+  ).toBeVisible();
 
   await step(page, "Log attempt", async (dialog: Locator) => {
     await dialog.getByLabel("Method").selectOption("PHONE");
@@ -42,23 +62,31 @@ test("a recall runs from the report through contact, acknowledgement and approve
     await dialog.getByLabel("Outcome").selectOption("REACHED");
     await dialog.getByLabel("What they said").fill("Will check their stock");
   });
-  await expect(page.getByRole("list").getByText("contacted", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("list").getByText("contacted", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Will check their stock")).toBeVisible();
 
   await step(page, "Record acknowledgement", async (dialog: Locator) => {
     await dialog.getByLabel("Acknowledged on").fill(today);
     await dialog.getByLabel("Acknowledged by").fill("Asha Rao");
   });
-  await expect(page.getByRole("list").getByText("acknowledged", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("list").getByText("acknowledged", { exact: true }),
+  ).toBeVisible();
   await page.getByLabel("Move Tata Motors to").selectOption("RESOLVED");
-  await expect(page.getByRole("list").getByText("resolved", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("list").getByText("resolved", { exact: true }),
+  ).toBeVisible();
 
   await page.getByLabel("Filter by status").selectOption("PENDING");
   await expect(page.getByText("No customers match.")).toBeVisible();
   await page.getByLabel("Filter by status").selectOption("");
 
   await page.getByRole("link", { name: "Report", exact: true }).click();
-  await expect(page.getByRole("heading", { name: /Product recall report/ })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /Product recall report/ }),
+  ).toBeVisible();
   await expect(page.getByText(serial)).toBeVisible();
   await expect(page.getByRole("cell", { name: "Phone" })).toBeVisible();
   const [download] = await Promise.all([
@@ -67,41 +95,67 @@ test("a recall runs from the report through contact, acknowledgement and approve
   ]);
   expect(download.suggestedFilename()).toMatch(/^RCL-.*\.pdf$/);
   const stream = await download.createReadStream();
-  const first = await new Promise<Buffer>((resolve) => stream.once("data", resolve));
+  const first = await new Promise<Buffer>((resolve) =>
+    stream.once("data", resolve),
+  );
   expect(first.subarray(0, 5).toString()).toBe("%PDF-");
 
   await page.emulateMedia({ media: "print" });
   await expect(page.getByRole("navigation", { name: "Main" })).toBeHidden();
   await expect(page.getByRole("button", { name: "Print" })).toBeHidden();
-  const printed = await page.pdf({ path: test.info().outputPath("recall-print.pdf"), preferCSSPageSize: true });
+  const printed = await page.pdf({
+    path: test.info().outputPath("recall-print.pdf"),
+    preferCSSPageSize: true,
+  });
   expect(printed.subarray(0, 5).toString()).toBe("%PDF-");
   await page.emulateMedia({ media: "screen" });
 
   await page.goto(recallUrl);
   await step(page, "Request closure", async (dialog: Locator) => {
-    await dialog.getByLabel("Closure note").fill("Customer holds stock under quarantine");
+    await dialog
+      .getByLabel("Closure note")
+      .fill("Customer holds stock under quarantine");
     await dialog.getByLabel(/I accept that goods remain/).click();
   });
-  await expect(page.getByText("Someone other than you must approve closing this recall.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Approve closure" })).toHaveCount(0);
+  await expect(
+    page.getByText("Someone other than you must approve closing this recall."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Approve closure" }),
+  ).toHaveCount(0);
 
   await manager.goto(recallUrl);
   await manager.getByRole("button", { name: "Approve closure" }).click();
-  await expect(manager.getByRole("button", { name: "Approve closure" })).toHaveCount(0);
-  await expect(manager.getByText("closed", { exact: true }).first()).toBeVisible();
-  await expect(manager.getByRole("button", { name: "Log attempt" })).toHaveCount(0);
+  await expect(
+    manager.getByRole("button", { name: "Approve closure" }),
+  ).toHaveCount(0);
+  await expect(
+    manager.getByText("closed", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(
+    manager.getByRole("button", { name: "Log attempt" }),
+  ).toHaveCount(0);
 });
 
-test("goods under an open recall stay in until a recall manager gives a reason", async ({ page, browser }) => {
+test("goods under an open recall stay in until a recall manager gives a reason", async ({
+  page,
+  browser,
+}) => {
   test.setTimeout(90_000);
-  const { batchNumber } = await dispatchedBatch(page, browser, [`SN-${unique()}`]);
+  const { batchNumber } = await dispatchedBatch(page, browser, [
+    `SN-${unique()}`,
+  ]);
   const today = new Date().toISOString().slice(0, 10);
 
   await page.goto(`/traceability/${encodeURIComponent(batchNumber)}/recall`);
   await step(page, "Start a recall", async (dialog: Locator) => {
     await dialog.getByLabel("Recall date").fill(today);
-    await dialog.getByLabel("Reason for recall").fill("Cracks found in the shaft");
-    await dialog.getByLabel("What customers must do").fill("Stop use and return all units");
+    await dialog
+      .getByLabel("Reason for recall")
+      .fill("Cracks found in the shaft");
+    await dialog
+      .getByLabel("What customers must do")
+      .fill("Stop use and return all units");
   });
   await expect(page.getByRole("heading", { name: /^RCL-/ })).toBeVisible();
 
@@ -113,15 +167,24 @@ test("goods under an open recall stay in until a recall manager gives a reason",
   await dialog.getByLabel("Released batch 1").selectOption({ index: 1 });
   await dialog.getByLabel("Quantity 1").fill("1");
   await dialog.getByRole("button", { name: "Save" }).click();
-  await expect(dialog.getByText(`Batch ${batchNumber} is under recall RCL-`)).toBeVisible();
+  await expect(
+    dialog.getByText(`Batch ${batchNumber} is under recall RCL-`),
+  ).toBeVisible();
 
-  await dialog.getByLabel("Reason to dispatch despite the recall").fill("Replacement units, checked by QA");
+  await dialog
+    .getByLabel("Reason to dispatch despite the recall")
+    .fill("Replacement units, checked by QA");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole("cell", { name: `${batchNumber} × 1` }).first()).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: `${batchNumber} × 1` }).first(),
+  ).toBeVisible();
 });
 
-test("one recall covers several batches with the same fault", async ({ page, browser }) => {
+test("one recall covers several batches with the same fault", async ({
+  page,
+  browser,
+}) => {
   test.setTimeout(90_000);
   const { batchNumber, facilityId } = await dispatchedBatch(page, browser);
   const owner = apiCaller(page);
@@ -136,24 +199,81 @@ test("one recall covers several batches with the same fault", async ({ page, bro
   await page.goto(`/traceability/${encodeURIComponent(batchNumber)}/recall`);
   await page.getByRole("button", { name: "Start a recall" }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Other production batches in this recall (one per line)").fill("PB-NOT-A-BATCH");
+  await dialog
+    .getByLabel("Other production batches in this recall (one per line)")
+    .fill("PB-NOT-A-BATCH");
   await dialog.getByLabel("Recall date").fill(today);
   await dialog.getByLabel("Reason for recall").fill("Same heat of steel");
-  await dialog.getByLabel("What customers must do").fill("Quarantine and return");
+  await dialog
+    .getByLabel("What customers must do")
+    .fill("Quarantine and return");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog.getByText(/PB-NOT-A-BATCH/)).toBeVisible();
 
-  await dialog.getByLabel("Other production batches in this recall (one per line)").fill(second.batch.batchNumber);
+  await dialog
+    .getByLabel("Other production batches in this recall (one per line)")
+    .fill(second.batch.batchNumber);
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("heading", { name: /^RCL-/ })).toBeVisible();
-  await expect(page.getByText(`Batches ${[batchNumber, second.batch.batchNumber].sort().join(", ")}`)).toBeVisible();
+  await expect(
+    page.getByText(
+      `Batches ${[batchNumber, second.batch.batchNumber].sort().join(", ")}`,
+    ),
+  ).toBeVisible();
 
   // A lot is traced with its unit, and its recall report points to its batches instead of starting a recall.
-  const trace = await owner("GET", `/traceability/batches/${encodeURIComponent(batchNumber)}`);
+  const trace = await owner(
+    "GET",
+    `/traceability/batches/${encodeURIComponent(batchNumber)}`,
+  );
   const lot: string = trace.backward[0].batchNumber;
   await page.goto(`/traceability/${encodeURIComponent(batchNumber)}`);
   await expect(page.getByText(/· \d+ PCS/).first()).toBeVisible();
   await page.goto(`/traceability/${encodeURIComponent(lot)}/recall`);
-  await expect(page.getByText("A recall covers production batches.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start a recall" })).toHaveCount(0);
+  await expect(
+    page.getByText("A recall covers production batches."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Start a recall" }),
+  ).toHaveCount(0);
+});
+
+test("the regulator's details are recorded on a recall, and their report downloads", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(90_000);
+  const { batchNumber } = await dispatchedBatch(page, browser, [
+    `SN-${unique()}`,
+  ]);
+  const today = new Date().toISOString().slice(0, 10);
+  await page.goto(`/traceability/${encodeURIComponent(batchNumber)}/recall`);
+  await step(page, "Start a recall", async (dialog: Locator) => {
+    await dialog.getByLabel("Recall date").fill(today);
+    await dialog.getByLabel("Reason for recall").fill("Seal may leak");
+    await dialog
+      .getByLabel("What customers must do")
+      .fill("Quarantine the stock");
+  });
+  await expect(page.getByRole("heading", { name: /^RCL-/ })).toBeVisible();
+  await expect(page.getByText("Not yet classified")).toBeVisible();
+
+  await page.getByRole("button", { name: "Edit regulator details" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Hazard class").selectOption("CLASS_II");
+  await dialog.getByLabel("Regulator, such as FSSAI or CDSCO").fill("FSSAI");
+  await dialog.getByLabel("The regulator's reference").fill("FSSAI/RC/2026/77");
+  await dialog.getByLabel("Regulator told on").fill(today);
+  await dialog.getByLabel("Days customers have to acknowledge it").fill("5");
+  await dialog.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("FSSAI/RC/2026/77")).toBeVisible();
+  await expect(page.getByText(`5 days of ${today}`)).toBeVisible();
+
+  const download = page.waitForEvent("download");
+  await page
+    .getByRole("link", { name: "Interim report for the regulator (PDF)" })
+    .click();
+  expect((await download).suggestedFilename()).toMatch(
+    /^RCL-.*-regulatory\.pdf$/,
+  );
 });

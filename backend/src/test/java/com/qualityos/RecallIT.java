@@ -440,6 +440,110 @@ class RecallIT extends TraceabilityFixture {
         }
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.qualityos.recall.service.RecallService recallService;
+
+    private ResultActions regulatory(Session session, String recall, Map<String, Object> body) throws Exception {
+        return as(session, put("/api/v1/recalls/" + recall + "/regulatory").contentType("application/json")
+                .content(json.writeValueAsString(body)));
+    }
+
+    private Map<String, Object> regulatoryBody(String notifiedOn, int responseDays) {
+        Map<String, Object> body = new HashMap<>(Map.of("hazardClass", "CLASS_II", "regulator", "FSSAI",
+                "regulatorReference", "FSSAI/RC/2026/118", "responseDays", responseDays));
+        body.put("regulatorNotifiedOn", notifiedOn);
+        return body;
+    }
+
+    @Test
+    void whatTheRegulatorIsToldIsKeptAndAudited() throws Exception {
+        String recall = start();
+        regulatory(owner, recall, regulatoryBody(TODAY, 5)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.hazardClass").value("CLASS_II"))
+                .andExpect(jsonPath("$.data.regulatorReference").value("FSSAI/RC/2026/118"))
+                .andExpect(jsonPath("$.data.regulatorNotifiedOn").value(TODAY))
+                .andExpect(jsonPath("$.data.responseDays").value(5));
+        regulatory(owner, recall, regulatoryBody(LocalDate.now().minusDays(1).toString(), 5))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message")
+                        .value("The regulator cannot have been told before the recall started."));
+        regulatory(owner, recall, regulatoryBody(TODAY, 0)).andExpect(status().isBadRequest());
+        regulatory(addMember(owner, "VIEWER"), recall, regulatoryBody(TODAY, 5)).andExpect(status().isForbidden());
+        assertThat(inTransactionAs(owner.tenantId(), null, () -> jdbc.queryForObject(
+                "SELECT count(*) FROM audit_logs WHERE action = 'RECALL_REGULATORY_UPDATED'", Long.class)))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void theRegulatorsReportSaysWhatWasRecoveredAndWhoHasNotAnswered() throws Exception {
+        String recall = start();
+        regulatory(owner, recall, regulatoryBody(TODAY, 3)).andExpect(status().isOk());
+        byte[] interim = as(owner, get("/api/v1/recalls/" + recall + "/regulatory-report.pdf"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("application/pdf"))
+                .andReturn().getResponse().getContentAsByteArray();
+        try (PDDocument document = Loader.loadPDF(interim)) {
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text).contains("Interim recall report for the regulator", "FSSAI/RC/2026/118",
+                    "Class II: may cause temporary or", "Customers who have not acknowledged",
+                    "Tata Motors", "0%", "No corrective action is linked yet", numberOf(batch), "Declaration");
+        }
+
+        attempt(recall, "PHONE", "REACHED").andExpect(status().isCreated());
+        acknowledge(recall).andExpect(status().isCreated());
+        returnAll();
+        byte[] later = as(owner, get("/api/v1/recalls/" + recall + "/regulatory-report.pdf"))
+                .andReturn().getResponse().getContentAsByteArray();
+        try (PDDocument document = Loader.loadPDF(later)) {
+            String text = new PDFTextStripper().getText(document);
+            assertThat(text).contains("100%", "None. Every customer has acknowledged the recall");
+        }
+        Session stranger = register();
+        as(stranger, get("/api/v1/recalls/" + recall + "/regulatory-report.pdf")).andExpect(status().isNotFound());
+    }
+
+    private int escalate() {
+        return com.qualityos.common.tenant.TenantContext.callAs(owner.tenantId(), null,
+                recallService::escalateUnanswered);
+    }
+
+    @Test
+    void aCustomerSilentPastTheResponseTimeIsEscalatedOnce() throws Exception {
+        String recall = start();
+        String number = JsonPath.read(body(as(owner, get("/api/v1/recalls/" + recall))), "$.data.recallNumber");
+        // Still within the three days.
+        assertThat(escalate()).isZero();
+
+        asAppRole(owner.tenantId(), sql -> sql.update(
+                "UPDATE recalls SET recall_date = current_date - 4 WHERE id = ?::uuid", recall));
+        asAppRole(null, sql -> assertThat(sql.queryForList("SELECT tenants_with_unanswered_recalls()",
+                java.util.UUID.class)).contains(owner.tenantId()));
+        // Being reached is not answering.
+        attempt(recall, "PHONE", "REACHED").andExpect(status().isCreated());
+
+        assertThat(escalate()).isEqualTo(1);
+        assertThat(escalate()).isZero();
+        String inbox = body(as(manager, get("/api/v1/notifications?size=50")));
+        assertThat(JsonPath.<List<String>>read(inbox, "$.data.items[*].title"))
+                .containsOnlyOnce(number + ": a customer has not acknowledged the recall");
+        assertThat(JsonPath.<List<String>>read(inbox, "$.data.items[*].body").toString()).contains("Tata Motors");
+        assertThat(inTransactionAs(owner.tenantId(), null, () -> jdbc.queryForObject(
+                "SELECT count(*) FROM audit_logs WHERE action = 'RECALL_CUSTOMERS_ESCALATED'", Long.class)))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void aCustomerWhoAnsweredInTimeIsNotEscalated() throws Exception {
+        String recall = start();
+        attempt(recall, "PHONE", "REACHED").andExpect(status().isCreated());
+        acknowledge(recall).andExpect(status().isCreated());
+        asAppRole(owner.tenantId(), sql -> sql.update(
+                "UPDATE recalls SET recall_date = current_date - 10 WHERE id = ?::uuid", recall));
+        assertThat(escalate()).isZero();
+        asAppRole(null, sql -> assertThat(sql.queryForList("SELECT tenants_with_unanswered_recalls()",
+                java.util.UUID.class)).doesNotContain(owner.tenantId()));
+    }
+
     private ResultActions addBatches(Session session, String recall, String... numbers) throws Exception {
         return as(session, postJson("/api/v1/recalls/" + recall + "/batches", Map.of(
                 "batchNumbers", List.of(numbers), "reason", "Same heat of steel")));

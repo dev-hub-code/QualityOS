@@ -84,7 +84,9 @@ public final class ManufacturingDtos {
             @Min(1) @Max(1000) Integer capacityUnits,
             @DecimalMin("0") @Digits(integer = 14, fraction = 4) BigDecimal labourRate,
             @DecimalMin("0") @Digits(integer = 14, fraction = 4) BigDecimal machineRate,
-            @DecimalMin("0") @Digits(integer = 14, fraction = 4) BigDecimal overheadRate) {
+            @DecimalMin("0") @Digits(integer = 14, fraction = 4) BigDecimal overheadRate,
+            /* The facility's shifts the centre works; null or empty for all of them. */
+            @Size(max = 20) List<@NotNull UUID> shiftIds) {
     }
 
     public record WorkCenterResponse(
@@ -100,7 +102,8 @@ public final class ManufacturingDtos {
             int capacityUnits,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal labourRate,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal machineRate,
-            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal overheadRate) {
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal overheadRate,
+            List<UUID> shiftIds) {
     }
 
     public record WorkCenterDetail(WorkCenterResponse workCenter, List<MachineResponse> machines) {

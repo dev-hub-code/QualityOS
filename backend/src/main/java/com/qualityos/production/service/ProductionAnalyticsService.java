@@ -158,6 +158,7 @@ public class ProductionAnalyticsService {
 
         // Machines: shift time, planned and unplanned downtime, running time, units
         Map<UUID, List<ShiftCalendar>> shifts = calendar.shifts(facilityIds);
+        Map<UUID, Set<LocalDate>> holidays = calendar.holidays(facilityIds, from, to);
         List<LocalDate> days = from.datesUntil(to.plusDays(1)).toList();
         List<DowntimeRecord> stops = facilityIds.isEmpty() ? List.of()
                 : facilityId != null ? downtime.overlapping(facilityId, start, end)
@@ -183,9 +184,11 @@ public class ProductionAnalyticsService {
         double[] all = new double[8];
         for (Machine machine : machineList) {
             WorkCenter centre = centreById.get(machine.getWorkCenterId());
-            List<ShiftCalendar> calendarShifts = shifts.getOrDefault(centre.getFacilityId(), List.of());
-            double shift = days.stream().mapToDouble(day -> ProductionCalendar.workingMinutes(calendarShifts, day))
-                    .sum();
+            List<ShiftCalendar> calendarShifts = ProductionCalendar.worked(
+                    shifts.getOrDefault(centre.getFacilityId(), List.of()), centre.getShiftIds());
+            Set<LocalDate> closed = holidays.getOrDefault(centre.getFacilityId(), Set.of());
+            double shift = days.stream()
+                    .mapToDouble(day -> ProductionCalendar.workingMinutes(calendarShifts, closed, day)).sum();
             double planned = 0;
             double unplanned = 0;
             for (DowntimeRecord stop : stops) {

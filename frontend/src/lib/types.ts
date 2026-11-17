@@ -128,6 +128,15 @@ export interface FacilityDetail {
   departments: FacilityUnit[];
   productionLines: FacilityUnit[];
   shifts: Shift[];
+  /** From the start of this year on. */
+  holidays: Holiday[];
+}
+
+/** A day the facility does not work, whatever its shifts say. */
+export interface Holiday {
+  id: string;
+  date: string;
+  name: string;
 }
 
 export interface Supplier {
@@ -1729,6 +1738,8 @@ export interface WorkCenter {
   labourRate: string | null;
   machineRate: string | null;
   overheadRate: string | null;
+  /** The facility's shifts it works; empty for all of them. */
+  shiftIds: string[];
 }
 
 export type MachineStatus = "AVAILABLE" | "RUNNING" | "IDLE" | "MAINTENANCE" | "BREAKDOWN" | "INACTIVE";

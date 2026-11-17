@@ -236,6 +236,54 @@ class AdvancedManufacturingIT extends TraceabilityFixture {
     }
 
     @Test
+    void aCentreWorksOnlyItsShiftsAndNobodyWorksOnAHoliday() throws Exception {
+        LocalDate day = LocalDate.now().plusDays(1);
+        String night = idOf(body(as(owner, postJson("/api/v1/facilities/" + facility + "/shifts", Map.of(
+                "name", "Night", "startsAt", "20:00", "endsAt", "04:00", "breakMinutes", 0, "daysOfWeek", 127)))
+                .andExpect(status().isCreated())));
+        String query = API + "/scheduling?facilityId=" + facility + "&from=" + day + "&to=" + day.plusDays(1);
+        String capacity = "$.data.workCenters[0].days[0].capacityMinutes";
+        assertThat(JsonPath.<String>read(body(as(planner, get(query))), capacity)).isEqualTo("930.0");
+
+        // The centre works the night shift only.
+        Map<String, Object> centreBody = new java.util.HashMap<>(Map.of("code", "WC-" + code(), "name", "Turning",
+                "facilityId", facility, "shiftIds", List.of(night)));
+        as(owner, put(API + "/work-centers/" + centre).contentType("application/json")
+                .content(json.writeValueAsString(centreBody))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.shiftIds[0]").value(night));
+        assertThat(JsonPath.<String>read(body(as(planner, get(query))), capacity)).isEqualTo("480.0");
+        String elsewhere = facility(owner);
+        String foreign = idOf(body(as(owner, postJson("/api/v1/facilities/" + elsewhere + "/shifts", Map.of(
+                "name", "Day", "startsAt", "08:00", "endsAt", "16:00"))).andExpect(status().isCreated())));
+        centreBody.put("shiftIds", List.of(night, foreign));
+        as(owner, put(API + "/work-centers/" + centre).contentType("application/json")
+                .content(json.writeValueAsString(centreBody))).andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value("Choose shifts of the work centre's own facility."));
+
+        // A holiday the day after: an order planned over both days is loaded on the first.
+        String holiday = idOf(body(as(owner, postJson("/api/v1/facilities/" + facility + "/holidays",
+                Map.of("date", day.plusDays(1).toString(), "name", "Founders' day"))).andExpect(status().isCreated())));
+        as(owner, postJson("/api/v1/facilities/" + facility + "/holidays",
+                Map.of("date", day.plusDays(1).toString(), "name", "Again"))).andExpect(status().isConflict());
+        as(operator, postJson("/api/v1/facilities/" + facility + "/holidays",
+                Map.of("date", day.toString(), "name", "Mine"))).andExpect(status().isForbidden());
+        as(owner, get("/api/v1/facilities/" + facility)).andExpect(jsonPath("$.data.holidays[0].name")
+                .value("Founders' day"));
+        approved("4", day, day.plusDays(1));
+        String board = body(as(planner, get(query)));
+        assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[1].capacityMinutes")).isEqualTo("0.0");
+        assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[0].loadMinutes")).isEqualTo("240.0");
+        assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[1].loadMinutes")).isEqualTo("0.0");
+
+        as(owner, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/facilities/" + facility + "/holidays/" + holiday)).andExpect(status().isNoContent());
+        board = body(as(planner, get(query)));
+        assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[1].capacityMinutes")).isEqualTo("480.0");
+        assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[1].loadMinutes")).isEqualTo("120.0");
+        assertThat(asDatabaseSuperuser().queryForObject("SELECT count(*) FROM audit_logs WHERE action IN ('HOLIDAY_ADDED', "
+                + "'HOLIDAY_REMOVED') AND entity_id = ?", Integer.class, facility)).isEqualTo(2);
+    }
+
+    @Test
     void capacityIsCheckedAndCostAndAnalyticsComeFromWhatWasRecorded() throws Exception {
         LocalDate day = LocalDate.now().plusDays(1);
         // Ten shafts need 600 minutes of turning; one machine gives 450 a day.

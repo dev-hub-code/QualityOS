@@ -30,6 +30,9 @@ public class WorkCenter extends TenantOwnedEntity {
     private BigDecimal labourRate;
     private BigDecimal machineRate;
     private BigDecimal overheadRate;
+    /** The facility shifts it works; empty, it works them all. */
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    private java.util.List<UUID> shiftIds = new java.util.ArrayList<>();
 
     public WorkCenter(UUID facilityId, String code) {
         this.facilityId = facilityId;

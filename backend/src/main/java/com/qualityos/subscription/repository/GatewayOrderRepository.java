@@ -2,7 +2,7 @@ package com.qualityos.subscription.repository;
 
 import com.qualityos.subscription.entity.GatewayOrder;
 import jakarta.persistence.LockModeType;
-import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,6 +18,6 @@ public interface GatewayOrderRepository extends JpaRepository<GatewayOrder, UUID
     @Query("select o from GatewayOrder o where o.provider = ?1 and o.gatewayOrderId = ?2")
     Optional<GatewayOrder> lockByProviderAndGatewayOrderId(String provider, String gatewayOrderId);
 
-    Optional<GatewayOrder> findFirstByInvoiceIdAndStatusAndExpiresAtAfterOrderByExpiresAtDesc(
-            UUID invoiceId, GatewayOrder.Status status, Instant now);
+    List<GatewayOrder> findByInvoiceIdAndStatusInOrderByCreatedAtDesc(
+            UUID invoiceId, java.util.Collection<GatewayOrder.Status> statuses);
 }

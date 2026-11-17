@@ -20,8 +20,10 @@ const STATE: Record<Subscription["state"], string> = {
 
 const RETURNED: Record<OrderConfirmation["status"], string> = {
   PAID: "Payment received. Thank you.",
+  CREATING: "This payment has not reached us yet. If money left your account, it will show here shortly. Please do not pay again.",
   ACTIVE: "This payment has not reached us yet. If money left your account, it will show here shortly. Please do not pay again.",
   NEEDS_REVIEW: "We received a payment that could not be applied to this invoice. Please contact support. You do not need to pay again.",
+  ABANDONED: "This payment was not completed, and no money was taken for it. You can pay the invoice again.",
 };
 
 function limit(used: number, max: number | null) {

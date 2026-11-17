@@ -19,8 +19,12 @@ import lombok.Setter;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class GatewayOrder extends TenantOwnedEntity {
 
-    /** NEEDS_REVIEW: money was taken but could not be applied, so a person must decide what happens to it. */
-    public enum Status { ACTIVE, PAID, NEEDS_REVIEW }
+    /**
+     * CREATING: reserved for the invoice, while Cashfree is asked to create it. NEEDS_REVIEW: money was taken but could
+     * not be applied, so a person must decide what happens to it. ABANDONED: Cashfree has no such order, or it expired
+     * there unpaid; a payment that still reaches it is applied all the same.
+     */
+    public enum Status { CREATING, ACTIVE, PAID, NEEDS_REVIEW, ABANDONED }
 
     private UUID invoiceId;
     private String provider;
@@ -30,7 +34,7 @@ public class GatewayOrder extends TenantOwnedEntity {
 
     @Setter
     @Enumerated(EnumType.STRING)
-    private Status status = Status.ACTIVE;
+    private Status status = Status.CREATING;
 
     public GatewayOrder(UUID invoiceId, String provider, String gatewayOrderId, BigDecimal amount, Instant expiresAt) {
         this.invoiceId = invoiceId;

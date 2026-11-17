@@ -82,7 +82,7 @@ class CashfreeClientTest {
     void readsPaymentsWhetherTheIdIsATextOrANumber() {
         reply.set("""
                 [{"cf_payment_id":"1453995084705707520","payment_status":"SUCCESS","payment_amount":170.00,
-                  "payment_group":"upi","payment_message":"ok"},
+                  "payment_currency":"INR","payment_group":"upi","payment_message":"ok"},
                  {"cf_payment_id":1453002795,"payment_status":"FAILED","payment_amount":170.00,"payment_group":"card"}]
                 """);
 
@@ -92,6 +92,22 @@ class CashfreeClientTest {
         assertThat(payments).extracting(CashfreeClient.Payment::id).containsExactly("1453995084705707520", "1453002795");
         assertThat(payments.getFirst().amount()).isEqualByComparingTo("170");
         assertThat(payments.get(1).message()).isNull();
+        assertThat(payments.getFirst().currency()).isEqualTo("INR");
+        assertThat(payments.get(1).currency()).isNull();
+    }
+
+    @Test
+    void anOrderCashfreeDoesNotHaveIsEmptyNotAnError() {
+        status.set(404);
+        reply.set("{\"message\":\"order not found\",\"code\":\"order_not_found\"}");
+        assertThat(client.findOrder("QOS-404")).isEmpty();
+        assertThat(seen.get().getRequestURI().getPath()).isEqualTo("/pg/orders/QOS-404");
+
+        status.set(200);
+        reply.set("""
+                {"order_id":"QOS-1","order_status":"ACTIVE","payment_session_id":"session_1"}""");
+        assertThat(client.findOrder("QOS-1")).hasValueSatisfying(
+                order -> assertThat(order.paymentSessionId()).isEqualTo("session_1"));
     }
 
     @Test
@@ -99,7 +115,7 @@ class CashfreeClientTest {
         status.set(401);
         reply.set("{\"message\":\"authentication Failed for app-id\"}");
 
-        assertThatThrownBy(() -> client.order("QOS-1"))
+        assertThatThrownBy(() -> client.findOrder("QOS-1"))
                 .isInstanceOfSatisfying(QualityOsException.class,
                         e -> assertThat(e.errorCode()).isEqualTo(ErrorCode.PAYMENT_GATEWAY_UNAVAILABLE))
                 .hasMessageNotContaining("app-id");

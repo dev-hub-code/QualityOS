@@ -311,3 +311,26 @@ test("global search finds dispatches by customer and recalls by reason", async (
   await page.getByLabel("Search recalls").fill("no such recall");
   await expect(page.getByText("No recalls.")).toBeVisible();
 });
+
+test("a customer's complaint with nothing sent back raises an NCR on the dispatch", async ({ page, browser }) => {
+  test.setTimeout(90_000);
+  await dispatchedBatch(page, browser);
+  const today = new Date().toISOString().slice(0, 10);
+
+  await page.goto("/dispatches");
+  await step(page, "Confirm shipment", (dialog) => dialog.getByLabel("Shipped on").fill(today));
+  await page.getByRole("link", { name: /^DSP-/ }).first().click();
+  await expect(page.getByText("No complaints about this dispatch.")).toBeVisible();
+  await step(page, "Record complaint", async (dialog) => {
+    await dialog.getByLabel("Complaint reference, such as a call or email").fill("CALL-17");
+    await dialog.getByLabel("Received on").fill(today);
+    await dialog.getByLabel("Severity").selectOption("CRITICAL");
+    await dialog.getByLabel("What the customer reported").fill("Shafts snapped on the assembly line");
+  });
+  const dispatchUrl = page.url();
+  await page.getByRole("link", { name: /^NCR-/ }).click();
+  await expect(page.getByText(/Customer complaint from Tata Motors about DSP-/).first()).toBeVisible();
+  await expect(page.getByText("Shafts snapped on the assembly line", { exact: false }).first()).toBeVisible();
+  await page.getByRole("link", { name: "Customer complaint", exact: true }).click();
+  await expect(page).toHaveURL(dispatchUrl);
+});

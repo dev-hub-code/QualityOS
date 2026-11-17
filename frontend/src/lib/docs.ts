@@ -385,6 +385,7 @@ export const DOC_PAGES: DocPage[] = [
           ["Calibration", "Raised automatically when an instrument fails calibration."],
           ["Production", "Raised from a shop-floor report of rejected or scrapped goods, when Manufacturing settings ask for it."],
           ["Customer return", "Raised when a return is recorded as a quality complaint. One NCR covers the whole return, as major."],
+          ["Customer complaint", "Raised from a dispatch's page when a customer complains about goods they kept, such as by phone."],
           ["Manual", "Raised by hand, for anything else you notice."],
         ],
       },
@@ -714,7 +715,13 @@ export const DOC_PAGES: DocPage[] = [
           "A dispatch (DSP-2026-00001) names a customer and the batches going out. Only released batches can be dispatched.",
           "Naming serial numbers is optional. If you do, their number must match the quantity.",
           "A dispatch only counts as shipped once someone confirms the shipment. Traces flag it until then, and managers get a daily reminder after 3 days.",
+          "Nothing ships from a batch while its outgoing (OQC) inspection is open. Dispatch it once that inspection is decided.",
+          "Each dispatch and each customer has a page of its own. A dispatch's page shows its batches, returns and complaints, and a customer's page lists everything shipped to them.",
         ],
+      },
+      {
+        title: "Complaints with nothing sent back",
+        text: "When a customer reports a problem with goods they kept, such as by phone, open the dispatch and choose Record complaint. Give the reference, the date, the severity and what they reported. Each complaint raises its own NCR, linked to the dispatch, and stock is not touched. Goods that come back are recorded as a return instead.",
       },
       {
         title: "Two ways to undo",

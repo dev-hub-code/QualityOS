@@ -30,7 +30,7 @@ public class NonConformance extends TenantOwnedEntity {
         }
     }
 
-    public enum Source { INSPECTION, MANUAL, AUDIT, CALIBRATION, PRODUCTION, CUSTOMER_RETURN }
+    public enum Source { INSPECTION, MANUAL, AUDIT, CALIBRATION, PRODUCTION, CUSTOMER_RETURN, CUSTOMER_COMPLAINT }
 
     public enum Severity { CRITICAL, MAJOR, MINOR }
 
@@ -53,6 +53,7 @@ public class NonConformance extends TenantOwnedEntity {
     private UUID workOrderId;
     private UUID operationReportId;
     private UUID dispatchReversalId;
+    private UUID dispatchId;
     private UUID supplierId;
     private UUID materialId;
     private String batchNumber;
@@ -110,6 +111,18 @@ public class NonConformance extends TenantOwnedEntity {
                 null, Severity.MAJOR, title, description, null);
         ncr.dispatchReversalId = dispatchReversalId;
         return ncr;
+    }
+
+    public static NonConformance fromCustomerComplaint(String ncrNumber, UUID dispatchId, String batchNumber,
+            Severity severity, String title, String description) {
+        NonConformance ncr = new NonConformance(ncrNumber, Source.CUSTOMER_COMPLAINT, null, null, null, batchNumber,
+                null, severity, title, description, null);
+        ncr.dispatchId = dispatchId;
+        return ncr;
+    }
+
+    public UUID getDispatchId() {
+        return dispatchId;
     }
 
     public NonConformance(String ncrNumber, Source source, UUID inspectionId, UUID supplierId, UUID materialId,

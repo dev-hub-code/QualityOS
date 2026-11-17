@@ -18,6 +18,7 @@ import com.qualityos.organization.service.FacilityService;
 import com.qualityos.quality.dto.QualityDtos.Assignee;
 import com.qualityos.quality.dto.QualityDtos.AuditFailure;
 import com.qualityos.quality.dto.QualityDtos.CalibrationFailure;
+import com.qualityos.quality.dto.QualityDtos.CustomerComplaint;
 import com.qualityos.quality.dto.QualityDtos.ProductionReject;
 import com.qualityos.quality.dto.QualityDtos.CustomerReturn;
 import com.qualityos.quality.dto.QualityDtos.CapaHistory;
@@ -293,6 +294,30 @@ public class NcrService implements AttachmentPolicy {
                                 returned.customerName(), String.join(", ", returned.lines()),
                                 returned.dispatchNumber(), returned.returnReference(), returned.reason()))))
                 .getId();
+    }
+
+    /** Joins the caller's transaction. A dispatch can draw any number of complaints, each its own NCR. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public NcrOutcome raiseFromCustomerComplaint(CustomerComplaint complaint) {
+        NonConformance ncr = raise(complaint.facilityId(), NonConformance.fromCustomerComplaint(
+                numbers.next(NUMBER_PREFIX),
+                complaint.dispatchId(),
+                complaint.batchNumber(),
+                NonConformance.Severity.valueOf(complaint.severity()),
+                "Customer complaint from %s about %s".formatted(complaint.customerName(), complaint.dispatchNumber()),
+                "%s reported on %s (reference %s) about dispatch %s (%s): %s".formatted(
+                        complaint.customerName(), complaint.receivedOn(), complaint.reference(),
+                        complaint.dispatchNumber(), String.join(", ", complaint.lines()), complaint.description())));
+        return new NcrOutcome(ncr.getId(), ncr.getNcrNumber(), ncr.getStatus().name(), false, List.of());
+    }
+
+    /** The complaints raised against a dispatch, oldest first. */
+    @Transactional(readOnly = true)
+    public List<NcrOutcome> forDispatch(UUID dispatchId) {
+        return ncrs.findByDispatchIdOrderByCreatedAt(dispatchId).stream()
+                .map(ncr -> new NcrOutcome(ncr.getId(), ncr.getNcrNumber(), ncr.getStatus().name(),
+                        ncr.getStatus().isFinished(), List.of()))
+                .toList();
     }
 
     /** The NCRs raised for these customer returns, keyed by return. */
@@ -615,6 +640,7 @@ public class NcrService implements AttachmentPolicy {
                 ncr.getInstrumentId(),
                 ncr.getWorkOrderId(),
                 ncr.getDispatchReversalId(),
+                ncr.getDispatchId(),
                 ncr.getSupplierId(),
                 ncr.getSupplierId() == null ? null : supplierNames(Set.of(ncr.getSupplierId())).get(ncr.getSupplierId()),
                 ncr.getMaterialId(),

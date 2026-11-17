@@ -1,5 +1,8 @@
 package com.qualityos.traceability.controller;
 
+import com.qualityos.quality.dto.QualityDtos.NcrOutcome;
+import com.qualityos.traceability.dto.TraceabilityDtos.CreateComplaintRequest;
+import com.qualityos.traceability.service.CustomerComplaintService;
 import com.qualityos.common.response.ApiResponse;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.response.Pages;
@@ -45,10 +48,26 @@ public class DispatchController {
 
     private final DispatchService dispatches;
     private final DispatchReturnService returns;
+    private final CustomerComplaintService complaints;
 
-    DispatchController(DispatchService dispatches, DispatchReturnService returns) {
+    DispatchController(DispatchService dispatches, DispatchReturnService returns, CustomerComplaintService complaints) {
         this.dispatches = dispatches;
         this.returns = returns;
+        this.complaints = complaints;
+    }
+
+    /** Raises an NCR, so it takes the right to raise one as well as to see the dispatch. */
+    @PostMapping("/dispatches/{id}/complaints")
+    @PreAuthorize(Require.TRACEABILITY_VIEW + " and " + Require.NCR_CREATE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<NcrOutcome> complain(@PathVariable UUID id, @Valid @RequestBody CreateComplaintRequest request) {
+        return ApiResponse.ok(complaints.complain(id, request));
+    }
+
+    @GetMapping("/dispatches/{id}/complaints")
+    @PreAuthorize(Require.TRACEABILITY_VIEW)
+    public ApiResponse<List<NcrOutcome>> complaints(@PathVariable UUID id) {
+        return ApiResponse.ok(complaints.forDispatch(id));
     }
 
     @GetMapping("/customers")

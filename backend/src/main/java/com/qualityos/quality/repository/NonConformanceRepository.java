@@ -28,6 +28,8 @@ public interface NonConformanceRepository
 
     Optional<NonConformance> findByDispatchReversalId(UUID dispatchReversalId);
 
+    List<NonConformance> findByDispatchIdOrderByCreatedAt(UUID dispatchId);
+
     List<NonConformance> findByDispatchReversalIdIn(java.util.Collection<UUID> dispatchReversalIds);
 
     java.util.List<NonConformance> findByCalibrationRecordIdIn(java.util.Collection<UUID> calibrationRecordIds);

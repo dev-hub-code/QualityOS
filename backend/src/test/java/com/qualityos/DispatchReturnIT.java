@@ -94,6 +94,53 @@ class DispatchReturnIT extends TraceabilityFixture {
         as(owner, get("/api/v1/ncrs")).andExpect(jsonPath("$.data.totalItems").value(1));
     }
 
+    private ResultActions complain(Session who, String dispatchId, String reference, String receivedOn)
+            throws Exception {
+        return as(who, postJson("/api/v1/dispatches/" + dispatchId + "/complaints", Map.of(
+                "reference", reference, "receivedOn", receivedOn, "severity", "CRITICAL",
+                "description", "Shafts snapped on the assembly line", "dispatchItemId", line)));
+    }
+
+    @Test
+    void aComplaintWithNothingSentBackRaisesAnNcrOnTheDispatch() throws Exception {
+        String body = body(complain(owner, dispatch, "CALL-17", TODAY).andExpect(status().isCreated()));
+        String ncr = JsonPath.read(body, "$.data.id");
+        as(owner, get("/api/v1/ncrs/" + ncr))
+                .andExpect(jsonPath("$.data.source").value("CUSTOMER_COMPLAINT"))
+                .andExpect(jsonPath("$.data.severity").value("CRITICAL"))
+                .andExpect(jsonPath("$.data.dispatchId").value(dispatch))
+                .andExpect(jsonPath("$.data.batchNumber").value(numberOf(batch)))
+                .andExpect(jsonPath("$.data.title").value(org.hamcrest.Matchers.startsWith(
+                        "Customer complaint from Tata Motors about DSP-")))
+                .andExpect(jsonPath("$.data.description").value(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("reference CALL-17"),
+                        org.hamcrest.Matchers.containsString(numberOf(batch) + " × 1000"),
+                        org.hamcrest.Matchers.containsString("Shafts snapped on the assembly line"))));
+
+        // A second complaint is its own NCR; nothing came back, so stock and returns are untouched.
+        complain(owner, dispatch, "CALL-18", TODAY).andExpect(status().isCreated());
+        as(owner, get("/api/v1/dispatches/" + dispatch + "/complaints"))
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].id").value(ncr));
+        as(owner, get("/api/v1/dispatches/" + dispatch + "/reversals")).andExpect(jsonPath("$.data.length()").value(0));
+        assertAvailable("0.000000");
+
+        // Not before the shipment, nor dated in the future.
+        complain(owner, dispatch, "CALL-19", java.time.LocalDate.parse(TODAY).plusDays(1).toString())
+                .andExpect(status().isUnprocessableContent());
+        String other = releasedBatch(releasedLot("5").id(), "5", "5");
+        String unshipped = idOf(body(dispatch(customer(), other, "1", List.of()).andExpect(status().isCreated())));
+        as(owner, postJson("/api/v1/dispatches/" + unshipped + "/complaints", Map.of(
+                "reference", "CALL-20", "receivedOn", TODAY, "severity", "MINOR", "description", "Late")))
+                .andExpect(status().isUnprocessableContent());
+
+        // Raising an NCR takes that right; another organisation sees nothing.
+        complain(addMember(owner, "VIEWER"), dispatch, "CALL-21", TODAY).andExpect(status().isForbidden());
+        Session stranger = register();
+        complain(stranger, dispatch, "CALL-22", TODAY).andExpect(status().isNotFound());
+        as(stranger, get("/api/v1/dispatches/" + dispatch + "/complaints")).andExpect(status().isNotFound());
+    }
+
     @Test
     void aPartialReturnLeavesTheRestShippedAndStaysOutOfStock() throws Exception {
         recordReturn("RMA-1", "200")

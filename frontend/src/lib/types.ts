@@ -512,6 +512,7 @@ export interface Ncr extends NcrSummary {
   workOrderId: string | null;
   /** Set when a customer return, recorded as a quality complaint, raised the NCR. */
   dispatchReversalId: string | null;
+  dispatchId: string | null;
   defectCategoryId: string | null;
   defectCategoryName: string | null;
   rejectedQuantity: string | null;

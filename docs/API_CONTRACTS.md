@@ -175,6 +175,7 @@ raised on an NCR it covers, and the CAPA keeps that flag. `GET /ncrs/{id}` retur
 | Cancel a dispatch that never happened | `POST /dispatches/{id}/reverse` | Refused once a shipment is confirmed or any return exists. Restocks at once, because the goods never left |
 | Confirm goods left | `POST /dispatches/{id}/shipment` | Once only, and never on a cancelled dispatch |
 | Record a return | `POST /dispatches/{id}/reversals` | Needs a confirmed shipment. Stock returns only when an inspection accepts the goods. With `qualityComplaint: true` the return also raises one major NCR with source `CUSTOMER_RETURN` (its `dispatchReversalId` set), in the plant of its first batch. A return's `ncrId` and `ncrNumber` name it |
+| Record a complaint | `POST /dispatches/{id}/complaints`, `GET /dispatches/{id}/complaints` | For goods the customer kept, such as a phone call. Takes `reference`, `receivedOn` (between the shipment and today), `severity` and `description`, plus an optional `dispatchItemId`. Needs `TRACEABILITY_VIEW` and `NCR_CREATE`, and a confirmed shipment that was not reversed. Each complaint raises its own NCR with source `CUSTOMER_COMPLAINT` (its `dispatchId` set), in the plant of the batch named or the first. The list returns those NCRs, oldest first |
 
 Dispatches, customers and return lines stay on the trace after a full return, so `affectedCustomers` includes everyone
 a shipment reached. Only a dispatch cancelled through `/reverse` drops out, because those goods never left.

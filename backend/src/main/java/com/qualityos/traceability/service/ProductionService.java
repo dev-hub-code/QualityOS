@@ -85,6 +85,10 @@ public class ProductionService {
     private final List<BatchCompletionGuard> guards;
 
     @SuppressWarnings("java:S107")
+    /** For re-reading a row once it is locked; see {@link #lock}. */
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
+
     ProductionService(
             ProductionBatchRepository batches,
             BatchRelationshipRepository relationships,
@@ -399,6 +403,17 @@ public class ProductionService {
         lock(id).requireInspectable(inspectionType);
     }
 
+    /**
+     * As {@link #requireInspectable}, returning the batch as it stands under the lock, so that an inspection is sized
+     * from quantities no dispatch can change until it is saved.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public ProductionBatchView lockForInspection(UUID id, String inspectionType) {
+        ProductionBatch batch = lock(id);
+        batch.requireInspectable(inspectionType);
+        return view(batch);
+    }
+
     @Transactional(propagation = Propagation.MANDATORY)
     public void recordInspectionOutcome(UUID id, String inspectionType, String disposition) {
         ProductionBatch batch = lock(id);
@@ -486,8 +501,21 @@ public class ProductionService {
         return batches.findById(id).orElseThrow(() -> new ResourceNotFoundException("Production batch", id));
     }
 
+    /**
+     * Locks the batch's row and reads it under the lock. A lock query on a batch already loaded in this transaction
+     * would check its version instead, and fail when another transaction, such as a dispatch, committed in between;
+     * refreshing with the lock waits for that transaction and then sees what it did. Changes made earlier in this
+     * transaction are flushed first, so the refresh keeps them.
+     */
     private ProductionBatch lock(UUID id) {
-        return batches.findForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Production batch", id));
+        ProductionBatch batch = entityManager.find(ProductionBatch.class, id);
+        if (batch == null) {
+            throw new ResourceNotFoundException("Production batch", id);
+        }
+        // This transaction's own changes are written first, so that reading under the lock keeps them.
+        entityManager.flush();
+        entityManager.refresh(batch, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+        return batch;
     }
 
     /** Each batch, mapped to itself and every batch it was made from. Unknown batches are left out. */

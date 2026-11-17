@@ -73,6 +73,13 @@ class AqlSwitchingIT extends MasterDataFixture {
 
     /** Inspects a lot with this many nonconforming samples, through to approval. */
     private String lot(int nonconforming) throws Exception {
+        String inspection = submitted(nonconforming);
+        as(manager, postJson("/api/v1/inspections/" + inspection + "/approve", Map.of())).andExpect(status().isOk());
+        return inspection;
+    }
+
+    /** Inspects a lot with this many nonconforming samples, up to submission. */
+    private String submitted(int nonconforming) throws Exception {
         String inspection = start();
         int samples = JsonPath.read(body(as(owner, get("/api/v1/inspections/" + inspection))), "$.data.sampleSize");
         List<Map<String, Object>> results = new ArrayList<>();
@@ -83,7 +90,6 @@ class AqlSwitchingIT extends MasterDataFixture {
         as(owner, postJson("/api/v1/inspections/" + inspection + "/execute", Map.of("results", results)))
                 .andExpect(status().isOk());
         as(owner, postJson("/api/v1/inspections/" + inspection + "/submit", Map.of())).andExpect(status().isOk());
-        as(manager, postJson("/api/v1/inspections/" + inspection + "/approve", Map.of())).andExpect(status().isOk());
         return inspection;
     }
 
@@ -129,6 +135,35 @@ class AqlSwitchingIT extends MasterDataFixture {
         org.assertj.core.api.Assertions.assertThat(asDatabaseSuperuser().queryForObject(
                 "SELECT count(*) FROM audit_logs WHERE tenant_id = ?::uuid AND action = 'AQL_SWITCHED'",
                 Long.class, owner.tenantId())).isEqualTo(2);
+    }
+
+    @Test
+    void lotsApprovedAtTheSameMomentAreAllCounted() throws Exception {
+        List<String> lots = new ArrayList<>();
+        for (int index = 0; index < 4; index++) {
+            lots.add(submitted(0));
+        }
+        java.util.concurrent.CyclicBarrier together = new java.util.concurrent.CyclicBarrier(lots.size());
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(lots.size());
+        try {
+            List<java.util.concurrent.Future<Integer>> approvals = new ArrayList<>();
+            for (String lot : lots) {
+                approvals.add(pool.submit(() -> {
+                    together.await();
+                    return as(manager, postJson("/api/v1/inspections/" + lot + "/approve", Map.of()))
+                            .andReturn().getResponse().getStatus();
+                }));
+            }
+            for (var approval : approvals) {
+                org.assertj.core.api.Assertions.assertThat(approval.get()).isEqualTo(200);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        // Each accepted lot adds 3; none is lost to another approving at the same time.
+        state().andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].recentResults").value("AAAA"))
+                .andExpect(jsonPath("$.data[0].switchingScore").value(12));
     }
 
     @Test

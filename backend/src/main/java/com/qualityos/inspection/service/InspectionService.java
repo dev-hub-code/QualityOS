@@ -306,9 +306,10 @@ public class InspectionService implements AttachmentPolicy {
     }
 
     private Inspection inspectProductionBatch(CreateInspectionRequest request) {
-        ProductionBatchView batch = production.batch(request.productionBatchId());
-        InspectionTemplate template = templates.requireUsableForProduct(request.templateId(), batch.productId());
-        production.requireInspectable(batch.id(), template.getInspectionType().name());
+        ProductionBatchView unlocked = production.batch(request.productionBatchId());
+        InspectionTemplate template = templates.requireUsableForProduct(request.templateId(), unlocked.productId());
+        // Quantities are read again under the batch's lock, so a dispatch committed meanwhile is counted.
+        ProductionBatchView batch = production.lockForInspection(unlocked.id(), template.getInspectionType().name());
         TemplateVersion version = templates.versionInForce(template.getId());
         // An outgoing check covers what is left to ship. Earlier checks cover the whole batch.
         BigDecimal quantity = template.getInspectionType() == InspectionTemplate.Type.OQC ? batch.availableQuantity()

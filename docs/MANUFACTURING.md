@@ -8,7 +8,7 @@ manufacturing specification, the design, and the progress of each phase. It is t
 
 The application is a Spring Boot 4 modular monolith (`com.qualityos.<module>`) behind a Next.js 16 BFF, on
 PostgreSQL 18 with row-level security. `ModuleBoundariesTest` keeps each module's repositories and entities private,
-so modules call each other through services only. Flyway migrations V1–V21 define the schema.
+so modules call each other through services only. When this analysis was written, Flyway migrations V1–V21 defined the schema; later migrations (see `backend/src/main/resources/db/migration`) add the manufacturing tables and everything since.
 
 What already exists and is reused rather than rebuilt:
 

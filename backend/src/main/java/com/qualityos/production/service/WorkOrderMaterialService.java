@@ -536,11 +536,11 @@ public class WorkOrderMaterialService {
             List<SourceOption> options = material
                     ? freeLots.getOrDefault(line.getMaterialId(), List.of()).stream()
                             .map(lot -> new SourceOption(LOT, lot.itemId(), lot.internalBatch(), lot.receivedOn(),
-                                    lot.freeQuantity(), lot.uomId()))
+                                    lot.freeQuantity(), lot.uomId(), lot.expiryDate()))
                             .toList()
                     : freeBatches.getOrDefault(line.getComponentProductId(), List.of()).stream()
                             .map(batch -> new SourceOption(BATCH, batch.id(), batch.batchNumber(), null,
-                                    batch.availableQuantity(), batch.uomId()))
+                                    batch.availableQuantity(), batch.uomId(), null))
                             .toList();
             // Lines naming the same component share what is free.
             BigDecimal available = availableLeft.computeIfAbsent(key(line), k -> options.stream()

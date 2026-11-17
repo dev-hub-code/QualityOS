@@ -103,6 +103,7 @@ export const receiptSchema = z.object({
         purchaseOrderItemId: z.string().min(1),
         supplierBatch: z.string().trim().min(1, "Enter the supplier's batch"),
         quantity: positiveDecimal,
+        expiryDate: z.string(),
       }),
     )
     .min(1),

@@ -32,6 +32,7 @@ export const materialFields = (units: FieldOption[], categories: FieldOption[]):
   { name: "uomId", label: "Unit", type: "select", required: true, options: units },
   { name: "categoryId", label: "Category", type: "select", options: categories, addPath: "/product-categories" },
   { name: "inspectionRequired", label: "Inspect on receipt", type: "checkbox" },
+  { name: "shelfLifeDays", label: "Shelf life in days, if lots expire", type: "decimal" },
 ];
 
 export const productFields = (units: FieldOption[], categories: FieldOption[]): FieldDef[] => [

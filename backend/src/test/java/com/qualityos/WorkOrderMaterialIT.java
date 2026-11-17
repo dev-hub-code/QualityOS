@@ -206,6 +206,85 @@ class WorkOrderMaterialIT extends TraceabilityFixture {
                 .startsWith("Started short:");
     }
 
+    /** A lot of the material received on {@code receivedOn}, expiring on {@code expiry} (none when null). */
+    private ResultActions receiveExpiring(String materialId, String quantity, LocalDate receivedOn, LocalDate expiry)
+            throws Exception {
+        String created = body(as(owner, postJson("/api/v1/purchase-orders",
+                        orderRequest(approvedSupplier(owner), facility, materialId, quantity, null)))
+                .andExpect(status().isCreated()));
+        String order = idOf(created);
+        as(owner, postJson("/api/v1/purchase-orders/" + order + "/issue", Map.of())).andExpect(status().isOk());
+        Map<String, Object> item = new HashMap<>(Map.of("purchaseOrderItemId",
+                JsonPath.read(created, "$.data.items[0].id"), "supplierBatch", "HEAT-7", "quantity", quantity));
+        if (expiry != null) {
+            item.put("expiryDate", expiry.toString());
+        }
+        return as(owner, postJson("/api/v1/material-receipts", Map.of("purchaseOrderId", order,
+                "receivedOn", receivedOn.toString(), "items", List.of(item))));
+    }
+
+    private String lotExpiring(String quantity, LocalDate receivedOn, LocalDate expiry) throws Exception {
+        return JsonPath.read(body(receiveExpiring(material, quantity, receivedOn, expiry)
+                .andExpect(status().isCreated())), "$.data.items[0].id");
+    }
+
+    @Test
+    void lotsAreTakenFirstExpiringFirstAndExpiredOnesNotAtAll() throws Exception {
+        LocalDate today = LocalDate.now();
+        String old = lotExpiring("15", today.minusDays(20), null);
+        String soon = lotExpiring("15", today, today.plusDays(5));
+        String expired = lotExpiring("50", today.minusDays(10), today.minusDays(2));
+        // A lot cannot arrive already past its expiry.
+        receiveExpiring(material, "5", today, today.minusDays(1))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(containsString("before it was received")));
+
+        String order = released("10");
+        String view = materials(order);
+        assertThat(JsonPath.<List<String>>read(view, "$.data.lines[0].sources[*].id")).containsExactly(soon, old);
+        assertThat(JsonPath.<String>read(view, "$.data.lines[0].sources[0].expiryDate"))
+                .isEqualTo(today.plusDays(5).toString());
+        assertThat(JsonPath.<String>read(view, "$.data.lines[0].available")).isEqualTo("30.000000");
+
+        // Twenty-two needed: all of the lot expiring soonest, then the rest from the oldest.
+        send(approver, "/work-orders/" + order + "/reservations/auto", Map.of()).andExpect(status().isOk());
+        assertThat(lotColumn(soon, "reserved_quantity")).isEqualByComparingTo("15");
+        assertThat(lotColumn(old, "reserved_quantity")).isEqualByComparingTo("7");
+        assertThat(lotColumn(expired, "reserved_quantity")).isEqualByComparingTo("0");
+
+        // Expired stock is refused however it is asked for.
+        String other = released("10");
+        send(approver, "/work-orders/" + other + "/reservations", Map.of("lineNumber", 1, "lotId", expired,
+                "quantity", "1"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(containsString("expired on " + today.minusDays(2))));
+        consumeLot(startBatch(product()), expired, "1")
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(containsString("expired on")));
+
+        // A lot reserved before it expired cannot be issued after.
+        asDatabaseSuperuser().update("UPDATE material_receipt_items SET expiry_date = ? WHERE id = ?::uuid",
+                java.sql.Date.valueOf(today.minusDays(1)), soon);
+        send(approver, "/work-orders/" + order + "/start", Map.of()).andExpect(status().isOk());
+        send(approver, "/work-orders/" + order + "/issues", Map.of("lineNumber", 1, "lotId", soon, "quantity", "5"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(containsString("expired on")));
+    }
+
+    @Test
+    void aMaterialsShelfLifeGivesEachLotItsExpiry() throws Exception {
+        String kept = idOf(body(as(owner, postJson("/api/v1/materials", Map.of("code", code(), "name", "Adhesive",
+                        "uomId", unitId(owner, "KG"), "inspectionRequired", false, "shelfLifeDays", 30)))
+                .andExpect(status().isCreated())));
+        as(owner, get("/api/v1/materials/" + kept)).andExpect(jsonPath("$.data.material.shelfLifeDays").value(30));
+        LocalDate received = LocalDate.now().minusDays(3);
+        receiveExpiring(kept, "4", received, null).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.items[0].expiryDate").value(received.plusDays(30).toString()));
+        // An entered date wins over the shelf life.
+        receiveExpiring(kept, "4", received, received.plusDays(7)).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.items[0].expiryDate").value(received.plusDays(7).toString()));
+    }
+
     @Test
     void ordersIssuingFromTheSameLotAtOnceNeverTakeMoreThanItHas() throws Exception {
         String lot = lotIn(facility, "20");

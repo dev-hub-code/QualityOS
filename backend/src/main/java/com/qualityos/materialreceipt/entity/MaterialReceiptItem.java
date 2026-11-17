@@ -44,6 +44,9 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
 
     private String disposition;
 
+    /** The last day the lot may be used; null when it does not expire. */
+    private java.time.LocalDate expiryDate;
+
     public MaterialReceiptItem(
             MaterialReceipt receipt,
             UUID purchaseOrderItemId,
@@ -62,6 +65,22 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
         this.quantity = quantity;
         this.inspectionRequired = inspectionRequired;
         this.inspectionStatus = inspectionRequired ? InspectionStatus.PENDING : InspectionStatus.NOT_REQUIRED;
+    }
+
+    public void expiresOn(java.time.LocalDate date) {
+        this.expiryDate = date;
+    }
+
+    /** Whether the lot is past its expiry date on {@code today}. It may still be used on the date itself. */
+    public boolean isExpiredOn(java.time.LocalDate today) {
+        return expiryDate != null && expiryDate.isBefore(today);
+    }
+
+    /** Expired stock is not used in production, whoever asks. */
+    public void requireNotExpired(java.time.LocalDate today) {
+        if (isExpiredOn(today)) {
+            throw new BusinessRuleException("Batch " + internalBatch + " expired on " + expiryDate + ".");
+        }
     }
 
     void cancelInspection() {

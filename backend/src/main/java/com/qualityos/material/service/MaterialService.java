@@ -322,6 +322,7 @@ public class MaterialService implements AttachmentPolicy {
         material.setCategoryId(request.categoryId());
         material.setUomId(request.uomId());
         material.setInspectionRequired(request.inspectionRequired());
+        material.setShelfLifeDays(request.shelfLifeDays());
         material.setProperties(request.properties() == null ? new HashMap<>() : new HashMap<>(request.properties()));
     }
 }

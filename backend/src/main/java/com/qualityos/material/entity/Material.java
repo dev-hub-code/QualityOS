@@ -28,6 +28,9 @@ public class Material extends TenantOwnedEntity {
     private UUID categoryId;
     private UUID uomId;
     private boolean inspectionRequired = true;
+
+    /** How long a lot keeps from receipt, which gives a received lot its expiry unless one is entered. */
+    private Integer shelfLifeDays;
     private Instant archivedAt;
 
     /** Tenant-defined attributes with no fixed schema. */

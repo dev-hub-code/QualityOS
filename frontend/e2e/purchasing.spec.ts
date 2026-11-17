@@ -75,6 +75,7 @@ test("a supplier is approved, ordered from, and delivers in two batches", async 
   await page.getByLabel("Code", { exact: true }).fill("EN8");
   await page.getByLabel("Name", { exact: true }).fill("EN8 Bar");
   await page.getByLabel("Unit", { exact: true }).selectOption({ label: "KG – Kilogram" });
+  await page.getByLabel("Shelf life in days, if lots expire").fill("180");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("link", { name: "EN8" })).toBeVisible();
 
@@ -116,9 +117,16 @@ test("a supplier is approved, ordered from, and delivers in two batches", async 
   await expect(page.getByText("Line 1: only 100 remains to be received.")).toBeVisible();
 
   await page.getByLabel("Quantity received").nth(1).fill("10");
+  // The first lot takes its expiry from the material's shelf life; the second has one from the supplier.
+  const receivedOn = await page.getByLabel("Received on").inputValue();
+  const plusDays = (date: string, days: number) =>
+    new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+  await page.getByLabel("Expiry date").nth(1).fill(plusDays(receivedOn, 30));
   await page.getByRole("button", { name: "Record receipt" }).click();
   await expect(page).toHaveURL(/material-receipts\//);
   await expect(page.getByText("HEAT-2")).toBeVisible();
+  await expect(page.getByRole("row", { name: /HEAT-1/ }).getByText(plusDays(receivedOn, 180))).toBeVisible();
+  await expect(page.getByRole("row", { name: /HEAT-2/ }).getByText(plusDays(receivedOn, 30))).toBeVisible();
   await expect(page.getByText("pending").first()).toBeVisible();
 
   await page.getByRole("link", { name: "View order" }).click();

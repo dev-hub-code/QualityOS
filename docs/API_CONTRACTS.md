@@ -441,6 +441,13 @@ already used on the same work order returns the current materials without moving
 Lots from `GET /material-receipts/released-lots` and elsewhere now carry `reservedQuantity` and `facilityId`; ordinary
 consumption takes only `remainingQuantity` less `reservedQuantity`.
 
+Lots can expire. A material takes an optional `shelfLifeDays` (1 to 36500). A receipt item takes an optional
+`expiryDate`; left out, it is `receivedOn` plus the material's shelf life, and one before `receivedOn` is `422`. Receipt
+items, lots and a work order line's `sources` carry `expiryDate`. Released lots and sources leave out expired lots and
+come first expiring first (then lots without expiry, oldest first), which automatic reservation follows. Reserving,
+issuing (reserved or not) and consuming an expired lot is `422`. A lot is usable through its expiry date, in the
+organisation's time zone.
+
 Work order operations now also carry `statusReason`, `operatorName`, `machineCode`, `input`, `goodQuantity`,
 `rejectedQuantity`, `scrapQuantity` and `waiting`.
 

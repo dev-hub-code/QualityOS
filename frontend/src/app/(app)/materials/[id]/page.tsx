@@ -53,6 +53,7 @@ export default function MaterialPage() {
             ["Grade", material.grade],
             ["Unit", units.label(material.uomId)],
             ["Inspection on receipt", material.inspectionRequired ? "Required" : "Not required"],
+            ["Shelf life", material.shelfLifeDays ? `${material.shelfLifeDays} days from receipt` : "Lots do not expire"],
             ["Description", material.description],
           ]}
         />

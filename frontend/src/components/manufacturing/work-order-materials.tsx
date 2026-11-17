@@ -12,6 +12,11 @@ import { newRequestKey } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
 import type { WorkOrderMaterials, WorkOrderStatus } from "@/lib/types";
 
+/** Lots are offered first expiring first; the date shows why. */
+function expiring(expiryDate: string | null): string {
+  return expiryDate ? `, expires ${expiryDate}` : "";
+}
+
 type Line = WorkOrderMaterials["lines"][number];
 type Consumption = WorkOrderMaterials["consumptions"][number];
 type Dialog =
@@ -182,7 +187,7 @@ export function WorkOrderMaterialsPanel({ orderId, status }: { orderId: string; 
               required: true,
               options: dialog.line.sources.map((source) => ({
                 value: source.id,
-                label: `${source.number} (${amount(source.freeQuantity, source.uomId)} free)`,
+                label: `${source.number}${expiring(source.expiryDate)} (${amount(source.freeQuantity, source.uomId)} free)`,
               })),
             },
             { name: "quantity", label: `Quantity, in ${units.label(dialog.line.uomId)}`, type: "decimal", required: true },
@@ -214,7 +219,10 @@ export function WorkOrderMaterialsPanel({ orderId, status }: { orderId: string; 
                   })),
                 ...dialog.line.sources
                   .filter((source) => !data.reservations.some((r) => r.lotId === source.id && Number(r.openQuantity) > 0))
-                  .map((source) => ({ value: source.id, label: `${source.number} (${amount(source.freeQuantity, source.uomId)} free)` })),
+                  .map((source) => ({
+                    value: source.id,
+                    label: `${source.number}${expiring(source.expiryDate)} (${amount(source.freeQuantity, source.uomId)} free)`,
+                  })),
               ],
             },
             { name: "quantity", label: `Quantity, in ${units.label(dialog.line.uomId)}`, type: "decimal", required: true },

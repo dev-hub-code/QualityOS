@@ -8,6 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { GlobalSearch } from "@/components/app/global-search";
+import { OrganizationLogo } from "@/components/app/organization-logo";
 import { NotificationBell } from "@/components/app/notification-bell";
 import { VerifyEmailBanner } from "@/components/app/verify-email-banner";
 import { Button } from "@/components/ui/button";
@@ -176,6 +177,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           </span>
         </div>
 
+        {!controlCenter && me.tenantId && (
+          <div className={`flex ${hideWhenCollapsed}`}>
+            <OrganizationLogo
+              tenantId={me.tenantId}
+              name={me.organizations.find((organization) => organization.id === me.tenantId)?.name ?? "Organisation"}
+            />
+          </div>
+        )}
         {me.organizations.length > 1 ? (
           <select
             aria-label="Organisation"

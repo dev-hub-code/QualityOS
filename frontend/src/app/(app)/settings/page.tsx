@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { NotificationPreferences } from "@/components/app/notification-preferences";
 import { OrganizationForm } from "@/components/app/organization-form";
+import { OrganizationLogoSettings } from "@/components/app/organization-logo";
 import { QualityRulesSettings } from "@/components/app/quality-rules";
 import { ReviewPolicySettings } from "@/components/app/review-policy";
 import { applyServerErrors } from "@/components/forms/apply-server-errors";
@@ -85,6 +86,7 @@ export default function SettingsPage() {
           />
         )}
       </section>
+      {me && <OrganizationLogoSettings tenantId={me.tenantId} canManage={canManage} />}
       <ReviewPolicySettings />
       <QualityRulesSettings />
       <section className="space-y-4">

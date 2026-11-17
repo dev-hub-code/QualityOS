@@ -170,6 +170,7 @@ test("returned goods stay out of stock until an inspection accepts them", async 
     await dialog.getByLabel("Return reference").fill("RMA-1");
     await dialog.getByLabel("Date received").fill(new Date().toISOString().slice(0, 10));
     await dialog.getByLabel("Reason for return").fill("Scratched in transit");
+    await dialog.getByLabel("Something was wrong with the goods: raise an NCR").check();
   });
   await expect(page.getByText("(4 returned)")).toBeVisible();
   await expect(page.getByRole("button", { name: "Reverse", exact: true })).toHaveCount(0);
@@ -177,8 +178,14 @@ test("returned goods stay out of stock until an inspection accepts them", async 
   await page.goto(`/production-batches/${batchId}`);
   await expect(page.getByText("Available", { exact: true }).locator("..")).toContainText("0");
 
+  // The complaint raised an NCR, which leads back to the return.
   await page.goto("/dispatch-reversals");
   await page.getByRole("link", { name: /^RET-/ }).click();
+  const returnUrl = page.url();
+  await page.getByRole("link", { name: /^NCR-/ }).click();
+  await expect(page.getByText(/Customer return RET-.* from Tata Motors/).first()).toBeVisible();
+  await page.getByRole("link", { name: "Customer return", exact: true }).click();
+  await expect(page).toHaveURL(returnUrl);
   await page.getByRole("button", { name: "Inspect" }).click();
   await page.getByLabel("Template").selectOption({ label: "FINAL – Final check" });
   await page.getByRole("button", { name: "Save", exact: true }).click();

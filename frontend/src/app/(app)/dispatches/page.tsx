@@ -51,6 +51,7 @@ function Row({ dispatch }: { dispatch: Dispatch }) {
     { name: "reversalDate", label: "Date received or expected", type: "date", required: true },
     { name: "expected", label: "Not here yet: the goods are on their way", type: "checkbox" },
     { name: "reason", label: "Reason for return", type: "textarea", required: true },
+    { name: "qualityComplaint", label: "Something was wrong with the goods: raise an NCR", type: "checkbox" },
   ];
   return (
     <>
@@ -97,6 +98,7 @@ function Row({ dispatch }: { dispatch: Dispatch }) {
               reversalDate: values.reversalDate,
               expected: values.expected,
               reason: values.reason,
+              qualityComplaint: values.qualityComplaint,
               items,
             });
             await refresh();

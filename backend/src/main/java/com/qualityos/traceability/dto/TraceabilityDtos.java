@@ -213,10 +213,16 @@ public final class TraceabilityDtos {
             @NotNull LocalDate reversalDate,
             @NotBlank @Size(max = 1000) String reason,
             Boolean expected,
-            @NotEmpty List<@Valid ReturnLineRequest> items) {
+            @NotEmpty List<@Valid ReturnLineRequest> items,
+            /* Something was wrong with the goods, so the return raises an NCR. Left out, it does not. */
+            Boolean qualityComplaint) {
 
         public boolean isExpected() {
             return Boolean.TRUE.equals(expected);
+        }
+
+        public boolean isQualityComplaint() {
+            return Boolean.TRUE.equals(qualityComplaint);
         }
     }
 
@@ -251,7 +257,10 @@ public final class TraceabilityDtos {
             String recordedByName,
             Instant createdAt,
             Instant closedAt,
-            List<ReversalItemView> items) {
+            List<ReversalItemView> items,
+            /* The NCR the return raised as a quality complaint, if any. */
+            UUID ncrId,
+            String ncrNumber) {
     }
 
     /** @param status NOT_REVERSED, PARTIALLY_REVERSED or FULLY_REVERSED */

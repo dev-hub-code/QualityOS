@@ -1,5 +1,8 @@
 package com.qualityos.traceability.service;
 
+import com.qualityos.quality.dto.QualityDtos.CustomerReturn;
+import com.qualityos.quality.dto.QualityDtos.NcrOutcome;
+import com.qualityos.quality.service.NcrService;
 import com.qualityos.common.audit.AuditService;
 import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ConflictException;
@@ -76,6 +79,7 @@ public class DispatchReturnService {
     private final DocumentNumberService numbers;
     private final AuditService audit;
     private final FacilityScope scope;
+    private final NcrService ncrs;
 
     DispatchReturnService(
             DispatchReversalRepository reversals,
@@ -92,7 +96,9 @@ public class DispatchReturnService {
             TenantAccessService access,
             DocumentNumberService numbers,
             AuditService audit,
-            FacilityScope scope) {
+            FacilityScope scope,
+            NcrService ncrs) {
+        this.ncrs = ncrs;
         this.scope = scope;
         this.reversals = reversals;
         this.reversalItems = reversalItems;
@@ -198,8 +204,34 @@ public class DispatchReturnService {
         reversalItems.flush();
         audit.record("DISPATCH_RETURN_RECORDED", ENTITY, reversal.getId(), null,
                 Map.of("number", reversal.getReversalNumber(), "dispatch", dispatch.getDispatchNumber(),
-                        "reference", reference));
+                        "reference", reference, "qualityComplaint", request.isQualityComplaint()));
+        if (request.isQualityComplaint()) {
+            raiseComplaint(reversal, dispatch, request, lines);
+        }
         return views(List.of(reversal)).getFirst();
+    }
+
+    /** One NCR for the whole return, placed in the plant that made its first batch. */
+    private void raiseComplaint(DispatchReversal reversal, DispatchRecord dispatch, CreateReversalRequest request,
+            Map<UUID, DispatchItem> lines) {
+        Map<UUID, BigDecimal> byBatch = new java.util.LinkedHashMap<>();
+        request.items().forEach(line -> byBatch.merge(
+                lines.get(line.dispatchItemId()).getProductionBatchId(), line.quantity(), BigDecimal::add));
+        Map<UUID, ProductionBatchView> made = production.views(byBatch.keySet()).stream()
+                .collect(Collectors.toMap(ProductionBatchView::id, Function.identity()));
+        List<String> batchNumbers = byBatch.keySet().stream().map(id -> made.get(id).batchNumber()).toList();
+        List<String> described = byBatch.entrySet().stream().map(entry -> "%s × %s".formatted(
+                made.get(entry.getKey()).batchNumber(), entry.getValue().stripTrailingZeros().toPlainString())).toList();
+        ncrs.raiseFromCustomerReturn(new CustomerReturn(
+                reversal.getId(),
+                reversal.getReversalNumber(),
+                customers.findById(dispatch.getCustomerId()).orElseThrow().getName(),
+                dispatch.getDispatchNumber(),
+                reversal.getReturnReference(),
+                reversal.getReason(),
+                batchNumbers,
+                described,
+                made.get(byBatch.keySet().iterator().next()).facilityId()));
     }
 
     /** Physical receipt of an announced return. From here the goods wait in quarantine for an inspection. */
@@ -351,6 +383,7 @@ public class DispatchReturnService {
                         .toList())
                 .stream().collect(Collectors.toMap(ProductionBatchView::id, Function.identity()));
         Map<UUID, String> names = access.activeMembers();
+        Map<UUID, NcrOutcome> raised = ncrs.forCustomerReturns(found.stream().map(DispatchReversal::getId).toList());
         return found.stream()
                 .sorted(Comparator.comparing(DispatchReversal::getCreatedAt))
                 .map(reversal -> {
@@ -373,7 +406,9 @@ public class DispatchReturnService {
                                 return new ReversalItemView(item.getId(), item.getDispatchItemId(), batch.batchNumber(),
                                         batch.productCode(), item.getQuantity(), item.getSerialNumbers(),
                                         item.getStatus().name(), item.getDisposition());
-                            }).toList());
+                            }).toList(),
+                            raised.containsKey(reversal.getId()) ? raised.get(reversal.getId()).id() : null,
+                            raised.containsKey(reversal.getId()) ? raised.get(reversal.getId()).ncrNumber() : null);
                 })
                 .toList();
     }

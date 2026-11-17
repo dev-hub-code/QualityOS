@@ -382,6 +382,9 @@ export const DOC_PAGES: DocPage[] = [
         terms: [
           ["Inspection", "Raised automatically for failed, rejected or reworked material."],
           ["Audit", "Raised from an audit finding."],
+          ["Calibration", "Raised automatically when an instrument fails calibration."],
+          ["Production", "Raised from a shop-floor report of rejected or scrapped goods, when Manufacturing settings ask for it."],
+          ["Customer return", "Raised when a return is recorded as a quality complaint. One NCR covers the whole return, as major."],
           ["Manual", "Raised by hand, for anything else you notice."],
         ],
       },

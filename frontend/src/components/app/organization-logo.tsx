@@ -71,7 +71,7 @@ export function OrganizationLogoSettings({ tenantId, canManage }: { tenantId: st
     <section className="space-y-4">
       <h2 className="text-base font-semibold text-[#1b2a55]">Logo</h2>
       <p className="text-sm text-muted-foreground">
-        Shown in the menu and at the top of every email sent for your organisation. PNG or JPEG, up to 256 KB.
+        Shown in the menu, at the top of every email sent for your organisation, and on your PDF reports. PNG or JPEG, up to 256 KB.
       </p>
       {logo ? (
         // eslint-disable-next-line @next/next/no-img-element

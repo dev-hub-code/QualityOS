@@ -21,6 +21,10 @@ class OrganizationLogoIT extends AbstractIntegrationTest {
     /** The PNG signature followed by a few bytes: enough to be recognised, which is all the server checks. */
     private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 'I', 'H', 'D', 'R'};
 
+    /** A whole 1×1 PNG, which a PDF renderer can draw. */
+    private static final byte[] REAL_PNG = java.util.Base64.getDecoder().decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=");
+
     private ResultActions upload(Session session, String name, String claimedType, byte[] content) throws Exception {
         return mvc.perform(multipart("/api/v1/organizations/current/logo")
                 .file(new MockMultipartFile("file", name, claimedType, content))
@@ -68,6 +72,39 @@ class OrganizationLogoIT extends AbstractIntegrationTest {
         mvc.perform(delete("/api/v1/organizations/current/logo").header(HttpHeaders.AUTHORIZATION, owner.bearer()))
                 .andExpect(status().isNoContent());
         as(member, get("/api/v1/organizations/current/logo")).andExpect(status().isNotFound());
+    }
+
+    /** The images drawn on a PDF's first page. */
+    private static int imagesOnFirstPage(byte[] pdf) throws Exception {
+        try (org.apache.pdfbox.pdmodel.PDDocument document = org.apache.pdfbox.Loader.loadPDF(pdf)) {
+            int count = 0;
+            var resources = document.getPage(0).getResources();
+            for (var name : resources.getXObjectNames()) {
+                if (resources.getXObject(name) instanceof org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject) {
+                    count++;
+                }
+            }
+            return count;
+        }
+    }
+
+    @Test
+    void theOrganisationsReportsCarryItsLogo() throws Exception {
+        Session owner = register();
+        byte[] plain = as(owner, get("/api/v1/reports/ncr.pdf")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+        assertThat(imagesOnFirstPage(plain)).isZero();
+
+        upload(owner, "logo.png", "image/png", REAL_PNG).andExpect(status().isOk());
+        byte[] branded = as(owner, get("/api/v1/reports/ncr.pdf")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+        assertThat(imagesOnFirstPage(branded)).isEqualTo(1);
+
+        // Another organisation's reports stay plain.
+        Session other = register();
+        byte[] theirs = as(other, get("/api/v1/reports/ncr.pdf")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+        assertThat(imagesOnFirstPage(theirs)).isZero();
     }
 
     @Test

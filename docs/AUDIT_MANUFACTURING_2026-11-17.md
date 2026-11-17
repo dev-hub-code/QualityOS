@@ -4,7 +4,8 @@ Follows the [backend, security and concurrency audit](AUDIT_2026-11-17.md) of th
 the code is safe; this one asks whether its numbers are right. Each calculation was read in the code, worked by hand,
 and checked against the standard definition where there is one. Every example below is asserted by a test.
 
-**Summary:** three things were wrong and are fixed, two smaller ones are fixed, and two need a decision from the owner.
+**Summary:** three things were wrong and are fixed, two smaller ones are fixed, and the two that needed a decision were
+decided and done.
 No finding loses stock or lets bad goods out: the recall gap was still caught at dispatch.
 
 ## Findings
@@ -15,8 +16,8 @@ No finding loses stock or lets bad goods out: the recall gap was still caught at
 | 2 | Medium | **A sub-assembly under an open recall could go into new production.** The recall hold was checked only at dispatch. The new product would itself have been held there, since the hold follows what a batch was made from, but the recalled parts were already built in. | **Fixed.** Such a batch is no longer offered on a work order nor counted as available, and issuing it is refused, with no override. `WorkOrderMaterialIT.aSubAssemblyUnderAnOpenRecallIsNotOfferedNorIssued`. |
 | 3 | Low | **OEE was multiplied from rounded factors.** Availability, performance and quality were each rounded to one decimal before they were multiplied, so OEE could be off by about 0.1 point (68.5% instead of 68.6% below). | **Fixed.** OEE is the product of the unrounded ratios. `OeeFormulaTest`. |
 | 4 | Low | **The recipe Scale preview left out scrap.** It showed net quantities, while a work order of the same size adds each line's scrap allowance. | **Fixed.** Each line also gives `withScrap`, shown as "(242.25 KG with scrap allowance)". `ManufacturingIT.aRecipeScalesItsProportionalLinesAndKeepsItsParameters`. |
-| 5 | Decision | **Rework from an earlier operation skips the later ones.** Goods rejected at operation 10, reworked and accepted are added to the order's output at receipt, without passing operation 20. That is right when the rework order's own steps cover the rest of the route, which is up to whoever writes it. | **Owner to decide:** keep (and say so on the rework form), or send reworked goods back into the next operation's input. |
-| 6 | Decision | **Setup time counts as running time.** The running clock includes setup, so setup lowers OEE performance rather than availability, where most OEE conventions put it. OEE itself is the same; its split is not. | **Owner to decide:** keep, or count setup as a planned stop. |
+| 5 | Decision | **Rework from an earlier operation skips the later ones.** Goods rejected at operation 10, reworked and accepted are added to the order's output at receipt, without passing operation 20. That is right when the rework order's own steps cover the rest of the route, which is up to whoever writes it. | **Decided: back on the route.** Accepted rework goes into the next operation's input; only the last operation's own rework is added at receipt. The next operation cannot complete while such rework is open, and rework cannot be raised once the next operation is complete. `ProductionQualityIT.reworkedGoodsGoBackThroughTheRestOfTheRoute`. |
+| 6 | Decision | **Setup time counts as running time.** The running clock includes setup, so setup lowers OEE performance rather than availability, where most OEE conventions put it. OEE itself is the same; its split is not. | **Decided: an availability loss.** Availability and performance use operating time (running less setup); utilisation still counts setup. Machines show their setup minutes. `OeeFormulaTest.setupIsLostAvailabilityNotSlowRunning`. |
 
 Also noted, not changed: a machine's units come from the reports on operations it ran last, so an operation moved
 between machines part-way credits its units to the last one while its running minutes stay split.

@@ -121,6 +121,72 @@ class ProductionQualityIT extends TraceabilityFixture {
                 "scrapQuantity", "0", "reworkQuantity", rework);
     }
 
+    /** Raises, approves, works and closes a rework order from an operation, accepted on reinspection. */
+    private void reworkAccepted(String order, String operationId, String quantity) throws Exception {
+        String path = "/rework-orders/" + JsonPath.read(body(send(supervisor, "/rework-orders", Map.of(
+                "workOrderId", order, "operationId", operationId, "quantity", quantity, "reason", "Bore oversize",
+                "steps", List.of(Map.of("description", "Regrind bore", "workCenterId", centre))))
+                .andExpect(status().isCreated())), "$.data.rework.id");
+        send(manager, path + "/approve", Map.of()).andExpect(status().isOk());
+        send(operator, path + "/start", Map.of()).andExpect(status().isOk());
+        String step = JsonPath.read(body(as(owner, get(API + path))), "$.data.steps[0].id");
+        send(operator, path + "/steps/" + step + "/complete", Map.of()).andExpect(status().isOk());
+        send(operator, path + "/complete", Map.of("reworkedQuantity", quantity, "scrappedQuantity", "0"))
+                .andExpect(status().isOk());
+        String reinspection = JsonPath.read(body(send(owner, path + "/reinspect", Map.of("templateId", ipqc))
+                .andExpect(status().isOk())), "$.data.reinspection.id");
+        decide(reinspection, "20.0", "ACCEPT");
+        send(supervisor, path + "/close", Map.of()).andExpect(status().isOk());
+    }
+
+    private String input(String order, int index) throws Exception {
+        return JsonPath.read(body(as(owner, get(API + "/work-orders/" + order))), "$.data.operations[" + index + "].input");
+    }
+
+    @Test
+    void reworkedGoodsGoBackThroughTheRestOfTheRoute() throws Exception {
+        String order = order("10");
+        send(supervisor, "/work-orders/" + order + "/start", Map.of()).andExpect(status().isOk());
+        String turnId = operation(order, 0);
+        String turn = "/operations/" + turnId;
+        String grind = "/operations/" + operation(order, 1);
+        send(operator, turn + "/start", Map.of()).andExpect(status().isOk());
+        send(operator, turn + "/reports", report("10", "7", "3", "3")).andExpect(status().isOk());
+        send(operator, turn + "/complete", Map.of()).andExpect(status().isOk());
+        assertThat(input(order, 1)).isEqualTo("7.000000");
+
+        // While two are in rework, grinding the seven cannot finish the operation: the two come back through it.
+        send(operator, grind + "/start", Map.of()).andExpect(status().isOk());
+        send(operator, grind + "/reports", report("7", "7", "0", "0")).andExpect(status().isOk());
+        String created = body(send(supervisor, "/rework-orders", Map.of("workOrderId", order, "operationId", turnId,
+                "quantity", "2", "reason", "Bore oversize",
+                "steps", List.of(Map.of("description", "Regrind bore", "workCenterId", centre))))
+                .andExpect(status().isCreated()));
+        String number = JsonPath.read(created, "$.data.rework.reworkNumber");
+        send(operator, grind + "/complete", Map.of("reason", "Short"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value("Rework order " + number + ", from operation 10, is "
+                        + "still open. Its goods come back through operation 20, so close it first."));
+        send(supervisor, "/rework-orders/" + JsonPath.read(created, "$.data.rework.id") + "/cancel",
+                Map.of("reason", "Raised again below")).andExpect(status().isOk());
+        reworkAccepted(order, turnId, "2");
+
+        // Accepted, they are operation 20's to grind, not finished goods yet.
+        assertThat(input(order, 1)).isEqualTo("9.000000");
+        send(operator, grind + "/reports", report("2", "2", "0", "0")).andExpect(status().isOk());
+        send(operator, grind + "/complete", Map.of()).andExpect(status().isOk());
+        String completion = body(as(owner, get(API + "/work-orders/" + order + "/completion")));
+        assertThat(JsonPath.<String>read(completion, "$.data.expectedQuantity")).isEqualTo("9.000000");
+
+        // With grinding done, the last one marked for rework has no operation left to go through.
+        send(supervisor, "/rework-orders", Map.of("workOrderId", order, "operationId", turnId, "quantity", "1",
+                "reason", "Bore oversize", "steps", List.of(Map.of("description", "Regrind", "workCenterId", centre))))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message")
+                        .value("Operation 20 is already complete, so goods reworked from operation 10 could not go "
+                                + "through it."));
+    }
+
     @Test
     void gatesHoldTheLineAndReworkClosesOnlyOnReinspection() throws Exception {
         // Checkpoints name an inspection template of the right kind; only quality may set them.

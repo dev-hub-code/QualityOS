@@ -38,8 +38,9 @@ function OeeRow({ machine, label }: { machine: MachineOee; label: string }) {
       <td className="py-1.5 pr-3">
         <span className="font-medium">{label}</span>
         <span className="block text-xs text-muted-foreground">
-          Running {formatMinutes(machine.runningMinutes)} of {formatMinutes(machine.plannedProductionMinutes)} planned ·
-          unplanned stops {formatMinutes(machine.unplannedDowntimeMinutes)}
+          Running {formatMinutes(machine.runningMinutes)} of {formatMinutes(machine.plannedProductionMinutes)} planned
+          {Number(machine.setupMinutes) > 0 && <>, of which setup {formatMinutes(machine.setupMinutes)}</>} · unplanned
+          stops {formatMinutes(machine.unplannedDowntimeMinutes)}
         </span>
         {machine.notes.length > 0 && (
           <ul className="mt-1 list-disc pl-4 text-xs text-amber-800">

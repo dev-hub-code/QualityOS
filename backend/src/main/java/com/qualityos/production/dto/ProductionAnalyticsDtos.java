@@ -75,6 +75,8 @@ public final class ProductionAnalyticsDtos {
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal plannedDowntimeMinutes,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal plannedProductionMinutes,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal runningMinutes,
+            /* Of the running minutes, those spent setting up: lost availability, not performance. */
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal setupMinutes,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal unplannedDowntimeMinutes,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal utilisation,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal availability,

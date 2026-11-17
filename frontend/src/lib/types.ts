@@ -2595,6 +2595,8 @@ export interface MachineOee {
   plannedDowntimeMinutes: string | null;
   plannedProductionMinutes: string | null;
   runningMinutes: string | null;
+  /** Of the running minutes, those spent setting up: lost availability. */
+  setupMinutes: string | null;
   unplannedDowntimeMinutes: string | null;
   utilisation: string | null;
   availability: string | null;

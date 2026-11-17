@@ -71,7 +71,6 @@ public class CompletionService {
     static final String ENTITY = WorkOrderService.ENTITY;
     private static final int MAX_KEY = 100;
     private static final String COUNT = "Count";
-    private static final Set<String> ACCEPTED = Set.of("ACCEPT", "CONDITIONAL_ACCEPTANCE");
 
     private final WorkOrderRepository workOrders;
     private final WorkOrderOperationRepository operations;
@@ -339,16 +338,18 @@ public class CompletionService {
     }
 
     /**
-     * What came out good is the last operation's good output, plus rejects reworked from an operation and accepted on
-     * reinspection. Without operations there is nothing to count from.
+     * What came out good is the last operation's good output, plus its own rejects reworked and accepted on
+     * reinspection. Rework from an earlier operation went back through the operations after it, so the last one's
+     * output counts it already. Without operations there is nothing to count from.
      */
     private Totals totals(WorkOrder order) {
         List<WorkOrderOperation> running = operations.findByWorkOrderIdOrderBySequence(order.getId()).stream()
                 .filter(step -> step.getStatus() != WorkOrderOperation.Status.CANCELLED).toList();
         List<ReworkOrder> closed = reworks.ofOrder(order.getId()).stream()
                 .filter(rework -> rework.getStatus() == ReworkOrder.Status.CLOSED).toList();
+        UUID last = running.isEmpty() ? null : running.getLast().getId();
         BigDecimal reworked = closed.stream()
-                .filter(rework -> rework.getOperationId() != null && ACCEPTED.contains(rework.getFinalDisposition()))
+                .filter(rework -> rework.goesBackOnRoute() && rework.getOperationId().equals(last))
                 .map(ReworkOrder::getReworkedQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal rejected = running.stream().map(WorkOrderOperation::getRejectedQuantity)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);

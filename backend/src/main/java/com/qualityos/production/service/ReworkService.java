@@ -237,6 +237,17 @@ public class ReworkService {
                     .map(ReworkOrder::getQuantity)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             BigDecimal room = operation.getReworkQuantity().subtract(ordered).max(BigDecimal.ZERO);
+            // Reworked goods go back into the next operation, which must still be able to take them.
+            operations.findByWorkOrderIdOrderBySequence(order.getId()).stream()
+                    .filter(next -> next.getSequence() > operation.getSequence()
+                            && next.getStatus() != WorkOrderOperation.Status.CANCELLED)
+                    .findFirst()
+                    .filter(next -> next.getStatus() == WorkOrderOperation.Status.COMPLETED)
+                    .ifPresent(next -> {
+                        throw new BusinessRuleException(("Operation %d is already complete, so goods reworked from "
+                                + "operation %d could not go through it.").formatted(next.getSequence(),
+                                operation.getSequence()));
+                    });
             if (request.quantity().compareTo(room) > 0) {
                 throw new BusinessRuleException(("Operation %d has %s marked for rework that is not on a rework order "
                         + "yet.").formatted(operation.getSequence(), plain(room)));

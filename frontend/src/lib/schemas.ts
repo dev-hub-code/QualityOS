@@ -123,6 +123,7 @@ export const templateDraftSchema = z.object({
   samplePercent: optionalDecimal,
   aql: z.string(),
   inspectionLevel: z.enum(["I", "II", "III", "S1", "S2", "S3", "S4"]),
+  doubleSampling: z.boolean(),
   acceptanceNumber: wholeNumber,
   parameters: z.array(
     z.object({

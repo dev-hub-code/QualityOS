@@ -71,6 +71,7 @@ export function TemplateDraftForm({ templateId, draft }: { templateId: string; d
       samplePercent: draft.samplePercent ?? "",
       aql: AQLS.find((aql) => draft.aql !== null && Number(aql) === Number(draft.aql)) ?? "2.5",
       inspectionLevel: draft.inspectionLevel ?? "II",
+      doubleSampling: draft.doubleSampling ?? false,
       acceptanceNumber: String(draft.acceptanceNumber),
       parameters: draft.parameters.map(toParameterValues),
     },
@@ -89,6 +90,7 @@ export function TemplateDraftForm({ templateId, draft }: { templateId: string; d
         samplePercent: values.samplingType === "PERCENTAGE" ? values.samplePercent : null,
         aql: values.samplingType === "AQL" ? values.aql : null,
         inspectionLevel: values.samplingType === "AQL" ? values.inspectionLevel : null,
+        doubleSampling: values.samplingType === "AQL" && values.doubleSampling,
         acceptanceNumber: Number(values.acceptanceNumber),
         parameters: values.parameters.map((parameter) => ({
           ...parameter,
@@ -152,6 +154,10 @@ export function TemplateDraftForm({ templateId, draft }: { templateId: string; d
                   <option value="S4">S-4 (special)</option>
                 </select>
               </div>
+              <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                <input type="checkbox" className="size-4" {...register("doubleSampling")} />
+                Double sampling: a smaller first sample, and a second one only when the first is inconclusive
+              </label>
             </>
           ) : (
             <Field
@@ -167,7 +173,7 @@ export function TemplateDraftForm({ templateId, draft }: { templateId: string; d
         <p className="mt-3 text-sm text-muted-foreground">
           Critical parameters always fail on one bad sample.
           {samplingType === "AQL" &&
-            " Under AQL, each lot's size sets the sample size and how many nonconforming samples it accepts, single sampling. The switching rules move each supplier's lots between normal, tightened and reduced inspection. Special levels S-1 to S-4 suit costly or destructive tests. A sample failing several parameters counts once."}
+            " Under AQL, each lot's size sets the sample size and how many nonconforming samples it accepts. Double sampling uses the standard's double plans where it has one, and single sampling elsewhere. The switching rules move each supplier's lots between normal, tightened and reduced inspection. Special levels S-1 to S-4 suit costly or destructive tests. A sample failing several parameters counts once."}
         </p>
       </Section>
       {fields.map((field, index) => {

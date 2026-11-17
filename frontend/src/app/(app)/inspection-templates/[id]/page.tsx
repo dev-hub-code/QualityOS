@@ -41,7 +41,7 @@ function PublishedVersion({ version }: { version: TemplateVersion }) {
       <p className="mb-3 text-sm text-muted-foreground">
         {sampling(version)},{" "}
         {version.samplingType === "AQL"
-          ? "with sample size and acceptance set by each lot's size"
+          ? `${version.doubleSampling ? "double sampling, " : ""}with sample size and acceptance set by each lot's size`
           : `up to ${version.acceptanceNumber} failures allowed`}{" "}
         · from {version.effectiveFrom}
         {version.effectiveTo && ` to ${version.effectiveTo}`}

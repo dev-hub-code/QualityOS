@@ -178,6 +178,7 @@ public class InspectionTemplateService {
         draft.setAcceptanceNumber(latest.getAcceptanceNumber());
         draft.setAql(latest.getAql());
         draft.setInspectionLevel(latest.getInspectionLevel());
+        draft.setDoubleSampling(latest.isDoubleSampling());
         versions.saveAndFlush(draft);
         latest.getParameters().forEach(parameter -> draft.getParameters().add(copyOf(parameter, draft)));
         versions.saveAndFlush(draft);
@@ -203,6 +204,7 @@ public class InspectionTemplateService {
         draft.setAcceptanceNumber(aql ? 0 : request.acceptanceNumber());
         draft.setAql(aql ? request.aql() : null);
         draft.setInspectionLevel(aql ? request.inspectionLevel() : null);
+        draft.setDoubleSampling(aql && Boolean.TRUE.equals(request.doubleSampling()));
         draft.getParameters().clear();
         entityManager.flush();
         int order = 0;
@@ -256,7 +258,8 @@ public class InspectionTemplateService {
                 plan.severity() == null ? null : plan.severity().name(),
                 plan.codeLetter(),
                 plan.severity() == null ? null : version.getAql(),
-                plan.severity() == null ? null : version.getInspectionLevel().name());
+                plan.severity() == null ? null : version.getInspectionLevel().name(),
+                plan.secondSample());
     }
 
     @Transactional(readOnly = true)
@@ -414,7 +417,8 @@ public class InspectionTemplateService {
                 version.getEffectiveFrom(),
                 version.getEffectiveTo(),
                 version.getPublishedAt(),
-                version.getParameters().stream().map(InspectionTemplateService::toSpec).toList());
+                version.getParameters().stream().map(InspectionTemplateService::toSpec).toList(),
+                version.isDoubleSampling());
     }
 
     private static ParameterSpec toSpec(InspectionParameter parameter) {

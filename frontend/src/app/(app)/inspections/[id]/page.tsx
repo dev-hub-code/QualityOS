@@ -22,6 +22,15 @@ import { requirement, sampleKey, samplesOf, toEntries, toFormValues } from "@/li
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { Attachment, Inspection, NcrSummary, ParameterSpec } from "@/lib/types";
 
+/** The lot's plan in words: one sample, or under double sampling the first and then both together. */
+function planText(specification: Inspection["specification"]): string {
+  const first = `accept up to ${specification.acceptanceNumber} nonconforming, reject from ${specification.rejectionNumber}`;
+  const second = specification.secondSample;
+  if (!second) return first;
+  return `double sampling. First sample: ${first}; otherwise a second sample of ${second.sampleSize}, and both together accept up to ${second.acceptanceNumber}, reject from ${second.rejectionNumber}`;
+}
+
+
 const NOTE_FIELD: FieldDef = { name: "note", label: "Note" };
 const SEND_BACK_FIELDS: FieldDef[] = [{ ...NOTE_FIELD, label: "What needs correcting", required: true }];
 const SELECT_CLASS = "h-11 w-full rounded-xl border border-input bg-white/70 px-2 text-base";
@@ -332,17 +341,24 @@ export default function InspectionPage() {
               ? ([
                   [
                     "Sampling plan",
-                    `AQL ${Number(inspection.specification.aql)}, level ${levelLabel(inspection.specification.inspectionLevel)}, ${inspection.specification.severity.toLowerCase()} inspection, letter ${inspection.specification.codeLetter}: accept up to ${inspection.specification.acceptanceNumber} nonconforming, reject from ${inspection.specification.rejectionNumber}`,
+                    `AQL ${Number(inspection.specification.aql)}, level ${levelLabel(inspection.specification.inspectionLevel)}, ${inspection.specification.severity.toLowerCase()} inspection, letter ${inspection.specification.codeLetter}: ${planText(inspection.specification)}`,
                   ],
                 ] as [string, string][])
               : []),
           ]}
         />
       </Section>
+      {inspection.secondSampleDrawn && open && (
+        <p className="rounded-md border bg-muted/40 p-3 text-sm" role="status">
+          The first sample was inconclusive, so a second sample of {inspection.specification.secondSample?.sampleSize} is
+          needed. Record samples {inspection.sampleSize - (inspection.specification.secondSample?.sampleSize ?? 0) + 1} to{" "}
+          {inspection.sampleSize}, then submit again; both samples are counted together.
+        </p>
+      )}
       <LinkedNcr inspectionId={id} />
       <Review inspection={inspection} />
       <Execution
-        key={`${status}-${inspection.results.length}`}
+        key={`${status}-${inspection.results.length}-${inspection.sampleSize}`}
         inspection={inspection}
         editable={open && canExecute}
       />

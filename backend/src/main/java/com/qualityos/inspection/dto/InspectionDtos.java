@@ -83,6 +83,8 @@ public final class InspectionDtos {
             String batchNumber,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
             int sampleSize,
+            /* Under double sampling: the first sample was inconclusive, and the sample size includes the second. */
+            boolean secondSampleDrawn,
             String status,
             String evaluatedResult,
             String finalResult,

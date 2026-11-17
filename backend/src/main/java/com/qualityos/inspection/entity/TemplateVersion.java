@@ -36,11 +36,23 @@ public class TemplateVersion extends TenantOwnedEntity {
      * rejected. Only an AQL plan names its code letter and severity; elsewhere the rejection number is Ac + 1.
      */
     public record SamplingPlan(int sampleSize, int acceptanceNumber, int rejectionNumber, String codeLetter,
-            AqlTable.Severity severity) {
+            AqlTable.Severity severity, SecondSample secondSample) {
+
+        public SamplingPlan(int sampleSize, int acceptanceNumber, int rejectionNumber, String codeLetter,
+                AqlTable.Severity severity) {
+            this(sampleSize, acceptanceNumber, rejectionNumber, codeLetter, severity, null);
+        }
 
         public SamplingPlan(int sampleSize, int acceptanceNumber) {
             this(sampleSize, acceptanceNumber, acceptanceNumber + 1, null, null);
         }
+    }
+
+    /**
+     * Under double sampling, the second sample a lot takes when the first neither accepts nor rejects it. Its acceptance
+     * and rejection numbers count the nonconforming units of both samples together.
+     */
+    public record SecondSample(int sampleSize, int acceptanceNumber, int rejectionNumber) {
     }
 
     /** Above this, entering every sample by hand is not realistic, and a fixed plan fits better. */
@@ -76,6 +88,10 @@ public class TemplateVersion extends TenantOwnedEntity {
     @Setter
     @Enumerated(EnumType.STRING)
     private AqlTable.Level inspectionLevel;
+
+    /** For AQL sampling: double sampling where the standard has a plan for the lot, single sampling elsewhere. */
+    @Setter
+    private boolean doubleSampling;
 
     private LocalDate effectiveFrom;
     private LocalDate effectiveTo;
@@ -129,6 +145,16 @@ public class TemplateVersion extends TenantOwnedEntity {
     public SamplingPlan planFor(BigDecimal quantity, AqlTable.Severity severity) {
         if (samplingType == SamplingType.AQL) {
             long lot = quantity.setScale(0, RoundingMode.CEILING).longValueExact();
+            if (doubleSampling) {
+                var twice = AqlTable.doublePlan(lot, inspectionLevel, aql, severity);
+                if (twice.isPresent()) {
+                    AqlTable.DoublePlan plan = twice.get();
+                    checked(2 * plan.sampleSize());
+                    return new SamplingPlan(plan.sampleSize(), plan.firstAcceptance(), plan.firstRejection(),
+                            String.valueOf(plan.codeLetter()), severity, new SecondSample(plan.sampleSize(),
+                                    plan.secondAcceptance(), plan.secondRejection()));
+                }
+            }
             AqlTable.Plan plan = AqlTable.plan(lot, inspectionLevel, aql, severity);
             return new SamplingPlan(checked(plan.sampleSize()), plan.acceptanceNumber(), plan.rejectionNumber(),
                     String.valueOf(plan.codeLetter()), severity);

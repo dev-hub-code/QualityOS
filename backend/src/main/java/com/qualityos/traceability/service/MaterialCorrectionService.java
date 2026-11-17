@@ -16,6 +16,7 @@ import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.inspection.service.InspectionService;
 import com.qualityos.material.dto.MaterialDtos.MaterialReference;
+import com.qualityos.material.dto.MaterialDtos.UnitResponse;
 import com.qualityos.material.service.MaterialService;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.AppliedLotCorrection;
 import com.qualityos.materialreceipt.dto.MaterialReceiptDtos.LotCorrection;
@@ -175,9 +176,12 @@ public class MaterialCorrectionService {
             String batch = request.supplierBatch().trim();
             changes.add(new Change(Field.SUPPLIER_BATCH, lot.supplierBatch(), batch, lot.supplierBatch(), batch));
         }
-        if (request.quantity() != null && request.quantity().compareTo(lot.quantity()) != 0) {
-            changes.add(new Change(Field.QUANTITY, lot.quantity().toPlainString(), request.quantity().toPlainString(),
-                    lot.quantity().toPlainString(), request.quantity().toPlainString()));
+        BigDecimal quantity = request.quantity() == null ? null : inUnit(request, lot.uomId());
+        if (quantity != null && quantity.compareTo(lot.quantity()) != 0) {
+            Map<UUID, String> codes = unitCodes();
+            changes.add(new Change(Field.QUANTITY, lot.quantity().toPlainString(), quantity.toPlainString(),
+                    label(lot.quantity(), lot.uomId(), codes), label(quantity, lot.uomId(), codes)
+                            + entered(request, lot.uomId(), codes)));
         }
         return save(facilityId, new MaterialCorrection(numbers.next("MC"), TargetType.LOT, lot.itemId(), null, null,
                 request.reason().trim()), changes);
@@ -188,6 +192,8 @@ public class MaterialCorrectionService {
         UUID facilityId = production.batch(entry.childBatchId()).facilityId();
         scope.requireAllowed(facilityId, "Batch", entry.childBatchId().toString());
         List<Change> changes = new ArrayList<>();
+        UUID sourceUnit = entry.lotId() != null ? lot(entry.lotId()).uomId() : production.batch(entry.parentBatchId()).uomId();
+        UUID unit = sourceUnit;
         if (request.correctedLotId() != null && !request.correctedLotId().equals(entry.lotId())) {
             LotView replacement = lot(request.correctedLotId());
             if (!replacement.released()) {
@@ -196,13 +202,48 @@ public class MaterialCorrectionService {
             String original = entry.lotId() == null ? null : lot(entry.lotId()).internalBatch();
             changes.add(new Change(Field.SOURCE_LOT, entry.lotId() == null ? null : entry.lotId().toString(),
                     replacement.itemId().toString(), original, replacement.internalBatch()));
+            unit = replacement.uomId();
         }
-        if (request.quantity() != null && request.quantity().compareTo(entry.quantity()) != 0) {
-            changes.add(new Change(Field.QUANTITY, entry.quantity().toPlainString(), request.quantity().toPlainString(),
-                    entry.quantity().toPlainString(), request.quantity().toPlainString()));
+        boolean otherUnit = !Objects.equals(unit, sourceUnit);
+        // Moved to a lot kept in another unit, the same amount is taken from it, in that lot's unit.
+        BigDecimal quantity = request.quantity() != null ? inUnit(request, unit)
+                : otherUnit ? convert(entry.quantity(), sourceUnit, unit) : null;
+        if (quantity != null && (otherUnit || quantity.compareTo(entry.quantity()) != 0)) {
+            Map<UUID, String> codes = unitCodes();
+            changes.add(new Change(Field.QUANTITY, entry.quantity().toPlainString(), quantity.toPlainString(),
+                    label(entry.quantity(), sourceUnit, codes), label(quantity, unit, codes)
+                            + entered(request, unit, codes)));
         }
         return save(facilityId, new MaterialCorrection(numbers.next("MC"), TargetType.CONSUMPTION, entry.lotId(), entry.id(),
                 entry.childBatchId(), request.reason().trim()), changes);
+    }
+
+    /** A quantity typed in another unit, converted to the unit it is recorded in. */
+    private BigDecimal inUnit(CreateCorrectionRequest request, UUID unit) {
+        return request.uomId() == null ? request.quantity() : convert(request.quantity(), request.uomId(), unit);
+    }
+
+    private BigDecimal convert(BigDecimal quantity, UUID from, UUID to) {
+        if (from == null || to == null) {
+            throw new BusinessRuleException("This record has no unit, so enter the quantity without one.");
+        }
+        return materials.convert(quantity, from, to);
+    }
+
+    private Map<UUID, String> unitCodes() {
+        return materials.listUnits().stream().collect(Collectors.toMap(UnitResponse::id, UnitResponse::code));
+    }
+
+    private static String label(BigDecimal quantity, UUID unit, Map<UUID, String> codes) {
+        String amount = quantity.stripTrailingZeros().toPlainString();
+        String code = unit == null ? null : codes.get(unit);
+        return code == null ? amount : amount + " " + code;
+    }
+
+    /** What was typed, when it was in another unit, so that the request shows both. */
+    private static String entered(CreateCorrectionRequest request, UUID unit, Map<UUID, String> codes) {
+        return request.uomId() == null || request.quantity() == null || request.uomId().equals(unit) ? ""
+                : " (entered as " + label(request.quantity(), request.uomId(), codes) + ")";
     }
 
     private CorrectionDetail save(UUID facilityId, MaterialCorrection correction, List<Change> changes) {

@@ -204,7 +204,7 @@ export const DOC_PAGES: DocPage[] = [
         title: "Good to know",
         list: [
           "A material that requires no inspection is released as soon as it is received.",
-          "Quantities consumed in production are not converted between units, so record them in the lot's own unit.",
+          "Material used can be entered in any unit of the same kind as its lot or batch, such as grams from a lot kept in kilograms. It is converted to the lot's unit.",
         ],
       },
     ],
@@ -860,6 +860,8 @@ export const DOC_PAGES: DocPage[] = [
           "A lot that has been inspected needs two approvers.",
           "If a material has gone further than the lot, you must review and acknowledge the impact first.",
           "A correction does not trigger a new inspection. The approvers decide whether to act.",
+          "A quantity can be entered in any unit of the same kind. It is converted to the lot's unit, and the request shows both.",
+          "Moving an entry to a lot kept in another unit takes the same amount from it, converted to that lot's unit.",
           "A lot's internal batch number cannot be corrected, because it is generated.",
         ],
       },

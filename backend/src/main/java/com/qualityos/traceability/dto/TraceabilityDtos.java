@@ -78,7 +78,9 @@ public final class TraceabilityDtos {
             UUID supplierId,
             @Size(max = 100) String supplierBatch,
             @Positive @Digits(integer = 12, fraction = 6) BigDecimal quantity,
-            UUID correctedLotId) {
+            UUID correctedLotId,
+            /* The unit the quantity is in. Left out, it is the lot's or batch's own: the corrected lot's, when there is one. */
+            UUID uomId) {
     }
 
     /** @param impactAcknowledged required when the material has gone further than the lot itself */

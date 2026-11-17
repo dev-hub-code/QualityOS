@@ -1,5 +1,11 @@
 package com.qualityos.notification.controller;
 
+import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.notification.service.NotificationStream;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import com.qualityos.common.response.ApiResponse;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.notification.dto.NotificationDtos.NotificationResponse;
@@ -33,9 +39,23 @@ import org.springframework.web.bind.annotation.RestController;
 public class NotificationController {
 
     private final NotificationService notifications;
+    private final NotificationStream stream;
 
-    NotificationController(NotificationService notifications) {
+    NotificationController(NotificationService notifications, NotificationStream stream) {
         this.notifications = notifications;
+        this.stream = stream;
+    }
+
+    /**
+     * Server-sent events: a {@code notifications} event whenever the signed-in user's inbox changes. It names no
+     * notification, so the page reads the inbox as usual.
+     */
+    @GetMapping(path = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter stream(HttpServletResponse response) {
+        // Asks a proxy such as nginx not to hold events back.
+        response.setHeader("X-Accel-Buffering", "no");
+        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache");
+        return stream.connect(TenantContext.getCurrentTenantId(), TenantContext.getCurrentUserId());
     }
 
     @GetMapping

@@ -9,7 +9,7 @@ import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { GlobalSearch } from "@/components/app/global-search";
 import { OrganizationLogo } from "@/components/app/organization-logo";
-import { NotificationBell } from "@/components/app/notification-bell";
+import { NotificationBell, useNotificationStream } from "@/components/app/notification-bell";
 import { VerifyEmailBanner } from "@/components/app/verify-email-banner";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/hooks/use-me";
@@ -82,6 +82,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(storedCollapsed);
 
   const controlCenter = pathname === "/platform" || pathname.startsWith("/platform/");
+  // Only a member of an organisation has an inbox.
+  useNotificationStream(Boolean(me?.tenantId));
 
   useEffect(() => {
     if (me && leavesWorkspace(pathname, me.permissions, me.hasSubscription)) {

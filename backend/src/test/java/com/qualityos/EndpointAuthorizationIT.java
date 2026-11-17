@@ -41,6 +41,7 @@ class EndpointAuthorizationIT extends AbstractIntegrationTest {
             // The caller's own notifications.
             "GET /api/v1/notifications",
             "GET /api/v1/notifications/preferences",
+            "GET /api/v1/notifications/stream",
             "GET /api/v1/notifications/unread-count",
             "POST /api/v1/notifications/{id}/read",
             "POST /api/v1/notifications/read-all",

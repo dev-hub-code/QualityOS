@@ -96,4 +96,45 @@ public final class EvaluationEngine {
                 : review ? Evaluation.PENDING_REVIEW : Evaluation.PASS;
         return new Outcome(evaluation, criticalFailure);
     }
+
+    /** One sample's evaluation of one parameter. */
+    public record SampleEvaluation(String parameterCode, int sampleNumber, Evaluation evaluation) {
+    }
+
+    /**
+     * Combines the evaluations of an inspection sampled by AQL, which counts nonconforming units: a sample with any
+     * failed parameter is one, however many parameters it failed. The lot fails when more than {@code acceptanceNumber}
+     * samples are nonconforming. A failed critical sample still fails it, and a parameter checked once for the whole
+     * lot fails it when that check fails.
+     */
+    public static Outcome overallByUnits(
+            List<ParameterSpec> parameters, List<SampleEvaluation> results, int acceptanceNumber) {
+        java.util.Map<String, ParameterSpec> specs = parameters.stream()
+                .collect(java.util.stream.Collectors.toMap(ParameterSpec::code, spec -> spec));
+        boolean criticalFailure = false;
+        boolean lotFailure = false;
+        boolean review = false;
+        java.util.Set<Integer> nonconforming = new java.util.HashSet<>();
+        for (SampleEvaluation result : results) {
+            ParameterSpec spec = specs.get(result.parameterCode());
+            if (spec == null) {
+                continue;
+            }
+            review |= result.evaluation() == Evaluation.PENDING_REVIEW;
+            if (result.evaluation() != Evaluation.FAIL) {
+                continue;
+            }
+            if (spec.criticality() == Criticality.CRITICAL) {
+                criticalFailure = true;
+            } else if (spec.perSample()) {
+                nonconforming.add(result.sampleNumber());
+            } else {
+                lotFailure = true;
+            }
+        }
+        Evaluation evaluation = criticalFailure || lotFailure || nonconforming.size() > acceptanceNumber
+                ? Evaluation.FAIL
+                : review ? Evaluation.PENDING_REVIEW : Evaluation.PASS;
+        return new Outcome(evaluation, criticalFailure);
+    }
 }

@@ -30,6 +30,7 @@ const PUBLISH_FIELDS: FieldDef[] = [
 
 function sampling(version: TemplateVersion) {
   if (version.samplingType === "FULL") return "Every unit";
+  if (version.samplingType === "AQL") return `AQL ${Number(version.aql)}, inspection level ${version.inspectionLevel}`;
   return version.samplingType === "FIXED" ? `${version.sampleSize} samples` : `${version.samplePercent}% of the lot`;
 }
 
@@ -37,7 +38,11 @@ function PublishedVersion({ version }: { version: TemplateVersion }) {
   return (
     <Section title={`Version ${version.versionNumber}`} action={<StatusBadge status={version.status} />}>
       <p className="mb-3 text-sm text-muted-foreground">
-        {sampling(version)}, up to {version.acceptanceNumber} failures allowed · from {version.effectiveFrom}
+        {sampling(version)},{" "}
+        {version.samplingType === "AQL"
+          ? "with sample size and acceptance set by each lot's size"
+          : `up to ${version.acceptanceNumber} failures allowed`}{" "}
+        · from {version.effectiveFrom}
         {version.effectiveTo && ` to ${version.effectiveTo}`}
       </p>
       <ul className="divide-y text-sm">

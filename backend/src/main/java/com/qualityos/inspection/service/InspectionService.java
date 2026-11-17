@@ -261,11 +261,12 @@ public class InspectionService implements AttachmentPolicy {
             throw new BusinessRuleException("Returned goods take a final or outgoing inspection template.");
         }
         TemplateVersion version = templates.versionInForce(template.getId());
+        TemplateVersion.SamplingPlan plan = version.planFor(goods.quantity());
         Inspection inspection = new Inspection(
                 numbers.next("INS"),
                 template.getInspectionType(),
                 version.getId(),
-                json.writeValueAsString(templates.snapshot(template.getId(), version)),
+                json.writeValueAsString(templates.snapshot(template.getId(), version, plan)),
                 null,
                 batch.id(),
                 null,
@@ -273,7 +274,7 @@ public class InspectionService implements AttachmentPolicy {
                 null,
                 batch.batchNumber(),
                 goods.quantity(),
-                version.samplesFor(goods.quantity()));
+                plan.sampleSize());
         inspection.forReturnedGoods(goods.id());
         return save(inspection);
     }
@@ -282,13 +283,13 @@ public class InspectionService implements AttachmentPolicy {
         ReceivedBatch batch = receipts.batch(request.receiptItemId());
         InspectionTemplate template = templates.requireUsableFor(request.templateId(), batch.materialId());
         TemplateVersion version = templates.versionInForce(template.getId());
-        int samples = version.samplesFor(batch.quantity());
+        TemplateVersion.SamplingPlan plan = version.planFor(batch.quantity());
         receipts.startInspection(batch.itemId());
         return save(new Inspection(
                 numbers.next("INS"),
                 template.getInspectionType(),
                 version.getId(),
-                json.writeValueAsString(templates.snapshot(template.getId(), version)),
+                json.writeValueAsString(templates.snapshot(template.getId(), version, plan)),
                 batch.itemId(),
                 null,
                 batch.supplierId(),
@@ -296,7 +297,7 @@ public class InspectionService implements AttachmentPolicy {
                 batch.materialId(),
                 batch.internalBatch(),
                 batch.quantity(),
-                samples));
+                plan.sampleSize()));
     }
 
     private Inspection inspectProductionBatch(CreateInspectionRequest request) {
@@ -307,11 +308,12 @@ public class InspectionService implements AttachmentPolicy {
         // An outgoing check covers what is left to ship. Earlier checks cover the whole batch.
         BigDecimal quantity = template.getInspectionType() == InspectionTemplate.Type.OQC ? batch.availableQuantity()
                 : batch.producedQuantity() != null ? batch.producedQuantity() : batch.plannedQuantity();
+        TemplateVersion.SamplingPlan plan = version.planFor(quantity);
         return save(new Inspection(
                 numbers.next("INS"),
                 template.getInspectionType(),
                 version.getId(),
-                json.writeValueAsString(templates.snapshot(template.getId(), version)),
+                json.writeValueAsString(templates.snapshot(template.getId(), version, plan)),
                 null,
                 batch.id(),
                 null,
@@ -319,7 +321,7 @@ public class InspectionService implements AttachmentPolicy {
                 null,
                 batch.batchNumber(),
                 quantity,
-                version.samplesFor(quantity)));
+                plan.sampleSize()));
     }
 
     private Inspection save(Inspection inspection) {
@@ -483,8 +485,12 @@ public class InspectionService implements AttachmentPolicy {
         Map<String, List<Evaluation>> byParameter = recorded.stream().collect(Collectors.groupingBy(
                 InspectionResult::getParameterCode,
                 Collectors.mapping(InspectionResult::getEvaluation, Collectors.toList())));
-        Outcome outcome = EvaluationEngine.overall(
-                specification.parameters(), byParameter, specification.acceptanceNumber());
+        Outcome outcome = "AQL".equals(specification.samplingType())
+                ? EvaluationEngine.overallByUnits(specification.parameters(), recorded.stream()
+                        .map(result -> new EvaluationEngine.SampleEvaluation(
+                                result.getParameterCode(), result.getSampleNumber(), result.getEvaluation()))
+                        .toList(), specification.acceptanceNumber())
+                : EvaluationEngine.overall(specification.parameters(), byParameter, specification.acceptanceNumber());
         inspection.submit(outcome.evaluation(), outcome.criticalFailure(), TenantContext.getCurrentUserId());
         inspections.saveAndFlush(inspection);
         decide(id, "SUBMITTED", outcome.evaluation().name());

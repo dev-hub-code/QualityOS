@@ -37,7 +37,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Notifications are polled once a minute, with no live push. Only email and in-app channels exist | When a user needs it |
 | Organisation branding in email is the organisation name only. There is no logo upload | When a user needs it |
 | With verification switched off for private use, registration reveals that an email has an account | Private use only |
-| Sampling is fixed, percentage or every unit; AQL tables (such as ISO 2859-1) are not built | When a customer needs them |
+| Sampling is fixed, percentage, every unit, or AQL by ISO 2859-1: single sampling for normal inspection at general levels I to III. Tightened and reduced inspection, switching rules, special levels S-1 to S-4, and double or multiple plans are not built. An AQL plan over 500 samples is refused | When a customer needs them |
 | A one-person organisation can review its own inspections, NCR closures and CAPA verifications once an administrator turns this on under Settings. It applies only while there is one active member, and each use needs a reason, recorded as `SELF_REVIEW`. An administrator could deactivate everyone else to use it, but both steps are in the audit log | Review after real use |
 | Each organisation chooses which NCR severities need a closed CAPA and which need a verified fix (default: critical and major). The NCR statuses and their order are fixed | When a user needs it |
 | A change to the CAPA rule applies to open NCRs at once. A CAPA keeps the verification rule it was raised under | By design |

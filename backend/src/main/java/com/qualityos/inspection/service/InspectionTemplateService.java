@@ -20,6 +20,7 @@ import com.qualityos.inspection.dto.TemplateDtos.VersionResponse;
 import com.qualityos.inspection.entity.InspectionParameter;
 import com.qualityos.inspection.entity.InspectionTemplate;
 import com.qualityos.inspection.entity.TemplateVersion;
+import com.qualityos.inspection.entity.AqlTable;
 import com.qualityos.inspection.entity.TemplateVersion.SamplingType;
 import com.qualityos.inspection.entity.TemplateVersion.Status;
 import com.qualityos.inspection.repository.InspectionTemplateRepository;
@@ -175,6 +176,8 @@ public class InspectionTemplateService {
         draft.setSampleSize(latest.getSampleSize());
         draft.setSamplePercent(latest.getSamplePercent());
         draft.setAcceptanceNumber(latest.getAcceptanceNumber());
+        draft.setAql(latest.getAql());
+        draft.setInspectionLevel(latest.getInspectionLevel());
         versions.saveAndFlush(draft);
         latest.getParameters().forEach(parameter -> draft.getParameters().add(copyOf(parameter, draft)));
         versions.saveAndFlush(draft);
@@ -195,7 +198,11 @@ public class InspectionTemplateService {
         draft.setSamplingType(request.samplingType());
         draft.setSampleSize(request.samplingType() == SamplingType.FIXED ? request.sampleSize() : null);
         draft.setSamplePercent(request.samplingType() == SamplingType.PERCENTAGE ? request.samplePercent() : null);
-        draft.setAcceptanceNumber(request.acceptanceNumber());
+        boolean aql = request.samplingType() == SamplingType.AQL;
+        // An AQL plan takes its acceptance number from the table for each lot.
+        draft.setAcceptanceNumber(aql ? 0 : request.acceptanceNumber());
+        draft.setAql(aql ? request.aql() : null);
+        draft.setInspectionLevel(aql ? request.inspectionLevel() : null);
         draft.getParameters().clear();
         entityManager.flush();
         int order = 0;
@@ -235,14 +242,15 @@ public class InspectionTemplateService {
     }
 
     @Transactional(readOnly = true)
-    public SpecSnapshot snapshot(UUID templateId, TemplateVersion version) {
+    /** @param plan the sampling plan of the lot being inspected */
+    public SpecSnapshot snapshot(UUID templateId, TemplateVersion version, TemplateVersion.SamplingPlan plan) {
         InspectionTemplate template = load(templateId);
         return new SpecSnapshot(
                 template.getCode(),
                 template.getName(),
                 version.getVersionNumber(),
                 version.getSamplingType().name(),
-                version.getAcceptanceNumber(),
+                plan.acceptanceNumber(),
                 version.getParameters().stream().map(InspectionTemplateService::toSpec).toList());
     }
 
@@ -338,6 +346,12 @@ public class InspectionTemplateService {
         if (request.samplingType() == SamplingType.PERCENTAGE && request.samplePercent() == null) {
             throw new BusinessRuleException("Enter a sample percentage.");
         }
+        if (request.samplingType() == SamplingType.AQL) {
+            if (request.aql() == null || request.inspectionLevel() == null) {
+                throw new BusinessRuleException("Choose an AQL and an inspection level.");
+            }
+            AqlTable.column(request.aql());
+        }
         Set<String> codes = new HashSet<>();
         for (ParameterRequest parameter : request.parameters()) {
             if (!codes.add(parameter.code().trim())) {
@@ -390,6 +404,8 @@ public class InspectionTemplateService {
                 version.getSampleSize(),
                 version.getSamplePercent(),
                 version.getAcceptanceNumber(),
+                version.getAql(),
+                version.getInspectionLevel() == null ? null : version.getInspectionLevel().name(),
                 version.getEffectiveFrom(),
                 version.getEffectiveTo(),
                 version.getPublishedAt(),

@@ -146,6 +146,70 @@ class InspectionIT extends MasterDataFixture {
         as(owner, get("/api/v1/subscription")).andExpect(jsonPath("$.data.inspectionsThisMonth").value(1));
     }
 
+    /** AQL 4.0 at level II: a lot of 100 is code letter F, 20 samples, accepting 2 nonconforming. */
+    private String aqlTemplate(Session session) throws Exception {
+        return publishedTemplate(session, Map.of("samplingType", "AQL", "aql", "4.0", "inspectionLevel", "II",
+                "acceptanceNumber", 0, "parameters", List.of(parameter("DIA", "MAJOR", "19.9", "20.1"),
+                        parameter("LEN", "MAJOR", "99", "101"))));
+    }
+
+    /** Records every sample, failing the parameters named for each sample number. */
+    private ResultActions recordAll(Session session, String inspection, Map<Integer, List<String>> failing)
+            throws Exception {
+        List<Map<String, Object>> results = new java.util.ArrayList<>();
+        for (int sample = 1; sample <= 20; sample++) {
+            List<String> failed = failing.getOrDefault(sample, List.of());
+            results.add(Map.of("parameterCode", "DIA", "sampleNumber", sample,
+                    "valueNumeric", failed.contains("DIA") ? "21" : "20"));
+            results.add(Map.of("parameterCode", "LEN", "sampleNumber", sample,
+                    "valueNumeric", failed.contains("LEN") ? "105" : "100"));
+        }
+        return as(session, postJson("/api/v1/inspections/" + inspection + "/execute", Map.of("results", results)));
+    }
+
+    @Test
+    void anAqlPlanTakesItsSampleFromTheLotAndCountsNonconformingUnits() throws Exception {
+        Session owner = register();
+        String template = aqlTemplate(owner);
+        as(owner, get("/api/v1/inspection-templates/" + template))
+                .andExpect(jsonPath("$.data.versions[0].samplingType").value("AQL"))
+                .andExpect(jsonPath("$.data.versions[0].aql").value("4.000"))
+                .andExpect(jsonPath("$.data.versions[0].inspectionLevel").value("II"));
+
+        // Two samples failing both parameters are two nonconforming units, which the plan accepts.
+        String accepted = startInspection(owner, template);
+        as(owner, get("/api/v1/inspections/" + accepted))
+                .andExpect(jsonPath("$.data.sampleSize").value(20))
+                .andExpect(jsonPath("$.data.specification.acceptanceNumber").value(2));
+        recordAll(owner, accepted, Map.of(1, List.of("DIA", "LEN"), 2, List.of("DIA", "LEN"))).andExpect(status().isOk());
+        submit(owner, accepted).andExpect(jsonPath("$.data.evaluatedResult").value("PASS"));
+
+        // Three samples each failing one parameter are three, which it does not, though no parameter failed thrice.
+        String rejected = startInspection(owner, template);
+        recordAll(owner, rejected, Map.of(1, List.of("DIA"), 2, List.of("LEN"), 3, List.of("DIA")))
+                .andExpect(status().isOk());
+        submit(owner, rejected).andExpect(jsonPath("$.data.evaluatedResult").value("FAIL"));
+    }
+
+    @Test
+    void anAqlPlanNeedsAnAqlFromTheTableAndALevel() throws Exception {
+        Session owner = register();
+        String template = createTemplate(owner);
+        List<Map<String, Object>> parameters = List.of(parameter("DIA", "MAJOR", "19.9", "20.1"));
+        saveDraft(owner, template, Map.of("samplingType", "AQL", "aql", "2.0", "inspectionLevel", "II",
+                "acceptanceNumber", 0, "parameters", parameters)).andExpect(status().isUnprocessableContent());
+        saveDraft(owner, template, Map.of("samplingType", "AQL", "aql", "2.5",
+                "acceptanceNumber", 0, "parameters", parameters)).andExpect(status().isUnprocessableContent());
+        saveDraft(owner, template, Map.of("samplingType", "AQL", "aql", "2.5", "inspectionLevel", "III",
+                "acceptanceNumber", 0, "parameters", parameters)).andExpect(status().isOk());
+        // A new version keeps the plan.
+        publish(owner, template, TODAY).andExpect(status().isOk());
+        as(owner, postJson("/api/v1/inspection-templates/" + template + "/versions", Map.of()))
+                .andExpect(status().isCreated());
+        as(owner, get("/api/v1/inspection-templates/" + template))
+                .andExpect(jsonPath("$.data.versions[?(@.status == 'DRAFT')].inspectionLevel").value(hasItem("III")));
+    }
+
     @Test
     void passingMaterialFlowsFromReceiptToAcceptance() throws Exception {
         Session owner = register();

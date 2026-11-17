@@ -76,3 +76,7 @@ These commands are the current evidence. CI has not run them on GitHub yet.
 - [Continuous integration](docs/CI.md)
 - [Security review](docs/SECURITY_REVIEW.md)
 - [Platform administration](docs/PLATFORM_ADMIN.md)
+
+## License
+
+Released under the [MIT License](LICENSE).

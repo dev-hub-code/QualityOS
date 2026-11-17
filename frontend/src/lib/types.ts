@@ -625,6 +625,7 @@ export interface Dispatch {
   carrierReference: string | null;
   id: string;
   dispatchNumber: string;
+  customerId: string;
   customerName: string;
   dispatchedOn: string;
   reference: string | null;
@@ -638,6 +639,8 @@ export interface Dispatch {
     expectedQuantity: string;
   }[];
   reversalReason: string | null;
+  reversedAt: string | null;
+  createdAt: string;
 }
 
 /** How much of a dispatch has come back, is on its way back, or is still with the customer. */

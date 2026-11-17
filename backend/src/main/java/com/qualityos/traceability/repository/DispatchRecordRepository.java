@@ -43,6 +43,19 @@ public interface DispatchRecordRepository extends JpaRepository<DispatchRecord, 
             and """ + MATCHING)
     Page<DispatchRecord> findWithin(Collection<UUID> facilities, String pattern, Pageable pageable);
 
+    /** As {@link #findMatching}, for one customer. */
+    @Query("select d from DispatchRecord d where d.customerId = :customerId and " + MATCHING)
+    Page<DispatchRecord> findMatchingFor(UUID customerId, String pattern, Pageable pageable);
+
+    /** As {@link #findWithin}, for one customer. */
+    @Query("""
+            select d from DispatchRecord d
+            where d.customerId = :customerId and not exists (
+                select 1 from DispatchItem i, ProductionBatch b
+                where i.dispatchId = d.id and b.id = i.productionBatchId and b.facilityId not in :facilities)
+            and """ + MATCHING)
+    Page<DispatchRecord> findWithinFor(UUID customerId, Collection<UUID> facilities, String pattern, Pageable pageable);
+
     /** Serialises cancelling, shipping and returning, which rule each other out. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select d from DispatchRecord d where d.id = :id")

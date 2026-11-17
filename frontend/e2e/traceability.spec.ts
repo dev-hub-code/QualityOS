@@ -107,6 +107,14 @@ test("raw material is traced through production and inspection to the customer",
 
   // A dispatch recorded by mistake is reversed. It stays on the trace, and the customer no longer counts as affected.
   const traceUrl = page.url();
+  // The dispatch and its customer each have a page of their own.
+  await page.goto("/dispatches");
+  await page.getByRole("link", { name: /^DSP-/ }).first().click();
+  await expect(page.getByRole("heading", { name: /^DSP-/ })).toBeVisible();
+  await expect(page.getByText("Nothing has come back.")).toBeVisible();
+  await page.getByRole("link", { name: "Tata Motors" }).click();
+  await expect(page.getByRole("heading", { name: "Tata Motors" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^DSP-/ })).toHaveCount(1);
   await page.goto("/dispatches");
   await step(page, "Reverse", (dialog) => dialog.getByLabel("Why this dispatch never really happened").fill("Wrong customer"));
   await expect(page.getByText("reversed", { exact: true })).toBeVisible();
@@ -181,6 +189,7 @@ test("returned goods stay out of stock until an inspection accepts them", async 
   // The complaint raised an NCR, which leads back to the return.
   await page.goto("/dispatch-reversals");
   await page.getByRole("link", { name: /^RET-/ }).click();
+  await expect(page).toHaveURL(/dispatch-reversals\/[0-9a-f-]+$/);
   const returnUrl = page.url();
   await page.getByRole("link", { name: /^NCR-/ }).click();
   await expect(page.getByText(/Customer return RET-.* from Tata Motors/).first()).toBeVisible();

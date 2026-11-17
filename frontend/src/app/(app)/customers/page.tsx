@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
-import { PageHeader, useAction, useRefresh } from "@/components/records/parts";
+import { PageHeader, RecordLink, useAction, useRefresh } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
@@ -39,7 +39,7 @@ export default function CustomersPage() {
         {data.map((customer) => (
           <li key={customer.id} className="flex items-center justify-between gap-3 p-3">
             <span>
-              {customer.code} – {customer.name}
+              {customer.code} – <RecordLink href={`/customers/${customer.id}`}>{customer.name}</RecordLink>
             </span>
             {canManage && (
               <Button variant="ghost" size="sm" onClick={() => run(() => api.delete(`${PATH}/${customer.id}`))}>

@@ -340,7 +340,7 @@ function Results() {
               toFound={(dispatches) =>
                 dispatches.items.map((dispatch) => ({
                   key: dispatch.id,
-                  href: "/dispatches",
+                  href: `/dispatches/${dispatch.id}`,
                   label: dispatch.dispatchNumber,
                   description: `${dispatch.customerName}, dispatched ${dispatch.dispatchedOn}`,
                   detail: dispatch.reference ? `Reference ${dispatch.reference}` : undefined,
@@ -378,7 +378,7 @@ function Results() {
                   .slice(0, PER_KIND)
                   .map((customer) => ({
                     key: customer.id,
-                    href: "/customers",
+                    href: `/customers/${customer.id}`,
                     label: customer.code,
                     description: customer.name,
                     detail: customer.gstin ? `GSTIN ${customer.gstin}` : undefined,

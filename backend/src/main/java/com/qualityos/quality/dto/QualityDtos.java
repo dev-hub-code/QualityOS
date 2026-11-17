@@ -62,6 +62,23 @@ public final class QualityDtos {
     }
 
     /**
+     * Goods a customer sent back because something was wrong with them.
+     *
+     * @param lines one line per returned batch, such as "PB-2026-00001 × 5"
+     */
+    public record CustomerReturn(
+            UUID dispatchReversalId,
+            String returnNumber,
+            String customerName,
+            String dispatchNumber,
+            String returnReference,
+            String reason,
+            List<String> batchNumbers,
+            List<String> lines,
+            UUID facilityId) {
+    }
+
+    /**
      * Goods rejected or scrapped in one shop-floor report.
      *
      * @param quantity rejected plus scrapped, in {@code uomId}
@@ -163,6 +180,7 @@ public final class QualityDtos {
             UUID auditId,
             UUID instrumentId,
             UUID workOrderId,
+            UUID dispatchReversalId,
             UUID supplierId,
             String supplierName,
             UUID materialId,

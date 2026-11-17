@@ -66,6 +66,35 @@ class DispatchReturnIT extends TraceabilityFixture {
     }
 
     @Test
+    void aReturnRecordedAsAQualityComplaintRaisesOneNcr() throws Exception {
+        Map<String, Object> complaint = new HashMap<>(returnOf("RMA-Q", "30", List.of()));
+        complaint.put("reason", "Shafts cracked in use");
+        complaint.put("qualityComplaint", true);
+        String body = body(as(owner, postJson("/api/v1/dispatches/" + dispatch + "/reversals", complaint))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.ncrNumber").isNotEmpty()));
+        String ncr = JsonPath.read(body, "$.data.ncrId");
+        String number = JsonPath.read(body, "$.data.reversalNumber");
+
+        as(owner, get("/api/v1/ncrs/" + ncr))
+                .andExpect(jsonPath("$.data.source").value("CUSTOMER_RETURN"))
+                .andExpect(jsonPath("$.data.severity").value("MAJOR"))
+                .andExpect(jsonPath("$.data.status").value("OPEN"))
+                .andExpect(jsonPath("$.data.batchNumber").value(numberOf(batch)))
+                .andExpect(jsonPath("$.data.dispatchReversalId").value(JsonPath.<String>read(body, "$.data.id")))
+                .andExpect(jsonPath("$.data.title").value("Customer return " + number + " from Tata Motors"))
+                .andExpect(jsonPath("$.data.description").value(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString(numberOf(batch) + " × 30"),
+                        org.hamcrest.Matchers.containsString("Shafts cracked in use"))));
+        as(owner, get("/api/v1/dispatch-reversals/" + JsonPath.read(body, "$.data.id")))
+                .andExpect(jsonPath("$.data.ncrId").value(ncr));
+
+        // A return that is not a complaint, such as the wrong size ordered, raises nothing.
+        recordReturn("RMA-SIZE", "10").andExpect(status().isCreated()).andExpect(jsonPath("$.data.ncrId").isEmpty());
+        as(owner, get("/api/v1/ncrs")).andExpect(jsonPath("$.data.totalItems").value(1));
+    }
+
+    @Test
     void aPartialReturnLeavesTheRestShippedAndStaysOutOfStock() throws Exception {
         recordReturn("RMA-1", "200")
                 .andExpect(status().isCreated())

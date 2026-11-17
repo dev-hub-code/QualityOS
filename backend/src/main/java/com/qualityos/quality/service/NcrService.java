@@ -19,6 +19,7 @@ import com.qualityos.quality.dto.QualityDtos.Assignee;
 import com.qualityos.quality.dto.QualityDtos.AuditFailure;
 import com.qualityos.quality.dto.QualityDtos.CalibrationFailure;
 import com.qualityos.quality.dto.QualityDtos.ProductionReject;
+import com.qualityos.quality.dto.QualityDtos.CustomerReturn;
 import com.qualityos.quality.dto.QualityDtos.CapaHistory;
 import com.qualityos.quality.dto.QualityDtos.NcrHistory;
 import com.qualityos.quality.dto.QualityDtos.NcrOutcome;
@@ -274,6 +275,35 @@ public class NcrService implements AttachmentPolicy {
                         rejectDescription(reject),
                         reject.quantity()).rejectedIn(reject.uomId())))
                 .getId();
+    }
+
+    /**
+     * Joins the return's transaction, so a complaint cannot be recorded without its NCR. Repeats return the same NCR.
+     * The returned goods themselves wait for their own inspection.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public UUID raiseFromCustomerReturn(CustomerReturn returned) {
+        return ncrs.findByDispatchReversalId(returned.dispatchReversalId())
+                .orElseGet(() -> raise(returned.facilityId(), NonConformance.fromCustomerReturn(
+                        numbers.next(NUMBER_PREFIX),
+                        returned.dispatchReversalId(),
+                        returned.batchNumbers().size() == 1 ? returned.batchNumbers().getFirst() : null,
+                        "Customer return %s from %s".formatted(returned.returnNumber(), returned.customerName()),
+                        "%s returned %s from dispatch %s (reference %s). Reason: %s".formatted(
+                                returned.customerName(), String.join(", ", returned.lines()),
+                                returned.dispatchNumber(), returned.returnReference(), returned.reason()))))
+                .getId();
+    }
+
+    /** The NCRs raised for these customer returns, keyed by return. */
+    @Transactional(readOnly = true)
+    public Map<UUID, NcrOutcome> forCustomerReturns(java.util.Collection<UUID> returnIds) {
+        if (returnIds.isEmpty()) {
+            return Map.of();
+        }
+        return ncrs.findByDispatchReversalIdIn(returnIds).stream().collect(java.util.stream.Collectors.toMap(
+                NonConformance::getDispatchReversalId, ncr -> new NcrOutcome(ncr.getId(), ncr.getNcrNumber(),
+                        ncr.getStatus().name(), ncr.getStatus().isFinished(), List.of())));
     }
 
     /** For a shop-floor report: the category must exist and be in use. */
@@ -584,6 +614,7 @@ public class NcrService implements AttachmentPolicy {
                 ncr.getAuditId(),
                 ncr.getInstrumentId(),
                 ncr.getWorkOrderId(),
+                ncr.getDispatchReversalId(),
                 ncr.getSupplierId(),
                 ncr.getSupplierId() == null ? null : supplierNames(Set.of(ncr.getSupplierId())).get(ncr.getSupplierId()),
                 ncr.getMaterialId(),

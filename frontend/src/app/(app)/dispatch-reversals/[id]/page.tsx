@@ -7,6 +7,7 @@ import {
   Details,
   PageHeader,
   QueryState,
+  RecordLink,
   Section,
   StatusBadge,
   useRefresh,
@@ -26,6 +27,7 @@ export default function DispatchReversalPage() {
   const path = `/dispatch-reversals/${id}`;
   const canInspect = usePermission("INSPECTION_CREATE");
   const canManage = usePermission("TRACEABILITY_MANAGE");
+  const canSeeNcrs = usePermission("NCR_VIEW");
   const refresh = useRefresh();
   const [inspecting, setInspecting] = useState<string | null>(null);
   const [receiving, setReceiving] = useState(false);
@@ -65,6 +67,15 @@ export default function DispatchReversalPage() {
             ["Customer", reversal.customerName],
             [reversal.status === "EXPECTED" ? "Expected on" : "Date received", reversal.reversalDate],
             ["Reason", reversal.reason],
+            [
+              "NCR",
+              reversal.ncrId &&
+                (canSeeNcrs ? (
+                  <RecordLink href={`/ncrs/${reversal.ncrId}`}>{reversal.ncrNumber}</RecordLink>
+                ) : (
+                  reversal.ncrNumber
+                )),
+            ],
             ["Recorded by", reversal.recordedByName],
           ]}
         />

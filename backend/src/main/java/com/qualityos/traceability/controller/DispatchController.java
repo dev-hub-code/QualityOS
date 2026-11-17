@@ -74,10 +74,11 @@ public class DispatchController {
     @GetMapping("/dispatches")
     @PreAuthorize(Require.TRACEABILITY_VIEW)
     public ApiResponse<PageResponse<DispatchResponse>> list(
+            @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size,
             @RequestParam(required = false) String sort) {
-        return ApiResponse.ok(dispatches.list(Pages.of(page, size, sort, SORTABLE, "dispatchNumber")));
+        return ApiResponse.ok(dispatches.list(q, Pages.of(page, size, sort, SORTABLE, "dispatchNumber")));
     }
 
     @PostMapping("/dispatches")

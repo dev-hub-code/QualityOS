@@ -11,6 +11,7 @@ import type {
   AuditSummary,
   CapaSummary,
   Customer,
+  Dispatch,
   InspectionSummary,
   Instrument,
   Machine,
@@ -18,6 +19,7 @@ import type {
   NcrSummary,
   Product,
   PurchaseOrderSummary,
+  RecallSummary,
   ReceiptSummary,
   ReworkSummary,
   SearchHit,
@@ -86,6 +88,7 @@ function Results() {
   const canSeeInstruments = usePermission("CALIBRATION_VIEW");
   const canSeeItems = usePermission("PRODUCT_VIEW");
   const canSeePurchasing = usePermission("PURCHASE_VIEW");
+  const canSeeRecalls = usePermission("RECALL_VIEW");
   const nothingToSearch = ![
     canTrace,
     canSeeNcrs,
@@ -98,6 +101,7 @@ function Results() {
     canSeeInstruments,
     canSeeItems,
     canSeePurchasing,
+    canSeeRecalls,
   ].some(Boolean);
   const lower = term.toLowerCase();
   return (
@@ -323,6 +327,38 @@ function Results() {
                   label: receipt.grnNumber,
                   description: `${receipt.supplierName}, received ${receipt.receivedOn}`,
                   detail: <StatusBadge status={receipt.status} />,
+                }))
+              }
+            />
+          )}
+          {canTrace && (
+            <Kind<PageResponse<Dispatch>>
+              title="Dispatches"
+              path={`/dispatches?${page}`}
+              paged
+              toFound={(dispatches) =>
+                dispatches.items.map((dispatch) => ({
+                  key: dispatch.id,
+                  href: "/dispatches",
+                  label: dispatch.dispatchNumber,
+                  description: `${dispatch.customerName}, dispatched ${dispatch.dispatchedOn}`,
+                  detail: dispatch.reference ? `Reference ${dispatch.reference}` : undefined,
+                }))
+              }
+            />
+          )}
+          {canSeeRecalls && (
+            <Kind<PageResponse<RecallSummary>>
+              title="Recalls"
+              path={`/recalls?${page}`}
+              paged
+              toFound={(recalls) =>
+                recalls.items.map((recall) => ({
+                  key: recall.id,
+                  href: `/recalls/${recall.id}`,
+                  label: recall.recallNumber,
+                  description: recall.reason,
+                  detail: <StatusBadge status={recall.status} />,
                 }))
               }
             />

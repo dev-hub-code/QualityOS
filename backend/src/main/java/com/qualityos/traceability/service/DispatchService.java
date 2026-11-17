@@ -7,6 +7,7 @@ import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.mail.EmailContent;
 import com.qualityos.common.mail.EmailTemplate;
 import com.qualityos.common.persistence.DocumentNumberService;
+import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.organization.service.OrganizationService;
@@ -151,10 +152,11 @@ public class DispatchService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<DispatchResponse> list(Pageable pageable) {
+    public PageResponse<DispatchResponse> list(String search, Pageable pageable) {
+        String pattern = Searches.pattern(search);
         Page<DispatchRecord> page = scope.restriction()
-                .map(allowed -> dispatches.findWithin(allowed, pageable))
-                .orElseGet(() -> dispatches.findAll(pageable));
+                .map(allowed -> dispatches.findWithin(allowed, pattern, pageable))
+                .orElseGet(() -> dispatches.findMatching(pattern, pageable));
         return PageResponse.from(page, responses(page.getContent())::get);
     }
 

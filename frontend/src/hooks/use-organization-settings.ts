@@ -8,7 +8,11 @@ export const ORGANIZATION_SETTINGS_PATH = "/organizations/current/settings";
 
 type Rules = Pick<
   OrganizationSettings,
-  "singlePersonReview" | "capaRequiredFrom" | "effectivenessRequiredFrom" | "actionEvidenceRequired"
+  | "singlePersonReview"
+  | "capaRequiredFrom"
+  | "effectivenessRequiredFrom"
+  | "actionEvidenceRequired"
+  | "capaEscalationDays"
 >;
 
 export function useOrganizationSettings() {
@@ -25,17 +29,26 @@ export function useSaveOrganizationSettings() {
   return useMutation({
     mutationFn: (changes: Partial<Rules>) => {
       if (!data) throw new Error("Settings are still loading.");
-      const { singlePersonReview, capaRequiredFrom, effectivenessRequiredFrom, actionEvidenceRequired, version } = data;
+      const {
+        singlePersonReview,
+        capaRequiredFrom,
+        effectivenessRequiredFrom,
+        actionEvidenceRequired,
+        capaEscalationDays,
+        version,
+      } = data;
       return api.put(ORGANIZATION_SETTINGS_PATH, {
         singlePersonReview,
         capaRequiredFrom,
         effectivenessRequiredFrom,
         actionEvidenceRequired,
+        capaEscalationDays,
         version,
         ...changes,
       });
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: [ORGANIZATION_SETTINGS_PATH] }),
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: [ORGANIZATION_SETTINGS_PATH] }),
   });
 }
 

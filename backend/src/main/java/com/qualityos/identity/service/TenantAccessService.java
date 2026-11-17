@@ -201,6 +201,14 @@ public class TenantAccessService implements TenantAccessResolver {
                 """, String.class, TenantContext.getCurrentTenantId(), userId).stream().findFirst();
     }
 
+    /**
+     * @return whether the organisation's plan and subscription allow this permission now, whoever holds it: for work
+     *     a member may do because it is theirs, not because a role gives it
+     */
+    public boolean planAllows(String permission) {
+        return plan.narrow(TenantContext.getCurrentTenantId(), Set.of(permission)).contains(permission);
+    }
+
     public Set<UUID> holdersOf(String permission) {
         return Set.copyOf(jdbc.queryForList(HOLDERS, UUID.class, TenantContext.getCurrentTenantId(), permission));
     }

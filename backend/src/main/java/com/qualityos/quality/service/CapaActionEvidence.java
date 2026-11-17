@@ -2,6 +2,7 @@ package com.qualityos.quality.service;
 
 import com.qualityos.common.attachment.AttachmentPolicy;
 import com.qualityos.common.security.Permissions;
+import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.quality.entity.CorrectiveAction;
 import com.qualityos.quality.repository.CapaActionRepository;
@@ -20,8 +21,11 @@ class CapaActionEvidence implements AttachmentPolicy {
     private final CapaActionRepository actions;
     private final CorrectiveActionRepository capas;
     private final FacilityScope scope;
+    private final com.qualityos.identity.service.TenantAccessService access;
 
-    CapaActionEvidence(CapaActionRepository actions, CorrectiveActionRepository capas, FacilityScope scope) {
+    CapaActionEvidence(CapaActionRepository actions, CorrectiveActionRepository capas, FacilityScope scope,
+            com.qualityos.identity.service.TenantAccessService access) {
+        this.access = access;
         this.actions = actions;
         this.capas = capas;
         this.scope = scope;
@@ -45,6 +49,25 @@ class CapaActionEvidence implements AttachmentPolicy {
     @Override
     public boolean parentExists(UUID entityId) {
         return capaOf(entityId).filter(capa -> scope.allows(capa.getFacilityId())).isPresent();
+    }
+
+    /** The action's owner sees its evidence, without needing to see every CAPA. */
+    @Override
+    public boolean callerMayView(UUID entityId) {
+        UUID caller = TenantContext.getCurrentUserId();
+        return actions.findById(entityId).filter(action -> action.getOwnerId().equals(caller)).isPresent();
+    }
+
+    /**
+     * The action's owner may attach evidence to it, and take back a wrong file, until it is done, while the plan allows
+     * CAPA work.
+     */
+    @Override
+    public boolean callerMayManage(UUID entityId) {
+        UUID caller = TenantContext.getCurrentUserId();
+        return actions.findById(entityId)
+                .filter(action -> !action.isDone() && action.getOwnerId().equals(caller))
+                .isPresent() && access.planAllows(Permissions.CAPA_MANAGE);
     }
 
     @Override

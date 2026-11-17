@@ -18,6 +18,19 @@ public interface AttachmentPolicy {
     /** @return whether the parent exists in the current tenant */
     boolean parentExists(UUID entityId);
 
+    /** @return whether the current user may see this parent's files without {@link #viewPermission()}: it is theirs */
+    default boolean callerMayView(UUID entityId) {
+        return false;
+    }
+
+    /**
+     * @return whether the current user may add or remove this parent's files without {@link #managePermission()}: it is
+     *     theirs
+     */
+    default boolean callerMayManage(UUID entityId) {
+        return false;
+    }
+
     /** @return whether the parent's files are now part of a closed record, and can no longer change */
     default boolean locked(UUID entityId) {
         return false;

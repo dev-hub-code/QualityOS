@@ -26,4 +26,15 @@ public interface CapaActionRepository extends JpaRepository<CapaAction, UUID> {
             order by a.targetDate
             """)
     List<CapaAction> findOverdue(LocalDate today, Instant remindedBefore);
+
+    /** Open actions of open CAPAs due on or before the given date, not yet escalated. */
+    @Query("""
+            select a from CapaAction a
+            where a.completedAt is null and a.targetDate <= :dueBy and a.escalatedAt is null
+              and exists (select c from CorrectiveAction c where c.id = a.capaId
+                          and c.status not in (com.qualityos.quality.entity.CorrectiveAction.Status.CLOSED,
+                                               com.qualityos.quality.entity.CorrectiveAction.Status.CANCELLED))
+            order by a.targetDate
+            """)
+    List<CapaAction> findToEscalate(LocalDate dueBy);
 }

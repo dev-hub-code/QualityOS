@@ -34,6 +34,12 @@ class QualityRules {
         return settings.get().actionEvidenceRequired();
     }
 
+    /** @return days late before a CAPA or action is escalated, or 0 when the organisation never escalates */
+    @Transactional(readOnly = true)
+    int escalationDays() {
+        return settings.get().capaEscalationDays();
+    }
+
     static boolean covers(SeverityThreshold threshold, Severity severity) {
         return switch (threshold) {
             case NEVER -> false;

@@ -7,6 +7,7 @@ import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.common.persistence.DocumentNumberService;
+import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.ReviewPolicy;
@@ -201,9 +202,10 @@ public class RecallService implements AttachmentPolicy {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<RecallSummary> list(Pageable page) {
-        var found = scope.restriction().map(allowed -> recalls.findWithin(allowed, page))
-                .orElseGet(() -> recalls.findAll(page));
+    public PageResponse<RecallSummary> list(String search, Pageable page) {
+        String pattern = Searches.pattern(search);
+        var found = scope.restriction().map(allowed -> recalls.findWithin(allowed, pattern, page))
+                .orElseGet(() -> recalls.findMatching(pattern, page));
         Map<UUID, List<RecallBatch>> byRecall = batches.findByRecallIdIn(found.map(Recall::getId).toList()).stream()
                 .collect(Collectors.groupingBy(RecallBatch::getRecallId));
         Map<UUID, String> names = production.views(byRecall.values().stream().flatMap(List::stream)

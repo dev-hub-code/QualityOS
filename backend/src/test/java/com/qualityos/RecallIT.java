@@ -95,6 +95,28 @@ class RecallIT extends TraceabilityFixture {
     }
 
     @Test
+    void recallsAndDispatchesAreFoundByWhatTheySay() throws Exception {
+        String recall = start();
+        String recallNumber = JsonPath.read(body(as(owner, get("/api/v1/recalls/" + recall))), "$.data.recallNumber");
+        String dispatchNumber = JsonPath.read(body(as(owner, get("/api/v1/dispatches"))),
+                "$.data.items[0].dispatchNumber");
+        for (String term : List.of(recallNumber.toLowerCase(), "CRACKS", numberOf(batch))) {
+            as(owner, get("/api/v1/recalls").param("q", term))
+                    .andExpect(jsonPath("$.data.items.length()").value(1))
+                    .andExpect(jsonPath("$.data.items[0].id").value(recall));
+        }
+        for (String term : List.of(dispatchNumber, "tata")) {
+            as(owner, get("/api/v1/dispatches").param("q", term))
+                    .andExpect(jsonPath("$.data.items.length()").value(1))
+                    .andExpect(jsonPath("$.data.items[0].id").value(dispatch));
+        }
+        // A wildcard is searched for as itself.
+        as(owner, get("/api/v1/recalls").param("q", "%")).andExpect(jsonPath("$.data.items.length()").value(0));
+        as(owner, get("/api/v1/dispatches").param("q", "Bajaj")).andExpect(jsonPath("$.data.items.length()").value(0));
+        as(owner, get("/api/v1/dispatches")).andExpect(jsonPath("$.data.items.length()").value(1));
+    }
+
+    @Test
     void anUnknownBatchIsRefused() throws Exception {
         as(owner, postJson("/api/v1/recalls", Map.of("batchNumbers", List.of("NOPE"), "recallDate", TODAY,
                         "reason", "x", "instructions", "y")))

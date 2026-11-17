@@ -31,6 +31,11 @@ public final class Searches {
                 .toArray(Predicate[]::new));
     }
 
+    /** A case-insensitive LIKE pattern for a query's own search, escaped with a backslash. Blank matches anything. */
+    public static String pattern(String term) {
+        return term == null || term.isBlank() ? "%" : "%" + escape(term.trim().toLowerCase(Locale.ROOT)) + "%";
+    }
+
     public static <T> Specification<T> equalTo(String field, Object value) {
         return value == null ? Specification.unrestricted() : (root, query, cb) -> cb.equal(root.get(field), value);
     }

@@ -65,10 +65,11 @@ public class RecallController {
 
     @GetMapping
     public ApiResponse<PageResponse<RecallSummary>> list(
+            @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size,
             @RequestParam(required = false) String sort) {
-        return ApiResponse.ok(recalls.list(Pages.of(page, size, sort, SORTABLE, "createdAt")));
+        return ApiResponse.ok(recalls.list(q, Pages.of(page, size, sort, SORTABLE, "createdAt")));
     }
 
     @PostMapping

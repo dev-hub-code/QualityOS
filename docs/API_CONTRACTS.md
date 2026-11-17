@@ -191,6 +191,8 @@ A sent email is an attempt with the outcome `NO_REPLY`. Only `REACHED` moves a c
 acknowledgement allows `RESOLVED`. Closing needs every customer resolved or covered by an exception, any linked CAPA closed,
 and a second person.
 
+`GET /recalls` takes `q`, matched in any case against the recall number, the reason or a batch number. `GET /dispatches` takes `q` too, matched against the dispatch number, the reference, or the customer's name or code. A member limited to some facilities still sees only what lies wholly inside them.
+
 While a recall is open, `POST /recalls/{id}/batches` adds batches found later (`batchNumbers`, `reason`). Their
 customers get contact records as at the start, a batch already in the recall is skipped, and adding none is a 422. It is
 audited as `RECALL_BATCHES_ADDED` with the numbers and reason. `PUT /recalls/{id}/capa` links, changes or (with an empty

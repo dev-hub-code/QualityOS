@@ -49,7 +49,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Material used can be entered in any unit of the same kind as its lot or batch, and is converted to that unit. The dialog lists every unit and the server refuses one that does not convert. A correction can be entered in another unit too, and is converted the same way. Units are added through the API alone, as before | When a user needs it |
 | A customer who returned everything still shows as having received the batch. This is deliberate: a recall should reach them | By design |
 | A return covers any lines of one dispatch at once. A return across several dispatches is recorded once per dispatch. Credit notes and refunds are separate and not built | When a user needs it |
-| Global search does not cover dispatches or recalls, whose lists have no search. Customers have no page of their own, so a customer found opens the customer list. Each kind stops at 10 matches | When a user needs it |
+| Customers and dispatches have no page of their own, so a customer or dispatch found by global search opens its list. Each kind stops at 10 matches | When a user needs it |
 | A lot's internal batch number cannot be corrected, because other records refer to it by number. It is generated, so it cannot be mistyped | By design |
 | A corrected lot keeps its original purchase order line, and a finished NCR keeps its original supplier and material | By design: history is preserved |
 | A correction of an inspected lot does not trigger reinspection. It needs two approvers, who decide whether to act | Review after real use |

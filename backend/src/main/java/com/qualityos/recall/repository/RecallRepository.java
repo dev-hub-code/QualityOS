@@ -20,12 +20,24 @@ public interface RecallRepository extends JpaRepository<Recall, UUID> {
 
     List<Recall> findByRecallNumberIn(Collection<String> recallNumbers);
 
-    /** Recalls lying wholly inside these facilities. A member cannot act on a recall they can only partly see. */
+    String MATCHING = """
+            (lower(r.recallNumber) like :pattern escape '\\'
+             or lower(r.reason) like :pattern escape '\\'
+             or exists (select 1 from RecallBatch rb, com.qualityos.traceability.entity.ProductionBatch b
+                        where rb.recallId = r.id and b.id = rb.productionBatchId
+                          and lower(b.batchNumber) like :pattern escape '\\'))
+            """;
+
+    /** Recalls whose number, reason or one of whose batch numbers matches. */
+    @Query("select r from Recall r where " + MATCHING)
+    Page<Recall> findMatching(String pattern, Pageable pageable);
+
+    /** As {@link #findMatching}, lying wholly inside these facilities. A member cannot act on a recall they can only partly see. */
     @Query("""
             select r from Recall r
             where not exists (
                 select 1 from RecallBatch rb, com.qualityos.traceability.entity.ProductionBatch b
                 where rb.recallId = r.id and b.id = rb.productionBatchId and b.facilityId not in :facilities)
-            """)
-    Page<Recall> findWithin(Collection<UUID> facilities, Pageable pageable);
+            and """ + MATCHING)
+    Page<Recall> findWithin(Collection<UUID> facilities, String pattern, Pageable pageable);
 }

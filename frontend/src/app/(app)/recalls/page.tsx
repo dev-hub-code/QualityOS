@@ -19,7 +19,7 @@ export default function RecallsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Recalls" subtitle="Start a recall from a batch's recall report." />
-      <DataTable path="/recalls" columns={COLUMNS} emptyMessage="No recalls." />
+      <DataTable path="/recalls" columns={COLUMNS} searchLabel="Search recalls" emptyMessage="No recalls." />
     </div>
   );
 }

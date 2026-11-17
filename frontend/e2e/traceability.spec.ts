@@ -244,3 +244,35 @@ test("one return takes goods back from several lines of a dispatch", async ({ pa
   await page.goto("/dispatch-reversals");
   await expect(page.getByRole("link", { name: /^RET-/ })).toHaveCount(1);
 });
+
+test("global search finds dispatches by customer and recalls by reason", async ({ page, browser }) => {
+  test.setTimeout(90_000);
+  const { batchNumber } = await dispatchedBatch(page, browser);
+  const call = apiCaller(page);
+  await call("POST", "/recalls", {
+    batchNumbers: [batchNumber],
+    recallDate: new Date().toISOString().slice(0, 10),
+    reason: "Hairline cracks in the shaft",
+    instructions: "Stop use and return all units",
+  });
+  const card = (title: string) =>
+    page.locator("[data-slot='card']").filter({ has: page.getByText(title, { exact: true }) });
+  const search = async (term: string) => {
+    await page.getByLabel("Search everything").fill(term);
+    await page.getByLabel("Search everything").press("Enter");
+  };
+
+  await page.goto("/dashboard");
+  await search("tata motors");
+  await expect(card("Dispatches")).toContainText("Tata Motors, dispatched");
+  await expect(card("Recalls")).toContainText("Nothing matches.");
+
+  await search("hairline");
+  await expect(card("Recalls")).toContainText("Hairline cracks in the shaft");
+  await card("Recalls").getByRole("link").first().click();
+  await expect(page).toHaveURL(/\/recalls\/[0-9a-f-]+$/);
+
+  await page.goto("/recalls");
+  await page.getByLabel("Search recalls").fill("no such recall");
+  await expect(page.getByText("No recalls.")).toBeVisible();
+});

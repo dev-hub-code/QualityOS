@@ -23,14 +23,25 @@ public interface DispatchRecordRepository extends JpaRepository<DispatchRecord, 
             """)
     long countUnconfirmed(LocalDate before);
 
-    /** Dispatches with every line in these facilities. One that also carries another plant's goods is left out. */
+    String MATCHING = """
+            (lower(d.dispatchNumber) like :pattern escape '\\'
+             or lower(coalesce(d.reference, '')) like :pattern escape '\\'
+             or exists (select 1 from Customer c where c.id = d.customerId
+                        and (lower(c.name) like :pattern escape '\\' or lower(c.code) like :pattern escape '\\')))
+            """;
+
+    /** Dispatches whose number, reference, or customer's name or code matches. */
+    @Query("select d from DispatchRecord d where " + MATCHING)
+    Page<DispatchRecord> findMatching(String pattern, Pageable pageable);
+
+    /** As {@link #findMatching}, with every line in these facilities. One that also carries another plant's goods is left out. */
     @Query("""
             select d from DispatchRecord d
             where not exists (
                 select 1 from DispatchItem i, ProductionBatch b
                 where i.dispatchId = d.id and b.id = i.productionBatchId and b.facilityId not in :facilities)
-            """)
-    Page<DispatchRecord> findWithin(Collection<UUID> facilities, Pageable pageable);
+            and """ + MATCHING)
+    Page<DispatchRecord> findWithin(Collection<UUID> facilities, String pattern, Pageable pageable);
 
     /** Serialises cancelling, shipping and returning, which rule each other out. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)

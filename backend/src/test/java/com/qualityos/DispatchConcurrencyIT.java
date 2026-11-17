@@ -76,6 +76,29 @@ class DispatchConcurrencyIT extends TraceabilityFixture {
         assertThat(dispatchedFirst + inspectedFirst).isEqualTo(ROUNDS);
     }
 
+    @Test
+    void twoDispatchesOfTheSameStockNeverShipMoreThanThereIs() throws Exception {
+        String batch = releasedBatch(releasedLot("10").id(), "10", "10");
+        String first = customer();
+        String second = customer();
+        CyclicBarrier together = new CyclicBarrier(2);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            List<Future<Integer>> shipped = List.of(first, second).stream().map(customer -> pool.submit(at(together,
+                    () -> as(owner, postJson("/api/v1/dispatches", java.util.Map.of("customerId", customer,
+                            "dispatchedOn", TODAY, "items", List.of(java.util.Map.of("productionBatchId", batch,
+                                    "quantity", "6", "serialNumbers", List.of())))))
+                            .andReturn().getResponse().getStatus()))).toList();
+            // Ten in the batch: one dispatch of six goes, the other finds only four.
+            assertThat(List.of(shipped.get(0).get(), shipped.get(1).get())).containsExactlyInAnyOrder(201, 422);
+        } finally {
+            pool.shutdownNow();
+        }
+        String available = JsonPath.read(body(as(owner, get("/api/v1/production-batches/" + batch))),
+                "$.data.batch.availableQuantity");
+        assertThat(new BigDecimal(available)).isEqualByComparingTo("4");
+    }
+
     /** Waits for the other request, so both are sent together. */
     private static <T> Callable<T> at(CyclicBarrier together, Callable<T> request) {
         return () -> {

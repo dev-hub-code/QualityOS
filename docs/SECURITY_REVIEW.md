@@ -1,5 +1,7 @@
 # Security review
 
+> Later review: [17 November 2026 audit](AUDIT_2026-11-17.md) covers the code merged since this one.
+
 Code review and local testing of the `dev` branch on 1 November 2026. This is not an independent penetration test and
 does not claim any certification.
 

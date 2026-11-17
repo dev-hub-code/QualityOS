@@ -493,7 +493,7 @@ export const DOC_PAGES: DocPage[] = [
           "A batch can also consume another batch, but never itself.",
           "A batch cannot be completed until what went into it is recorded.",
           "IPQC can happen during production. FQC needs a completed batch.",
-          "A released batch can take an optional OQC of what is left to ship. Accepting it keeps the batch released. A hold stops shipping until it is decided, and a rejection stops what is left for good.",
+          "A released batch can take an optional OQC of what is left to ship. Accepting it keeps the batch released. Nothing ships from the batch while its OQC is open. A hold stops shipping until it is decided, and a rejection stops what is left for good.",
           "Serial numbers are registered once the batch is complete, and there cannot be more than there are units.",
         ],
       },

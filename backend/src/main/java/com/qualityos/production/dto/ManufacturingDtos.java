@@ -208,7 +208,13 @@ public final class ManufacturingDtos {
             @DecimalMin("0") @DecimalMax(value = "100", inclusive = false) @Digits(integer = 2, fraction = 2)
             BigDecimal scrapPercent,
             Boolean scales,
-            @Size(max = 1000) String notes) {
+            @Size(max = 1000) String notes,
+            /* Materials approved to stand in for a material line, one for one in the line's unit. */
+            @Size(max = 5) List<@NotNull UUID> alternateMaterialIds) {
+    }
+
+    /** A material approved to stand in for a line's material. */
+    public record Alternate(UUID materialId, String code, String name) {
     }
 
     public record LineResponse(
@@ -222,7 +228,8 @@ public final class ManufacturingDtos {
             UUID uomId,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal scrapPercent,
             boolean scales,
-            String notes) {
+            String notes,
+            List<Alternate> alternates) {
     }
 
     public record SaveParameterRequest(

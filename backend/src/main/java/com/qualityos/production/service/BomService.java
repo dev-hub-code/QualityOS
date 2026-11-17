@@ -435,6 +435,31 @@ public class BomService {
         line.setScrapPercent(request.scrapPercent() == null ? BigDecimal.ZERO : request.scrapPercent());
         line.setScales(request.scales() == null || request.scales());
         line.setNotes(request.notes());
+        line.setAlternateMaterialIds(new java.util.ArrayList<>(alternates(request, componentUom)));
+    }
+
+    /** Distinct active materials, other than the line's own, measured in a unit of the same kind. */
+    private List<UUID> alternates(SaveLineRequest request, UUID componentUom) {
+        List<UUID> chosen = request.alternateMaterialIds() == null ? List.of() : request.alternateMaterialIds();
+        if (chosen.isEmpty()) {
+            return List.of();
+        }
+        if (request.materialId() == null) {
+            throw new BusinessRuleException("Only a material line can have substitutes.");
+        }
+        if (Set.copyOf(chosen).size() != chosen.size() || chosen.contains(request.materialId())) {
+            throw new BusinessRuleException("List each substitute once, and not the line's own material.");
+        }
+        for (UUID alternate : chosen) {
+            MaterialReference reference = materials.requireActive(alternate);
+            try {
+                materials.convert(BigDecimal.ONE, componentUom, reference.uomId());
+            } catch (BusinessRuleException e) {
+                throw new BusinessRuleException("Substitute %s is measured in a unit of another kind than the line."
+                        .formatted(reference.code()));
+            }
+        }
+        return List.copyOf(chosen);
     }
 
     private void copyContent(Bom source, Bom target) {
@@ -447,6 +472,7 @@ public class BomService {
             copy.setScrapPercent(line.getScrapPercent());
             copy.setScales(line.isScales());
             copy.setNotes(line.getNotes());
+            copy.setAlternateMaterialIds(new java.util.ArrayList<>(line.getAlternateMaterialIds()));
             lines.save(copy);
         }
         for (ProcessParameter parameter : parameters.findByBomIdOrderByCode(source.getId())) {
@@ -474,8 +500,9 @@ public class BomService {
 
     private BomDetail detail(Bom bom) {
         List<BomLine> content = lines.findByBomIdOrderByLineNumber(bom.getId());
-        Map<UUID, MaterialReference> materialRefs = materials.references(
-                content.stream().map(BomLine::getMaterialId).filter(java.util.Objects::nonNull).toList());
+        Map<UUID, MaterialReference> materialRefs = materials.references(java.util.stream.Stream.concat(
+                content.stream().map(BomLine::getMaterialId).filter(java.util.Objects::nonNull),
+                content.stream().flatMap(line -> line.getAlternateMaterialIds().stream())).distinct().toList());
         Set<UUID> productIds = new HashSet<>(content.stream()
                 .map(BomLine::getComponentProductId).filter(java.util.Objects::nonNull).toList());
         productIds.add(bom.getProductId());
@@ -488,7 +515,11 @@ public class BomService {
                     : productRefs.get(line.getComponentProductId()).name();
             return new LineResponse(line.getId(), line.getLineNumber(), material ? MATERIAL : PRODUCT,
                     line.componentId(), code, name, line.getQuantity(), line.getUomId(), line.getScrapPercent(),
-                    line.isScales(), line.getNotes());
+                    line.isScales(), line.getNotes(), line.getAlternateMaterialIds().stream()
+                            .map(materialRefs::get)
+                            .map(ref -> new com.qualityos.production.dto.ManufacturingDtos.Alternate(
+                                    ref.id(), ref.code(), ref.name()))
+                            .toList());
         }).toList();
         List<ParameterResponse> parameterResponses = parameters.findByBomIdOrderByCode(bom.getId()).stream()
                 .map(Parameters::toResponse)

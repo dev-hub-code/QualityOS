@@ -65,11 +65,18 @@ describe("toLineRequest", () => {
       scrapPercent: null,
       scales: true,
       notes: null,
+      alternateMaterialIds: [],
     });
     const product = toLineRequest({ component: "product:p1", quantity: "1", uomId: "u", scrapPercent: "5", fixed: true });
     expect(product.componentProductId).toBe("p1");
     expect(product.scrapPercent).toBe("5");
     expect(product.scales).toBe(false);
+  });
+
+  it("keeps each chosen substitute once, and only on a material line", () => {
+    const chosen = { component: "material:m1", quantity: "2", uomId: "u", substitute1: "a", substitute2: "", substitute3: "a" };
+    expect(toLineRequest(chosen).alternateMaterialIds).toEqual(["a"]);
+    expect(toLineRequest({ ...chosen, component: "product:p1" }).alternateMaterialIds).toEqual([]);
   });
 });
 

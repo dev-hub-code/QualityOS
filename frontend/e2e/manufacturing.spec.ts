@@ -13,6 +13,7 @@ test("a BOM is drafted, approved and exploded, and machines keep their status hi
   const unit = (code: string) => units.find((candidate) => candidate.code === code)!.id;
   await call("POST", "/facilities", { code: "PUNE", name: "Pune Plant" });
   await call("POST", "/materials", { code: "EN8", name: "EN8 Bar", uomId: unit("KG"), inspectionRequired: false });
+  await call("POST", "/materials", { code: "EN9", name: "EN9 Bar", uomId: unit("KG"), inspectionRequired: false });
   const shaft = await call("POST", "/products", { code: "SH-1", name: "Shaft", productType: "SEMI_FINISHED", uomId: unit("PCS") });
   await call("POST", "/products", { code: "GB-1", name: "Gearbox", productType: "FINISHED", uomId: unit("PCS") });
 
@@ -58,8 +59,10 @@ test("a BOM is drafted, approved and exploded, and machines keep their status hi
     await dialog.getByLabel("Material or product").selectOption({ label: "Material: EN8 – EN8 Bar" });
     await dialog.getByLabel(/^Quantity/).fill("500");
     await dialog.getByLabel("Unit").selectOption(unit("GM"));
+    await dialog.getByLabel(/Approved substitute 1/).selectOption({ label: "EN9 – EN9 Bar" });
   });
   await expect(page.getByText("1. EN8 – EN8 Bar")).toBeVisible();
+  await expect(page.getByText("substitutes: EN9")).toBeVisible();
   await page.getByRole("button", { name: "Submit for approval" }).click();
   await step(page, "Approve", async () => {});
   await expect(page.locator("[data-slot='badge']", { hasText: "in effect" })).toBeVisible();

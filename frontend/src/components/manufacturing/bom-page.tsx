@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
-import { DEFINITIONS, describeLimits, toLineRequest } from "@/lib/manufacturing";
+import { DEFINITIONS, SUBSTITUTE_FIELDS, describeLimits, toLineRequest } from "@/lib/manufacturing";
 import { DECIMAL_PATTERN, formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { BomDetail, BomLine, Explosion, ScaledRecipe } from "@/lib/types";
 
@@ -164,6 +164,14 @@ export function BomPage({ kind, id }: { kind: "BOM" | "RECIPE"; id: string }) {
     ...(kind === "RECIPE"
       ? ([{ name: "fixed", label: "Fixed quantity, whatever the batch size", type: "checkbox" }] as FieldDef[])
       : []),
+    ...SUBSTITUTE_FIELDS.map(
+      (name, index): FieldDef => ({
+        name,
+        label: `Approved substitute ${index + 1}, for a material line`,
+        type: "select",
+        options: materials,
+      }),
+    ),
     { name: "notes", label: "Notes", type: "textarea" },
   ];
 
@@ -188,6 +196,12 @@ export function BomPage({ kind, id }: { kind: "BOM" | "RECIPE"; id: string }) {
               <span>
                 {line.lineNumber}. {line.componentCode} – {line.componentName}
                 {line.componentType === "PRODUCT" && <span className="text-muted-foreground"> (made in-house)</span>}
+                {line.alternates.length > 0 && (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · substitutes: {line.alternates.map((alternate) => alternate.code).join(", ")}
+                  </span>
+                )}
               </span>
               <span className="flex items-center gap-2">
                 <span>
@@ -253,6 +267,9 @@ export function BomPage({ kind, id }: { kind: "BOM" | "RECIPE"; id: string }) {
                   ...editing,
                   component: `${editing.componentType === "MATERIAL" ? "material" : "product"}:${editing.componentId}`,
                   fixed: !editing.scales,
+                  ...Object.fromEntries(
+                    editing.alternates.map((alternate, index) => [SUBSTITUTE_FIELDS[index], alternate.materialId]),
+                  ),
                 }
           }
           onClose={() => setEditing(null)}

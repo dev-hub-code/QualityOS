@@ -62,8 +62,16 @@ export function toLineRequest(values: Record<string, unknown>) {
     scrapPercent: scrap === "" ? null : scrap,
     scales: values.fixed !== true,
     notes: values.notes || null,
+    // Substitutes only make sense on a material line; blanks and repeats are dropped.
+    alternateMaterialIds:
+      kind === "material"
+        ? [...new Set(SUBSTITUTE_FIELDS.map((name) => String(values[name] ?? "")).filter((value) => value !== ""))]
+        : [],
   };
 }
+
+/** The form's substitute choices, of which a line can name up to three here. */
+export const SUBSTITUTE_FIELDS = ["substitute1", "substitute2", "substitute3"] as const;
 
 /** "Target 180, 175 to 185 °C" */
 export function describeLimits(parameter: { target: string | null; minimum: string | null; maximum: string | null; unit: string | null }) {

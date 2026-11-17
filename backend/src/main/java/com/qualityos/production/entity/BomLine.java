@@ -28,6 +28,13 @@ public class BomLine extends TenantOwnedEntity {
     private boolean scales = true;
     private String notes;
 
+    /**
+     * Materials approved to stand in for this line's material, one for one in the line's unit. They are frozen into a
+     * work order on release, and reserved or issued against the line by hand.
+     */
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    private java.util.List<UUID> alternateMaterialIds = new java.util.ArrayList<>();
+
     public BomLine(UUID bomId, int lineNumber) {
         this.bomId = bomId;
         this.lineNumber = lineNumber;

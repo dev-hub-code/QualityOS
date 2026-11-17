@@ -448,6 +448,14 @@ come first expiring first (then lots without expiry, oldest first), which automa
 issuing (reserved or not) and consuming an expired lot is `422`. A lot is usable through its expiry date, in the
 organisation's time zone.
 
+A BOM or recipe line takes `alternateMaterialIds` (up to 5 active materials, not the line's own, each in a unit of the
+same kind; material lines only) and returns `alternates` (`materialId`, `code`, `name`). They are frozen into the work
+order's line on release. A work order line's `sources` then list the substitutes' free lots after its own, with
+`substituteCode`, and `substituteAvailable` gives their free stock in the line's unit (not part of `available`).
+Automatic reservation takes only the line's own material; reserving or issuing a substitute's lot counts one for one
+toward the line and is audited as `WORK_ORDER_MATERIAL_SUBSTITUTED`. A material named as a substitute counts as in use
+when archiving.
+
 Work order operations now also carry `statusReason`, `operatorName`, `machineCode`, `input`, `goodQuantity`,
 `rejectedQuantity`, `scrapQuantity` and `waiting`.
 

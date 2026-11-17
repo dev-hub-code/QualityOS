@@ -2,6 +2,7 @@ package com.qualityos;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -70,7 +71,11 @@ class WorkOrderMaterialIT extends TraceabilityFixture {
     }
 
     private String released(String quantity) throws Exception {
-        String order = JsonPath.read(body(send(owner, "/work-orders", Map.of("productId", product,
+        return released(product, quantity);
+    }
+
+    private String released(String productId, String quantity) throws Exception {
+        String order = JsonPath.read(body(send(owner, "/work-orders", Map.of("productId", productId,
                         "facilityId", facility, "quantity", quantity, "plannedStart", TODAY,
                         "plannedEnd", LocalDate.now().plusDays(2).toString())).andExpect(status().isCreated())),
                 "$.data.workOrder.id");
@@ -283,6 +288,78 @@ class WorkOrderMaterialIT extends TraceabilityFixture {
         // An entered date wins over the shelf life.
         receiveExpiring(kept, "4", received, received.plusDays(7)).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.items[0].expiryDate").value(received.plusDays(7).toString()));
+    }
+
+    @Test
+    void aSubstituteNamedOnTheBomStandsInForTheLineMaterial() throws Exception {
+        String substitute = material(owner, false, "KG");
+        String counted = material(owner, false, "PCS");
+        String housing = idOf(body(as(owner, postJson("/api/v1/products", Map.of("code", code(), "name", "Housing",
+                        "productType", "FINISHED", "uomId", unitId(owner, "PCS"))))
+                .andExpect(status().isCreated())));
+        String bom = JsonPath.read(body(send(owner, "/boms", Map.of("productId", housing))
+                .andExpect(status().isCreated())), "$.data.revision.id");
+        Map<String, Object> line = new HashMap<>(Map.of("materialId", material, "quantity", "2",
+                "uomId", unitId(owner, "KG"), "scrapPercent", "10"));
+        line.put("alternateMaterialIds", List.of(material));
+        send(owner, "/boms/" + bom + "/lines", line).andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(containsString("not the line's own material")));
+        line.put("alternateMaterialIds", List.of(counted));
+        send(owner, "/boms/" + bom + "/lines", line).andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(containsString("unit of another kind")));
+        line.put("alternateMaterialIds", List.of(substitute));
+        String saved = body(send(owner, "/boms/" + bom + "/lines", line).andExpect(status().isOk()));
+        assertThat(JsonPath.<List<String>>read(saved, "$.data.lines[0].alternates[*].materialId"))
+                .containsExactly(substitute);
+        send(owner, "/boms/" + bom + "/submit", Map.of()).andExpect(status().isOk());
+        send(manager, "/boms/" + bom + "/approve", Map.of()).andExpect(status().isOk());
+
+        // Only the substitute is in stock: it is offered and shown, but automatic reservation leaves it to a person.
+        String substituteLot = JsonPath.read(body(receiveExpiring(substitute, "30", LocalDate.now(), null)
+                .andExpect(status().isCreated())), "$.data.items[0].id");
+        String order = released(housing, "10");
+        String path = "/work-orders/" + order;
+        send(approver, path + "/reservations/auto", Map.of()).andExpect(status().isOk());
+        String view = materials(order);
+        assertThat(JsonPath.<String>read(view, "$.data.lines[0].reserved")).isEqualTo("0.000000");
+        assertThat(JsonPath.<String>read(view, "$.data.lines[0].available")).isEqualTo("0.000000");
+        assertThat(JsonPath.<String>read(view, "$.data.lines[0].substituteAvailable")).isEqualTo("30.000000");
+        assertThat(JsonPath.<List<String>>read(view, "$.data.lines[0].sources[*].id")).containsExactly(substituteLot);
+        assertThat(JsonPath.<String>read(view, "$.data.lines[0].sources[0].substituteCode")).isNotBlank();
+        assertThat(JsonPath.<List<String>>read(view, "$.data.shortages").getFirst())
+                .contains("approved substitutes free");
+
+        // A person takes the substitute, one for one in the line's unit; an unrelated material is refused.
+        send(approver, path + "/reservations", Map.of("lineNumber", 1, "lotId", substituteLot, "quantity", "12"))
+                .andExpect(status().isOk());
+        String unrelated = JsonPath.read(body(receiveExpiring(counted, "5", LocalDate.now(), null)
+                .andExpect(status().isCreated())), "$.data.items[0].id");
+        send(approver, path + "/reservations", Map.of("lineNumber", 1, "lotId", unrelated, "quantity", "1"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(containsString("nor an approved substitute")));
+
+        String lot = lotIn(facility, "30");
+        send(approver, path + "/start", Map.of()).andExpect(status().isOk());
+        send(approver, path + "/issues", Map.of("lineNumber", 1, "lotId", substituteLot, "quantity", "12"))
+                .andExpect(status().isOk());
+        send(approver, path + "/issues", Map.of("lineNumber", 1, "lotId", lot, "quantity", "10"))
+                .andExpect(status().isOk());
+        view = materials(order);
+        assertThat(JsonPath.<String>read(view, "$.data.lines[0].issued")).isEqualTo("22.000000");
+        assertThat(JsonPath.<String>read(view, "$.data.lines[0].outstanding")).isEqualTo("0.000000");
+        assertThat(lotColumn(substituteLot, "consumed_quantity")).isEqualByComparingTo("12");
+        assertThat(asDatabaseSuperuser().queryForObject("SELECT count(*) FROM audit_logs WHERE tenant_id = ?::uuid "
+                + "AND action = 'WORK_ORDER_MATERIAL_SUBSTITUTED'", Long.class, owner.tenantId())).isEqualTo(2);
+        // A material named as a substitute is in use, like the line's own.
+        as(owner, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                        "/api/v1/materials/" + substitute))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(allOf(containsString("1 approved BOM or recipe"),
+                        containsString("1 open work order"))));
+        // Frozen with the rest of the released line.
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> asDatabaseSuperuser().update(
+                "UPDATE work_order_materials SET alternate_material_ids = '[]' WHERE work_order_id = ?::uuid", order))
+                .hasMessageContaining("cannot be rewritten");
     }
 
     @Test

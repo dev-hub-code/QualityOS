@@ -512,8 +512,10 @@ Phase 3:
   still counts as issued, and cannot take reserved stock.
 - Material is issued in the line's unit. A lot in another unit is converted, which may leave a remainder below six
   decimal places.
-- Material substitution (issuing another material against a line) is not built. Scrapped material is recorded as
-  scrap on the operation that lost it (phase 4), not as a separate stock movement.
+- Substitution is by approved alternates on BOM and recipe lines, frozen on release and taken by hand, one for one in
+  the line's unit; there is no conversion factor between a material and its substitute, and no substitution of a
+  material that is not listed. Scrapped material is recorded as scrap on the operation that lost it (phase 4), not as a
+  separate stock movement.
 
 Phase 4:
 

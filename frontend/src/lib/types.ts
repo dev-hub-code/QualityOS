@@ -1798,6 +1798,8 @@ export interface BomLine {
   scrapPercent: string;
   scales: boolean;
   notes: string | null;
+  /** Materials approved to stand in for a material line, one for one in its unit. */
+  alternates: { materialId: string; code: string; name: string }[];
 }
 
 export interface ProcessParameter {
@@ -1839,7 +1841,7 @@ export interface ScaledRecipe {
   batchSize: string;
   uomId: string;
   factor: string;
-  lines: (Omit<BomLine, "id" | "scrapPercent" | "notes">)[];
+  lines: (Omit<BomLine, "id" | "scrapPercent" | "notes" | "alternates">)[];
   parameters: ProcessParameter[];
 }
 
@@ -2028,7 +2030,11 @@ export interface WorkOrderMaterials {
       freeQuantity: string;
       uomId: string;
       expiryDate: string | null;
+      /** A lot of an approved substitute: its material's code. */
+      substituteCode: string | null;
     }[];
+    /** Free stock of approved substitutes, in the line's unit, not counted in available. */
+    substituteAvailable: string;
   }[];
   reservations: {
     id: string;

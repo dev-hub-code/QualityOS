@@ -525,7 +525,7 @@ export const DOC_PAGES: DocPage[] = [
         terms: [
           ["Work centre", "A place in a facility where operations run, such as a turning cell. It can carry labour, machine and overhead rates per hour."],
           ["Machine", "Equipment at a work centre. Its status is AVAILABLE, RUNNING, IDLE, MAINTENANCE, BREAKDOWN or INACTIVE, and every change is kept."],
-          ["BOM", "The materials and sub-assemblies that make one or more units of a discrete product, with scrap allowances."],
+          ["BOM", "The materials and sub-assemblies that make one or more units of a discrete product, with scrap allowances. A material line can name approved substitutes, measured in a unit of the same kind, that may stand in for it one for one."],
           ["Recipe", "A BOM for a process product: a base batch size, lines that scale or stay fixed, and process parameters."],
           ["Routing", "The numbered operations that make the product, each at a work centre with setup and run times and its own parameters."],
         ],
@@ -586,7 +586,7 @@ export const DOC_PAGES: DocPage[] = [
         title: "Plans and materials",
         list: [
           "A production plan covers one facility and a period, with products, quantities and due dates. Work orders are raised from the lines of an approved plan.",
-          "After release, the order lists what it needs and what is short. Released lots can be reserved by hand, or reserved at once first expiring first: lots expiring soonest, then lots without an expiry, oldest first. Expired lots are never offered.",
+          "After release, the order lists what it needs and what is short. Released lots can be reserved by hand, or reserved at once first expiring first: lots expiring soonest, then lots without an expiry, oldest first. Expired lots are never offered. A line's approved substitutes are offered after its own lots, marked as substitutes, and are only ever reserved or issued by hand; they count one for one toward the line.",
           "Issuing material records consumption on the order's batch. Reservations are used first.",
           "Scheduling shows each work centre's load against its shift capacity, and warns about late orders and overloaded days. The planner decides what to move.",
         ],

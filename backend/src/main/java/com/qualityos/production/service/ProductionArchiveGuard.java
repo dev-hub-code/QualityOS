@@ -49,11 +49,13 @@ class ProductionArchiveGuard implements ArchiveGuard {
                 add(uses, "approved BOM or recipe", "approved BOMs or recipes", """
                         SELECT count(DISTINCT b.id) FROM bom_lines l
                         JOIN boms b ON b.tenant_id = l.tenant_id AND b.id = l.bom_id
-                        WHERE l.material_id = ? AND \s""" + BOM_IN_EFFECT, id);
+                        WHERE (l.material_id = ? OR l.alternate_material_ids ?? ?::text) AND \s"""
+                        + BOM_IN_EFFECT, id, id);
                 add(uses, "open work order", "open work orders", """
                         SELECT count(DISTINCT w.id) FROM work_order_materials m
                         JOIN work_orders w ON w.tenant_id = m.tenant_id AND w.id = m.work_order_id
-                        WHERE m.material_id = ? AND w.""" + OPEN_ORDER, id);
+                        WHERE (m.material_id = ? OR m.alternate_material_ids ?? ?::text) AND w.""" + OPEN_ORDER,
+                        id, id);
                 add(uses, "open reservation of its lots", "open reservations of its lots", """
                         SELECT count(*) FROM material_reservations r
                         JOIN work_order_materials m ON m.tenant_id = r.tenant_id AND m.id = r.work_order_material_id
@@ -71,8 +73,8 @@ class ProductionArchiveGuard implements ArchiveGuard {
         return uses;
     }
 
-    private void add(List<String> uses, String one, String many, String sql, UUID id) {
-        Long count = jdbc.queryForObject(sql, Long.class, id);
+    private void add(List<String> uses, String one, String many, String sql, Object... arguments) {
+        Long count = jdbc.queryForObject(sql, Long.class, arguments);
         if (count != null && count > 0) {
             uses.add(count + " " + (count == 1 ? one : many));
         }

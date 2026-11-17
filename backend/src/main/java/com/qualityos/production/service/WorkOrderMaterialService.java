@@ -146,6 +146,7 @@ public class WorkOrderMaterialService {
         LotView lot = lotFor(order, line, request.lotId());
         BigDecimal inLot = convert(request.quantity(), line.getUomId(), lot.uomId());
         receipts.reserve(lot.itemId(), inLot);
+        recordSubstitution(order, line, lot, "reserved", inLot);
         MaterialReservation reservation = reservations.saveAndFlush(
                 new MaterialReservation(id, line.getId(), lot.itemId(), inLot, lot.uomId()));
         movements.saveAndFlush(new MaterialMovement(id, line.getId(), MaterialMovement.Type.RESERVED, lot.itemId(),
@@ -266,6 +267,7 @@ public class WorkOrderMaterialService {
             }
             LotView lot = lotFor(order, line, request.lotId());
             BigDecimal inLot = convert(request.quantity(), line.getUomId(), lot.uomId());
+            recordSubstitution(order, line, lot, "issued", inLot);
             BigDecimal fromReserved = BigDecimal.ZERO;
             for (MaterialReservation reservation : reservations.findOpen(id)) {
                 if (reservation.getLotId().equals(lot.itemId())
@@ -444,11 +446,31 @@ public class WorkOrderMaterialService {
     }
 
     private WorkOrderMaterial lineFor(WorkOrder order, Sources sources, ConsumptionRef consumption) {
-        String wanted = sources.key(consumption);
-        return requirements.findByWorkOrderIdOrderByLineNumber(order.getId()).stream()
-                .filter(line -> key(line).equals(wanted))
-                .findFirst()
-                .orElse(null);
+        return matching(requirements.findByWorkOrderIdOrderByLineNumber(order.getId()), sources.key(consumption))
+                .stream().findFirst().orElse(null);
+    }
+
+    /**
+     * The lines a consumption counts against: those naming its material or product, or failing any, the material lines
+     * that list it as a substitute.
+     */
+    private static List<WorkOrderMaterial> matching(List<WorkOrderMaterial> lines, String wanted) {
+        List<WorkOrderMaterial> own = lines.stream().filter(line -> key(line).equals(wanted)).toList();
+        if (!own.isEmpty() || !wanted.startsWith(MATERIAL + ":")) {
+            return own;
+        }
+        UUID material = UUID.fromString(wanted.substring(MATERIAL.length() + 1));
+        return lines.stream().filter(line -> line.getAlternateMaterialIds().contains(material)).toList();
+    }
+
+    /** Taking a substitute is audited on its own, so that it can be found. */
+    private void recordSubstitution(WorkOrder order, WorkOrderMaterial line, LotView lot, String how,
+            BigDecimal quantity) {
+        if (!lot.materialId().equals(line.getMaterialId())) {
+            audit.record("WORK_ORDER_MATERIAL_SUBSTITUTED", ENTITY, order.getId(), null, Map.of(
+                    "line", line.getLineNumber(), "lot", lot.internalBatch(), "material", lot.materialCode(),
+                    "how", how, "quantity", quantity.toPlainString()));
+        }
     }
 
     /**
@@ -474,8 +496,7 @@ public class WorkOrderMaterialService {
         Sources sources = sources(consumptions);
         Map<UUID, BigDecimal> issued = new HashMap<>();
         for (ConsumptionRef consumption : consumptions) {
-            String wanted = sources.key(consumption);
-            List<WorkOrderMaterial> matching = lines.stream().filter(line -> key(line).equals(wanted)).toList();
+            List<WorkOrderMaterial> matching = matching(lines, sources.key(consumption));
             if (matching.isEmpty()) {
                 continue;
             }
@@ -516,7 +537,9 @@ public class WorkOrderMaterialService {
         Map<UUID, Integer> attribution = new HashMap<>();
         Map<UUID, Coverage> coverage = coverage(order, lines, consumptions, open, attribution);
 
-        Set<UUID> materialIds = lines.stream().map(WorkOrderMaterial::getMaterialId).filter(Objects::nonNull)
+        Set<UUID> materialIds = Stream.concat(
+                        lines.stream().map(WorkOrderMaterial::getMaterialId).filter(Objects::nonNull),
+                        lines.stream().flatMap(line -> line.getAlternateMaterialIds().stream()))
                 .collect(Collectors.toSet());
         Set<UUID> productIds = lines.stream().map(WorkOrderMaterial::getComponentProductId).filter(Objects::nonNull)
                 .collect(Collectors.toSet());
@@ -533,19 +556,27 @@ public class WorkOrderMaterialService {
         List<String> shortages = new ArrayList<>();
         for (WorkOrderMaterial line : lines) {
             boolean material = line.getMaterialId() != null;
+            // The line's own lots first, then its substitutes' lots.
             List<SourceOption> options = material
-                    ? freeLots.getOrDefault(line.getMaterialId(), List.of()).stream()
+                    ? Stream.concat(Stream.of(line.getMaterialId()), line.getAlternateMaterialIds().stream())
+                            .flatMap(each -> freeLots.getOrDefault(each, List.of()).stream())
                             .map(lot -> new SourceOption(LOT, lot.itemId(), lot.internalBatch(), lot.receivedOn(),
-                                    lot.freeQuantity(), lot.uomId(), lot.expiryDate()))
+                                    lot.freeQuantity(), lot.uomId(), lot.expiryDate(),
+                                    lot.materialId().equals(line.getMaterialId()) ? null : lot.materialCode()))
                             .toList()
                     : freeBatches.getOrDefault(line.getComponentProductId(), List.of()).stream()
                             .map(batch -> new SourceOption(BATCH, batch.id(), batch.batchNumber(), null,
-                                    batch.availableQuantity(), batch.uomId(), null))
+                                    batch.availableQuantity(), batch.uomId(), null, null))
                             .toList();
             // Lines naming the same component share what is free.
             BigDecimal available = availableLeft.computeIfAbsent(key(line), k -> options.stream()
+                    .filter(option -> option.substituteCode() == null)
                     .map(option -> convert(option.freeQuantity(), option.uomId(), line.getUomId()))
                     .reduce(BigDecimal.ZERO, BigDecimal::add));
+            BigDecimal substituteAvailable = options.stream()
+                    .filter(option -> option.substituteCode() != null)
+                    .map(option -> convert(option.freeQuantity(), option.uomId(), line.getUomId()))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
             Coverage c = coverage.get(line.getId());
             BigDecimal shortage = c.outstanding().subtract(available).max(BigDecimal.ZERO);
             availableLeft.put(key(line), available.subtract(c.outstanding()).max(BigDecimal.ZERO));
@@ -554,13 +585,14 @@ public class WorkOrderMaterialService {
             String name = material ? materialRefs.get(line.getMaterialId()).name()
                     : productRefs.get(line.getComponentProductId()).name();
             if (shortage.signum() > 0) {
-                shortages.add("%s is short by %s %s.".formatted(code, plain(shortage),
-                        units.get(line.getUomId())));
+                shortages.add("%s is short by %s %s%s.".formatted(code, plain(shortage), units.get(line.getUomId()),
+                        substituteAvailable.signum() > 0 ? ", with %s %s of approved substitutes free".formatted(
+                                plain(scaled(substituteAvailable)), units.get(line.getUomId())) : ""));
             }
             lineViews.add(new MaterialLine(line.getLineNumber(), material ? MATERIAL : PRODUCT,
                     material ? line.getMaterialId() : line.getComponentProductId(), code, name, line.getUomId(),
                     line.getRequiredQuantity(), scaled(c.issued()), scaled(c.reserved()), scaled(c.outstanding()),
-                    scaled(available), scaled(shortage), options));
+                    scaled(available), scaled(shortage), options, scaled(substituteAvailable)));
         }
 
         Set<UUID> lotIds = Stream.concat(all.stream().map(MaterialReservation::getLotId),
@@ -607,8 +639,8 @@ public class WorkOrderMaterialService {
     private LotView lotFor(WorkOrder order, WorkOrderMaterial line, UUID lotId) {
         LotView lot = receipts.lots(List.of(lotId)).stream().findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Batch", lotId));
-        if (!lot.materialId().equals(line.getMaterialId())) {
-            throw new BusinessRuleException("Batch %s is not of line %d's material."
+        if (!line.takes(lot.materialId())) {
+            throw new BusinessRuleException("Batch %s is neither line %d's material nor an approved substitute for it."
                     .formatted(lot.internalBatch(), line.getLineNumber()));
         }
         requireSameFacility(order, lot.facilityId());

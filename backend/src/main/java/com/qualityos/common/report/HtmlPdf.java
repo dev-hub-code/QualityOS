@@ -1,5 +1,10 @@
 package com.qualityos.common.report;
 
+import com.qualityos.common.tenant.TenantContext;
+import java.util.Base64;
+import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import com.openhtmltopdf.outputdevice.helper.BaseRendererBuilder.FontStyle;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.samskivert.mustache.Mustache;
@@ -21,8 +26,37 @@ public class HtmlPdf {
 
     private static final String SANS = "Report Sans";
 
+    /** Where a template wants the organisation's logo. Invoices are ProductionOS's own, and carry none. */
+    public static final String LOGO = "<!--organisation-logo-->";
+
     private final byte[] regular = font("fonts/DejaVuSans.ttf");
     private final byte[] bold = font("fonts/DejaVuSans-Bold.ttf");
+    private final JdbcTemplate jdbc;
+
+    /** Without the database, as in rendering samples: no logo. */
+    public HtmlPdf() {
+        this(null);
+    }
+
+    @Autowired
+    public HtmlPdf(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    /**
+     * The current organisation's logo, embedded in the document, or nothing. Only PNG and JPEG are ever stored, so
+     * the type is one the renderer reads and no file is fetched.
+     */
+    private String logo() {
+        UUID tenant = jdbc == null ? null : TenantContext.findCurrentTenantId().orElse(null);
+        if (tenant == null) {
+            return "";
+        }
+        return jdbc.query("SELECT content_type, data FROM tenant_logo(?)", (rows, row) ->
+                        "<img class=\"organisation-logo\" alt=\"\" src=\"data:" + rows.getString("content_type") + ";base64,"
+                                + Base64.getEncoder().encodeToString(rows.getBytes("data")) + "\"/>",
+                        tenant).stream().findFirst().orElse("");
+    }
 
     /** A page header or footer is a CSS string, where a quote in a name would end it and drop the whole rule. */
     public static String cssString(String value) {
@@ -38,6 +72,9 @@ public class HtmlPdf {
     }
 
     public byte[] render(String html) {
+        if (html.contains(LOGO)) {
+            html = html.replace(LOGO, logo());
+        }
         try (ByteArrayOutputStream pdf = new ByteArrayOutputStream()) {
             new PdfRendererBuilder()
                     .useFastMode()

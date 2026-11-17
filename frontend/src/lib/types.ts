@@ -197,6 +197,8 @@ export interface Material {
   categoryId: string | null;
   uomId: string;
   inspectionRequired: boolean;
+  /** Days a lot keeps from receipt, or null when lots do not expire. */
+  shelfLifeDays: number | null;
   version: number;
 }
 
@@ -292,6 +294,8 @@ export interface ReceiptItem {
   internalBatch: string;
   quantity: string;
   inspectionStatus: string;
+  /** The lot's last day of use, or null when it does not expire. */
+  expiryDate: string | null;
 }
 
 export interface Receipt {
@@ -2015,7 +2019,16 @@ export interface WorkOrderMaterials {
     outstanding: string;
     available: string;
     shortage: string;
-    sources: { sourceType: "LOT" | "BATCH"; id: string; number: string; receivedOn: string | null; freeQuantity: string; uomId: string }[];
+    /** Expired lots are left out, and the rest come first expiring first. */
+    sources: {
+      sourceType: "LOT" | "BATCH";
+      id: string;
+      number: string;
+      receivedOn: string | null;
+      freeQuantity: string;
+      uomId: string;
+      expiryDate: string | null;
+    }[];
   }[];
   reservations: {
     id: string;

@@ -37,7 +37,7 @@ function ReceiptForm({ order }: { order: PurchaseOrder }) {
     defaultValues: {
       receivedOn: new Date().toISOString().slice(0, 10),
       deliveryNote: "",
-      items: openItems.map((item) => ({ purchaseOrderItemId: item.id, supplierBatch: "", quantity: "" })),
+      items: openItems.map((item) => ({ purchaseOrderItemId: item.id, supplierBatch: "", quantity: "", expiryDate: "" })),
     },
   });
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
@@ -49,6 +49,8 @@ function ReceiptForm({ order }: { order: PurchaseOrder }) {
         ...values,
         purchaseOrderId: order.id,
         deliveryNote: values.deliveryNote || null,
+        // A blank expiry is left to the material's shelf life.
+        items: values.items.map((item) => ({ ...item, expiryDate: item.expiryDate || null })),
       });
       await queryClient.invalidateQueries();
       router.push(`/material-receipts/${receipt.id}`);
@@ -73,7 +75,7 @@ function ReceiptForm({ order }: { order: PurchaseOrder }) {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => append({ purchaseOrderItemId: openItems[0].id, supplierBatch: "", quantity: "" })}
+            onClick={() => append({ purchaseOrderItemId: openItems[0].id, supplierBatch: "", quantity: "", expiryDate: "" })}
           >
             Add batch
           </Button>
@@ -81,7 +83,7 @@ function ReceiptForm({ order }: { order: PurchaseOrder }) {
       >
         <div className="space-y-4">
           {fields.map((field, index) => (
-            <div key={field.id} className="grid items-end gap-3 sm:grid-cols-[1fr_12rem_10rem_auto]">
+            <div key={field.id} className="grid items-end gap-3 sm:grid-cols-[1fr_12rem_10rem_10rem_auto]">
               <div className="space-y-1.5">
                 <Label htmlFor={`line-${index}`}>Order line</Label>
                 <select
@@ -108,6 +110,13 @@ function ReceiptForm({ order }: { order: PurchaseOrder }) {
                 inputMode="decimal"
                 error={errors.items?.[index]?.quantity}
                 {...register(`items.${index}.quantity`)}
+              />
+              <Field
+                label="Expiry date"
+                id={`expiry-${index}`}
+                type="date"
+                error={errors.items?.[index]?.expiryDate}
+                {...register(`items.${index}.expiryDate`)}
               />
               <Button type="button" variant="ghost" disabled={fields.length === 1} onClick={() => remove(index)}>
                 Remove

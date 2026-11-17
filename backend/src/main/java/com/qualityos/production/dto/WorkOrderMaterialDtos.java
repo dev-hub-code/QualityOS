@@ -55,7 +55,9 @@ public final class WorkOrderMaterialDtos {
             String number,
             LocalDate receivedOn,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal freeQuantity,
-            UUID uomId) {
+            UUID uomId,
+            /* A lot's last day of use, or null; expired lots are not offered. */
+            LocalDate expiryDate) {
     }
 
     /**

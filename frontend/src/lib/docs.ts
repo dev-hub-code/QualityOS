@@ -204,6 +204,7 @@ export const DOC_PAGES: DocPage[] = [
         title: "Good to know",
         list: [
           "A material that requires no inspection is released as soon as it is received.",
+          "Give a material a shelf life in days if its lots expire. Each lot received then expires that many days after its receipt date, unless another expiry date is entered when receiving.",
           "Material used can be entered in any unit of the same kind as its lot or batch, such as grams from a lot kept in kilograms. It is converted to the lot's unit.",
         ],
       },
@@ -294,6 +295,8 @@ export const DOC_PAGES: DocPage[] = [
         title: "Good to know",
         list: [
           "You cannot receive more than what remains on the order line.",
+          "Enter a lot's expiry date when receiving if the supplier gives one; left blank, the material's shelf life sets it. A lot already past its expiry cannot be received.",
+          "An expired lot cannot be reserved, issued or used in production. It may still be used on its expiry date.",
           "A lot that requires inspection cannot be used until it is released.",
           "Lots that need inspection appear in the inspection queue, and everyone who can start inspections at that facility is notified.",
         ],
@@ -583,7 +586,7 @@ export const DOC_PAGES: DocPage[] = [
         title: "Plans and materials",
         list: [
           "A production plan covers one facility and a period, with products, quantities and due dates. Work orders are raised from the lines of an approved plan.",
-          "After release, the order lists what it needs and what is short. Released lots can be reserved by hand, or the oldest free lots reserved at once.",
+          "After release, the order lists what it needs and what is short. Released lots can be reserved by hand, or reserved at once first expiring first: lots expiring soonest, then lots without an expiry, oldest first. Expired lots are never offered.",
           "Issuing material records consumption on the order's batch. Reservations are used first.",
           "Scheduling shows each work centre's load against its shift capacity, and warns about late orders and overloaded days. The planner decides what to move.",
         ],

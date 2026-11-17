@@ -54,6 +54,7 @@ export default function MaterialReceiptPage() {
                 <TableHead>Supplier batch</TableHead>
                 <TableHead>Internal lot</TableHead>
                 <TableHead>Quantity</TableHead>
+                <TableHead>Expires</TableHead>
                 <TableHead>Inspection</TableHead>
               </TableRow>
             </TableHeader>
@@ -66,6 +67,7 @@ export default function MaterialReceiptPage() {
                   <TableCell>{item.supplierBatch}</TableCell>
                   <TableCell>{item.internalBatch}</TableCell>
                   <TableCell>{formatQuantity(item.quantity)}</TableCell>
+                  <TableCell>{item.expiryDate ?? "—"}</TableCell>
                   <TableCell>
                     <StatusBadge status={item.inspectionStatus} />
                   </TableCell>

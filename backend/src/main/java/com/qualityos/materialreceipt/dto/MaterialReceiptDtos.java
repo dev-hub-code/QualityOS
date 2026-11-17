@@ -31,7 +31,9 @@ public final class MaterialReceiptDtos {
     public record ReceiptItemRequest(
             @NotNull UUID purchaseOrderItemId,
             @NotBlank @Size(max = 100) String supplierBatch,
-            @NotNull @Positive @Digits(integer = 12, fraction = 6) BigDecimal quantity) {
+            @NotNull @Positive @Digits(integer = 12, fraction = 6) BigDecimal quantity,
+            /* The lot's last day of use. Left out, it is the receipt date plus the material's shelf life, if any. */
+            LocalDate expiryDate) {
     }
 
     public record VoidReceiptRequest(@NotBlank @Size(max = 1000) String reason) {
@@ -74,7 +76,8 @@ public final class MaterialReceiptDtos {
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
             boolean inspectionRequired,
             String inspectionStatus,
-            String disposition) {
+            String disposition,
+            LocalDate expiryDate) {
     }
 
     /** A received batch, as the inspection module sees it. */
@@ -115,7 +118,9 @@ public final class MaterialReceiptDtos {
             boolean released,
             /* Set aside for work orders, out of what remains. */
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal reservedQuantity,
-            UUID facilityId) {
+            UUID facilityId,
+            /* The last day the lot may be used, or null when it does not expire. */
+            LocalDate expiryDate) {
 
         /** What ordinary consumption can still take. */
         public BigDecimal freeQuantity() {

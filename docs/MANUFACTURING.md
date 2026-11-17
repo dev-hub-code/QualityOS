@@ -504,7 +504,9 @@ Phase 2:
 Phase 3:
 
 - Sub-assemblies are issued from released batches but not reserved: batches have no reserved quantity yet.
-- There is no expiry on lots, so automatic reservation goes by receipt date (first in, first out), not first expiry.
+- Lots expire by an entered date or the material's shelf life; automatic reservation goes first expiring first, and
+  expired lots are refused. Finished-goods batches have no expiry yet, and there is no reminder of lots about to
+  expire.
 - Requirements are one level deep. A sub-assembly's own materials belong to its own work order.
 - Consumption recorded straight on the batch page is not checked against the order's lines or the over-issue rule; it
   still counts as issued, and cannot take reserved stock.

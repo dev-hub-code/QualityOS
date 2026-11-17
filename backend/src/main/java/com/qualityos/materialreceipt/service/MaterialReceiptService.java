@@ -37,6 +37,7 @@ import com.qualityos.purchaseorder.service.PurchaseOrderService;
 import com.qualityos.supplier.dto.SupplierDtos.SupplierReference;
 import com.qualityos.supplier.service.SupplierService;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -72,6 +73,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
     private final FacilityScope scope;
     private final NotificationService notifications;
     private final TenantAccessService access;
+    private final com.qualityos.organization.service.OrganizationService organizations;
 
     private final EntityManager entityManager;
 
@@ -86,7 +88,9 @@ public class MaterialReceiptService implements AttachmentPolicy {
             FacilityScope scope,
             NotificationService notifications,
             TenantAccessService access,
+            com.qualityos.organization.service.OrganizationService organizations,
             EntityManager entityManager) {
+        this.organizations = organizations;
         this.scope = scope;
         this.notifications = notifications;
         this.access = access;
@@ -138,7 +142,8 @@ public class MaterialReceiptService implements AttachmentPolicy {
                 request.receivedOn(), request.deliveryNote(), request.notes());
         for (ReceiptItemRequest item : request.items()) {
             ReceiptLine line = lines.get(item.purchaseOrderItemId());
-            receipt.getItems().add(new MaterialReceiptItem(
+            MaterialReference material = referenced.get(line.materialId());
+            MaterialReceiptItem lot = new MaterialReceiptItem(
                     receipt,
                     line.itemId(),
                     line.materialId(),
@@ -146,12 +151,30 @@ public class MaterialReceiptService implements AttachmentPolicy {
                     item.supplierBatch().trim(),
                     numbers.next("LOT"),
                     item.quantity(),
-                    referenced.get(line.materialId()).inspectionRequired()));
+                    material.inspectionRequired());
+            lot.expiresOn(expiryOf(item, material, request.receivedOn()));
+            receipt.getItems().add(lot);
         }
         receipts.saveAndFlush(receipt);
         audit.record("MATERIAL_RECEIVED", "MaterialReceipt", receipt.getId());
         tellInspectors(receipt, referenced);
         return toDetail(receipt);
+    }
+
+    /** As entered, or the receipt date plus the material's shelf life. A lot cannot arrive already expired. */
+    private static LocalDate expiryOf(ReceiptItemRequest item, MaterialReference material, LocalDate receivedOn) {
+        LocalDate expiry = item.expiryDate() != null ? item.expiryDate()
+                : material.shelfLifeDays() == null ? null : receivedOn.plusDays(material.shelfLifeDays());
+        if (expiry != null && expiry.isBefore(receivedOn)) {
+            throw new BusinessRuleException("%s (%s) expired on %s, before it was received."
+                    .formatted(item.supplierBatch().trim(), material.code(), expiry));
+        }
+        return expiry;
+    }
+
+    /** Today where the organisation is, which decides whether a lot has expired. */
+    private LocalDate today() {
+        return LocalDate.now(java.time.ZoneId.of(organizations.getCurrent().timezone()));
     }
 
     /** Lots that need inspection go to those who start inspections at that facility. */
@@ -229,6 +252,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
     @Transactional(propagation = Propagation.MANDATORY)
     public BigDecimal consume(UUID itemId, java.util.function.Function<UUID, BigDecimal> inLotUnit) {
         MaterialReceiptItem item = lockUsable(itemId);
+        item.requireNotExpired(today());
         BigDecimal quantity = inLotUnit.apply(item.getUomId());
         item.consume(quantity);
         items.flush();
@@ -242,6 +266,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
     @Transactional(propagation = Propagation.MANDATORY)
     public LotView reserve(UUID itemId, BigDecimal quantity) {
         MaterialReceiptItem item = lockUsable(itemId);
+        item.requireNotExpired(today());
         item.reserve(quantity);
         items.flush();
         return lots(List.of(item)).getFirst();
@@ -256,7 +281,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
     @Transactional(propagation = Propagation.MANDATORY)
     public BigDecimal reserveUpTo(UUID itemId, BigDecimal most) {
         MaterialReceiptItem item = lockUsable(itemId);
-        if (!item.isReleased()) {
+        if (!item.isReleased() || item.isExpiredOn(today())) {
             return BigDecimal.ZERO;
         }
         BigDecimal amount = most.min(item.freeQuantity()).max(BigDecimal.ZERO);
@@ -276,19 +301,22 @@ public class MaterialReceiptService implements AttachmentPolicy {
     /** Takes stock that was set aside, in the lot's unit. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void consumeReserved(UUID itemId, BigDecimal quantity) {
-        lockUsable(itemId).consumeReserved(quantity);
+        MaterialReceiptItem item = lockUsable(itemId);
+        item.requireNotExpired(today());
+        item.consumeReserved(quantity);
         items.flush();
     }
 
-    /** Released lots of the materials, in the facility, with stock not yet set aside, oldest first. */
+    /** Released, unexpired lots of the materials, in the facility, with stock not yet set aside, first expiring first. */
     @Transactional(readOnly = true)
     public List<LotView> freeLots(Collection<UUID> materialIds, UUID facilityId) {
         if (materialIds.isEmpty()) {
             return List.of();
         }
-        return lots(items.findLotsOf(materialIds, facilityId).stream()
-                .filter(item -> item.isReleased() && item.freeQuantity().signum() > 0)
-                .toList());
+        LocalDate today = today();
+        return lots(firstExpiringFirst(items.findLotsOf(materialIds, facilityId).stream()
+                .filter(item -> item.isReleased() && item.freeQuantity().signum() > 0 && !item.isExpiredOn(today))
+                .toList()));
     }
 
     /**
@@ -353,10 +381,11 @@ public class MaterialReceiptService implements AttachmentPolicy {
 
     @Transactional(readOnly = true)
     public List<LotView> releasedLots(UUID materialId) {
-        return lots(items.findLots(materialId).stream()
-                .filter(item -> item.isReleased() && item.freeQuantity().signum() > 0)
+        LocalDate today = today();
+        return lots(firstExpiringFirst(items.findLots(materialId).stream()
+                .filter(item -> item.isReleased() && item.freeQuantity().signum() > 0 && !item.isExpiredOn(today))
                 .filter(item -> scope.allows(item.getReceipt().getFacilityId()))
-                .toList());
+                .toList()));
     }
 
     /** What each lot cost: its purchase order line's price, per that line's unit. Lots without a price are left out. */
@@ -398,6 +427,12 @@ public class MaterialReceiptService implements AttachmentPolicy {
                 PageRequest.of(0, limit)));
     }
 
+    /** First expiry, first out: lots that expire sooner come first, then lots without an expiry, oldest first. */
+    private static List<MaterialReceiptItem> firstExpiringFirst(List<MaterialReceiptItem> oldestFirst) {
+        return oldestFirst.stream().sorted(java.util.Comparator.comparing(MaterialReceiptItem::getExpiryDate,
+                java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()))).toList();
+    }
+
     private List<LotView> lots(List<MaterialReceiptItem> found) {
         Map<UUID, SupplierReference> supplierNames = suppliers.references(
                 found.stream().map(item -> item.getReceipt().getSupplierId()).collect(Collectors.toSet()));
@@ -425,7 +460,8 @@ public class MaterialReceiptService implements AttachmentPolicy {
                     item.getDisposition(),
                     item.isReleased(),
                     item.getReservedQuantity(),
-                    receipt.getFacilityId());
+                    receipt.getFacilityId(),
+                    item.getExpiryDate());
         }).toList();
     }
 
@@ -543,7 +579,8 @@ public class MaterialReceiptService implements AttachmentPolicy {
                             item.getQuantity(),
                             item.isInspectionRequired(),
                             item.getInspectionStatus().name(),
-                            item.getDisposition());
+                            item.getDisposition(),
+                            item.getExpiryDate());
                 }).toList());
     }
 }

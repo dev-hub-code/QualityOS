@@ -25,7 +25,9 @@ public final class MaterialDtos {
             @NotNull UUID uomId,
             boolean inspectionRequired,
             Map<String, String> properties,
-            Long version) {
+            Long version,
+            /* Days a lot keeps from receipt; none means lots have no expiry unless one is entered. */
+            @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(36500) Integer shelfLifeDays) {
     }
 
     public record MaterialResponse(
@@ -38,7 +40,8 @@ public final class MaterialDtos {
             UUID uomId,
             boolean inspectionRequired,
             Map<String, String> properties,
-            long version) {
+            long version,
+            Integer shelfLifeDays) {
     }
 
     public record MaterialDetail(MaterialResponse material, List<SpecificationResponse> specifications) {
@@ -89,6 +92,7 @@ public final class MaterialDtos {
     }
 
     /** What other modules may know about a material. */
-    public record MaterialReference(UUID id, String code, String name, UUID uomId, boolean inspectionRequired) {
+    public record MaterialReference(UUID id, String code, String name, UUID uomId, boolean inspectionRequired,
+            Integer shelfLifeDays) {
     }
 }

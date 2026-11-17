@@ -129,6 +129,10 @@ tells those who manage work orders or plans at that facility, and repeats once a
 `audit-reminders` runs hourly and tells each lead auditor once, a week before a planned audit, in the organisation's own
 date.
 
+`announcement-emails` runs every 15 minutes. For each organisation that an emailed announcement reaches today, it
+records the announcement as sent and creates a notice for every active member, in one transaction. The notification
+delivery job then sends the emails, so members who turned announcements off are not emailed.
+
 ## Production module
 
 `com.qualityos.production` holds manufacturing: definitions, plans, work orders, the shop floor, quality gates,

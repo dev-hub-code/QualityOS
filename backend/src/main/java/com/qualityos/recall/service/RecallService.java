@@ -9,11 +9,13 @@ import com.qualityos.common.security.Permissions;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.FacilityScope;
+import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.organization.dto.OrganizationResponse;
 import com.qualityos.organization.service.OrganizationService;
 import com.qualityos.quality.service.CapaService;
 import com.qualityos.recall.dto.RecallDtos.AcknowledgementRequest;
+import com.qualityos.recall.dto.RecallDtos.AddBatchesRequest;
 import com.qualityos.recall.dto.RecallDtos.ClosureReview;
 import com.qualityos.recall.dto.RecallDtos.ContactAttemptRequest;
 import com.qualityos.recall.dto.RecallDtos.ContactView;
@@ -55,6 +57,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -89,6 +92,7 @@ public class RecallService implements AttachmentPolicy {
     private final CapaService capas;
     private final OrganizationService organizations;
     private final TenantAccessService access;
+    private final ReviewPolicy reviewPolicy;
     private final FacilityScope scope;
     private final DocumentNumberService numbers;
     private final AuditService audit;
@@ -105,6 +109,7 @@ public class RecallService implements AttachmentPolicy {
             CapaService capas,
             OrganizationService organizations,
             TenantAccessService access,
+            ReviewPolicy reviewPolicy,
             FacilityScope scope,
             DocumentNumberService numbers,
             AuditService audit) {
@@ -119,6 +124,7 @@ public class RecallService implements AttachmentPolicy {
         this.capas = capas;
         this.organizations = organizations;
         this.access = access;
+        this.reviewPolicy = reviewPolicy;
         this.scope = scope;
         this.numbers = numbers;
         this.audit = audit;
@@ -140,6 +146,57 @@ public class RecallService implements AttachmentPolicy {
         ids.forEach(id -> batches.save(new RecallBatch(recall.getId(), id)));
         addMissingCustomers(recall, traceability.recallScope(ids, permissions));
         audit.record("RECALL_CREATED", ENTITY, recall.getId());
+        return detail(recall, permissions);
+    }
+
+    /**
+     * Adds batches found after the recall started. Whoever received them, or anything made from them, gets a contact
+     * record, as at the start. A batch already in the recall is left as it is.
+     */
+    @Transactional
+    public RecallDetail addBatches(UUID id, AddBatchesRequest request, Set<String> permissions) {
+        Recall recall = lock(id);
+        recall.requireOpen();
+        Set<UUID> present = batchIds(id);
+        Map<UUID, String> found = new LinkedHashMap<>();
+        for (String number : request.batchNumbers()) {
+            String trimmed = number.trim();
+            found.put(production.byNumber(trimmed)
+                    .orElseThrow(() -> new ResourceNotFoundException("Batch", trimmed)).id(), trimmed);
+        }
+        scope.require(facilitiesOf(found.keySet()), "Batch", "");
+        List<String> added = new ArrayList<>();
+        found.forEach((batchId, number) -> {
+            if (!present.contains(batchId)) {
+                batches.save(new RecallBatch(id, batchId));
+                added.add(number);
+            }
+        });
+        if (added.isEmpty()) {
+            throw new BusinessRuleException("These batches are already in this recall.");
+        }
+        batches.flush();
+        syncedScope(recall, permissions);
+        audit.record("RECALL_BATCHES_ADDED", ENTITY, id, null,
+                Map.of("batches", added, "reason", request.reason().trim()));
+        return detail(recall, permissions);
+    }
+
+    /** Links the CAPA that deals with the cause, or unlinks it, while the recall is open. */
+    @Transactional
+    public RecallDetail linkCapa(UUID id, UUID capaId, Set<String> permissions) {
+        Recall recall = lock(id);
+        if (capaId != null && capas.isClosed(capaId).isEmpty()) {
+            throw new ResourceNotFoundException("CAPA", capaId.toString());
+        }
+        UUID previous = recall.getCapaId();
+        recall.linkCapa(capaId);
+        recalls.flush();
+        Map<String, Object> before = new HashMap<>();
+        before.put("capaId", previous);
+        Map<String, Object> after = new HashMap<>();
+        after.put("capaId", capaId);
+        audit.record("RECALL_CAPA_LINKED", ENTITY, id, before, after);
         return detail(recall, permissions);
     }
 
@@ -303,13 +360,15 @@ public class RecallService implements AttachmentPolicy {
 
     /** Looks again at everything, because goods may have gone out to someone new since closure was requested. */
     @Transactional
-    public RecallDetail close(UUID id, Set<String> permissions) {
+    public RecallDetail close(UUID id, String note, Set<String> permissions) {
         Recall recall = lock(id);
         ClosureReview review = review(recall, syncedScope(recall, permissions), true);
         if (!review.blockers().isEmpty()) {
             throw new BusinessRuleException("This recall cannot close yet: " + String.join(" ", review.blockers()));
         }
-        recall.close(TenantContext.getCurrentUserId(), Instant.now());
+        UUID actor = TenantContext.getCurrentUserId();
+        recall.close(actor, Instant.now(),
+                reviewPolicy.permits(actor, recall.getClosureRequestedBy(), ENTITY, id, "RECALL_CLOSE", note));
         recalls.flush();
         audit.record("RECALL_CLOSED", ENTITY, id);
         return detail(recall, permissions);
@@ -379,7 +438,8 @@ public class RecallService implements AttachmentPolicy {
         List<String> names = production.views(roots).stream().map(ProductionBatchView::batchNumber).sorted().toList();
         return new RecallDetail(recall.getId(), recall.getRecallNumber(), recall.getRecallDate(), recall.getReason(),
                 recall.getInstructions(), recall.getCapaId(), recall.getStatus().name(), names, recall.getClosureNote(),
-                memberName(recall.getClosureRequestedBy()), recall.getClosureRequestedAt(),
+                recall.getClosureRequestedBy(), memberName(recall.getClosureRequestedBy()),
+                recall.getClosureRequestedAt(),
                 memberName(recall.getClosedBy()), recall.getClosedAt(), review(recall, covered, true));
     }
 

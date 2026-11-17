@@ -41,7 +41,7 @@ public final class PlatformConsoleDtos {
 
     public record Announcement(
             UUID id, String title, String message, String severity, String audience, LocalDate startsOn,
-            LocalDate endsOn, boolean active, long version) {
+            LocalDate endsOn, boolean active, boolean email, long version) {
     }
 
     public record SaveAnnouncementRequest(
@@ -52,8 +52,14 @@ public final class PlatformConsoleDtos {
             @NotNull LocalDate startsOn,
             @NotNull LocalDate endsOn,
             boolean active,
+            /* Also email every active member it reaches, once, on or after the start date. Absent means no. */
+            Boolean email,
             long version,
             @NotBlank @Size(max = 500) String reason) {
+
+        public boolean emailed() {
+            return Boolean.TRUE.equals(email);
+        }
     }
 
     public record OpenTicketRequest(

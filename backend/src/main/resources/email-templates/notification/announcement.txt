@@ -1,0 +1,10 @@
+Subject: {{title}}
+
+{{title}}
+
+Hello {{recipientName}},
+{{message}}
+
+This is a message from the ProductionOS team to everyone in {{organizationName}}.
+
+Open ProductionOS: {{actionUrl}}

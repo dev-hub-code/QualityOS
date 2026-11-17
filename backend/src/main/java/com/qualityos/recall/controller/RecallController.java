@@ -5,12 +5,15 @@ import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.response.Pages;
 import com.qualityos.common.security.Permissions.Require;
 import com.qualityos.recall.dto.RecallDtos.AcknowledgementRequest;
+import com.qualityos.recall.dto.RecallDtos.AddBatchesRequest;
+import com.qualityos.recall.dto.RecallDtos.CloseRequest;
 import com.qualityos.recall.dto.RecallDtos.ContactAttemptRequest;
 import com.qualityos.recall.dto.RecallDtos.ContactStatusRequest;
 import com.qualityos.recall.dto.RecallDtos.ContactView;
 import com.qualityos.recall.dto.RecallDtos.CreateRecallRequest;
 import com.qualityos.recall.dto.RecallDtos.ExceptionRequest;
 import com.qualityos.recall.dto.RecallDtos.HistoryEntry;
+import com.qualityos.recall.dto.RecallDtos.LinkCapaRequest;
 import com.qualityos.recall.dto.RecallDtos.ReasonRequest;
 import com.qualityos.recall.dto.RecallDtos.RecallDashboard;
 import com.qualityos.recall.dto.RecallDtos.RecallDetail;
@@ -73,6 +76,20 @@ public class RecallController {
     @PreAuthorize(Require.RECALL_MANAGE)
     public ApiResponse<RecallDetail> create(@Valid @RequestBody CreateRecallRequest request, Authentication caller) {
         return ApiResponse.ok(recalls.create(request, permissions(caller)));
+    }
+
+    @PostMapping("/{id}/batches")
+    @PreAuthorize(Require.RECALL_MANAGE)
+    public ApiResponse<RecallDetail> addBatches(
+            @PathVariable UUID id, @Valid @RequestBody AddBatchesRequest request, Authentication caller) {
+        return ApiResponse.ok(recalls.addBatches(id, request, permissions(caller)));
+    }
+
+    @PutMapping("/{id}/capa")
+    @PreAuthorize(Require.RECALL_MANAGE)
+    public ApiResponse<RecallDetail> linkCapa(
+            @PathVariable UUID id, @RequestBody LinkCapaRequest request, Authentication caller) {
+        return ApiResponse.ok(recalls.linkCapa(id, request.capaId(), permissions(caller)));
     }
 
     @GetMapping("/{id}")
@@ -165,8 +182,9 @@ public class RecallController {
 
     @PostMapping("/{id}/close")
     @PreAuthorize(Require.RECALL_CLOSE)
-    public ApiResponse<RecallDetail> close(@PathVariable UUID id, Authentication caller) {
-        return ApiResponse.ok(recalls.close(id, permissions(caller)));
+    public ApiResponse<RecallDetail> close(
+            @PathVariable UUID id, @Valid @RequestBody(required = false) CloseRequest request, Authentication caller) {
+        return ApiResponse.ok(recalls.close(id, request == null ? null : request.note(), permissions(caller)));
     }
 
     @GetMapping("/{id}/report")

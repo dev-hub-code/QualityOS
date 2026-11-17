@@ -33,3 +33,25 @@ test("search finds machines and work orders alongside quality records", async ({
   await machines.getByRole("link", { name: "LATHE-77" }).click();
   await expect(page).toHaveURL(/\/manufacturing\/machines\/[0-9a-f-]+$/);
 });
+
+test("search finds instruments, products and customers", async ({ page }) => {
+  await signUp(page);
+  const call = apiCaller(page);
+  const facility = await call("POST", "/facilities", { code: `I-${unique()}`.slice(0, 20), name: "Gauge Plant" });
+  await call("POST", "/instruments", {
+    instrumentCode: "GAUGE-42", name: "Bore gauge", category: "Dimensional", facilityId: facility.id,
+    frequencyDays: 180, nextDueOn: new Date().toISOString().slice(0, 10),
+  });
+  await call("POST", "/customers", { code: "GAUGE-CUST", name: "Gauge Buyers" });
+
+  await page.goto("/dashboard");
+  await page.getByLabel("Search everything").fill("gauge");
+  await page.getByLabel("Search everything").press("Enter");
+  const card = (title: string) =>
+    page.locator("[data-slot='card']").filter({ has: page.getByText(title, { exact: true }) });
+  await expect(card("Instruments").getByRole("link", { name: "GAUGE-42" })).toBeVisible();
+  await expect(card("Customers").getByText("Gauge Buyers")).toBeVisible();
+  await expect(card("Products")).toContainText("Nothing matches.");
+  await card("Instruments").getByRole("link", { name: "GAUGE-42" }).click();
+  await expect(page).toHaveURL(/\/calibration\/[0-9a-f-]+$/);
+});

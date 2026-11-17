@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.jayway.jsonpath.JsonPath;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.subscription.service.AnnouncementEmails;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.HashMap;
@@ -21,6 +22,7 @@ import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -29,6 +31,9 @@ class PlatformConsoleIT extends MasterDataFixture {
 
     private static final String PLATFORM = "/api/v1/platform";
     private static final String SECRET_NOTE = "Customer is unhappy about renewal price";
+
+    @Autowired
+    private AnnouncementEmails announcementEmails;
 
     private Session owner;
     private Session root;
@@ -188,6 +193,39 @@ class PlatformConsoleIT extends MasterDataFixture {
         List<String> titles = JsonPath.read(body(as(owner, get("/api/v1/platform-notices"))), "$.data.announcements[*].title");
         assertThat(titles).contains(tag + " live", tag + " trial")
                 .doesNotContain(tag + " paid", tag + " future", tag + " off");
+    }
+
+    @Test
+    void anEmailedAnnouncementReachesEachMemberOnceAndOnlyItsAudience() throws Exception {
+        Session colleague = addMember(owner, "VIEWER");
+        String tag = UUID.randomUUID().toString();
+        LocalDate day = LocalDate.parse(today());
+        Map<String, Object> now = announcement(tag + " downtime", "ALL", today(), today());
+        now.put("email", true);
+        as(root, postJson(PLATFORM + "/announcements", now)).andExpect(status().isNoContent());
+        Map<String, Object> paid = announcement(tag + " paid", "PAID", today(), today());
+        paid.put("email", true);
+        as(root, postJson(PLATFORM + "/announcements", paid)).andExpect(status().isNoContent());
+        String tomorrow = day.plusDays(1).toString();
+        Map<String, Object> later = announcement(tag + " later", "ALL", tomorrow, tomorrow);
+        later.put("email", true);
+        as(root, postJson(PLATFORM + "/announcements", later)).andExpect(status().isNoContent());
+        as(root, postJson(PLATFORM + "/announcements", announcement(tag + " banner", "ALL", today(), today())))
+                .andExpect(status().isNoContent());
+        as(root, get(PLATFORM + "/announcements"))
+                .andExpect(jsonPath("$.data[?(@.title == '" + tag + " downtime')].email", hasItem(true)));
+
+        assertThat(announcementEmails.tenantsAwaiting()).contains(owner.tenantId());
+        int told = TenantContext.callAs(owner.tenantId(), null, () -> announcementEmails.sendDue());
+        assertThat(told).isEqualTo(2);
+        assertThat(TenantContext.callAs(owner.tenantId(), null, () -> announcementEmails.sendDue())).isZero();
+        assertThat(announcementEmails.tenantsAwaiting()).doesNotContain(owner.tenantId());
+
+        for (Session member : List.of(owner, colleague)) {
+            List<String> subjects = emailedSubjects(member);
+            assertThat(subjects).contains(tag + " downtime")
+                    .doesNotContain(tag + " paid", tag + " later", tag + " banner");
+        }
     }
 
     @Test

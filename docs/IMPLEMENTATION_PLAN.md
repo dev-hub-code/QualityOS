@@ -39,7 +39,6 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | With verification switched off for private use, registration reveals that an email has an account | Private use only |
 | Sampling is fixed, percentage or every unit; AQL tables (such as ISO 2859-1) are not built | When a customer needs them |
 | A one-person organisation can review its own inspections, NCR closures and CAPA verifications once an administrator turns this on under Settings. It applies only while there is one active member, and each use needs a reason, recorded as `SELF_REVIEW`. An administrator could deactivate everyone else to use it, but both steps are in the audit log | Review after real use |
-| Recalls, audits and material corrections still need a second person, even in a one-person organisation | When a user needs it |
 | Each organisation chooses which NCR severities need a closed CAPA and which need a verified fix (default: critical and major). The NCR statuses and their order are fixed | When a user needs it |
 | A change to the CAPA rule applies to open NCRs at once. A CAPA keeps the verification rule it was raised under | By design |
 | An NCR raised on a held lot has no rejected quantity, and a later reject does not fill it in | Review after real use |
@@ -47,11 +46,10 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Only inspection failures raise NCRs automatically. Evidence can be attached to the CAPA as a whole or to each action (`CAPA_ACTION`); both follow the CAPA's permissions and lock when it is finished. Evidence is not required to complete an action | When a user needs it |
 | An inspection takes the one published template that fits when none is chosen: the material's or product's own before a general one, of IQC for a lot, the type due at a batch's stage, or FQC/OQC for returns. When several or none fit, the person chooses, and the start dialogs list only fitting templates with that one preselected | Review after real use |
 | Production batches take IPQC and FQC inspections only. OQC and the other template types have no production flow | When a user needs it |
-| A template's material or product is set when it is created and cannot be changed afterwards | When a user needs it |
 | Material used can be entered in any unit of the same kind as its lot or batch, and is converted to that unit. The dialog lists every unit and the server refuses one that does not convert. A correction of material used is still entered in the source's own unit. Units are added through the API alone, as before | When a user needs it |
 | A customer who returned everything still shows as having received the batch. This is deliberate: a recall should reach them | By design |
 | A return covers any lines of one dispatch at once. A return across several dispatches is recorded once per dispatch. Credit notes and refunds are separate and not built | When a user needs it |
-| Global search covers lots, batches, products and serial numbers, and NCRs (number, title, batch), CAPAs (number, title) and suppliers (code, name, GSTIN). Each kind shows only to people allowed to view it, and stops at 10 matches. Serial search reports where a unit is now; earlier customers are on its detail page | When a user needs it |
+| Global search does not cover dispatches or recalls, whose lists have no search. Customers have no page of their own, so a customer found opens the customer list. Each kind stops at 10 matches | When a user needs it |
 | A lot's internal batch number cannot be corrected, because other records refer to it by number. It is generated, so it cannot be mistyped | By design |
 | A corrected lot keeps its original purchase order line, and a finished NCR keeps its original supplier and material | By design: history is preserved |
 | A correction of an inspected lot does not trigger reinspection. It needs two approvers, who decide whether to act | Review after real use |
@@ -63,13 +61,11 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A batch trace can still show inspections and NCRs of a lot from another plant, because lineage must stay whole | By design |
 | A dispatch of a batch under an open recall, or of anything made from it, is refused. Someone with `RECALL_MANAGE` can override with a reason, which is audited, and the customer joins the recall at once. Every built-in role that can dispatch can also manage recalls, so in practice the override is a reason, not a second person | Review after real use |
 | A dispatch recorded before a recall started can still have its shipment confirmed. The recall already covers its customer | Review after real use |
-| A recall starts from the traced batch, and other batch numbers can be typed in to join it. Batches cannot be added after the recall starts. A CAPA can be linked when it starts | When a user needs it |
 | Recording an instrument on an inspection is optional, and applies to the whole inspection, not each measurement | Review after real use |
 | A decision to reinspect after a failed calibration holds the goods that are left, but does not recall what was already used or dispatched, nor start the new inspection | Review after real use |
 | A recorded audit finding cannot be edited. A wrong one is handled by cancelling its NCR, and it stays on the report | Review after real use |
 | `tenant_settings` holds the review rule and the two NCR and CAPA rules so far | Grows as rules are added |
 | Dashboard figures are kept for 60 seconds per organisation, period and facility scope. Anything written to the audit log clears them at once on the same instance. Other changes, and changes on another instance, show within 60 seconds | With production work: use a shared cache if the figures must agree across instances |
-| A report stops at 5,000 rows and says so, so a larger period must be split | When a user needs it |
 | Key figures and charts show to anyone with `REPORT_VIEW`, as totals, even without the view permission for each kind of record. Lists and reports need that permission too | Review after real use |
 | The material rejection rate converts quantities to the base unit of their kind. Kinds that cannot be added together, such as kilograms and pieces, each get a rate, and the figure weighs those rates by their lots. The material rejection report shows each material in its own unit | Review after real use |
 | NCRs raised before unit conversion keep their rejected quantity without a unit | By design |
@@ -82,7 +78,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | The starting user and facility limits, grace period and annual prices are placeholders, editable under Plans. The trial length is under Settings | Owner to confirm before launch |
 | Which features each plan includes is an interpretation of the brief's table. Starter has no dashboards or reports | Owner to confirm before launch |
 | Account emails, such as reset links, cannot be retried, because a resent link would have expired. Failed ones show in the email log | By design |
-| Announcements are in-app banners for signed-in members. No email is sent, and people who are signed out do not see them | When a user needs it |
+| An emailed announcement goes once, to members active when it starts. Someone who joins later sees only the banner | Review after real use |
 | Support tickets are opened by operators. Customers cannot raise or see one, and nothing tells them a ticket's status | When a user needs it |
 | Support has no access to a customer's quality records. The separate time-limited approval the brief allows is not built | If support ever needs it |
 | Settings have no default currency, because only INR exists, and no notification defaults, because each person sets their own | When either is needed |

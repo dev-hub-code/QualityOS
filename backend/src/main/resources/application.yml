@@ -74,6 +74,11 @@ qualityos:
     seller-address: ${BILLING_SELLER_ADDRESS:}
     # Confirm with an accountant. Printed on invoices only when set.
     sac-code: ${BILLING_SAC_CODE:}
+  reports:
+    # Rows on screen and in a PDF. Past this, the report says so and offers Excel.
+    screen-rows: 5000
+    # Rows in an Excel download, which can hold a long period in one file.
+    excel-rows: 100000
   mail:
     from: ${MAIL_FROM:ProductionOS <no-reply@qualityos.local>}
     retry-delay: ${MAIL_RETRY_DELAY:5s}
@@ -92,6 +97,9 @@ qualityos:
     audit-reminders:
       initial-delay: PT5M
       interval: PT1H
+    announcement-emails:
+      initial-delay: PT2M
+      interval: PT15M
     usage-snapshots:
       initial-delay: PT7M
       interval: PT6H

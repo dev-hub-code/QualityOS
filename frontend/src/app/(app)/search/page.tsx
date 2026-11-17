@@ -7,7 +7,23 @@ import { PageHeader, QueryState, RecordLink, Section, StatusBadge } from "@/comp
 import { usePermission } from "@/hooks/use-me";
 import { api, type PageResponse } from "@/lib/api";
 import { searchHitLink } from "@/lib/search";
-import type { CapaSummary, Machine, NcrSummary, ReworkSummary, SearchHit, Supplier, WorkOrder } from "@/lib/types";
+import type {
+  AuditSummary,
+  CapaSummary,
+  Customer,
+  InspectionSummary,
+  Instrument,
+  Machine,
+  Material,
+  NcrSummary,
+  Product,
+  PurchaseOrderSummary,
+  ReceiptSummary,
+  ReworkSummary,
+  SearchHit,
+  Supplier,
+  WorkOrder,
+} from "@/lib/types";
 
 /** How many of each kind a search shows. A wider list is on that kind's own page, searched there. */
 const PER_KIND = 10;
@@ -65,8 +81,25 @@ function Results() {
   const canSeeSuppliers = usePermission("SUPPLIER_VIEW");
   const canSeeWorkOrders = usePermission("WORK_ORDER_VIEW");
   const canSeeMachines = usePermission("MANUFACTURING_VIEW");
-  const nothingToSearch =
-    !canTrace && !canSeeNcrs && !canSeeCapas && !canSeeSuppliers && !canSeeWorkOrders && !canSeeMachines;
+  const canSeeInspections = usePermission("INSPECTION_VIEW");
+  const canSeeAudits = usePermission("AUDIT_VIEW");
+  const canSeeInstruments = usePermission("CALIBRATION_VIEW");
+  const canSeeItems = usePermission("PRODUCT_VIEW");
+  const canSeePurchasing = usePermission("PURCHASE_VIEW");
+  const nothingToSearch = ![
+    canTrace,
+    canSeeNcrs,
+    canSeeCapas,
+    canSeeSuppliers,
+    canSeeWorkOrders,
+    canSeeMachines,
+    canSeeInspections,
+    canSeeAudits,
+    canSeeInstruments,
+    canSeeItems,
+    canSeePurchasing,
+  ].some(Boolean);
+  const lower = term.toLowerCase();
   return (
     <div className="max-w-3xl space-y-6">
       <PageHeader title="Search" subtitle={`Results for “${term}”`} />
@@ -180,6 +213,139 @@ function Results() {
                   description: machine.name,
                   detail: <StatusBadge status={machine.status} />,
                 }))
+              }
+            />
+          )}
+          {canSeeInspections && (
+            <Kind<PageResponse<InspectionSummary>>
+              title="Inspections"
+              path={`/inspections?${page}`}
+              paged
+              toFound={(inspections) =>
+                inspections.items.map((inspection) => ({
+                  key: inspection.id,
+                  href: `/inspections/${inspection.id}`,
+                  label: inspection.inspectionNumber,
+                  description: `${inspection.materialCode} – ${inspection.materialName} · ${inspection.batchNumber}`,
+                  detail: <StatusBadge status={inspection.status} />,
+                }))
+              }
+            />
+          )}
+          {canSeeAudits && (
+            <Kind<PageResponse<AuditSummary>>
+              title="Audits"
+              path={`/audits?${page}`}
+              paged
+              toFound={(audits) =>
+                audits.items.map((audit) => ({
+                  key: audit.id,
+                  href: `/audits/${audit.id}`,
+                  label: audit.auditNumber,
+                  description: audit.title,
+                  detail: <StatusBadge status={audit.status} />,
+                }))
+              }
+            />
+          )}
+          {canSeeInstruments && (
+            <Kind<PageResponse<Instrument>>
+              title="Instruments"
+              path={`/instruments?${page}`}
+              paged
+              toFound={(instruments) =>
+                instruments.items.map((instrument) => ({
+                  key: instrument.id,
+                  href: `/calibration/${instrument.id}`,
+                  label: instrument.instrumentCode,
+                  description: instrument.name,
+                  detail: instrument.serialNumber ? `Serial ${instrument.serialNumber}` : undefined,
+                }))
+              }
+            />
+          )}
+          {canSeeItems && (
+            <Kind<PageResponse<Product>>
+              title="Products"
+              path={`/products?${page}`}
+              paged
+              toFound={(products) =>
+                products.items.map((product) => ({
+                  key: product.id,
+                  href: `/products/${product.id}`,
+                  label: product.code,
+                  description: product.name,
+                }))
+              }
+            />
+          )}
+          {canSeeItems && (
+            <Kind<PageResponse<Material>>
+              title="Materials"
+              path={`/materials?${page}`}
+              paged
+              toFound={(materials) =>
+                materials.items.map((material) => ({
+                  key: material.id,
+                  href: `/materials/${material.id}`,
+                  label: material.code,
+                  description: material.name,
+                  detail: material.grade ? `Grade ${material.grade}` : undefined,
+                }))
+              }
+            />
+          )}
+          {canSeePurchasing && (
+            <Kind<PageResponse<PurchaseOrderSummary>>
+              title="Purchase orders"
+              path={`/purchase-orders?${page}`}
+              paged
+              toFound={(orders) =>
+                orders.items.map((order) => ({
+                  key: order.id,
+                  href: `/purchase-orders/${order.id}`,
+                  label: order.poNumber,
+                  description: order.supplierName,
+                  detail: <StatusBadge status={order.status} />,
+                }))
+              }
+            />
+          )}
+          {canSeePurchasing && (
+            <Kind<PageResponse<ReceiptSummary>>
+              title="Material receipts"
+              path={`/material-receipts?${page}`}
+              paged
+              toFound={(receipts) =>
+                receipts.items.map((receipt) => ({
+                  key: receipt.id,
+                  href: `/material-receipts/${receipt.id}`,
+                  label: receipt.grnNumber,
+                  description: `${receipt.supplierName}, received ${receipt.receivedOn}`,
+                  detail: <StatusBadge status={receipt.status} />,
+                }))
+              }
+            />
+          )}
+          {canTrace && (
+            <Kind<Customer[]>
+              title="Customers"
+              path="/customers"
+              toFound={(customers) =>
+                customers
+                  .filter((customer) =>
+                    [customer.code, customer.name, customer.gstin ?? ""].some((value) =>
+                      value.toLowerCase().includes(lower),
+                    ),
+                  )
+                  .slice(0, PER_KIND)
+                  .map((customer) => ({
+                    key: customer.id,
+                    href: "/customers",
+                    label: customer.code,
+                    description: customer.name,
+                    detail: customer.gstin ? `GSTIN ${customer.gstin}` : undefined,
+                  }))
               }
             />
           )}

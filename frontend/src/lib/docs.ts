@@ -250,7 +250,7 @@ export const DOC_PAGES: DocPage[] = [
       },
       {
         title: "Versions",
-        text: "A template starts as a draft, then is published with an effective date. A published version can never be changed. To change it, create a new version, and the old one becomes superseded. Inspections already carried out stay tied to the version they used.",
+        text: "A template starts as a draft, then is published with an effective date. A published version can never be changed. To change it, create a new version, and the old one becomes superseded. Inspections already carried out stay tied to the version they used. The name, and the material or product a template is for, can be changed with Edit; this changes only which items it is offered for from then on.",
       },
     ],
     example: {
@@ -750,7 +750,12 @@ export const DOC_PAGES: DocPage[] = [
       {
         title: "Searches",
         terms: [
-          ["Global search", "The box at the top of the menu finds lots, batches, products and serial numbers."],
+          [
+            "Global search",
+            "The box at the top of the menu finds lots, batches and serial numbers, NCRs, CAPAs, suppliers, " +
+              "work orders, machines, inspections, audits, instruments, products, materials, purchase orders, " +
+              "receipts and customers. Each kind shows only to people allowed to see it.",
+          ],
           ["Forward trace", "From a lot, which batches used it and which customers received them."],
           ["Backward trace", "From a batch, which lots and suppliers it came from."],
           ["Serial search", "Where a single unit is now. Earlier customers are on its detail page."],
@@ -761,7 +766,7 @@ export const DOC_PAGES: DocPage[] = [
         list: [
           "A batch's timeline shows inspections, NCRs and corrections in order.",
           "If serial numbers were not named on a dispatch, a trace shows the customer by batch, not by unit.",
-          "Search does not cover NCRs, CAPAs or suppliers.",
+          "Search does not cover dispatches or recalls. Find them on their own pages.",
         ],
       },
     ],
@@ -804,6 +809,7 @@ export const DOC_PAGES: DocPage[] = [
           "A linked CAPA must be closed.",
           "Someone other than the requester must approve the closure.",
           "While a recall is open, its batches, and anything made from them, cannot be dispatched. Someone who manages recalls can override this with a reason, and the customer joins the recall at once.",
+          "Batches found later can be added to an open recall, and the CAPA behind it can be linked or changed.",
         ],
       },
       {
@@ -1038,7 +1044,7 @@ export const DOC_PAGES: DocPage[] = [
         title: "Good to know",
         list: [
           "Preview shows the first 100 rows, and downloads hold them all.",
-          "A report stops at 5,000 rows and says so. Choose fewer dates to see the rest.",
+          "The screen and the PDF stop at 5,000 rows and say so. Excel holds up to 100,000, for a long period in one file.",
           "Every download is written to the audit log.",
           "Audits, recalls and single inspections have their own detailed reports on the record itself.",
         ],

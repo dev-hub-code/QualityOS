@@ -100,7 +100,7 @@ proxy refuses token-carrying endpoints, and refuses writes from another origin.
 |---|---|
 | 2 (built) | `/organizations`, `/users` (plus `/{membershipId}/roles`, `/activate`, `/deactivate`), `/roles`, `/permissions`, `/audit-logs` |
 | 3 (built) | `/facilities`, `/suppliers`, `/products`, `/materials`, `/purchase-orders`, `/material-receipts` |
-| 4 (built) | `/inspection-templates` (plus `/{id}/versions`, `/{id}/publish`), `/inspections` (plus `/{id}/execute`, `/submit`, `/approve`, `/send-back`, `/disposition`, `/cancel`, and `GET /{id}/report.pdf`, the report as a PDF built from the frozen specification, named `<inspection number>.pdf`), `/material-receipts/awaiting-inspection` |
+| 4 (built) | `/inspection-templates` (plus `PUT /{id}` for the `name`, `materialId` and `productId`, audited as `TEMPLATE_UPDATED`; inspections already started keep their specification; `/{id}/versions`, `/{id}/publish`), `/inspections` (plus `/{id}/execute`, `/submit`, `/approve`, `/send-back`, `/disposition`, `/cancel`, and `GET /{id}/report.pdf`, the report as a PDF built from the frozen specification, named `<inspection number>.pdf`), `/material-receipts/awaiting-inspection` |
 | 5 (built) | `/auth/password-reset/{request,confirm}`, `/auth/verify-email`, `/auth/resend-verification`, `/auth/verification-status`, `/auth/invitations/{preview,accept}`, `/invitations` (plus `/{id}/resend`, `/{id}/revoke`), `/notifications` (plus `/unread-count`, `/{id}/read`, `/read-all`, `/preferences`). `POST /users` is removed: people join by invitation |
 | 6 (built) | `/ncrs` (plus `/{id}/assign`, `/containment`, `/investigation`, `/request-verification`, `/send-back`, `/close`, `/reject`, `/cancel`), `/capas` (plus `/{id}/start-analysis`, `/analysis`, `/finish-analysis`, `/actions`, `/actions/{actionId}/complete`, `/start-implementation`, `/submit-verification`, `/verify`, `/close`, `/cancel`), `/defect-categories`, `/quality/assignees` |
 | 7 (built) | `/production-batches` (plus `/{id}/consume`, `/{id}/consumptions/{consumptionId}/reverse`, `/complete`, `/serials`), `/customers`, `/dispatches` (plus `/{id}/reverse` for a dispatch that never happened, `/{id}/reversals`, `/{id}/reversal-summary`), `/dispatch-reversals`, `/material-corrections` (plus `/{id}/submit`, `/approve`, `/reject`, `/cancel`), `/batches/{id}/correction-history`, `/traceability/search`, `/traceability/batches/{batchNumber}`, `/traceability/products/{productId}`, `/material-receipts/released-lots`. `POST /{id}/consume` takes an optional `uomId`: the quantity is converted to the lot's or batch's own unit, and what was typed is kept on the entry. `POST /inspections` now takes `productionBatchId` or `returnItemId` in place of `receiptItemId`. `templateId` is optional: without it the one fitting template is used. `GET /inspections/applicable-templates?receiptItemId=|productionBatchId=|returnItemId=` lists the fitting templates and the suggested one |
@@ -143,8 +143,11 @@ unverified sign-in is off. Local Docker Compose enforces it too. Integration tes
 
 `selfReviewInEffect` is true while `singlePersonReview` is on and the organisation has one active member. Then that
 person may approve or send back their own inspection, close an NCR whose verification they requested, and verify or
-close a CAPA they own. Each of those needs a note, and is recorded in the audit log as `SELF_REVIEW` with the step
-(`INSPECTION_APPROVE`, `INSPECTION_SEND_BACK`, `NCR_CLOSE`, `CAPA_VERIFY`, `CAPA_CLOSE`) and the reason. Once a second
+close a CAPA they own, close a recall or an audit whose closure they requested, and approve their own material
+correction, which then needs no second approval. Each of those needs a note (`note` in the body of the recall and audit
+`close` calls), and is recorded in the audit log as `SELF_REVIEW` with the step (`INSPECTION_APPROVE`,
+`INSPECTION_SEND_BACK`, `NCR_CLOSE`, `CAPA_VERIFY`, `CAPA_CLOSE`, `RECALL_CLOSE`, `AUDIT_CLOSE`,
+`MATERIAL_CORRECTION_APPROVE`) and the reason. Once a second
 member is active, the usual rule returns without anyone changing the setting.
 
 `capaRequiredFrom` and `effectivenessRequiredFrom` each name the least severe NCR a rule covers: `MINOR` (every NCR),
@@ -181,12 +184,17 @@ a member's facilities answer 404.
 | Recalls | Permission |
 |---|---|
 | `GET /recalls`, `GET /recalls/{id}`, `/customers`, `/contact-history`, `/dashboard`, `/report`, `/report.pdf` | `RECALL_VIEW` |
-| `POST /recalls`, `PUT /recalls/{id}/customers/{customerId}`, `POST .../contact-attempts`, `POST .../status`, `POST /recalls/{id}/acknowledgements`, `POST /recalls/{id}/request-closure` | `RECALL_MANAGE` |
+| `POST /recalls`, `PUT /recalls/{id}/customers/{customerId}`, `POST .../contact-attempts`, `POST .../status`, `POST /recalls/{id}/acknowledgements`, `POST /recalls/{id}/request-closure`, `POST /recalls/{id}/batches`, `PUT /recalls/{id}/capa` | `RECALL_MANAGE` |
 | `POST /recalls/{id}/customers/{customerId}/exception`, `POST /recalls/{id}/send-back`, `POST /recalls/{id}/close` | `RECALL_CLOSE` |
 
 A sent email is an attempt with the outcome `NO_REPLY`. Only `REACHED` moves a customer to `CONTACTED`, and only an
 acknowledgement allows `RESOLVED`. Closing needs every customer resolved or covered by an exception, any linked CAPA closed,
 and a second person.
+
+While a recall is open, `POST /recalls/{id}/batches` adds batches found later (`batchNumbers`, `reason`). Their
+customers get contact records as at the start, a batch already in the recall is skipped, and adding none is a 422. It is
+audited as `RECALL_BATCHES_ADDED` with the numbers and reason. `PUT /recalls/{id}/capa` links, changes or (with an empty
+`capaId`) unlinks the CAPA, audited as `RECALL_CAPA_LINKED`.
 
 | Calibration | Permission |
 |---|---|
@@ -230,7 +238,7 @@ may span two years at most. `facilityId` narrows the result; a facility the call
 | Method | Path | Result |
 |---|---|---|
 | GET | `/api/v1/analytics/overview` | Key figures, chart series, pending approvals, recent activity, and `production`: open and late work orders, work orders completed and on time, shop-floor loss and unplanned downtime |
-| GET | `/api/v1/reports/{slug}` | Report as JSON: columns, up to 5,000 rows, `truncated` |
+| GET | `/api/v1/reports/{slug}` | Report as JSON: columns, up to 5,000 rows, `truncated`. The PDF stops there too; the `.xlsx` holds up to 100,000 rows and says where it stops. Both limits are set under `qualityos.reports` |
 | GET | `/api/v1/reports/{slug}.pdf` | The same report as a PDF, audited as `REPORT_EXPORTED` |
 | GET | `/api/v1/reports/{slug}.xlsx` | The same report as a workbook, audited as `REPORT_EXPORTED` |
 
@@ -330,7 +338,7 @@ may be sent again after `POST /reauthenticate`.
 | `GET /api/v1/platform/settings` | | Read settings |
 | `PUT /api/v1/platform/settings` | `PLATFORM_SETTINGS_MANAGE`, password | Save, with `version` and `reason` |
 | `GET /api/v1/platform/announcements` | | List |
-| `POST /api/v1/platform/announcements`, `PUT .../{id}` | `PLATFORM_CUSTOMER_MANAGE` | Create or save, with `version` and `reason` |
+| `POST /api/v1/platform/announcements`, `PUT .../{id}` | `PLATFORM_CUSTOMER_MANAGE` | Create or save, with `version` and `reason`. Optional `email: true` also emails every active member it reaches, once per organisation, on or after `startsOn` |
 | `GET /api/v1/platform/support/tickets` | | Filter by `tenantId`, `status` |
 | `POST /api/v1/platform/support/tickets` | `PLATFORM_CUSTOMER_MANAGE` | Open with `tenantId`, `subject`, `note` |
 | `PUT /api/v1/platform/support/tickets/{id}/status` | `PLATFORM_CUSTOMER_MANAGE` | Change status, with `version` |

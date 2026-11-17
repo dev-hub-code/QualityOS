@@ -4,6 +4,7 @@ import com.qualityos.auditmanagement.dto.AuditDtos.AnswerItemRequest;
 import com.qualityos.auditmanagement.dto.AuditDtos.AuditDetail;
 import com.qualityos.auditmanagement.dto.AuditDtos.AuditReport;
 import com.qualityos.auditmanagement.dto.AuditDtos.AuditSummary;
+import com.qualityos.auditmanagement.dto.AuditDtos.CloseRequest;
 import com.qualityos.auditmanagement.dto.AuditDtos.CompleteAuditRequest;
 import com.qualityos.auditmanagement.dto.AuditDtos.CreateAuditRequest;
 import com.qualityos.auditmanagement.dto.AuditDtos.FindingRequest;
@@ -128,8 +129,9 @@ public class QualityAuditController {
 
     @PostMapping("/{id}/close")
     @PreAuthorize(Require.AUDIT_CLOSE)
-    public ApiResponse<AuditDetail> close(@PathVariable UUID id) {
-        return ApiResponse.ok(audits.close(id));
+    public ApiResponse<AuditDetail> close(
+            @PathVariable UUID id, @Valid @RequestBody(required = false) CloseRequest request) {
+        return ApiResponse.ok(audits.close(id, request == null ? null : request.note()));
     }
 
     @PostMapping("/{id}/cancel")

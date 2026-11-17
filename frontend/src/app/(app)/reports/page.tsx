@@ -78,7 +78,9 @@ export default function ReportsPage() {
           </div>
           <p className="text-sm text-muted-foreground">{data.note}</p>
           {data.truncated && (
-            <p className="text-sm text-destructive">This report stops at {data.rows.length} rows. Choose fewer dates.</p>
+            <p className="text-sm text-destructive">
+              This view stops at {data.rows.length} rows. Download Excel for the rest, or choose fewer dates.
+            </p>
           )}
           {data.rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing to report for this period.</p>

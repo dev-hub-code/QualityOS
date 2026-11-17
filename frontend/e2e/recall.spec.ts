@@ -22,6 +22,13 @@ test("a recall runs from the report through contact, acknowledgement and approve
   await expect(page.getByRole("listitem").getByText("Tata Motors")).toBeVisible();
   const recallUrl = page.url();
 
+  await page.getByRole("button", { name: "Add batches" }).click();
+  await page.getByRole("dialog").getByLabel(/Batch numbers/).fill(batchNumber);
+  await page.getByRole("dialog").getByLabel("Why they belong to this recall").fill("Same heat of steel");
+  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("dialog").getByText("These batches are already in this recall.")).toBeVisible();
+  await page.keyboard.press("Escape");
+
   await step(page, "Log attempt", async (dialog: Locator) => {
     await dialog.getByLabel("Method").selectOption("EMAIL");
     await dialog.getByLabel("Date").fill(today);
@@ -75,10 +82,8 @@ test("a recall runs from the report through contact, acknowledgement and approve
     await dialog.getByLabel("Closure note").fill("Customer holds stock under quarantine");
     await dialog.getByLabel(/I accept that goods remain/).click();
   });
-  await expect(page.getByRole("button", { name: "Approve closure" })).toBeVisible();
-
-  await page.getByRole("button", { name: "Approve closure" }).click();
-  await expect(page.getByText("Someone else must approve closing this recall.")).toBeVisible();
+  await expect(page.getByText("Someone other than you must approve closing this recall.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Approve closure" })).toHaveCount(0);
 
   await manager.goto(recallUrl);
   await manager.getByRole("button", { name: "Approve closure" }).click();

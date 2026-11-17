@@ -44,6 +44,11 @@ public class Recall extends TenantOwnedEntity {
         this.capaId = capaId;
     }
 
+    public void linkCapa(UUID capaId) {
+        requireOpen();
+        this.capaId = capaId;
+    }
+
     public void requireOpen() {
         if (status != Status.OPEN) {
             throw new BusinessRuleException("This recall is no longer open for changes.");
@@ -66,9 +71,10 @@ public class Recall extends TenantOwnedEntity {
         closureNote = null;
     }
 
-    public void close(UUID approver, Instant now) {
+    /** @param reviewPermitted whether the approver may approve, which a requester may only in a one-person organisation */
+    public void close(UUID approver, Instant now, boolean reviewPermitted) {
         requirePendingClosure();
-        if (approver.equals(closureRequestedBy)) {
+        if (!reviewPermitted) {
             throw new BusinessRuleException("Someone else must approve closing this recall.");
         }
         status = Status.CLOSED;

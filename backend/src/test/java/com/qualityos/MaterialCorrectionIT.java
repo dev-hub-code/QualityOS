@@ -185,6 +185,27 @@ class MaterialCorrectionIT extends TraceabilityFixture {
     }
 
     @Test
+    void aSoleMemberApprovesTheirOwnCorrectionAlone() throws Exception {
+        Lot lot = releasedLot("10");
+        Lot right = releasedLot("10");
+        String component = releasedBatch(lot.id(), "4", "4");
+        String assembly = startBatch(product());
+        as(owner, postJson("/api/v1/production-batches/" + assembly + "/consume",
+                        Map.of("parentBatchId", component, "quantity", "2")))
+                .andExpect(status().isOk());
+        String id = submitted(Map.of("consumptionId", entry(component, 0), "correctedLotId", right.id()));
+        approve(owner, id, true).andExpect(status().isUnprocessableContent());
+
+        workAlone();
+        as(owner, get(PATH + "/" + id)).andExpect(jsonPath("$.data.approvalsNeeded").value(2));
+        as(owner, postJson(PATH + "/" + id + "/approve", Map.of("impactAcknowledged", true)))
+                .andExpect(status().isUnprocessableContent());
+        approve(owner, id, false).andExpect(status().isUnprocessableContent());
+        approve(owner, id, true).andExpect(jsonPath("$.data.status").value("APPLIED"));
+        assertThat(selfReviews(owner.tenantId(), "MATERIAL_CORRECTION_APPROVE")).isEqualTo(1);
+    }
+
+    @Test
     void aQuantityCorrectionMovesThePurchaseOrderAndCannotGoBelowWhatWasUsed() throws Exception {
         String material = material(owner, false);
         IssuedOrder order = issuedOrder(owner, material, "100");

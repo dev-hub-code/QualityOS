@@ -12,6 +12,7 @@ import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.FacilityScope;
+import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.inspection.service.InspectionService;
 import com.qualityos.material.dto.MaterialDtos.MaterialReference;
@@ -76,6 +77,7 @@ public class MaterialCorrectionService {
     private final MaterialService materials;
     private final SupplierService suppliers;
     private final TenantAccessService access;
+    private final ReviewPolicy reviewPolicy;
     private final NotificationService notifications;
     private final DocumentNumberService numbers;
     private final AuditService audit;
@@ -92,6 +94,7 @@ public class MaterialCorrectionService {
             MaterialService materials,
             SupplierService suppliers,
             TenantAccessService access,
+            ReviewPolicy reviewPolicy,
             NotificationService notifications,
             DocumentNumberService numbers,
             AuditService audit,
@@ -107,6 +110,7 @@ public class MaterialCorrectionService {
         this.materials = materials;
         this.suppliers = suppliers;
         this.access = access;
+        this.reviewPolicy = reviewPolicy;
         this.notifications = notifications;
         this.numbers = numbers;
         this.audit = audit;
@@ -234,11 +238,13 @@ public class MaterialCorrectionService {
     public CorrectionDetail approve(UUID id, ApproveCorrectionRequest request) {
         MaterialCorrection correction = lock(id);
         UUID approver = TenantContext.getCurrentUserId();
-        if (approver.equals(correction.getCreatedBy())) {
-            throw new BusinessRuleException("Someone other than the requester must approve this.");
-        }
         if (correction.getStatus() != Status.PENDING_APPROVAL) {
             throw new BusinessRuleException("Only a correction awaiting approval can be approved.");
+        }
+        boolean own = approver.equals(correction.getCreatedBy());
+        if (own && !reviewPolicy.permits(
+                approver, correction.getCreatedBy(), ENTITY, id, "MATERIAL_CORRECTION_APPROVE", request.note())) {
+            throw new BusinessRuleException("Someone other than the requester must approve this.");
         }
         List<MaterialCorrectionApproval> recorded = approvals.findByCorrectionIdOrderByCreatedAt(id);
         if (recorded.stream().anyMatch(approval -> approval.getApproverId().equals(approver))) {
@@ -252,7 +258,8 @@ public class MaterialCorrectionService {
         }
         approvals.save(new MaterialCorrectionApproval(id, approver, request.note(), request.impactAcknowledged()));
         audit.record("MATERIAL_CORRECTION_APPROVAL_RECORDED", ENTITY, id);
-        if (recorded.size() + 1 >= correction.approvalsNeeded()) {
+        // A sole member is the only possible approver, so their approval is the whole decision.
+        if (own || recorded.size() + 1 >= correction.approvalsNeeded()) {
             Instant now = Instant.now();
             correction.approved(now);
             audit.record("MATERIAL_CORRECTION_APPROVED", ENTITY, id);

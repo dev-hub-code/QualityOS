@@ -32,6 +32,13 @@ public final class TemplateDtos {
             UUID productId) {
     }
 
+    /** What a template applies to can change; its code and type cannot, since inspections are numbered by them. */
+    public record UpdateTemplateRequest(
+            @NotBlank @Size(max = 200) String name,
+            UUID materialId,
+            UUID productId) {
+    }
+
     public record TemplateSummary(
             UUID id,
             String code,

@@ -15,6 +15,7 @@ import com.qualityos.inspection.dto.TemplateDtos.SaveTemplateRequest;
 import com.qualityos.inspection.dto.TemplateDtos.SpecSnapshot;
 import com.qualityos.inspection.dto.TemplateDtos.TemplateDetail;
 import com.qualityos.inspection.dto.TemplateDtos.TemplateSummary;
+import com.qualityos.inspection.dto.TemplateDtos.UpdateTemplateRequest;
 import com.qualityos.inspection.dto.TemplateDtos.VersionResponse;
 import com.qualityos.inspection.entity.InspectionParameter;
 import com.qualityos.inspection.entity.InspectionTemplate;
@@ -29,9 +30,11 @@ import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
@@ -89,15 +92,7 @@ public class InspectionTemplateService {
         if (templates.existsByCode(code)) {
             throw new ConflictException("A template with this code already exists.");
         }
-        if (request.materialId() != null && request.productId() != null) {
-            throw new BusinessRuleException("A template applies to a material or a product, not both.");
-        }
-        if (request.materialId() != null) {
-            materials.requireActive(request.materialId());
-        }
-        if (request.productId() != null) {
-            products.requireExists(request.productId());
-        }
+        requireTarget(request.materialId(), request.productId());
         InspectionTemplate template = new InspectionTemplate(code);
         template.setName(request.name().trim());
         template.setInspectionType(request.inspectionType());
@@ -107,6 +102,46 @@ public class InspectionTemplateService {
         versions.saveAndFlush(new TemplateVersion(template.getId(), 1));
         audit.record("TEMPLATE_CREATED", "InspectionTemplate", template.getId());
         return get(template.getId());
+    }
+
+    /**
+     * Changes the name, or which material or product the template applies to. Inspections already started keep the
+     * specification they were given; the change decides only which items it is offered for from now on.
+     */
+    @Transactional
+    public TemplateDetail update(UUID id, UpdateTemplateRequest request) {
+        InspectionTemplate template = load(id);
+        boolean sameTarget = Objects.equals(template.getMaterialId(), request.materialId())
+                && Objects.equals(template.getProductId(), request.productId());
+        if (!sameTarget) {
+            requireTarget(request.materialId(), request.productId());
+        }
+        Map<String, Object> before = target(template);
+        template.setName(request.name().trim());
+        template.setMaterialId(request.materialId());
+        template.setProductId(request.productId());
+        audit.record("TEMPLATE_UPDATED", "InspectionTemplate", id, before, target(template));
+        return get(id);
+    }
+
+    private void requireTarget(UUID materialId, UUID productId) {
+        if (materialId != null && productId != null) {
+            throw new BusinessRuleException("A template applies to a material or a product, not both.");
+        }
+        if (materialId != null) {
+            materials.requireActive(materialId);
+        }
+        if (productId != null) {
+            products.requireExists(productId);
+        }
+    }
+
+    private static Map<String, Object> target(InspectionTemplate template) {
+        Map<String, Object> state = new HashMap<>();
+        state.put("name", template.getName());
+        state.put("materialId", template.getMaterialId());
+        state.put("productId", template.getProductId());
+        return state;
     }
 
     @Transactional

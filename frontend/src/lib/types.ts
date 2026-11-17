@@ -832,6 +832,7 @@ export interface RecallDetail {
   status: "OPEN" | "PENDING_CLOSURE" | "CLOSED";
   batchNumbers: string[];
   closureNote: string | null;
+  closureRequestedById: string | null;
   closureRequestedBy: string | null;
   closureRequestedAt: string | null;
   closedBy: string | null;
@@ -1582,6 +1583,7 @@ export interface PlatformAnnouncement {
   startsOn: string;
   endsOn: string;
   active: boolean;
+  email: boolean;
   version: number;
 }
 

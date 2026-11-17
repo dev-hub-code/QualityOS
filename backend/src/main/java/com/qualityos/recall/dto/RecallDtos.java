@@ -31,6 +31,16 @@ public final class RecallDtos {
             UUID capaId) {
     }
 
+    /** More batches found after a recall started, with why they belong to it. */
+    public record AddBatchesRequest(
+            @NotEmpty @Size(max = 200) List<@NotBlank @Size(max = 100) String> batchNumbers,
+            @NotBlank @Size(max = 2000) String reason) {
+    }
+
+    /** @param capaId empty to unlink the CAPA */
+    public record LinkCapaRequest(UUID capaId) {
+    }
+
     public record UpdateContactRequest(
             @Size(max = 200) String contactPerson,
             @Size(max = 500) String contactDetails,
@@ -71,6 +81,10 @@ public final class RecallDtos {
         }
     }
 
+    /** The note is needed only when someone approves their own request in a one-person organisation. */
+    public record CloseRequest(@Size(max = 2000) String note) {
+    }
+
     public record ReasonRequest(@NotBlank @Size(max = 2000) String reason) {
     }
 
@@ -102,6 +116,7 @@ public final class RecallDtos {
             String status,
             List<String> batchNumbers,
             String closureNote,
+            UUID closureRequestedById,
             String closureRequestedBy,
             Instant closureRequestedAt,
             String closedBy,

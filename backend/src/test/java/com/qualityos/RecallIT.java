@@ -212,6 +212,23 @@ class RecallIT extends TraceabilityFixture {
     }
 
     @Test
+    void aSoleMemberClosesTheirOwnRecallWithAReason() throws Exception {
+        String recall = resolved();
+        returnAll();
+        requestClosure(owner, recall, false).andExpect(status().isOk());
+        String path = "/api/v1/recalls/" + recall + "/close";
+        as(owner, postJson(path, Map.of())).andExpect(status().isUnprocessableContent());
+
+        workAlone();
+        as(owner, postJson(path, Map.of())).andExpect(status().isUnprocessableContent());
+        as(owner, postJson(path, Map.of("note", "I am the only person here")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("CLOSED"))
+                .andExpect(jsonPath("$.data.closureRequestedById").value(owner.userId().toString()));
+        assertThat(selfReviews(owner.tenantId(), "RECALL_CLOSE")).isEqualTo(1);
+    }
+
+    @Test
     void closureNeedsASecondPersonAndIsFinal() throws Exception {
         String recall = resolved();
         returnAll();
@@ -399,5 +416,51 @@ class RecallIT extends TraceabilityFixture {
             assertThat(text).contains("Product recall report", "Cracks found in the shaft", "Tata Motors",
                     numberOf(batch), "Page 1 of " + document.getNumberOfPages());
         }
+    }
+
+    private ResultActions addBatches(Session session, String recall, String... numbers) throws Exception {
+        return as(session, postJson("/api/v1/recalls/" + recall + "/batches", Map.of(
+                "batchNumbers", List.of(numbers), "reason", "Same heat of steel")));
+    }
+
+    @Test
+    void aBatchFoundLaterJoinsTheRecallAndItsCustomersAreAdded() throws Exception {
+        String later = releasedBatch(releasedLot("50").id(), "50", "50");
+        String other = customer();
+        ship(idOf(body(dispatch(other, later, "50", List.of()).andExpect(status().isCreated())))).andExpect(status().isOk());
+        String recall = start();
+        as(owner, get("/api/v1/recalls/" + recall + "/customers")).andExpect(jsonPath("$.data.length()").value(1));
+
+        addBatches(owner, recall, numberOf(later), numberOf(batch)).andExpect(status().isOk());
+        as(owner, get("/api/v1/recalls/" + recall + "/customers")).andExpect(jsonPath("$.data.length()").value(2));
+        addBatches(owner, recall, numberOf(later)).andExpect(status().isUnprocessableContent());
+        addBatches(owner, recall, "NOPE").andExpect(status().isNotFound());
+        addBatches(addMember(owner, "VIEWER"), recall, numberOf(later)).andExpect(status().isForbidden());
+
+        String audit = body(as(owner, get("/api/v1/audit-logs?action=RECALL_BATCHES_ADDED")));
+        assertThat(JsonPath.<List<String>>read(audit, "$.data.items[*].entityId")).containsExactly(recall);
+        assertThat(audit).contains(numberOf(later)).doesNotContain("\"" + numberOf(batch) + "\"");
+    }
+
+    @Test
+    void aClosedRecallTakesNoMoreBatches() throws Exception {
+        String recall = resolved();
+        requestClosure(owner, recall, true).andExpect(status().isOk());
+        String later = releasedBatch(releasedLot("5").id(), "5", "5");
+        addBatches(owner, recall, numberOf(later)).andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void aCapaCanBeLinkedAfterTheRecallStartsAndThenMustCloseFirst() throws Exception {
+        String recall = resolved();
+        String capa = idOf(body(as(owner, postJson("/api/v1/capas", capaRequest())).andExpect(status().isCreated())));
+        as(owner, put("/api/v1/recalls/" + recall + "/capa").contentType("application/json")
+                        .content(json.writeValueAsString(Map.of("capaId", capa))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.capaId").value(capa));
+        requestClosure(owner, recall, true).andExpect(status().isUnprocessableContent());
+        as(owner, put("/api/v1/recalls/" + recall + "/capa").contentType("application/json").content("{}"))
+                .andExpect(status().isOk());
+        requestClosure(owner, recall, true).andExpect(status().isOk());
     }
 }

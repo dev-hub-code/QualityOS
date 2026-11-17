@@ -72,3 +72,7 @@ export const templateFields = (materials: FieldOption[], products: FieldOption[]
   { name: "materialId", label: "Only for material", type: "select", options: materials },
   { name: "productId", label: "Only for product", type: "select", options: products },
 ];
+
+/** The code and type stay; the name and what the template applies to can change. */
+export const templateEditFields = (materials: FieldOption[], products: FieldOption[]): FieldDef[] =>
+  templateFields(materials, products).filter((field) => !["code", "inspectionType"].includes(field.name));

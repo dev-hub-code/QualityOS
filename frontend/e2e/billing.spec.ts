@@ -415,9 +415,10 @@ test("an operator posts an announcement and keeps a private support ticket", asy
   await page.getByRole("button", { name: "New announcement" }).click();
   await page.getByLabel("Title").fill(title);
   await page.getByLabel("Message").fill("Back by six.");
+  await page.getByLabel(/Also email every member/).check();
   await page.getByLabel("Reason").fill("Planned work");
   await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByRole("row", { name: title })).toBeVisible();
+  await expect(page.getByRole("row", { name: title })).toContainText("emailed");
 
   await customer.goto("/dashboard");
   await expect(customer.getByText(title)).toBeVisible();

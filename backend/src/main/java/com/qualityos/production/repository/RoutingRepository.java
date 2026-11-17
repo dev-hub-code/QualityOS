@@ -15,6 +15,8 @@ public interface RoutingRepository extends JpaRepository<Routing, UUID>, JpaSpec
 
     List<Routing> findByProductIdAndStatus(UUID productId, Status status);
 
+    List<Routing> findByProductIdInAndStatus(Collection<UUID> productIds, Status status);
+
     boolean existsByProductIdAndStatusIn(UUID productId, Collection<Status> statuses);
 
     @Query("SELECT coalesce(max(r.revision), 0) FROM Routing r WHERE r.productId = ?1")

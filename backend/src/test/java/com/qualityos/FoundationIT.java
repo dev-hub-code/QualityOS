@@ -77,4 +77,10 @@ class FoundationIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.data.application").value("ProductionOS"))
                 .andExpect(jsonPath("$.correlationId").isNotEmpty());
     }
+
+    @Test
+    void anApplicationConnectionWaitsForARowLockOnlySoLong() {
+        // Through the application's own pool: a stuck wait ends in a 409 rather than holding the connection.
+        assertThat(jdbc.queryForObject("SHOW lock_timeout", String.class)).isEqualTo("10s");
+    }
 }

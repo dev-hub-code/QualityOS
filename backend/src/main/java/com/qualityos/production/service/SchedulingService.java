@@ -162,9 +162,19 @@ public class SchedulingService {
         Map<UUID, Map<LocalDate, Set<String>>> contributors = new HashMap<>();
         Map<UUID, List<String>> warnings = new HashMap<>();
         Map<UUID, Double> remainingByOrder = new HashMap<>();
+        // Approved orders are planned from their routing: every approved routing of their products, loaded at once.
+        Map<UUID, List<Routing>> routingsByProduct = routings.findByProductIdInAndStatus(open.stream()
+                        .filter(order -> order.getReleasedAt() == null).map(WorkOrder::getProductId)
+                        .collect(Collectors.toSet()), RevisionedDefinition.Status.APPROVED)
+                .stream().collect(Collectors.groupingBy(Routing::getProductId));
+        Map<UUID, List<RoutingOperation>> stepsByRouting = routingsByProduct.isEmpty() ? Map.of()
+                : routingOperations.findByRoutingIdInOrderBySequence(routingsByProduct.values().stream()
+                        .flatMap(List::stream).map(Routing::getId).toList())
+                        .stream().collect(Collectors.groupingBy(RoutingOperation::getRoutingId));
         for (WorkOrder order : open) {
             List<String> notes = new ArrayList<>();
-            Map<UUID, Double> remaining = remaining(order, released.getOrDefault(order.getId(), List.of()), now,
+            Map<UUID, Double> remaining = remaining(order, released.getOrDefault(order.getId(), List.of()),
+                    routingsByProduct, stepsByRouting, now,
                     notes);
             remaining.keySet().stream().filter(centre -> !centreById.containsKey(centre)).findAny()
                     .ifPresent(ignored -> notes.add("Some of its operations are at work centres outside this "
@@ -301,7 +311,8 @@ public class SchedulingService {
      * Minutes still to work at each work centre. A released order counts its operations' planned setup and run time
      * less what has run; an approved one, the routing in effect on its planned start.
      */
-    private Map<UUID, Double> remaining(WorkOrder order, List<WorkOrderOperation> steps, Instant now,
+    private static Map<UUID, Double> remaining(WorkOrder order, List<WorkOrderOperation> steps,
+            Map<UUID, List<Routing>> routingsByProduct, Map<UUID, List<RoutingOperation>> stepsByRouting, Instant now,
             List<String> notes) {
         Map<UUID, Double> remaining = new LinkedHashMap<>();
         if (order.getReleasedAt() != null) {
@@ -318,13 +329,16 @@ public class SchedulingService {
             }
             return remaining;
         }
-        Optional<Routing> routing = routings.findApprovedOn(order.getProductId(), order.getPlannedStart(),
-                RevisionedDefinition.Status.APPROVED).stream().findFirst();
+        LocalDate on = order.getPlannedStart();
+        Optional<Routing> routing = routingsByProduct.getOrDefault(order.getProductId(), List.of()).stream()
+                .filter(found -> found.getEffectiveFrom() != null && !found.getEffectiveFrom().isAfter(on)
+                        && (found.getEffectiveTo() == null || !found.getEffectiveTo().isBefore(on)))
+                .findFirst();
         if (routing.isEmpty()) {
             notes.add("No approved routing is in effect on its planned start, so its load is not known.");
             return remaining;
         }
-        for (RoutingOperation step : routingOperations.findByRoutingIdOrderBySequence(routing.get().getId())) {
+        for (RoutingOperation step : stepsByRouting.getOrDefault(routing.get().getId(), List.of())) {
             double minutes = step.getSetupMinutes().add(step.getRunMinutes().multiply(order.getQuantity()))
                     .doubleValue();
             remaining.merge(step.getWorkCenterId(), minutes, Double::sum);

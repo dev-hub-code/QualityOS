@@ -9,5 +9,7 @@ public interface RoutingOperationRepository extends JpaRepository<RoutingOperati
 
     List<RoutingOperation> findByRoutingIdOrderBySequence(UUID routingId);
 
+    List<RoutingOperation> findByRoutingIdInOrderBySequence(java.util.Collection<UUID> routingIds);
+
     boolean existsByRoutingIdAndSequence(UUID routingId, int sequence);
 }

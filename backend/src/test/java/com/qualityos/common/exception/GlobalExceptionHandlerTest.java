@@ -22,6 +22,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
+import java.util.List;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
@@ -125,6 +126,16 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void aLockNotGrantedIsARetryableConflictNotAServerError() throws Exception {
+        for (String path : List.of("/test/deadlock", "/test/lock-timeout")) {
+            mvc.perform(get(path))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.error.code").value("CONCURRENT_MODIFICATION"))
+                    .andExpect(jsonPath("$.error.message").value("Someone else was changing this at the same moment. Try again."));
+        }
+    }
+
+    @Test
     void dataIntegrityFailureHidesDatabaseDetails() throws Exception {
         mvc.perform(get("/test/duplicate"))
                 .andExpect(status().isConflict())
@@ -196,6 +207,16 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/test/stale")
         void stale() {
             throw new OptimisticLockingFailureException("row version mismatch");
+        }
+
+        @GetMapping("/test/deadlock")
+        void deadlock() {
+            throw new org.springframework.dao.PessimisticLockingFailureException("deadlock detected");
+        }
+
+        @GetMapping("/test/lock-timeout")
+        void lockTimeout() {
+            throw new org.springframework.dao.CannotAcquireLockException("canceling statement due to lock timeout");
         }
 
         @GetMapping("/test/duplicate")

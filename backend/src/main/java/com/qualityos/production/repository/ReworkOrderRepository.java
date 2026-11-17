@@ -14,6 +14,8 @@ public interface ReworkOrderRepository extends JpaRepository<ReworkOrder, UUID>,
 
     List<ReworkOrder> findByWorkOrderIdOrderByCreatedAtAscIdAsc(UUID workOrderId);
 
+    List<ReworkOrder> findByWorkOrderIdInOrderByCreatedAtAscIdAsc(java.util.Collection<UUID> workOrderIds);
+
     List<ReworkOrder> findByOperationId(UUID operationId);
 
     /** Without loading the rework order, so that it is read only once its work order is locked. */

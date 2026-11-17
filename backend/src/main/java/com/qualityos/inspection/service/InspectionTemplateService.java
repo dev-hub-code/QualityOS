@@ -75,7 +75,17 @@ public class InspectionTemplateService {
                 .and(Searches.contains(search, "code", "name"))
                 .and(Searches.equalTo("inspectionType", type))
                 .and(appliesToMaterial(materialId));
-        return PageResponse.from(templates.findAll(filter, pageable), this::toSummary);
+        // A page's versions and item names in one query each, not one per template.
+        org.springframework.data.domain.Page<InspectionTemplate> page = templates.findAll(filter, pageable);
+        Map<UUID, List<TemplateVersion>> versionsOf = page.isEmpty() ? Map.of()
+                : versions.findByTemplateIdInOrderByVersionNumberDesc(page.map(InspectionTemplate::getId).toList())
+                        .stream().collect(java.util.stream.Collectors.groupingBy(TemplateVersion::getTemplateId));
+        var materialRefs = materials.references(page.stream().map(InspectionTemplate::getMaterialId)
+                .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet()));
+        var productRefs = products.references(page.stream().map(InspectionTemplate::getProductId)
+                .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet()));
+        return PageResponse.from(page, template -> toSummary(template,
+                versionsOf.getOrDefault(template.getId(), List.of()), appliesTo(template, materialRefs, productRefs)));
     }
 
     @Transactional(readOnly = true)
@@ -376,7 +386,11 @@ public class InspectionTemplateService {
     }
 
     private TemplateSummary toSummary(InspectionTemplate template) {
-        List<TemplateVersion> all = versions.findByTemplateIdOrderByVersionNumberDesc(template.getId());
+        return toSummary(template, versions.findByTemplateIdOrderByVersionNumberDesc(template.getId()),
+                appliesTo(template));
+    }
+
+    private TemplateSummary toSummary(InspectionTemplate template, List<TemplateVersion> all, String appliesTo) {
         return new TemplateSummary(
                 template.getId(),
                 template.getCode(),
@@ -384,19 +398,27 @@ public class InspectionTemplateService {
                 template.getInspectionType().name(),
                 template.getMaterialId(),
                 template.getProductId(),
-                appliesTo(template),
+                appliesTo,
                 all.stream().filter(v -> v.getStatus() == Status.PUBLISHED).findFirst()
                         .map(TemplateVersion::getVersionNumber).orElse(null),
                 all.stream().anyMatch(v -> v.getStatus() == Status.DRAFT));
     }
 
     private String appliesTo(InspectionTemplate template) {
+        return appliesTo(template,
+                template.getMaterialId() == null ? Map.of() : materials.references(Set.of(template.getMaterialId())),
+                template.getProductId() == null ? Map.of() : products.references(Set.of(template.getProductId())));
+    }
+
+    private static String appliesTo(InspectionTemplate template,
+            Map<UUID, com.qualityos.material.dto.MaterialDtos.MaterialReference> materialRefs,
+            Map<UUID, com.qualityos.product.dto.ProductDtos.ProductReference> productRefs) {
         if (template.getMaterialId() != null) {
-            var material = materials.references(Set.of(template.getMaterialId())).get(template.getMaterialId());
+            var material = materialRefs.get(template.getMaterialId());
             return material == null ? null : material.code() + " – " + material.name();
         }
         if (template.getProductId() != null) {
-            var product = products.references(Set.of(template.getProductId())).get(template.getProductId());
+            var product = productRefs.get(template.getProductId());
             return product == null ? null : product.code() + " – " + product.name();
         }
         return null;

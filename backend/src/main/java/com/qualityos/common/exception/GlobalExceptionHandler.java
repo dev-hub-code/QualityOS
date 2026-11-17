@@ -67,6 +67,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return respond(code, new ApiError(code.name(), "The record was changed by someone else. Reload and retry."));
     }
 
+    /**
+     * A deadlock PostgreSQL broke, or a row lock not granted within the lock timeout: someone else was changing the
+     * same record at that moment, and trying again will work.
+     */
+    @ExceptionHandler(org.springframework.dao.PessimisticLockingFailureException.class)
+    ResponseEntity<ApiResponse<Void>> handleLockFailure(org.springframework.dao.PessimisticLockingFailureException ex) {
+        log.warn("Lock not obtained: {}", ex.getMostSpecificCause().getMessage());
+        ErrorCode code = ErrorCode.CONCURRENT_MODIFICATION;
+        return respond(code, new ApiError(code.name(), "Someone else was changing this at the same moment. Try again."));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException ex) {
         log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());

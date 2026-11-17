@@ -12,6 +12,8 @@ spring:
       maximum-pool-size: ${DB_POOL_SIZE:10}
       # Fail fast during a database outage. The 30s default outlasts readiness probe timeouts.
       connection-timeout: 3000
+      # A request waiting this long for another's row lock gives up with 409 instead of holding a connection.
+      connection-init-sql: SET lock_timeout = '${DB_LOCK_TIMEOUT:10s}'
   flyway:
     # Migrations run as the schema owner, on a connection separate from the runtime pool.
     user: ${DB_MIGRATION_USER}

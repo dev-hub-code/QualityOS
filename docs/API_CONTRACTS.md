@@ -83,8 +83,8 @@ fields are allow-listed per endpoint. `data` is a `PageResponse`:
 | `PUT`, `DELETE /suppliers/categories/{id}` | Rename or delete. Delete is refused with `409` while any supplier holds it |
 | `PUT`, `DELETE /product-categories/{id}` | Rename or delete. Delete is refused with `409` while any material or product holds it |
 | `GET /subscription/payment-gateway` | Whether online payment is available, and in which mode |
-| `POST /subscription/invoices/{id}/checkout` | Takes `phone`. Opens or continues a Cashfree order for the invoice's own total |
-| `POST /subscription/gateway-orders/{orderId}/confirm` | Asks Cashfree what happened and applies it. Returns `ACTIVE`, `PAID` or `NEEDS_REVIEW` |
+| `POST /subscription/invoices/{id}/checkout` | Takes `phone`. Opens or continues a Cashfree order for the invoice's own total. The order is reserved under the invoice's row lock first, so a second checkout at the same moment gets the same order, or `409` "A payment for this invoice is being started. Try again in a moment." while Cashfree is creating it. A reservation Cashfree turns out to hold is carried on; one it never created is set aside (`ABANDONED`) once the create call has plainly failed, or after two minutes |
+| `POST /subscription/gateway-orders/{orderId}/confirm` | Asks Cashfree what happened and applies it. Returns `CREATING`, `ACTIVE`, `PAID`, `NEEDS_REVIEW` or `ABANDONED`. A successful payment without an amount, or not in INR, is `NEEDS_REVIEW`; money reaching an abandoned order is still applied |
 | `POST /public/webhooks/cashfree` | Cashfree only, checked by signature. Reach it through the web app at `/api/webhooks/cashfree` |
 | `GET /auth/me` | User, current organisation, whether it has a subscription, permissions and memberships. An addition to the brief |
 

@@ -61,7 +61,18 @@ public class CashfreePayments {
     private record Payer(String email, String name) {
     }
 
-    private record Prepared(SubscriptionInvoice invoice, Payer payer, Optional<GatewayOrder> open) {
+    /**
+     * How long an order may stay reserved without Cashfree knowing it before it is taken for abandoned: longer than a
+     * create call can take (CashfreeClient's connect and read timeouts).
+     */
+    private static final Duration CREATE_GRACE = Duration.ofMinutes(2);
+
+    private static final String CURRENCY = "INR";
+
+    /**
+     * @param order the order reserved by this request when {@code reserved}, else one already open or being created
+     */
+    private record Prepared(SubscriptionInvoice invoice, Payer payer, GatewayOrder order, boolean reserved) {
     }
 
     private final CashfreeProperties properties;
@@ -102,26 +113,68 @@ public class CashfreePayments {
         return new PaymentGateway(properties.configured(), properties.configured() ? properties.mode() : null);
     }
 
-    /** Continues an open order for the invoice rather than starting another, so that it cannot be paid twice. */
+    /**
+     * Continues the invoice's open order rather than starting another, so that it cannot be paid twice. The order is
+     * reserved under the invoice's row lock before Cashfree is asked to create it: a second checkout at the same moment
+     * finds the reservation and shares that order, or is asked to try again while it is being created. If the
+     * application stops after Cashfree created an order but before recording it, the next checkout finds the order at
+     * Cashfree and carries on with it.
+     */
     public CheckoutResponse checkout(UUID invoiceId, CheckoutRequest request) {
         requireConfigured();
-        Prepared prepared = tx.execute(status -> prepare(invoiceId));
-        if (prepared.open().isPresent()) {
-            String reference = prepared.open().get().getGatewayOrderId();
-            CashfreeClient.Order open = cashfree.order(reference);
-            if ("PAID".equals(open.status())) {
+        // Twice at most: once more after setting aside an order Cashfree no longer has open.
+        for (int attempt = 0; attempt < 2; attempt++) {
+            Prepared prepared = tx.execute(status -> prepare(invoiceId));
+            if (prepared.reserved()) {
+                return create(prepared, request);
+            }
+            GatewayOrder open = prepared.order();
+            String reference = open.getGatewayOrderId();
+            Optional<CashfreeClient.Order> found = cashfree.findOrder(reference);
+            if (found.isPresent() && "PAID".equals(found.get().status())) {
+                opened(reference);
                 reconcile(reference);
                 throw new ConflictException("This invoice has just been paid.");
             }
-            if ("ACTIVE".equals(open.status()) && open.paymentSessionId() != null) {
-                return new CheckoutResponse(reference, open.paymentSessionId(), properties.mode());
+            if (found.isPresent() && "ACTIVE".equals(found.get().status()) && found.get().paymentSessionId() != null) {
+                opened(reference);
+                return new CheckoutResponse(reference, found.get().paymentSessionId(), properties.mode());
             }
+            if (found.isEmpty() && open.getStatus() == GatewayOrder.Status.CREATING
+                    && open.getCreatedAt().isAfter(Instant.now().minus(CREATE_GRACE))) {
+                throw new ConflictException("A payment for this invoice is being started. Try again in a moment.");
+            }
+            // Expired or ended at Cashfree, or never created there: nothing more can be paid on it.
+            abandon(reference);
         }
+        throw new ConflictException("A payment for this invoice is being started. Try again in a moment.");
+    }
+
+    private CheckoutResponse create(Prepared prepared, CheckoutRequest request) {
+        String reference = prepared.order().getGatewayOrderId();
+        CashfreeClient.Order created;
+        try {
+            created = cashfree.createOrder(newOrder(prepared, request));
+        } catch (RuntimeException e) {
+            // Cashfree may have created it before the failure. If it plainly has not, the next checkout need not wait.
+            try {
+                if (cashfree.findOrder(reference).isEmpty()) {
+                    abandon(reference);
+                }
+            } catch (RuntimeException unknown) {
+                // Still unknown: the next checkout settles the reservation.
+            }
+            throw e;
+        }
+        opened(reference);
+        return new CheckoutResponse(reference, created.paymentSessionId(), properties.mode());
+    }
+
+    private CashfreeClient.NewOrder newOrder(Prepared prepared, CheckoutRequest request) {
         SubscriptionInvoice invoice = prepared.invoice();
-        String reference = "QOS-" + HexFormat.of().toHexDigits(UUID.randomUUID().getMostSignificantBits())
-                + HexFormat.of().toHexDigits(UUID.randomUUID().getLeastSignificantBits());
-        Instant expires = Instant.now().plus(ORDER_LIFETIME);
-        CashfreeClient.Order created = cashfree.createOrder(new CashfreeClient.NewOrder(
+        GatewayOrder reserved = prepared.order();
+        String reference = reserved.getGatewayOrderId();
+        return new CashfreeClient.NewOrder(
                 reference,
                 invoice.getTotal(),
                 new CashfreeClient.Customer(
@@ -129,14 +182,30 @@ public class CashfreePayments {
                         prepared.payer().name(), prepared.payer().email(), request.phone()),
                 UriComponentsBuilder.fromUriString(appUrl).path("/settings/billing")
                         .queryParam("order_id", reference).toUriString(),
-                OffsetDateTime.ofInstant(expires, CHECKOUT_ZONE),
-                "Invoice " + invoice.getInvoiceNumber()));
+                OffsetDateTime.ofInstant(reserved.getExpiresAt(), CHECKOUT_ZONE),
+                "Invoice " + invoice.getInvoiceNumber());
+    }
+
+    /** Cashfree holds the order: a reservation becomes open. Audited once, when it does. */
+    private void opened(String reference) {
         tx.executeWithoutResult(status -> {
-            GatewayOrder order = orders.save(new GatewayOrder(invoiceId, PROVIDER, reference, invoice.getTotal(), expires));
-            audit.record("PAYMENT_CHECKOUT_STARTED", "GatewayOrder", order.getId(), null,
-                    Map.of("invoice", invoice.getInvoiceNumber(), "amount", invoice.getTotal().toPlainString()));
+            GatewayOrder order = orders.lockByProviderAndGatewayOrderId(PROVIDER, reference).orElseThrow();
+            if (order.getStatus() == GatewayOrder.Status.CREATING) {
+                order.setStatus(GatewayOrder.Status.ACTIVE);
+                audit.record("PAYMENT_CHECKOUT_STARTED", "GatewayOrder", order.getId(), null,
+                        Map.of("invoice", subscriptions.invoice(order.getInvoiceId()).getInvoiceNumber(),
+                                "amount", order.getAmount().toPlainString()));
+            }
         });
-        return new CheckoutResponse(reference, created.paymentSessionId(), properties.mode());
+    }
+
+    private void abandon(String reference) {
+        tx.executeWithoutResult(status -> {
+            GatewayOrder order = orders.lockByProviderAndGatewayOrderId(PROVIDER, reference).orElseThrow();
+            if (order.getStatus() == GatewayOrder.Status.CREATING || order.getStatus() == GatewayOrder.Status.ACTIVE) {
+                order.setStatus(GatewayOrder.Status.ABANDONED);
+            }
+        });
     }
 
     /** Row-level security hides another organisation's order, so this reveals nothing about it. */
@@ -196,7 +265,8 @@ public class CashfreePayments {
     private GatewayOrder.Status apply(String reference, List<CashfreeClient.Payment> payments) {
         GatewayOrder order = orders.lockByProviderAndGatewayOrderId(PROVIDER, reference)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", reference));
-        if (order.getStatus() != GatewayOrder.Status.ACTIVE) {
+        // An abandoned or still-reserved order can take money all the same: it is applied, never dropped.
+        if (order.getStatus() == GatewayOrder.Status.PAID || order.getStatus() == GatewayOrder.Status.NEEDS_REVIEW) {
             return order.getStatus();
         }
         if (subscriptions.invoice(order.getInvoiceId()).getStatus() == SubscriptionInvoice.Status.ISSUED) {
@@ -212,7 +282,18 @@ public class CashfreePayments {
         return order.getStatus();
     }
 
+    /**
+     * A successful payment must say how much was paid, in rupees: one that does not is kept for a person rather than
+     * taken as the invoice amount. A failed one moved no money, so the order's amount stands in for a missing figure.
+     */
     private void settle(GatewayOrder order, CashfreeClient.Payment payment, boolean failed) {
+        if (!failed && payment.amount() == null) {
+            throw new BusinessRuleException("Cashfree did not report how much payment " + payment.id() + " was.");
+        }
+        if (!failed && payment.currency() != null && !CURRENCY.equals(payment.currency())) {
+            throw new BusinessRuleException("Payment " + payment.id() + " was in " + payment.currency()
+                    + ", not " + CURRENCY + ".");
+        }
         BigDecimal amount = payment.amount() == null ? order.getAmount() : payment.amount();
         LocalDate today = LocalDate.now(ZoneId.of(organizations.getCurrent().timezone()));
         subscriptions.settle(order.getInvoiceId(), PROVIDER, new RecordPaymentRequest(
@@ -226,15 +307,32 @@ public class CashfreePayments {
         return message.length() > MAX_REASON ? message.substring(0, MAX_REASON) : message;
     }
 
+    /**
+     * Under the invoice's row lock: the order already open or being created, or a new one reserved. A checkout at the
+     * same moment waits here, then finds this one.
+     */
     private Prepared prepare(UUID invoiceId) {
+        // Row-level security hides another organisation's invoice, so this finds nothing to lock there.
+        jdbc.query("SELECT id FROM subscription_invoices WHERE id = ? FOR UPDATE", (rows, row) -> null, invoiceId);
         SubscriptionInvoice invoice = subscriptions.invoice(invoiceId);
         if (invoice.getStatus() != SubscriptionInvoice.Status.ISSUED) {
             throw new ConflictException("This invoice is not open for payment.");
         }
         Payer payer = jdbc.queryForObject(PAYER, (rows, row) -> new Payer(rows.getString(1), rows.getString(2)),
                 TenantContext.getCurrentUserId());
-        return new Prepared(invoice, payer, orders.findFirstByInvoiceIdAndStatusAndExpiresAtAfterOrderByExpiresAtDesc(
-                invoiceId, GatewayOrder.Status.ACTIVE, Instant.now()));
+        Instant now = Instant.now();
+        Optional<GatewayOrder> open = orders.findByInvoiceIdAndStatusInOrderByCreatedAtDesc(invoiceId,
+                        List.of(GatewayOrder.Status.CREATING, GatewayOrder.Status.ACTIVE)).stream()
+                .filter(order -> order.getStatus() == GatewayOrder.Status.CREATING || order.getExpiresAt().isAfter(now))
+                .findFirst();
+        if (open.isPresent()) {
+            return new Prepared(invoice, payer, open.get(), false);
+        }
+        String reference = "QOS-" + HexFormat.of().toHexDigits(UUID.randomUUID().getMostSignificantBits())
+                + HexFormat.of().toHexDigits(UUID.randomUUID().getLeastSignificantBits());
+        GatewayOrder reserved = orders.saveAndFlush(
+                new GatewayOrder(invoiceId, PROVIDER, reference, invoice.getTotal(), now.plus(ORDER_LIFETIME)));
+        return new Prepared(invoice, payer, reserved, true);
     }
 
     private void requireConfigured() {

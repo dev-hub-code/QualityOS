@@ -85,7 +85,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Maintenance mode removes change permissions, so a member's action is refused. Signing in, reading, billing and account actions still work | Review after real use |
 | Operators sign in with a password and an authenticator code, and the Control Center stays closed until they set one up. There are no backup codes: a Super Admin resets a lost authenticator (see [PLATFORM_ADMIN.md](PLATFORM_ADMIN.md)). Members of customer organisations sign in with a password only | Review after real use |
 | Duplicate references are checked before saving, so two identical references saved at the same moment for different organisations could both pass | With a payment gateway |
-| Only `NCR_CAPA`, `REPORTS` and `ADVANCED` are enforced. A feature added in the Control Center is listed but restricts nothing until code enforces it | When a feature is sold |
+| `NCR_CAPA`, `REPORTS`, `ADVANCED` and `MANUFACTURING` are enforced. A feature added in the Control Center is listed but restricts nothing until code enforces it | When a feature is sold |
 | Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
 | All seven manufacturing phases are built, through finished-goods receipt and OEE. Each phase's own limits are listed in [MANUFACTURING.md](MANUFACTURING.md) | Review after real use |
 

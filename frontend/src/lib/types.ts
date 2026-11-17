@@ -15,7 +15,7 @@ export interface Checkout {
 }
 
 export interface OrderConfirmation {
-  status: "ACTIVE" | "PAID" | "NEEDS_REVIEW";
+  status: "CREATING" | "ACTIVE" | "PAID" | "NEEDS_REVIEW" | "ABANDONED";
 }
 
 export interface Me {

@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -22,6 +23,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import tools.jackson.databind.JsonNode;
@@ -57,7 +59,8 @@ public class CashfreeClient {
         }
     }
 
-    public record Payment(String id, String status, BigDecimal amount, String group, String message) {
+    /** @param amount and currency as Cashfree reports them, either null when it leaves them out */
+    public record Payment(String id, String status, BigDecimal amount, String currency, String group, String message) {
     }
 
     private final CashfreeProperties properties;
@@ -97,8 +100,25 @@ public class CashfreeClient {
                 .body(json.writeValueAsString(body)).retrieve().body(String.class)));
     }
 
-    public Order order(String orderId) {
-        return parseOrder(call(() -> rest.get().uri("/orders/{id}", orderId).retrieve().body(String.class)));
+    /** @return empty when Cashfree has no order with this id */
+    public Optional<Order> findOrder(String orderId) {
+        try {
+            return Optional.of(parseOrder(call(() -> {
+                try {
+                    return rest.get().uri("/orders/{id}", orderId).retrieve().body(String.class);
+                } catch (HttpClientErrorException.NotFound e) {
+                    throw new OrderNotFound();
+                }
+            })));
+        } catch (OrderNotFound e) {
+            return Optional.empty();
+        }
+    }
+
+    private static final class OrderNotFound extends RuntimeException {
+        OrderNotFound() {
+            super(null, null, false, false);
+        }
     }
 
     public List<Payment> payments(String orderId) {
@@ -109,7 +129,7 @@ public class CashfreeClient {
             payments.add(new Payment(
                     text(row, "cf_payment_id"), text(row, "payment_status"),
                     row.hasNonNull("payment_amount") ? new BigDecimal(text(row, "payment_amount")) : null,
-                    text(row, "payment_group"), text(row, "payment_message")));
+                    text(row, "payment_currency"), text(row, "payment_group"), text(row, "payment_message")));
         }
         return payments;
     }

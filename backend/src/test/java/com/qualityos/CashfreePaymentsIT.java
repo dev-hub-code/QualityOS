@@ -78,7 +78,7 @@ class CashfreePaymentsIT extends AbstractIntegrationTest {
     }
 
     private CashfreeClient.Payment payment(String status, BigDecimal amount) {
-        return new CashfreeClient.Payment(UUID.randomUUID().toString(), status, amount, "upi", "Simulated");
+        return new CashfreeClient.Payment(UUID.randomUUID().toString(), status, amount, "INR", "upi", "Simulated");
     }
 
     private ResultActions webhook(String order, String secret) throws Exception {
@@ -133,7 +133,8 @@ class CashfreePaymentsIT extends AbstractIntegrationTest {
         assertThat(sent.getValue().customer().id()).matches("[A-Za-z0-9]{3,50}");
         assertThat(audited("PAYMENT_CHECKOUT_STARTED")).isEqualTo(1);
 
-        doReturn(new CashfreeClient.Order(order, "ACTIVE", "session_2")).when(cashfree).order(order);
+        doReturn(java.util.Optional.of(new CashfreeClient.Order(order, "ACTIVE", "session_2")))
+                .when(cashfree).findOrder(order);
         as(owner, postJson(BASE + "/invoices/" + invoice + "/checkout", PHONE))
                 .andExpect(jsonPath("$.data.orderId").value(order))
                 .andExpect(jsonPath("$.data.paymentSessionId").value("session_2"));
@@ -245,6 +246,141 @@ class CashfreePaymentsIT extends AbstractIntegrationTest {
         assertThat(invoiceStatus()).isEqualTo("PAID");
         assertThat(payments("FAILED")).isEqualTo(1);
         assertThat(payments("SUCCEEDED")).isEqualTo(1);
+    }
+
+    private String checkoutBody() throws Exception {
+        return as(owner, postJson(BASE + "/invoices/" + invoice + "/checkout", PHONE))
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    private List<String> orderStatuses() {
+        return asDatabaseSuperuser().queryForList(
+                "SELECT status FROM gateway_orders WHERE invoice_id = ?::uuid ORDER BY created_at", String.class, invoice);
+    }
+
+    @Test
+    void twoCheckoutsAtTheSameMomentShareOneOrder() throws Exception {
+        // Cashfree takes a while to create the order, long enough for the second request to arrive meanwhile.
+        org.mockito.Mockito.doAnswer(call -> {
+            Thread.sleep(400);
+            return new CashfreeClient.Order("ignored", "ACTIVE", "session_1");
+        }).when(cashfree).createOrder(any());
+        // By the time the second request asks, Cashfree holds the first one's order.
+        org.mockito.Mockito.doAnswer(call -> java.util.Optional.of(
+                new CashfreeClient.Order(call.getArgument(0), "ACTIVE", "session_1"))).when(cashfree).findOrder(anyString());
+
+        java.util.concurrent.CountDownLatch go = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            java.util.concurrent.Callable<String> click = () -> {
+                go.await();
+                return checkoutBody();
+            };
+            var first = pool.submit(click);
+            var second = pool.submit(click);
+            go.countDown();
+            List<String> bodies = List.of(first.get(), second.get());
+
+            List<String> orderIds = bodies.stream().map(body -> JsonPath.<String>read(body, "$.data.orderId")).toList();
+            assertThat(orderIds).doesNotContainNull();
+            assertThat(orderIds.get(0)).isEqualTo(orderIds.get(1));
+        } finally {
+            pool.shutdownNow();
+        }
+        verify(cashfree, times(1)).createOrder(any());
+        assertThat(orderStatuses()).containsExactly("ACTIVE");
+        assertThat(audited("PAYMENT_CHECKOUT_STARTED")).isEqualTo(1);
+    }
+
+    @Test
+    void aCheckoutThatStoppedHalfwayIsCarriedOnNotRepeated() throws Exception {
+        // Cashfree created the order, but the answer never came back, and asking again failed too.
+        org.mockito.Mockito.doThrow(new com.qualityos.common.exception.QualityOsException(
+                        com.qualityos.common.exception.ErrorCode.PAYMENT_GATEWAY_UNAVAILABLE, "No answer"))
+                .when(cashfree).createOrder(any());
+        org.mockito.Mockito.doThrow(new com.qualityos.common.exception.QualityOsException(
+                        com.qualityos.common.exception.ErrorCode.PAYMENT_GATEWAY_UNAVAILABLE, "No answer"))
+                .when(cashfree).findOrder(anyString());
+        as(owner, postJson(BASE + "/invoices/" + invoice + "/checkout", PHONE)).andExpect(status().is5xxServerError());
+        assertThat(orderStatuses()).containsExactly("CREATING");
+
+        // The next checkout finds it at Cashfree and carries on with it.
+        org.mockito.Mockito.doAnswer(call -> java.util.Optional.of(
+                new CashfreeClient.Order(call.getArgument(0), "ACTIVE", "session_9"))).when(cashfree).findOrder(anyString());
+        as(owner, postJson(BASE + "/invoices/" + invoice + "/checkout", PHONE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.paymentSessionId").value("session_9"));
+        verify(cashfree, times(1)).createOrder(any());
+        assertThat(orderStatuses()).containsExactly("ACTIVE");
+    }
+
+    @Test
+    void anOrderCashfreeNeverCreatedIsSetAsideAfterAWhile() throws Exception {
+        org.mockito.Mockito.doThrow(new com.qualityos.common.exception.QualityOsException(
+                        com.qualityos.common.exception.ErrorCode.PAYMENT_GATEWAY_UNAVAILABLE, "No answer"))
+                .when(cashfree).createOrder(any());
+        org.mockito.Mockito.doThrow(new com.qualityos.common.exception.QualityOsException(
+                        com.qualityos.common.exception.ErrorCode.PAYMENT_GATEWAY_UNAVAILABLE, "No answer"))
+                .when(cashfree).findOrder(anyString());
+        as(owner, postJson(BASE + "/invoices/" + invoice + "/checkout", PHONE)).andExpect(status().is5xxServerError());
+
+        // Cashfree does not have it, but it is too soon to be sure it is not still being made.
+        doReturn(java.util.Optional.empty()).when(cashfree).findOrder(anyString());
+        as(owner, postJson(BASE + "/invoices/" + invoice + "/checkout", PHONE))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.message")
+                        .value("A payment for this invoice is being started. Try again in a moment."));
+
+        // Later, it is set aside and a new order made.
+        asDatabaseSuperuser().update(
+                "UPDATE gateway_orders SET created_at = now() - INTERVAL '3 minutes' WHERE invoice_id = ?::uuid", invoice);
+        doReturn(new CashfreeClient.Order("ignored", "ACTIVE", "session_2")).when(cashfree).createOrder(any());
+        as(owner, postJson(BASE + "/invoices/" + invoice + "/checkout", PHONE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.paymentSessionId").value("session_2"));
+        assertThat(orderStatuses()).containsExactly("ABANDONED", "ACTIVE");
+    }
+
+    @Test
+    void aFailedCreateThatCashfreeNeverSawDoesNotHoldUpTheNextTry() throws Exception {
+        org.mockito.Mockito.doThrow(new com.qualityos.common.exception.QualityOsException(
+                        com.qualityos.common.exception.ErrorCode.PAYMENT_GATEWAY_UNAVAILABLE, "No answer"))
+                .when(cashfree).createOrder(any());
+        doReturn(java.util.Optional.empty()).when(cashfree).findOrder(anyString());
+        as(owner, postJson(BASE + "/invoices/" + invoice + "/checkout", PHONE)).andExpect(status().is5xxServerError());
+        assertThat(orderStatuses()).containsExactly("ABANDONED");
+
+        doReturn(new CashfreeClient.Order("ignored", "ACTIVE", "session_3")).when(cashfree).createOrder(any());
+        as(owner, postJson(BASE + "/invoices/" + invoice + "/checkout", PHONE)).andExpect(status().isOk());
+        assertThat(orderStatuses()).containsExactly("ABANDONED", "ACTIVE");
+    }
+
+    @Test
+    void aPaymentWithoutAnAmountIsKeptForAPerson() throws Exception {
+        String order = checkout();
+        cashfreeHolds(order, payment("SUCCESS", null));
+        webhook(order, "test-secret").andExpect(status().isOk());
+        assertThat(invoiceStatus()).isEqualTo("ISSUED");
+        assertThat(orderStatus(order)).isEqualTo("NEEDS_REVIEW");
+    }
+
+    @Test
+    void aPaymentInAnotherCurrencyIsKeptForAPerson() throws Exception {
+        String order = checkout();
+        cashfreeHolds(order, new CashfreeClient.Payment("p-usd", "SUCCESS", total, "USD", "card", "Simulated"));
+        webhook(order, "test-secret").andExpect(status().isOk());
+        assertThat(invoiceStatus()).isEqualTo("ISSUED");
+        assertThat(orderStatus(order)).isEqualTo("NEEDS_REVIEW");
+    }
+
+    @Test
+    void moneyReachingAnAbandonedOrderIsStillApplied() throws Exception {
+        String order = checkout();
+        asDatabaseSuperuser().update("UPDATE gateway_orders SET status = 'ABANDONED' WHERE gateway_order_id = ?", order);
+        cashfreeHolds(order, payment("SUCCESS", total));
+        webhook(order, "test-secret").andExpect(status().isOk());
+        assertThat(invoiceStatus()).isEqualTo("PAID");
+        assertThat(orderStatus(order)).isEqualTo("PAID");
     }
 
     @Test

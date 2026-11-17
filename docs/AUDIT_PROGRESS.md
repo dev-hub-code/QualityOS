@@ -2,7 +2,8 @@
 
 Progress on the gaps raised in *QualityOS Repository Audit and Functional Flows* (5 November 2026).
 
-Last updated: 5 November 2026.
+Last updated: 17 November 2026. Later reviews (17 November) are in `AUDIT_2026-11-17.md`,
+`AUDIT_MANUFACTURING_2026-11-17.md` and `AUDIT_BACKEND_2026-11-17.md`.
 
 ## Done
 
@@ -15,11 +16,9 @@ Last updated: 5 November 2026.
 | #42 | A failed calibration raises a MAJOR NCR for the inspections that used the instrument since its last good calibration. Each inspection needs a decision: *Result stands* or *Reinspect*, with a reason | P1 Calibration impact closure |
 | #43 | `audit/` and the documentation PDF are no longer tracked by git | Housekeeping |
 
-## In review
+| #44 | *Reinspect* holds the goods: a lot goes back to awaiting inspection, and a batch goes on hold, until a new inspection releases them. The calibration's NCR cannot close while any decision is pending | P1 Calibration impact closure |
 
-| PR | Change | Merge after |
-|---|---|---|
-| #44 | *Reinspect* holds the goods: a lot goes back to awaiting inspection, and a batch goes on hold, until a new inspection releases them. The calibration's NCR cannot close while any decision is pending | Ready now. Everything it depends on is merged |
+Everything below marked done was merged after these, between #57 and #128.
 
 ## Pending
 
@@ -35,36 +34,46 @@ Phase 11 is on hold until you ask for it.
 
 ### P1: quality process
 
-- [ ] **Inspection sampling and routing**: AQL (ISO 2859-1) sampling tables, automatic template choice by material, product or operation, and product binding in the UI
-- [ ] **CAPA execution**: evidence and due-date reminders for each action, permission for action owners to complete their own actions, escalation, and reopening when a fix proves ineffective
-- [ ] **More NCR sources**: supplier issues, customer complaints and process incidents. Inspection, audit and calibration are already covered
-- [ ] **Recall, remaining**: start from several batches in the UI, link a CAPA from the UI, a regulatory report pack, and escalation when customers don't respond
+- [x] **Inspection sampling and routing**: AQL (ISO 2859-1) sampling with special levels, switching rules and double
+  sampling (#103, #114, #117), and the template chosen by material, product or operation
+- [ ] **CAPA execution**, remaining: an action owner without `CAPA_MANAGE` cannot complete their own action, and
+  there is no escalation. Done: evidence before an action completes (#101), a reminder for each late action (#80),
+  and a new action needed after an ineffective verification
+- [ ] **More NCR sources**, remaining: supplier issues and process incidents as sources of their own (today they are
+  raised by hand). Done: customer complaints and quality returns (#104, #113), and production rejects
+- [ ] **Recall**, remaining: a regulatory report pack, and escalation when customers do not respond. Done: one recall
+  for several batches, and linking its CAPA later (#57)
 - [ ] **Calibration, remaining**:
   - recall goods that were already used or dispatched;
   - start the new inspection automatically after *Reinspect*;
   - link instruments to each measurement, not to the whole inspection.
 - [ ] **Transfers between plants**: a stock transfer with in-transit and received states, and dispatches split by plant
-- [ ] Material receipt notifies inspectors
+- [x] Material receipt notifies inspectors (#79)
 
 ### P1: commercial and support
 
+- [x] Two checkouts of one invoice at the same moment share one Cashfree order, a checkout stopped halfway is carried
+  on rather than repeated, and a payment without an amount or in another currency is kept for a person (#128)
 - [ ] Cashfree sandbox run: success, failure, duplicate webhook, bad signature, amount mismatch
 - [ ] Refunds, credit notes and reconciliation
 - [ ] GST invoice reviewed by an accountant
 - [ ] Proration and auto-debit renewals
-- [ ] Enforce every plan feature, or label it as not enforced. Today only NCR_CAPA, REPORTS and ADVANCED are enforced
-- [ ] Customer support portal: customers raise and track tickets
+- [x] Every plan feature on sale is enforced: `NCR_CAPA`, `REPORTS`, `ADVANCED` and `MANUFACTURING`. A feature added
+  later in the Control Center restricts nothing until code enforces it
+- [x] Customer support portal: customers raise and track their requests (#98)
 - [x] Support access to a customer's data only with their consent, for a limited time, and audited (read-only, or with changes for at most 24 hours if the customer allows, never approvals, access or billing)
 - [x] MFA for platform operators (V20, authenticator app)
 
 ### P2: experience and scale
 
-- [ ] Push notifications instead of one-minute polling, complete email templates, tenant logo
-- [ ] Reviewed Hindi and Marathi translations, and translating the app itself
-- [ ] Server-side search in pickers (now capped at 100), and restoring archived records. Search across NCRs, CAPAs and suppliers is built
+- [x] Notifications pushed to the bell as they happen (#106), an email template for each (#90), and the organisation's
+  logo in the app, its emails and PDFs (#105, #110)
+- [x] Pickers list every record (#82), and archived records can be restored (#81)
 - [ ] Background report exports beyond 5,000 rows, and separate permissions for totals and detail
-- [ ] Audit every change to child records, with before and after values
+- [ ] Audit every change to child records, with before and after values. Done for facility units, supplier contacts,
+  material mappings and units (#84)
 - [ ] Offline inspection on the shop floor
+- Not planned: translations. The app is English only (#89).
 
 ## Notes
 

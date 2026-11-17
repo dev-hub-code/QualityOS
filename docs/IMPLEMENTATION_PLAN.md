@@ -34,7 +34,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Someone can still deliberately lock out a known email (10 failures, 15 minutes), though the IP limit slows it down. A reset link unlocks the account | Review after real use |
 | The IP rate limit is held per backend instance, so several instances multiply it. Shared limits need Redis or the load balancer | With production work |
 | An expired sign-up is emptied after 30 days, not deleted, because its audit rows cannot be removed. Its suspended organisation row stays. With unverified login allowed, nothing is expired | By design |
-| Notifications are polled once a minute, with no live push. Only email and in-app channels exist | When a user needs it |
+| The bell updates live over server-sent events, with a 5-minute poll behind it. Connections are held per instance, so running several instances needs a shared channel (such as PostgreSQL `LISTEN`/`NOTIFY`) before every page hears every change. Only email and in-app channels exist | When a user needs it |
 | An administrator can upload a PNG or JPEG logo (up to 256 KB). It shows in the menu and on the organisation's emails. PDF reports and invoices still show the name only, and there are no brand colours | When a user needs it |
 | With verification switched off for private use, registration reveals that an email has an account | Private use only |
 | Sampling is fixed, percentage, every unit, or AQL by ISO 2859-1: single sampling for normal inspection at general levels I to III. Tightened and reduced inspection, switching rules, special levels S-1 to S-4, and double or multiple plans are not built. An AQL plan over 500 samples is refused | When a customer needs them |

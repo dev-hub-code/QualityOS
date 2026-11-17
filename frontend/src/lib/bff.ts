@@ -84,6 +84,10 @@ export function forwardedHeaders(request: NextRequest): Headers {
   return headers;
 }
 
+export function isEventStream(upstream: Response): boolean {
+  return upstream.headers.get("content-type")?.startsWith("text/event-stream") ?? false;
+}
+
 /** Headers carried from the backend's response to the browser. Downloads depend on the last two. */
 export function returnedHeaders(upstream: Response): Headers {
   const headers = new Headers({

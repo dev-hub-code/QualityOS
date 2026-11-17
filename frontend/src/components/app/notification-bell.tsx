@@ -1,12 +1,32 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell } from "lucide-react";
 import Link from "next/link";
+import { useEffect } from "react";
 import { api } from "@/lib/api";
 
-const POLL_MILLIS = 60_000;
+/** The stream announces changes at once; the poll only catches up on any it missed. */
+const POLL_MILLIS = 5 * 60_000;
 
+/**
+ * Listens for changes to the signed-in user's notifications, and re-reads the bell and the inbox when one comes. The
+ * event names nothing, so what is shown always comes from the usual inbox requests. The browser reconnects by itself.
+ */
+export function useNotificationStream(enabled: boolean) {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!enabled || typeof EventSource === "undefined") return;
+    const source = new EventSource("/api/v1/notifications/stream");
+    source.addEventListener("notifications", () => {
+      void queryClient.invalidateQueries({ queryKey: ["/notifications/unread-count"] });
+      void queryClient.invalidateQueries({ queryKey: ["/notifications"] });
+    });
+    return () => source.close();
+  }, [enabled, queryClient]);
+}
+
+/** Shown twice on a page (the phone header and the menu), so the stream is opened once, by the app shell. */
 export function NotificationBell() {
   const { data } = useQuery({
     queryKey: ["/notifications/unread-count"],

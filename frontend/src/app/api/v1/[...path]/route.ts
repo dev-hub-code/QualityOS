@@ -5,6 +5,7 @@ import {
   backendUrl,
   clearSessionCookies,
   forwardedHeaders,
+  isEventStream,
   isProxyablePath,
   isTokenIssuingRequest,
   isTrustedOrigin,
@@ -36,7 +37,8 @@ async function forward(
   const send = (accessToken: string | undefined) => {
     const headers = forwardedHeaders(request);
     if (accessToken) headers.set("authorization", `Bearer ${accessToken}`);
-    return fetch(target, { method: request.method, headers, body });
+    // A browser that leaves closes the backend connection too, which matters for an event stream.
+    return fetch(target, { method: request.method, headers, body, signal: request.signal });
   };
 
   let renewed: TokenResponse | undefined;
@@ -52,10 +54,16 @@ async function forward(
   }
 
   const hasBody = upstream.status !== 204 && upstream.status !== 304;
-  const response = new NextResponse(hasBody ? await upstream.arrayBuffer() : null, {
+  // Events are passed on as they come; anything else is read whole.
+  const streaming = upstream.ok && isEventStream(upstream);
+  const response = new NextResponse(streaming ? upstream.body : hasBody ? await upstream.arrayBuffer() : null, {
     status: upstream.status,
     headers: returnedHeaders(upstream),
   });
+  if (streaming) {
+    response.headers.set("cache-control", "no-cache, no-transform");
+    response.headers.set("x-accel-buffering", "no");
+  }
 
   if (renewed) setSessionCookies(response, renewed);
   if (upstream.status === 401) clearSessionCookies(response);

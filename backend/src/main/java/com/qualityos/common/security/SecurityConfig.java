@@ -1,5 +1,6 @@
 package com.qualityos.common.security;
 
+import jakarta.servlet.DispatcherType;
 import com.qualityos.common.exception.ErrorCode;
 import com.qualityos.common.response.ApiError;
 import com.qualityos.common.response.ApiResponse;
@@ -58,6 +59,8 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // The second pass of a request already authorised, such as a notification stream closing.
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .requestMatchers(PUBLIC_PATHS).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/verification-status").authenticated()
                         .anyRequest().hasAuthority(TenantJwtAuthenticationConverter.MEMBER))

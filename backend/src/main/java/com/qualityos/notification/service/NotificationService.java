@@ -32,10 +32,13 @@ public class NotificationService {
 
     private final NotificationRepository notifications;
     private final NotificationPreferenceRepository preferences;
+    private final NotificationStream stream;
 
-    NotificationService(NotificationRepository notifications, NotificationPreferenceRepository preferences) {
+    NotificationService(NotificationRepository notifications, NotificationPreferenceRepository preferences,
+            NotificationStream stream) {
         this.notifications = notifications;
         this.preferences = preferences;
+        this.stream = stream;
     }
 
     /**
@@ -88,6 +91,7 @@ public class NotificationService {
                     return notification;
                 })
                 .toList());
+        stream.changedAfterCommit(TenantContext.getCurrentTenantId(), targets);
     }
 
     /** Only an email that gave up can go again. One already sent, or skipped, stays as it is. */
@@ -126,11 +130,18 @@ public class NotificationService {
         notifications.findByIdAndUserId(id, TenantContext.getCurrentUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("Notification", id))
                 .markRead(Instant.now());
+        changedForMe();
     }
 
     @Transactional
     public void markAllRead() {
         notifications.markAllRead(TenantContext.getCurrentUserId(), Instant.now());
+        changedForMe();
+    }
+
+    /** The user's other tabs and devices update their bell too. */
+    private void changedForMe() {
+        stream.changedAfterCommit(TenantContext.getCurrentTenantId(), Set.of(TenantContext.getCurrentUserId()));
     }
 
     @Transactional(readOnly = true)

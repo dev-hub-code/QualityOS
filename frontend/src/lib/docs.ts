@@ -1092,7 +1092,7 @@ export const DOC_PAGES: DocPage[] = [
       {
         title: "Good to know",
         list: [
-          "Every notification appears in the app under the bell. The count refreshes about once a minute.",
+          "Every notification appears in the app under the bell. The count updates as soon as something new arrives.",
           "In Settings you can turn off email for each type. In-app notifications stay on.",
           "The app and its email are in English.",
         ],

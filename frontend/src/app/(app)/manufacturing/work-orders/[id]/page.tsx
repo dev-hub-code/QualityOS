@@ -31,6 +31,7 @@ import { api } from "@/lib/api";
 import { PRIORITY_LABELS, reschedulable, workOrderActions } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
 import type { WorkOrderDetail, WorkOrderStatus } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 /** The statuses whose reason is shown above the details. */
 const REASON_LABELS: Partial<Record<WorkOrderStatus, string>> = {
@@ -46,6 +47,7 @@ const link = "text-primary hover:underline";
 type Dialog = "edit" | "sendBack" | "approve" | "hold" | "cancel" | "reschedule" | null;
 
 export default function WorkOrderPage() {
+  const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const path = `/manufacturing/work-orders/${id}`;
   const can = {
@@ -87,7 +89,15 @@ export default function WorkOrderPage() {
           </Button>
         )}
         {actions.includes("submit") && (
-          <Button disabled={pending} onClick={() => run(() => api.post(`${path}/submit`))}>
+          <Button disabled={pending} onClick={() =>
+              confirm({
+                title: "Submit this work order for approval?",
+                description: "Approvers are notified, and the order can no longer be edited unless it is sent back.",
+                confirmLabel: "Submit",
+              }).then((ok) => {
+                if (ok) void run(() => api.post(`${path}/submit`));
+              })
+            }>
             Submit for approval
           </Button>
         )}
@@ -98,12 +108,28 @@ export default function WorkOrderPage() {
           </Button>
         )}
         {actions.includes("release") && (
-          <Button disabled={pending} onClick={() => run(() => api.post(`${path}/release`))}>
+          <Button disabled={pending} onClick={() =>
+              confirm({
+                title: "Release this work order?",
+                description: "The BOM or recipe and routing in effect are frozen onto the order, and material can be reserved for it. This cannot be undone.",
+                confirmLabel: "Release",
+              }).then((ok) => {
+                if (ok) void run(() => api.post(`${path}/release`));
+              })
+            }>
             Release
           </Button>
         )}
         {actions.includes("start") && (
-          <Button disabled={pending} onClick={() => run(() => api.post(`${path}/start`))}>
+          <Button disabled={pending} onClick={() =>
+              confirm({
+                title: "Start production?",
+                description: "The production batch opens, and the first operation becomes ready on the shop floor.",
+                confirmLabel: "Start production",
+              }).then((ok) => {
+                if (ok) void run(() => api.post(`${path}/start`));
+              })
+            }>
             Start production
           </Button>
         )}

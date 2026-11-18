@@ -35,6 +35,7 @@ import type {
   Plan,
   Subscription,
 } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const STATE: Record<Subscription["state"], string> = {
   TRIAL: "Trial",
@@ -111,6 +112,7 @@ function PlanCard({
 }
 
 export default function BillingPage() {
+  const confirm = useConfirm();
   const { run, pending, message } = useAction();
   const [cycle, setCycle] = useState<BillingCycle>("MONTHLY");
   const get = <T,>(path: string) => ({
@@ -218,7 +220,17 @@ export default function BillingPage() {
               size="sm"
               variant="outline"
               disabled={pending}
-              onClick={() => run(() => api.post("/subscription/cancel"))}
+              onClick={() =>
+                confirm({
+                  title: "Cancel your subscription?",
+                  description:
+                    "It runs to the end of the period already paid for, then ends. You can keep it at any time before then.",
+                  confirmLabel: "Cancel subscription",
+                  danger: true,
+                }).then((ok) => {
+                  if (ok) void run(() => api.post("/subscription/cancel"));
+                })
+              }
             >
               Cancel subscription
             </Button>

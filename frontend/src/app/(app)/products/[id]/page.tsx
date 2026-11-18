@@ -28,6 +28,7 @@ import { api, type PageResponse } from "@/lib/api";
 import { productFields } from "@/lib/record-fields";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { ProductDetail, ProductionBatch } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const REVISION_FIELDS: FieldDef[] = [
   { name: "revision", label: "Revision", required: true },
@@ -36,6 +37,7 @@ const REVISION_FIELDS: FieldDef[] = [
 ];
 
 export default function ProductPage() {
+  const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const path = `/products/${id}`;
   const canManage = usePermission("PRODUCT_MANAGE");
@@ -98,7 +100,16 @@ export default function ProductPage() {
                 {formatQuantity(line.quantityPerUnit)} {units.label(line.uomId)}
               </span>
               {canManage && (
-                <Button variant="ghost" size="sm" onClick={() => run(() => api.delete(`${path}/materials/${line.id}`))}>
+                <Button variant="ghost" size="sm" onClick={() =>
+                    confirm({
+                      title: "Remove this material from the product?",
+                      description: "It is no longer listed on the product.",
+                      confirmLabel: "Remove",
+                      danger: true,
+                    }).then((ok) => {
+                      if (ok) void run(() => api.delete(`${path}/materials/${line.id}`));
+                    })
+                  }>
                   Remove
                 </Button>
               )}

@@ -19,10 +19,12 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { DispatchReturn } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const RECEIVE_FIELDS: FieldDef[] = [{ name: "receivedOn", label: "Date received", type: "date", required: true }];
 
 export default function DispatchReversalPage() {
+  const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const path = `/dispatch-reversals/${id}`;
   const canInspect = usePermission("INSPECTION_CREATE");
@@ -47,7 +49,16 @@ export default function DispatchReversalPage() {
       {canManage && reversal.status === "EXPECTED" && (
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => setReceiving(true)}>Mark received</Button>
-          <Button variant="outline" onClick={() => api.post(`${path}/cancel`).then(refresh)}>
+          <Button variant="outline" onClick={() =>
+              confirm({
+                title: "Cancel this return?",
+                description: "The return is cancelled and nothing is received against it. This cannot be undone.",
+                confirmLabel: "Cancel return",
+                danger: true,
+              }).then((ok) => {
+                if (ok) void api.post(`${path}/cancel`).then(refresh);
+              })
+            }>
             Cancel return
           </Button>
         </div>

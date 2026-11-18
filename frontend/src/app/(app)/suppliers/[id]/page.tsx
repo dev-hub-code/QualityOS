@@ -22,6 +22,7 @@ import { api } from "@/lib/api";
 import { supplierFields } from "@/lib/record-fields";
 import type { FieldDef } from "@/lib/record-form";
 import type { SupplierDetail } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const NOTE_FIELDS: FieldDef[] = [{ name: "note", label: "Reason", required: true }];
 const CONTACT_FIELDS: FieldDef[] = [
@@ -33,6 +34,7 @@ const CONTACT_FIELDS: FieldDef[] = [
 ];
 
 export default function SupplierPage() {
+  const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const path = `/suppliers/${id}`;
   const canUpdate = usePermission("SUPPLIER_UPDATE");
@@ -52,13 +54,29 @@ export default function SupplierPage() {
     <div className="space-y-6">
       <PageHeader title={supplier.name} subtitle={<StatusBadge status={status} />}>
         {canUpdate && (status === "DRAFT" || status === "REJECTED") && (
-          <Button disabled={pending} onClick={() => act("submit")}>
+          <Button disabled={pending} onClick={() =>
+              confirm({
+                title: "Send this supplier for approval?",
+                description: "Approvers can then approve or reject it.",
+                confirmLabel: "Submit",
+              }).then((ok) => {
+                if (ok) void act("submit");
+              })
+            }>
             Submit for approval
           </Button>
         )}
         {canApprove && status === "PENDING_APPROVAL" && (
           <>
-            <Button disabled={pending} onClick={() => act("approve")}>
+            <Button disabled={pending} onClick={() =>
+                confirm({
+                  title: "Approve this supplier?",
+                  description: "It can then be chosen on purchase orders.",
+                  confirmLabel: "Approve supplier",
+                }).then((ok) => {
+                  if (ok) void act("approve");
+                })
+              }>
               Approve
             </Button>
             <Button variant="destructive" onClick={() => setDialog("reject")}>
@@ -72,7 +90,15 @@ export default function SupplierPage() {
           </Button>
         )}
         {canApprove && status === "BLOCKED" && (
-          <Button disabled={pending} onClick={() => act("reinstate")}>
+          <Button disabled={pending} onClick={() =>
+              confirm({
+                title: "Reinstate this supplier?",
+                description: "It can be used on purchase orders again.",
+                confirmLabel: "Reinstate",
+              }).then((ok) => {
+                if (ok) void act("reinstate");
+              })
+            }>
             Reinstate
           </Button>
         )}
@@ -121,7 +147,16 @@ export default function SupplierPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => run(() => api.delete(`${path}/contacts/${contact.id}`))}
+                  onClick={() =>
+                      confirm({
+                        title: `Remove ${contact.name}?`,
+                        description: "The contact is removed from this supplier.",
+                        confirmLabel: "Remove contact",
+                        danger: true,
+                      }).then((ok) => {
+                        if (ok) void run(() => api.delete(`${path}/contacts/${contact.id}`));
+                      })
+                    }
                 >
                   Remove
                 </Button>

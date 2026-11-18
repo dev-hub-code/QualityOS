@@ -9,11 +9,13 @@ import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
 import { FISHBONE_BRANCHES, WHY_COUNT, toFishbone, toFiveWhys } from "@/lib/capa";
 import type { Capa } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const TEXTAREA_CLASS = "w-full rounded-xl border border-input bg-white/70 px-2 py-1.5 text-sm";
 
 /** The 5 Why and fishbone tools are optional aids. Only the root cause itself is required. */
 export function CapaAnalysisForm({ capa }: { capa: Capa }) {
+  const confirm = useConfirm();
   const { run, pending, message } = useAction();
   const [rootCause, setRootCause] = useState(capa.rootCause ?? "");
   const [whys, setWhys] = useState(() => Array.from({ length: WHY_COUNT }, (_, index) => capa.fiveWhys[index] ?? ""));
@@ -80,7 +82,15 @@ export function CapaAnalysisForm({ capa }: { capa: Capa }) {
           </Button>
           <Button
             disabled={pending}
-            onClick={() => run(() => save().then(() => api.post(`${path}/finish-analysis`)))}
+            onClick={() =>
+                confirm({
+                  title: "Finish the analysis?",
+                  description: "The root cause is saved, and the CAPA moves on to action planning.",
+                  confirmLabel: "Finish analysis",
+                }).then((ok) => {
+                  if (ok) void run(() => save().then(() => api.post(`${path}/finish-analysis`)));
+                })
+              }
           >
             Finish analysis
           </Button>

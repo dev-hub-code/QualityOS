@@ -8,6 +8,7 @@ import { RecordLink, StatusBadge, useAction } from "@/components/records/parts";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type { AuditFinding } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 export function AuditFindings({
   auditId,
@@ -20,6 +21,7 @@ export function AuditFindings({
   canRaise: boolean;
   canAttach: boolean;
 }) {
+  const confirm = useConfirm();
   const { run, message } = useAction();
   const [evidence, setEvidence] = useState<string | null>(null);
   if (findings.length === 0) return <p className="text-sm text-muted-foreground">No findings.</p>;
@@ -52,7 +54,15 @@ export function AuditFindings({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => run(() => api.post(`/audits/${auditId}/findings/${finding.id}/ncr`))}
+                  onClick={() =>
+                      confirm({
+                        title: "Raise an NCR for this finding?",
+                        description: "An NCR with source Audit is opened, and follows the usual closing rules.",
+                        confirmLabel: "Raise NCR",
+                      }).then((ok) => {
+                        if (ok) void run(() => api.post(`/audits/${auditId}/findings/${finding.id}/ncr`));
+                      })
+                    }
                 >
                   Raise NCR
                 </Button>

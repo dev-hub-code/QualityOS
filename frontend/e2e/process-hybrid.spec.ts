@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { apiCaller, signUp } from "./helpers";
+import { apiCaller, signUp, confirmAction } from "./helpers";
 import { step } from "./trace-setup";
 
 const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
@@ -122,6 +122,7 @@ test("a process product is made to a recipe and closed short", async ({ page }) 
   await expect(scale.getByText("(242.25 KG with scrap allowance)")).toBeVisible();
   await expect(scale.getByText("500 GM")).toBeVisible();
   await page.getByRole("button", { name: "Submit for approval" }).click();
+  await confirmAction(page);
   await step(page, "Approve", async () => {});
   await expect(page.locator("[data-slot='badge']", { hasText: "in effect" })).toBeVisible();
 

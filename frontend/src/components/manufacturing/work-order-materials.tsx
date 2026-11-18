@@ -11,6 +11,7 @@ import { api } from "@/lib/api";
 import { newRequestKey } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
 import type { WorkOrderMaterials, WorkOrderStatus } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 /** Lots are offered first expiring first; the date shows why. */
 function expiring(expiryDate: string | null): string {
@@ -37,6 +38,7 @@ const cell = "py-2 text-right tabular-nums";
  * once.
  */
 export function WorkOrderMaterialsPanel({ orderId, status }: { orderId: string; status: WorkOrderStatus }) {
+  const confirm = useConfirm();
   const path = `/manufacturing/work-orders/${orderId}`;
   const canReserve = usePermission("WORK_ORDER_MATERIAL_RESERVE");
   const canIssue = usePermission("WORK_ORDER_MATERIAL_ISSUE");
@@ -141,7 +143,15 @@ export function WorkOrderMaterialsPanel({ orderId, status }: { orderId: string; 
                     size="sm"
                     variant="ghost"
                     disabled={pending}
-                    onClick={() => run(() => api.post(`${path}/reservations/${reservation.id}/release`, {}))}
+                    onClick={() =>
+                        confirm({
+                          title: "Release this reservation?",
+                          description: "The material is free for other orders again.",
+                          confirmLabel: "Release reservation",
+                        }).then((ok) => {
+                          if (ok) void run(() => api.post(`${path}/reservations/${reservation.id}/release`, {}));
+                        })
+                      }
                   >
                     Release
                   </Button>

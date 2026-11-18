@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
-import { apiCaller, signUp } from "./helpers";
+import { apiCaller, signUp, confirmAction } from "./helpers";
 import { step } from "./trace-setup";
 
 const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
@@ -63,6 +63,7 @@ test("a work order raised from a plan is approved, released and started", async 
     await dialog.getByLabel("Due").fill(day(7));
   });
   await page.getByRole("button", { name: "Approve plan" }).click();
+  await confirmAction(page);
   await expect(page.locator("[data-slot='badge']", { hasText: "approved" })).toBeVisible();
 
   // The order takes what is still to be ordered on the line.
@@ -74,8 +75,10 @@ test("a work order raised from a plan is approved, released and started", async 
   await expect(page.getByText("Revision 1")).toBeVisible();
 
   await page.getByRole("button", { name: "Submit for approval" }).click();
+  await confirmAction(page);
   await step(page, "Approve", async () => {});
   await page.getByRole("button", { name: "Release" }).click();
+  await confirmAction(page);
   const materials = page.locator("[data-slot='card']").filter({ hasText: "Still to find" });
   await expect(materials.getByText("22 KG").first()).toBeVisible();
   await expect(page.getByText("is short by 7 KG")).toBeVisible();
@@ -85,6 +88,7 @@ test("a work order raised from a plan is approved, released and started", async 
   const reservations = page.locator("[data-slot='card']").filter({ hasText: "Reservations" });
   await expect(reservations.getByText(`lot ${lot}`)).toBeVisible();
   await page.getByRole("button", { name: "Start production" }).click();
+  await confirmAction(page);
   await expect(page.getByRole("link", { name: /^PB-/ })).toBeVisible();
   await expect(page.getByText(/Started short:/)).toBeVisible();
 

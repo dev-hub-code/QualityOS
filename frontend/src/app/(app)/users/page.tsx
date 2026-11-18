@@ -17,6 +17,7 @@ import { useMe } from "@/hooks/use-me";
 import { ApiError, api, type PageResponse } from "@/lib/api";
 import { inviteSchema, type InviteValues } from "@/lib/schemas";
 import type { Invitation, Member, Role } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 function RolePicker({
   roles,
@@ -185,6 +186,7 @@ function EditRolesDialog({
 }
 
 function PendingInvitations() {
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const invitations = useQuery({
     queryKey: ["invitations"],
@@ -211,7 +213,16 @@ function PendingInvitations() {
               <Button variant="ghost" size="sm" onClick={() => act.mutate({ id: invitation.id, action: "resend" })}>
                 Resend
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => act.mutate({ id: invitation.id, action: "revoke" })}>
+              <Button variant="ghost" size="sm" onClick={() =>
+                  confirm({
+                    title: `Revoke the invitation to ${invitation.email}?`,
+                    description: "The link stops working, and the user place is freed.",
+                    confirmLabel: "Revoke invitation",
+                    danger: true,
+                  }).then((ok) => {
+                    if (ok) void act.mutate({ id: invitation.id, action: "revoke" });
+                  })
+                }>
                 Revoke
               </Button>
             </span>
@@ -224,6 +235,7 @@ function PendingInvitations() {
 
 export default function UsersPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const { data: me } = useMe();
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Member | null>(null);
@@ -296,7 +308,19 @@ export default function UsersPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setActive.mutate({ member, active: member.status !== "ACTIVE" })}
+                      onClick={() =>
+                        member.status === "ACTIVE"
+                          ? confirm({
+                              title: `Deactivate ${member.fullName}?`,
+                              description:
+                                "They are signed out and can no longer sign in. Their records are kept, and you can activate them again.",
+                              confirmLabel: "Deactivate",
+                              danger: true,
+                            }).then((ok) => {
+                              if (ok) setActive.mutate({ member, active: false });
+                            })
+                          : setActive.mutate({ member, active: true })
+                      }
                     >
                       {member.status === "ACTIVE" ? "Deactivate" : "Activate"}
                     </Button>

@@ -25,10 +25,12 @@ import { api } from "@/lib/api";
 import { planActions } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
 import type { PlanDetail, PlanLine, WorkOrderDetail } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 type Dialog = { kind: "edit" | "line" | "close" | "cancel" } | { kind: "editLine" | "order"; line: PlanLine } | null;
 
 export default function ProductionPlanPage() {
+  const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const path = `/manufacturing/production-plans/${id}`;
   const canManage = usePermission("PRODUCTION_PLAN_MANAGE");
@@ -66,7 +68,15 @@ export default function ProductionPlanPage() {
           </Button>
         )}
         {actions.includes("approve") && (
-          <Button disabled={pending} onClick={() => run(() => api.post(`${path}/approve`))}>
+          <Button disabled={pending} onClick={() =>
+              confirm({
+                title: "Approve this plan?",
+                description: "Work orders can then be raised from its lines.",
+                confirmLabel: "Approve plan",
+              }).then((ok) => {
+                if (ok) void run(() => api.post(`${path}/approve`));
+              })
+            }>
             Approve plan
           </Button>
         )}
@@ -152,7 +162,16 @@ export default function ProductionPlanPage() {
                               size="sm"
                               variant="ghost"
                               disabled={pending}
-                              onClick={() => run(() => api.delete(`${path}/lines/${line.id}`))}
+                              onClick={() =>
+                                  confirm({
+                                    title: "Remove this line from the plan?",
+                                    description: "Its product, quantity and due date are removed from the plan.",
+                                    confirmLabel: "Remove line",
+                                    danger: true,
+                                  }).then((ok) => {
+                                    if (ok) void run(() => api.delete(`${path}/lines/${line.id}`));
+                                  })
+                                }
                             >
                               Remove
                             </Button>

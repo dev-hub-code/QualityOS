@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { apiCaller, PASSWORD, signUp, unique } from "./helpers";
+import { apiCaller, PASSWORD, signUp, unique, confirmAction } from "./helpers";
 import { acceptInvitation, inviteUser } from "./mail";
 
 async function dialogAdd(
@@ -109,6 +109,7 @@ test("a template is published, and a failed critical measurement never releases 
   await page.getByLabel("DIA sample 1").fill("20.0");
   await page.getByLabel("DIA sample 2").fill("25");
   await page.getByRole("button", { name: "Submit for approval" }).click();
+  await confirmAction(page);
   await expect(
     page.getByText("submitted", { exact: true }).first(),
   ).toBeVisible();
@@ -236,6 +237,7 @@ test("a template is published, and a failed critical measurement never releases 
     .getByLabel("Root cause")
     .fill("No thermocouple replacement schedule");
   await page.getByRole("button", { name: "Finish analysis" }).click();
+  await confirmAction(page);
   await step(page, "Add action", async (dialog) => {
     await dialog.getByLabel("Type").selectOption("CORRECTIVE");
     await dialog.getByLabel("Description").fill("Replace thermocouple");
@@ -423,6 +425,7 @@ test("under double sampling an inconclusive first sample asks for a second, coun
       .fill(sample === 1 ? "25" : "20.0");
   }
   await page.getByRole("button", { name: "Submit for approval" }).click();
+  await confirmAction(page);
   await expect(
     page.getByRole("status").filter({ hasText: "a second sample of 13 is" }),
   ).toBeVisible();
@@ -430,6 +433,7 @@ test("under double sampling an inconclusive first sample asks for a second, coun
     await page.getByLabel(`DIA sample ${sample}`, { exact: true }).fill("20.0");
   }
   await page.getByRole("button", { name: "Submit for approval" }).click();
+  await confirmAction(page);
   await expect(
     page.getByText("submitted", { exact: true }).first(),
   ).toBeVisible();

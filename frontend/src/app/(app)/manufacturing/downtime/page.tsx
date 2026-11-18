@@ -16,6 +16,7 @@ import { api } from "@/lib/api";
 import { formatMinutes, LOSS_CATEGORY_LABELS, localDate, toInstant } from "@/lib/manufacturing";
 import type { FieldDef } from "@/lib/record-form";
 import type { DepartmentOption, DowntimeGroupBy, DowntimeRecord, DowntimeSummary, LossCategory } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const PATH = "/manufacturing/downtime";
 const SELECT_CLASS = "h-9 rounded-xl border border-input bg-white/70 px-2 text-sm";
@@ -150,6 +151,7 @@ function Summary() {
 
 /** Stops recorded on the floor, from machine status changes, and by hand. */
 export default function DowntimePage() {
+  const confirm = useConfirm();
   const canManage = usePermission("DOWNTIME_MANAGE");
   const machines = useMachines();
   const workCenters = useWorkCenters();
@@ -202,7 +204,15 @@ export default function DowntimePage() {
                   <Button
                     size="sm"
                     disabled={pending}
-                    onClick={() => run(() => api.post(`${PATH}/${row.original.id}/end`, {}))}
+                    onClick={() =>
+                        confirm({
+                          title: "End this stop now?",
+                          description: "The stop is recorded as ending now, and its minutes count towards downtime.",
+                          confirmLabel: "End stop",
+                        }).then((ok) => {
+                          if (ok) void run(() => api.post(`${PATH}/${row.original.id}/end`, {}));
+                        })
+                      }
                   >
                     End now
                   </Button>

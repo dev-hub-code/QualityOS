@@ -10,6 +10,7 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import type { FieldDef } from "@/lib/record-form";
 import type { Category, DefectCategory } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const NAME_FIELDS: FieldDef[] = [{ name: "name", label: "Name", required: true }];
 const DEFECT_FIELDS: FieldDef[] = [{ name: "code", label: "Code", required: true }, ...NAME_FIELDS];
@@ -27,6 +28,7 @@ interface SectionProps {
 }
 
 function CategorySection({ title, noun, path, fields, canView, canManage, archives }: SectionProps) {
+  const confirm = useConfirm();
   const refresh = useRefresh();
   const { run, message } = useAction();
   const [adding, setAdding] = useState(false);
@@ -66,7 +68,16 @@ function CategorySection({ title, noun, path, fields, canView, canManage, archiv
                       Rename
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" onClick={() => run(() => api.delete(`${path}/${category.id}`))}>
+                  <Button variant="ghost" size="sm" onClick={() =>
+                      confirm({
+                        title: `Delete ${category.name}?`,
+                        description: "It can no longer be chosen. This cannot be undone.",
+                        confirmLabel: "Delete",
+                        danger: true,
+                      }).then((ok) => {
+                        if (ok) void run(() => api.delete(`${path}/${category.id}`));
+                      })
+                    }>
                     {archives ? "Archive" : "Delete"}
                   </Button>
                 </span>

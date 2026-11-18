@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { apiCaller, signUp, unique } from "./helpers";
+import { apiCaller, signUp, unique, confirmAction } from "./helpers";
 import { makePlatformAdmin, signInOperator } from "./operators";
 
 test("support reads a customer's records only while the customer allows it, and the customer sees what it read", async ({
@@ -35,6 +35,7 @@ test("support reads a customer's records only while the customer allows it, and 
   await page.getByLabel("Allow access for").selectOption({ label: "24 hours" });
   await page.getByLabel("Note for support (optional)").fill("Ticket 42");
   await page.getByRole("button", { name: "Allow support access" }).click();
+  await confirmAction(page);
   await expect(
     page.getByText(/Support can read your records until/),
   ).toBeVisible();
@@ -85,6 +86,7 @@ test("support reads a customer's records only while the customer allows it, and 
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Withdraw access" }).click();
+  await confirmAction(page);
   await expect(page.getByText("Support has no access.")).toBeVisible();
   await operator.goto(`/platform/organisations/${tenantId}`);
   await expect(operator.getByText(/Support access not granted/)).toBeVisible();
@@ -114,6 +116,7 @@ test("support makes changes only when the customer allows it, and they show as s
     page.getByLabel("Allow access for").locator("option"),
   ).toHaveText(["24 hours"]);
   await page.getByRole("button", { name: "Allow support access" }).click();
+  await confirmAction(page);
   await expect(
     page.getByText(/Support can read and change your records until/),
   ).toBeVisible();

@@ -10,6 +10,7 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import type { FieldDef } from "@/lib/record-form";
 import type { Customer } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const FIELDS: FieldDef[] = [
   { name: "code", label: "Code", required: true },
@@ -23,6 +24,7 @@ const FIELDS: FieldDef[] = [
 const PATH = "/customers";
 
 export default function CustomersPage() {
+  const confirm = useConfirm();
   const canManage = usePermission("TRACEABILITY_MANAGE");
   const refresh = useRefresh();
   const { run, message } = useAction();
@@ -42,7 +44,16 @@ export default function CustomersPage() {
               {customer.code} – <RecordLink href={`/customers/${customer.id}`}>{customer.name}</RecordLink>
             </span>
             {canManage && (
-              <Button variant="ghost" size="sm" onClick={() => run(() => api.delete(`${PATH}/${customer.id}`))}>
+              <Button variant="ghost" size="sm" onClick={() =>
+                  confirm({
+                    title: `Archive ${customer.name}?`,
+                    description: "The customer can no longer be chosen on new dispatches. Their past dispatches and traces are kept.",
+                    confirmLabel: "Archive",
+                    danger: true,
+                  }).then((ok) => {
+                    if (ok) void run(() => api.delete(`${PATH}/${customer.id}`));
+                  })
+                }>
                 Archive
               </Button>
             )}

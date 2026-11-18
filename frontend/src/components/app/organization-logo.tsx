@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { FormError } from "@/components/forms/field";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const LOGO = "/api/v1/organizations/current/logo";
 const MAX_BYTES = 256 * 1024;
@@ -54,6 +55,7 @@ function initials(name: string) {
 
 /** Settings: upload, replace or remove the logo shown in the app and on the organisation's emails. */
 export function OrganizationLogoSettings({ tenantId, canManage }: { tenantId: string; canManage: boolean }) {
+  const confirm = useConfirm();
   const logo = useLogo(tenantId);
   const queryClient = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
@@ -111,7 +113,16 @@ export function OrganizationLogoSettings({ tenantId, canManage }: { tenantId: st
             {logo ? "Replace logo" : "Upload logo"}
           </Button>
           {logo && (
-            <Button variant="outline" disabled={pending} onClick={() => run(() => api.delete("/organizations/current/logo"))}>
+            <Button variant="outline" disabled={pending} onClick={() =>
+                confirm({
+                  title: "Remove your logo?",
+                  description: "It is no longer shown in the menu, emails or PDF reports.",
+                  confirmLabel: "Remove logo",
+                  danger: true,
+                }).then((ok) => {
+                  if (ok) void run(() => api.delete("/organizations/current/logo"));
+                })
+              }>
               Remove logo
             </Button>
           )}

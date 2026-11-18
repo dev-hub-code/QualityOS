@@ -31,6 +31,7 @@ import type {
   RecallDetail,
   RecallHistoryEntry,
 } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const STATUSES = [
   "PENDING",
@@ -160,6 +161,7 @@ function Closure({ recall, path }: { recall: RecallDetail; path: string }) {
   const refresh = useRefresh();
   const { run, message } = useAction();
   const { data: me } = useMe();
+  const confirm = useConfirm();
   const selfReviewInEffect = useSelfReviewInEffect();
   const [dialog, setDialog] = useState<"request" | "back" | "close" | null>(
     null,
@@ -216,7 +218,17 @@ function Closure({ recall, path }: { recall: RecallDetail; path: string }) {
                 onClick={() =>
                   ownClosure
                     ? setDialog("close")
-                    : run(() => api.post(`${path}/close`).then(refresh))
+                    : confirm({
+                        title: "Approve closing this recall?",
+                        description:
+                          "The recall is closed, and its reports become final.",
+                        confirmLabel: "Approve closure",
+                      }).then((ok) => {
+                        if (ok)
+                          void run(() =>
+                            api.post(`${path}/close`).then(refresh),
+                          );
+                      })
                 }
               >
                 Approve closure

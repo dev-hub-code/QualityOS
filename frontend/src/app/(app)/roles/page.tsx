@@ -16,6 +16,7 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { roleSchema, type RoleValues } from "@/lib/schemas";
 import type { Permission, Role } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 function RoleDialog({
   role,
@@ -101,6 +102,7 @@ function RoleDialog({
 }
 
 export default function RolesPage() {
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const canManage = usePermission("ROLE_MANAGE");
   const [dialog, setDialog] = useState<{ role: Role | null } | null>(null);
@@ -152,7 +154,16 @@ export default function RolesPage() {
                       <Button variant="ghost" size="sm" onClick={() => setDialog({ role })}>
                         Edit
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => remove.mutate(role.id)}>
+                      <Button variant="ghost" size="sm" onClick={() =>
+                          confirm({
+                            title: `Delete the role ${role.name}?`,
+                            description: "This cannot be undone.",
+                            confirmLabel: "Delete role",
+                            danger: true,
+                          }).then((ok) => {
+                            if (ok) void remove.mutate(role.id);
+                          })
+                        }>
                         Delete
                       </Button>
                     </>

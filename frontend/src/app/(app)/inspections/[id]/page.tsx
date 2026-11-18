@@ -50,6 +50,7 @@ import type {
   NcrSummary,
   ParameterSpec,
 } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 /** The lot's plan in words: one sample, or under double sampling the first and then both together. */
 function planText(specification: Inspection["specification"]): string {
@@ -156,6 +157,7 @@ function Execution({
   inspection: Inspection;
   editable: boolean;
 }) {
+  const confirm = useConfirm();
   const units = useUnits();
   const { data: me } = useMe();
   const path = `/inspections/${inspection.id}`;
@@ -374,7 +376,16 @@ function Execution({
           <Button
             className="h-11 flex-1 sm:flex-none"
             disabled={pending}
-            onClick={() => save(true)}
+            onClick={() =>
+              confirm({
+                title: "Submit for approval?",
+                description:
+                  "Your results are locked, and a reviewer is asked to approve them. They can only change if the reviewer sends them back.",
+                confirmLabel: "Submit",
+              }).then((ok) => {
+                if (ok) void save(true);
+              })
+            }
           >
             Submit for approval
           </Button>
@@ -548,6 +559,7 @@ function LinkedNcr({ inspectionId }: { inspectionId: string }) {
 }
 
 export default function InspectionPage() {
+  const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const path = `/inspections/${id}`;
   const canExecute = usePermission("INSPECTION_EXECUTE");
@@ -581,7 +593,17 @@ export default function InspectionPage() {
         {status === "PENDING" && canCreate && (
           <Button
             variant="outline"
-            onClick={() => run(() => api.post(`${path}/cancel`))}
+            onClick={() =>
+              confirm({
+                title: "Cancel this inspection?",
+                description:
+                  "The inspection is cancelled. This cannot be undone.",
+                confirmLabel: "Cancel inspection",
+                danger: true,
+              }).then((ok) => {
+                if (ok) void run(() => api.post(`${path}/cancel`));
+              })
+            }
           >
             Cancel
           </Button>

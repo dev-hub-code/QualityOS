@@ -1462,6 +1462,13 @@ export interface Invoice {
   buyerGstin: string | null;
   periodStartsAt: string | null;
   periodEndsAt: string | null;
+  /** Before any credit for unused time; null on invoices raised before proration. */
+  listPrice: number | null;
+  prorationCredit: number | null;
+  prorationNote: string | null;
+  extraDays: number;
+  /** Raised on its own to renew the paid period. */
+  renewal: boolean;
 }
 
 export interface Payment {

@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { CreditNotes } from "@/components/billing/credit-notes";
+import { CreditNotes, InvoiceNote } from "@/components/billing/credit-notes";
 import { PayOnline } from "@/components/billing/pay-online";
 import {
   formatDate,
@@ -292,7 +292,10 @@ export default function BillingPage() {
                 {invoices.data?.map((invoice) => (
                   <TableRow key={invoice.id}>
                     <TableCell>{invoice.invoiceNumber}</TableCell>
-                    <TableCell>{invoice.planName}</TableCell>
+                    <TableCell className="whitespace-normal">
+                      {invoice.planName}
+                      <InvoiceNote invoice={invoice} />
+                    </TableCell>
                     <TableCell>{invoice.issuedOn}</TableCell>
                     <TableCell>
                       <StatusBadge status={invoice.status} />

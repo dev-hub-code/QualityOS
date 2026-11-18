@@ -27,6 +27,7 @@ const TYPES: Record<string, string> = {
   PAYMENT_RECEIVED: "Payment recorded",
   PLAN_CHANGED: "Plan changed",
   REFUND_ISSUED: "Refund issued",
+  RENEWAL_INVOICE: "Renewal invoice",
 };
 
 export default function PlatformNotificationsPage() {

@@ -57,7 +57,7 @@ Phase 11 is on hold until you ask for it.
 - [ ] Cashfree sandbox run: success, failure, duplicate webhook, bad signature, amount mismatch
 - [x] Refunds, credit notes and reconciliation
 - [ ] GST invoice reviewed by an accountant
-- [ ] Proration and auto-debit renewals
+- [x] Proration and automatic renewal invoices (auto-debit through card or UPI mandates not built)
 - [x] Every plan feature on sale is enforced: `NCR_CAPA`, `REPORTS`, `ADVANCED` and `MANUFACTURING`. A feature added
   later in the Control Center restricts nothing until code enforces it
 - [x] Customer support portal: customers raise and track their requests (#98)

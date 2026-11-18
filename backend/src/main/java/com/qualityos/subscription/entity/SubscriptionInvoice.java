@@ -56,6 +56,13 @@ public class SubscriptionInvoice extends TenantOwnedEntity {
     private String sellerGstin;
     @lombok.Setter
     private Instant overdueNotifiedAt;
+    /** Before any credit for unused time. Null on invoices raised before proration. */
+    private BigDecimal listPrice;
+    private BigDecimal prorationCredit;
+    private String prorationNote;
+    private int extraDays;
+    /** The end of the period this invoice was raised on its own to renew. */
+    private Instant renewsPeriodEnding;
 
     public SubscriptionInvoice(UUID subscriptionId, String invoiceNumber) {
         this.subscriptionId = subscriptionId;

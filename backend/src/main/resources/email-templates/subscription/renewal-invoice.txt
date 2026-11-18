@@ -1,0 +1,8 @@
+Subject: Renewal invoice {{invoiceNumber}} for {{organizationName}}
+
+Your renewal invoice
+
+Hello {{recipientName}},
+Your {{planName}} plan renews soon. Invoice {{invoiceNumber}} for {{amount}} is ready. Pay it by {{dueDate}} to keep working without a break. If you no longer want to renew, cancel the subscription from the billing page.
+
+Pay the invoice: {{actionUrl}}

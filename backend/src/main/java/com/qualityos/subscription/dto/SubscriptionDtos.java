@@ -286,7 +286,12 @@ public final class SubscriptionDtos {
             String buyerName,
             String buyerGstin,
             Instant periodStartsAt,
-            Instant periodEndsAt) {
+            Instant periodEndsAt,
+            BigDecimal listPrice,
+            BigDecimal prorationCredit,
+            String prorationNote,
+            int extraDays,
+            boolean renewal) {
     }
 
     public record PaymentResponse(

@@ -28,6 +28,7 @@ public enum EmailTemplate {
     SUBSCRIPTION_EXPIRY("subscription/expiry"),
     PAYMENT_CONFIRMATION("subscription/payment-confirmation"),
     REFUND_ISSUED("subscription/refund-issued"),
+    RENEWAL_INVOICE("subscription/renewal-invoice"),
     PRODUCTION_APPROVAL("production/approval"),
     PRODUCTION_SENT_BACK("production/sent-back"),
     PRODUCTION_STOPPED("production/stopped"),

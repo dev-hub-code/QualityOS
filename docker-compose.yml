@@ -44,6 +44,10 @@ services:
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-ProductionOS <no-reply@qualityos.local>}
+      # The uat profile sends through SendGrid; local, dev and sit use the SMTP settings above (Mailpit).
+      # MAIL_PROVIDER is not passed: an empty value would override the profile's choice.
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      SENDGRID_SANDBOX: ${SENDGRID_SANDBOX:-false}
       BILLING_SELLER_NAME: ${BILLING_SELLER_NAME:-ProductionOS}
       BILLING_SELLER_GSTIN: ${BILLING_SELLER_GSTIN:-}
       BILLING_SELLER_ADDRESS: ${BILLING_SELLER_ADDRESS:-}

@@ -1,0 +1,9 @@
+# Dev: the shared development environment. Built on local; every email is caught by Mailpit and none leaves.
+qualityos:
+  environment: DEV
+  mail:
+    provider: smtp
+spring:
+  mail:
+    host: ${SMTP_HOST:mailpit}
+    port: ${SMTP_PORT:1025}

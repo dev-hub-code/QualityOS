@@ -40,18 +40,22 @@ public class EmailService {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
     private final Duration retryDelay;
+    /** "[UAT] " and the like outside local and production, so a test email is never taken for a real one. */
+    private final String subjectPrefix;
 
     EmailService(
             EmailRenderer renderer,
             MailGateway gateway,
             JdbcTemplate jdbc,
             PlatformTransactionManager transactionManager,
-            @Value("${qualityos.mail.retry-delay}") Duration retryDelay) {
+            @Value("${qualityos.mail.retry-delay}") Duration retryDelay,
+            @Value("${qualityos.environment:}") String environment) {
         this.renderer = renderer;
         this.gateway = gateway;
         this.jdbc = jdbc;
         this.tx = new TransactionTemplate(transactionManager);
         this.retryDelay = retryDelay;
+        this.subjectPrefix = environment == null || environment.isBlank() ? "" : "[" + environment.trim() + "] ";
     }
 
     public RenderedEmail render(EmailRequest request) {
@@ -121,7 +125,7 @@ public class EmailService {
         try {
             MailMessage.InlineImage logo = logoOf(request);
             RenderedEmail email = render(request, logo);
-            gateway.send(new MailMessage(request.to(), email.subject(), email.text(), email.html(), logo));
+            gateway.send(new MailMessage(request.to(), subjectPrefix + email.subject(), email.text(), email.html(), logo));
             record(request, "SENT", attempt, null);
         } catch (MailDeliveryException | EmailTemplateException ex) {
             Throwable cause = ex.getCause() != null ? ex.getCause() : ex;

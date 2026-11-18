@@ -9,3 +9,6 @@ node_modules/
 # Local reference files, not part of the project
 /audit/
 /docs/QualityOS-Documentation.pdf
+
+# Third-party reference material, kept locally only.
+docs/Scale-1-User-to-1-Crore.pdf

@@ -2,7 +2,14 @@ import type { ProductionBatch } from "@/lib/types";
 
 /** Serial numbers are typed or pasted, separated by lines or commas. */
 export function parseSerials(text: string): string[] {
-  return [...new Set(text.split(/[\n,]/).map((serial) => serial.trim()).filter(Boolean))];
+  return [
+    ...new Set(
+      text
+        .split(/[\n,]/)
+        .map((serial) => serial.trim())
+        .filter(Boolean),
+    ),
+  ];
 }
 
 /**
@@ -10,12 +17,17 @@ export function parseSerials(text: string): string[] {
  * to ship can take an optional outgoing check.
  */
 export function inspectionTypeFor(
-  batch: Pick<ProductionBatch, "status" | "producedQuantity" | "availableQuantity">,
+  batch: Pick<
+    ProductionBatch,
+    "status" | "producedQuantity" | "availableQuantity"
+  >,
 ): "IPQC" | "FQC" | "OQC" | null {
   if (batch.status === "IN_PROGRESS") return "IPQC";
   if (batch.status === "COMPLETED") return "FQC";
-  if (batch.status === "ON_HOLD") return batch.producedQuantity === null ? "IPQC" : "FQC";
-  if (batch.status === "RELEASED" && Number(batch.availableQuantity) > 0) return "OQC";
+  if (batch.status === "ON_HOLD")
+    return batch.producedQuantity === null ? "IPQC" : "FQC";
+  if (batch.status === "RELEASED" && Number(batch.availableQuantity) > 0)
+    return "OQC";
   return null;
 }
 
@@ -23,14 +35,23 @@ export function inspectionTypeFor(
  * The consume dialog offers lots and batches in one list, so each option carries its kind. Without a unit, the
  * quantity is in the lot's or batch's own.
  */
-export function toConsumeRequest(source: string, quantity: string, uomId?: string) {
+export function toConsumeRequest(
+  source: string,
+  quantity: string,
+  uomId?: string,
+) {
   const [kind, id] = source.split(":");
   const unit = uomId ? { uomId } : {};
-  return kind === "lot" ? { receiptItemId: id, quantity, ...unit } : { parentBatchId: id, quantity, ...unit };
+  return kind === "lot"
+    ? { receiptItemId: id, quantity, ...unit }
+    : { parentBatchId: id, quantity, ...unit };
 }
 
 /** The dispatch form numbers its lines: productionBatchId1, quantity1, serials1, and so on. */
-export function toDispatchItems(values: Record<string, unknown>, lines: number) {
+export function toDispatchItems(
+  values: Record<string, unknown>,
+  lines: number,
+) {
   return Array.from({ length: lines }, (_, index) => {
     const line = index + 1;
     return {
@@ -45,16 +66,43 @@ export function toDispatchItems(values: Record<string, unknown>, lines: number) 
  * The return form has a quantity and serials for each line that can still come back: quantity1, serials1, and so on.
  * Lines left blank are not part of the return.
  */
-export function toReturnItems(values: Record<string, unknown>, lineIds: string[]) {
+export function toReturnItems(
+  values: Record<string, unknown>,
+  lineIds: string[],
+) {
   return lineIds.flatMap((dispatchItemId, index) => {
     const line = index + 1;
     const quantity = String(values[`quantity${line}`] ?? "").trim();
     if (!quantity) return [];
-    return [{ dispatchItemId, quantity, serialNumbers: parseSerials(String(values[`serials${line}`] ?? "")) }];
+    return [
+      {
+        dispatchItemId,
+        quantity,
+        serialNumbers: parseSerials(String(values[`serials${line}`] ?? "")),
+      },
+    ];
   });
 }
 
 /** The traced batch first, then any others typed one per line or separated by commas, each once. */
 export function recallBatchNumbers(batchNumber: string, others: string) {
   return [...new Set([batchNumber, ...parseSerials(others)])];
+}
+
+/**
+ * The send-stock form has a choice and a quantity per line: stock1 ("LOT:id" or "BATCH:id") and quantity1, and so on.
+ */
+export function toTransferItems(
+  values: Record<string, unknown>,
+  lines: number,
+) {
+  return Array.from({ length: lines }, (_, index) => {
+    const line = index + 1;
+    const [kind, id] = String(values[`stock${line}`] ?? "").split(":");
+    return {
+      lotId: kind === "LOT" ? id : null,
+      batchId: kind === "BATCH" ? id : null,
+      quantity: values[`quantity${line}`],
+    };
+  });
 }

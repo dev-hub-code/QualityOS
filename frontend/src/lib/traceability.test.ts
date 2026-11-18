@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { inspectionTypeFor, parseSerials, toConsumeRequest, toDispatchItems, toReturnItems, recallBatchNumbers } from "./traceability";
+import {
+  inspectionTypeFor,
+  parseSerials,
+  toConsumeRequest,
+  toDispatchItems,
+  toReturnItems,
+  recallBatchNumbers,
+  toTransferItems,
+} from "./traceability";
 
 describe("parseSerials", () => {
   it("splits on lines and commas, and drops blanks and repeats", () => {
@@ -9,34 +17,96 @@ describe("parseSerials", () => {
 
 describe("inspectionTypeFor", () => {
   it("follows the batch's stage", () => {
-    expect(inspectionTypeFor({ status: "IN_PROGRESS", producedQuantity: null, availableQuantity: "0" })).toBe("IPQC");
-    expect(inspectionTypeFor({ status: "COMPLETED", producedQuantity: "5", availableQuantity: "5" })).toBe("FQC");
-    expect(inspectionTypeFor({ status: "ON_HOLD", producedQuantity: null, availableQuantity: "0" })).toBe("IPQC");
-    expect(inspectionTypeFor({ status: "ON_HOLD", producedQuantity: "5", availableQuantity: "5" })).toBe("FQC");
+    expect(
+      inspectionTypeFor({
+        status: "IN_PROGRESS",
+        producedQuantity: null,
+        availableQuantity: "0",
+      }),
+    ).toBe("IPQC");
+    expect(
+      inspectionTypeFor({
+        status: "COMPLETED",
+        producedQuantity: "5",
+        availableQuantity: "5",
+      }),
+    ).toBe("FQC");
+    expect(
+      inspectionTypeFor({
+        status: "ON_HOLD",
+        producedQuantity: null,
+        availableQuantity: "0",
+      }),
+    ).toBe("IPQC");
+    expect(
+      inspectionTypeFor({
+        status: "ON_HOLD",
+        producedQuantity: "5",
+        availableQuantity: "5",
+      }),
+    ).toBe("FQC");
   });
 
   it("offers an outgoing check while a released batch has stock to ship", () => {
-    expect(inspectionTypeFor({ status: "RELEASED", producedQuantity: "5", availableQuantity: "5" })).toBe("OQC");
-    expect(inspectionTypeFor({ status: "RELEASED", producedQuantity: "5", availableQuantity: "0" })).toBeNull();
+    expect(
+      inspectionTypeFor({
+        status: "RELEASED",
+        producedQuantity: "5",
+        availableQuantity: "5",
+      }),
+    ).toBe("OQC");
+    expect(
+      inspectionTypeFor({
+        status: "RELEASED",
+        producedQuantity: "5",
+        availableQuantity: "0",
+      }),
+    ).toBeNull();
   });
 
   it("offers nothing once the batch is rejected", () => {
-    expect(inspectionTypeFor({ status: "REJECTED", producedQuantity: "5", availableQuantity: "5" })).toBeNull();
+    expect(
+      inspectionTypeFor({
+        status: "REJECTED",
+        producedQuantity: "5",
+        availableQuantity: "5",
+      }),
+    ).toBeNull();
   });
 });
 
 describe("toConsumeRequest", () => {
   it("names the right source", () => {
-    expect(toConsumeRequest("lot:1", "2")).toEqual({ receiptItemId: "1", quantity: "2" });
-    expect(toConsumeRequest("batch:9", "2")).toEqual({ parentBatchId: "9", quantity: "2" });
-    expect(toConsumeRequest("lot:1", "2500", "")).toEqual({ receiptItemId: "1", quantity: "2500" });
-    expect(toConsumeRequest("lot:1", "2500", "g")).toEqual({ receiptItemId: "1", quantity: "2500", uomId: "g" });
+    expect(toConsumeRequest("lot:1", "2")).toEqual({
+      receiptItemId: "1",
+      quantity: "2",
+    });
+    expect(toConsumeRequest("batch:9", "2")).toEqual({
+      parentBatchId: "9",
+      quantity: "2",
+    });
+    expect(toConsumeRequest("lot:1", "2500", "")).toEqual({
+      receiptItemId: "1",
+      quantity: "2500",
+    });
+    expect(toConsumeRequest("lot:1", "2500", "g")).toEqual({
+      receiptItemId: "1",
+      quantity: "2500",
+      uomId: "g",
+    });
   });
 });
 
 describe("toDispatchItems", () => {
   it("collects each numbered line", () => {
-    const values = { customerId: "c", productionBatchId1: "a", quantity1: "2", serials1: "S1\nS2", productionBatchId2: "b", quantity2: "1" };
+    const values = {
+      customerId: "c",
+      productionBatchId1: "a",
+      quantity1: "2",
+      serials1: "S1\nS2",
+      productionBatchId2: "b",
+      quantity2: "1",
+    };
     expect(toDispatchItems(values, 2)).toEqual([
       { productionBatchId: "a", quantity: "2", serialNumbers: ["S1", "S2"] },
       { productionBatchId: "b", quantity: "1", serialNumbers: [] },
@@ -46,7 +116,13 @@ describe("toDispatchItems", () => {
 
 describe("toReturnItems", () => {
   it("keeps each line given a quantity, with its serials, and leaves out blank lines", () => {
-    const values = { quantity1: "2", serials1: "SN-1\nSN-2", quantity2: " ", quantity3: "1", serials3: "" };
+    const values = {
+      quantity1: "2",
+      serials1: "SN-1\nSN-2",
+      quantity2: " ",
+      quantity3: "1",
+      serials3: "",
+    };
     expect(toReturnItems(values, ["a", "b", "c"])).toEqual([
       { dispatchItemId: "a", quantity: "2", serialNumbers: ["SN-1", "SN-2"] },
       { dispatchItemId: "c", quantity: "1", serialNumbers: [] },
@@ -60,10 +136,33 @@ describe("toReturnItems", () => {
 
 describe("recallBatchNumbers", () => {
   it("starts with the traced batch and adds the others once each", () => {
-    expect(recallBatchNumbers("PB-1", " PB-2\nPB-3, PB-1\n\nPB-2 ")).toEqual(["PB-1", "PB-2", "PB-3"]);
+    expect(recallBatchNumbers("PB-1", " PB-2\nPB-3, PB-1\n\nPB-2 ")).toEqual([
+      "PB-1",
+      "PB-2",
+      "PB-3",
+    ]);
   });
 
   it("is the traced batch alone when nothing else is typed", () => {
     expect(recallBatchNumbers("PB-1", "")).toEqual(["PB-1"]);
+  });
+});
+
+describe("toTransferItems", () => {
+  it("sends each line as a lot or a batch, by the kind its choice names", () => {
+    expect(
+      toTransferItems(
+        {
+          stock1: "LOT:l-1",
+          quantity1: "4",
+          stock2: "BATCH:b-1",
+          quantity2: "2",
+        },
+        2,
+      ),
+    ).toEqual([
+      { lotId: "l-1", batchId: null, quantity: "4" },
+      { lotId: null, batchId: "b-1", quantity: "2" },
+    ]);
   });
 });

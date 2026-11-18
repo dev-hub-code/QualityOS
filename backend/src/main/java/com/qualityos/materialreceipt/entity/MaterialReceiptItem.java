@@ -47,6 +47,15 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
     /** The last day the lot may be used; null when it does not expire. */
     private java.time.LocalDate expiryDate;
 
+    /** Sent to another plant, in transit or received there as a lot of its own. */
+    private BigDecimal transferredQuantity = BigDecimal.ZERO;
+
+    /** Where a lot received from another plant is. Null for a lot still at the plant of its goods receipt. */
+    private UUID facilityId;
+
+    /** The lot this one was sent from, for a lot received from another plant. */
+    private UUID transferredFromId;
+
     public MaterialReceiptItem(
             MaterialReceipt receipt,
             UUID purchaseOrderItemId,
@@ -65,6 +74,41 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
         this.quantity = quantity;
         this.inspectionRequired = inspectionRequired;
         this.inspectionStatus = inspectionRequired ? InspectionStatus.PENDING : InspectionStatus.NOT_REQUIRED;
+    }
+
+    /**
+     * The part of {@code source} received at another plant. It keeps the receipt, supplier batch, inspection result and
+     * expiry of the lot it came from, so it is used as that lot would be.
+     */
+    public static MaterialReceiptItem receivedFrom(
+            MaterialReceiptItem source, String internalBatch, BigDecimal quantity, UUID facilityId) {
+        MaterialReceiptItem lot = new MaterialReceiptItem(source.receipt, source.purchaseOrderItemId, source.materialId,
+                source.uomId, source.supplierBatch, internalBatch, quantity, source.inspectionRequired);
+        lot.inspectionStatus = source.inspectionStatus;
+        lot.disposition = source.disposition;
+        lot.expiryDate = source.expiryDate;
+        lot.facilityId = facilityId;
+        lot.transferredFromId = source.getId();
+        return lot;
+    }
+
+    /** The plant the lot is at: its goods receipt's, unless it was received from another plant. */
+    public UUID currentFacilityId() {
+        return facilityId != null ? facilityId : receipt.getFacilityId();
+    }
+
+    /** Sends part of the lot to another plant. Only released stock not set aside can go. */
+    public void transferOut(BigDecimal amount) {
+        requireReleased();
+        if (amount.compareTo(freeQuantity()) > 0) {
+            throw new BusinessRuleException("Batch " + internalBatch + " has only " + plain(freeQuantity()) + " free.");
+        }
+        transferredQuantity = transferredQuantity.add(amount);
+    }
+
+    /** A transfer cancelled while in transit: the stock is back. */
+    public void returnTransferred(BigDecimal amount) {
+        transferredQuantity = transferredQuantity.subtract(amount);
     }
 
     public void expiresOn(java.time.LocalDate date) {
@@ -99,7 +143,7 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
     }
 
     public BigDecimal remainingQuantity() {
-        return quantity.subtract(consumedQuantity);
+        return quantity.subtract(consumedQuantity).subtract(transferredQuantity);
     }
 
     /** What is left and not set aside for a work order. */

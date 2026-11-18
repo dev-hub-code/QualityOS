@@ -55,13 +55,14 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Naming serial numbers on a dispatch is optional, so a batch can ship without saying which units went. A trace then shows the customer by batch, not by unit | Review after real use |
 | A dispatch only counts as shipped once someone confirms it. Traces flag it until then, and managers get a daily reminder after three days | Review after real use |
 | A limited member sees only records placed in their facilities. Anything that cannot be placed stays with unlimited members: older manual NCRs and CAPAs, and new ones raised without a facility | By design |
-| A dispatch carrying goods from two plants is hidden from a member limited to one of them, as is its return | Review after real use |
-| A lot from another plant cannot be consumed by a member limited elsewhere. An unlimited member must record a transfer like that | Review after real use |
+| A dispatch leaves from one plant. Older dispatches carrying goods from two plants stay hidden from a member limited to one of them, as do their returns | By design |
+| A lot from another plant cannot be consumed by a member limited elsewhere. Stock moves between plants by a transfer, which sends any part of a lot or batch | Review after real use |
+| Serial numbers stay with the batch they were made in. A batch received from another plant is dispatched by batch, not by unit | When a user needs it |
 | A batch trace can still show inspections and NCRs of a lot from another plant, because lineage must stay whole | By design |
 | A dispatch of a batch under an open recall, or of anything made from it, is refused. Someone with `RECALL_MANAGE` can override with a reason, which is audited, and the customer joins the recall at once. Every built-in role that can dispatch can also manage recalls, so in practice the override is a reason, not a second person | Review after real use |
 | A dispatch recorded before a recall started can still have its shipment confirmed. The recall already covers its customer | Review after real use |
-| Recording an instrument on an inspection is optional, and applies to the whole inspection, not each measurement | Review after real use |
-| A decision to reinspect after a failed calibration holds the goods that are left, but does not recall what was already used or dispatched, nor start the new inspection | Review after real use |
+| Recording an instrument on an inspection is optional. Each measurement may name the instrument that took it | Review after real use |
+| A decision to reinspect after a failed calibration holds the goods that are left and starts the new inspection. What was already used or dispatched is shown, with its recall report, but recalling it is a person's decision | By design |
 | A recorded audit finding cannot be edited. A wrong one is handled by cancelling its NCR, and it stays on the report | Review after real use |
 | `tenant_settings` holds the review rule, the two NCR and CAPA rules and the action evidence rule so far | Grows as rules are added |
 | Dashboard figures are kept for 60 seconds per organisation, period and facility scope. Anything written to the audit log clears them at once on the same instance. Other changes, and changes on another instance, show within 60 seconds | With production work: use a shared cache if the figures must agree across instances |

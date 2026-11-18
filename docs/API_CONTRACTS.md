@@ -281,6 +281,22 @@ after its planned date (moved on by whole cycles if that date has passed). The d
 `nextAuditId` and `nextAuditNumber`. The repeat is skipped, and `AUDIT_REPEAT_SKIPPED` is logged with the reason, when the
 checklist or facility is archived or the lead auditor has left. The QR code holds only a link, which asks whoever scans it to sign in.
 
+## Stock transfers between plants
+
+`/api/v1/stock-transfers`: `GET` (list, `status`, `facilityId`; sortable by `transferNumber`, `sentOn`, `status`,
+`createdAt`) and `GET /{id}` need `TRACEABILITY_VIEW`; sending, receiving and cancelling need `TRACEABILITY_MANAGE`.
+
+| Action | Endpoint | Rules |
+|---|---|---|
+| Send | `POST /stock-transfers` | `fromFacilityId`, `toFacilityId` (another active plant), `sentOn` (not in the future), optional `note`, and up to 50 `items`, each naming a `lotId` or a `batchId` (not both, each once) and a `quantity` in its own unit. Only released stock can go: an unexpired lot's free stock (not reserved for work orders), or a released batch's available stock. Each must be at the sending plant, which the sender must reach. The quantity leaves at once, numbered `STR-`. Audited as `STOCK_TRANSFER_SENT` |
+| Receive | `POST /stock-transfers/{id}/receive` | `receivedOn`, between `sentOn` and today. Only someone who can reach the receiving plant. Each line becomes a lot or batch of its own there, numbered after its source with `-T1`, `-T2`…: a lot keeps its goods receipt, supplier batch, inspection result and expiry, and a batch is released. A received batch is recorded as made from its source, so traces, recalls and recall holds reach it; traces from a lot also follow the lots received from it. Audited as `STOCK_TRANSFER_RECEIVED` |
+| Cancel | `POST /stock-transfers/{id}/cancel` | `reason`. While in transit, by someone who can reach the sending plant. The stock goes back. Audited as `STOCK_TRANSFER_CANCELLED` |
+
+A transfer is visible to anyone who can reach either plant. A lot's `facilityId` is where it is now. A goods receipt lists
+only what the supplier delivered, cannot be voided once any of it was transferred, and a lot received from another plant
+is corrected through the lot it came from. A dispatch leaves from one plant: one whose batches are at two plants is
+refused (`422`), so dispatch from each plant, or transfer the stock first.
+
 ## Analytics and reports
 
 All need `REPORT_VIEW`. `from` and `to` are dates in the organisation's time zone. They default to the last 90 days and

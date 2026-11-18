@@ -46,7 +46,8 @@ Phase 11 is on hold until you ask for it.
 - [x] **Calibration follow-ups** (#132): the new inspection starts on its own after *Reinspect*; the review shows the
   batches and customers the goods already reached, with a recall report for each batch; and each measurement names the
   instrument that took it, so a failure names the parameters in doubt.
-- [ ] **Transfers between plants**: a stock transfer with in-transit and received states, and dispatches split by plant
+- [x] **Transfers between plants** (#133): any part of a lot or batch is sent, in transit, then received as a lot or
+  batch of its own at the other plant that traces, recalls and holds follow; a dispatch leaves from one plant
 - [x] Material receipt notifies inspectors (#79)
 
 ### P1: commercial and support

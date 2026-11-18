@@ -447,4 +447,54 @@ public final class TraceabilityDtos {
             List<CapaHistory> capas,
             List<TimelineEvent> timeline) {
     }
+
+    /** Parts of lots and batches sent from one plant to another. Each line names a lot or a batch, not both. */
+    public record CreateTransferRequest(
+            @NotNull UUID fromFacilityId,
+            @NotNull UUID toFacilityId,
+            @NotNull LocalDate sentOn,
+            @Size(max = 1000) String note,
+            @NotEmpty @Size(max = 50) List<@Valid @NotNull TransferLineRequest> items) {
+    }
+
+    public record TransferLineRequest(
+            UUID lotId,
+            UUID batchId,
+            @NotNull @Positive @Digits(integer = 12, fraction = 6) BigDecimal quantity) {
+    }
+
+    public record ReceiveTransferRequest(@NotNull LocalDate receivedOn) {
+    }
+
+    public record CancelTransferRequest(@NotBlank @Size(max = 1000) String reason) {
+    }
+
+    /** A line of a transfer: what was sent, and once received, the lot or batch it became at the other plant. */
+    public record TransferLine(
+            String kind,
+            UUID sourceId,
+            String sourceNumber,
+            String itemCode,
+            String itemName,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
+            UUID uomId,
+            UUID receivedId,
+            String receivedNumber) {
+    }
+
+    public record TransferResponse(
+            UUID id,
+            String transferNumber,
+            UUID fromFacilityId,
+            String fromFacilityName,
+            UUID toFacilityId,
+            String toFacilityName,
+            String status,
+            LocalDate sentOn,
+            LocalDate receivedOn,
+            String note,
+            String cancelReason,
+            Instant createdAt,
+            List<TransferLine> items) {
+    }
 }

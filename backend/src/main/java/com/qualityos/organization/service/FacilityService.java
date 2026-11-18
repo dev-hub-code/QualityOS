@@ -279,7 +279,14 @@ public class FacilityService {
         return facilities.findById(id).map(facility -> facility.getArchivedAt() == null).orElse(false);
     }
 
-    /** For other modules recording new activity at a facility. */
+    /** Facility names by id, for other modules' views. */
+    @Transactional(readOnly = true)
+    public Map<UUID, String> names(Collection<UUID> ids) {
+        return facilities.findAllById(ids).stream()
+                .collect(java.util.stream.Collectors.toMap(Facility::getId, Facility::getName));
+    }
+
+        /** For other modules recording new activity at a facility. */
     @Transactional(readOnly = true)
     public void requireActive(UUID id) {
         if (load(id).getArchivedAt() != null) {

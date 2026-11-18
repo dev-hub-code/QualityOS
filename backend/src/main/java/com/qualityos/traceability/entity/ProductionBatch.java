@@ -39,11 +39,42 @@ public class ProductionBatch extends TenantOwnedEntity {
     private BigDecimal dispatchedQuantity = BigDecimal.ZERO;
     private Instant completedAt;
 
+    /** Sent to another plant, in transit or received there as a batch of its own. */
+    private BigDecimal transferredQuantity = BigDecimal.ZERO;
+
+    /** The batch this one was sent from, for a batch received from another plant. */
+    private UUID transferredFromId;
+
     public ProductionBatch(String batchNumber, UUID productId, UUID facilityId, BigDecimal plannedQuantity) {
         this.batchNumber = batchNumber;
         this.productId = productId;
         this.facilityId = facilityId;
         this.plannedQuantity = plannedQuantity;
+    }
+
+    /**
+     * The part of {@code source} received at another plant: released, as its source was, and numbered after it. The
+     * link between them is recorded as lineage too, so traces, recalls and holds reach it.
+     */
+    public static ProductionBatch receivedFrom(
+            ProductionBatch source, String batchNumber, BigDecimal quantity, UUID facilityId, Instant now) {
+        ProductionBatch batch = new ProductionBatch(batchNumber, source.productId, facilityId, quantity);
+        batch.producedQuantity = quantity;
+        batch.completedAt = now;
+        batch.status = Status.RELEASED;
+        batch.transferredFromId = source.getId();
+        return batch;
+    }
+
+    /** Sends part of the batch to another plant. Only released stock can go. */
+    public void transferOut(BigDecimal quantity) {
+        requireAvailable(quantity);
+        transferredQuantity = transferredQuantity.add(quantity);
+    }
+
+    /** A transfer cancelled while in transit: the stock is back. */
+    public void returnTransferred(BigDecimal quantity) {
+        transferredQuantity = transferredQuantity.subtract(quantity);
     }
 
     public void requireInProgress() {
@@ -137,7 +168,7 @@ public class ProductionBatch extends TenantOwnedEntity {
     public BigDecimal availableQuantity() {
         return producedQuantity == null
                 ? BigDecimal.ZERO
-                : producedQuantity.subtract(usedQuantity).subtract(dispatchedQuantity);
+                : producedQuantity.subtract(usedQuantity).subtract(dispatchedQuantity).subtract(transferredQuantity);
     }
 
     /** As an ingredient of a later batch. */

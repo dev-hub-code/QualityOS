@@ -203,14 +203,21 @@ public class DispatchService {
         if (request.dispatchedOn().isAfter(today)) {
             throw new BusinessRuleException("A dispatch cannot be dated in the future.");
         }
-        Map<UUID, List<String>> held = recallHolds.openRecalls(
-                request.items().stream().map(DispatchItemRequest::productionBatchId).collect(Collectors.toSet()));
+        Set<UUID> shipped = request.items().stream().map(DispatchItemRequest::productionBatchId)
+                .collect(Collectors.toSet());
+        Map<UUID, List<String>> held = recallHolds.openRecalls(shipped);
         String override = held.isEmpty() ? null : requireRecallOverride(held, request.recallOverrideReason(), permissions);
         DispatchRecord dispatch = dispatches.saveAndFlush(new DispatchRecord(
                 numbers.next("DSP"), customer.getId(), request.dispatchedOn(), request.reference()));
         request.items().stream()
                 .sorted(Comparator.comparing(DispatchItemRequest::productionBatchId))
                 .forEach(line -> ship(dispatch, line));
+        // Checked once every batch is locked by ship(), so that this read never races a concurrent dispatch.
+        long plants = batches.findAllById(shipped).stream().map(ProductionBatch::getFacilityId).distinct().count();
+        if (plants > 1) {
+            throw new BusinessRuleException("A dispatch leaves from one plant. Dispatch from each plant separately, or"
+                    + " transfer the stock to one plant first.");
+        }
         audit.record("MATERIAL_DISPATCHED", "DispatchRecord", dispatch.getId(), null,
                 Map.of("number", dispatch.getDispatchNumber(), "customer", customer.getCode()));
         if (override != null) {

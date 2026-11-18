@@ -18,6 +18,10 @@ public interface GatewayOrderRepository extends JpaRepository<GatewayOrder, UUID
     @Query("select o from GatewayOrder o where o.provider = ?1 and o.gatewayOrderId = ?2")
     Optional<GatewayOrder> lockByProviderAndGatewayOrderId(String provider, String gatewayOrderId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select o from GatewayOrder o where o.id = ?1")
+    Optional<GatewayOrder> lockById(java.util.UUID id);
+
     List<GatewayOrder> findByInvoiceIdAndStatusInOrderByCreatedAtDesc(
             UUID invoiceId, java.util.Collection<GatewayOrder.Status> statuses);
 }

@@ -17,7 +17,8 @@ const PATH = "/platform/unapplied-payments";
 
 /**
  * Payments the gateway took that no invoice could take: the wrong amount or currency, or an invoice already paid.
- * They are never revenue, so they go back whole, through the gateway.
+ * They are never revenue, so they go back whole, through the gateway. One stays listed until Cashfree confirms its
+ * refund went through; a failed refund leaves it to refund again.
  */
 export function UnappliedPayments() {
   const billing = usePermission("PLATFORM_BILLING_MANAGE");
@@ -40,13 +41,25 @@ export function UnappliedPayments() {
               {payment.gatewayOrderId} for {payment.invoiceNumber}, since{" "}
               {formatDate(payment.since)}
             </span>
-            {billing && (
+            {payment.status === "REFUND_PENDING" && (
+              <span className="text-muted-foreground">
+                Refund sent, waiting for Cashfree to confirm it
+              </span>
+            )}
+            {payment.status === "NEEDS_REVIEW" &&
+              payment.refundStatus === "FAILED" && (
+                <span className="text-destructive">
+                  The last refund failed
+                  {payment.refundFailure ? `: ${payment.refundFailure}` : ""}
+                </span>
+              )}
+            {billing && payment.status === "NEEDS_REVIEW" && (
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => setRefunding(payment)}
               >
-                Refund
+                {payment.refundStatus === "FAILED" ? "Refund again" : "Refund"}
               </Button>
             )}
           </li>

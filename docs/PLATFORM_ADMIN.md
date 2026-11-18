@@ -42,8 +42,15 @@ The amount comes from the invoice, and a payment counts only after ProductionOS 
 customer's return nor a webhook's contents settle anything alone. Payments appear under Payments with provider `CASHFREE`.
 
 A payment that was taken but could not be applied, usually because the invoice was replaced or already paid, is listed
-under Payments as waiting for review. Refund sends the whole amount back through Cashfree and marks the order
-`REFUNDED`. It is never revenue, so it gets no credit note.
+under Payments as waiting for review. Refund sends the whole amount back through Cashfree. It stays listed, as
+waiting for Cashfree to confirm, until Cashfree says the refund went through; then the order is `REFUNDED`. A refund
+Cashfree refuses or fails puts it back to review, with the reason, to refund again. It is never revenue, so it gets no
+credit note.
+
+Every gateway refund is saved, with its own reference, before Cashfree is asked, and Cashfree is never asked inside a
+database transaction. If Cashfree's answer is lost, the `refunds` job (every 15 minutes) looks the refund up: if
+Cashfree has it, its answer is applied; if Cashfree never received it, it is sent again under the same reference,
+which Cashfree accepts only once. A payment webhook replayed for an order being or already refunded changes nothing.
 
 ## Credit notes and refunds
 

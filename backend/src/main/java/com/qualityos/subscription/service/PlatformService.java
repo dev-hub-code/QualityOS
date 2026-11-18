@@ -166,7 +166,14 @@ public class PlatformService {
 
     public CreditNoteResponse issueCreditNote(UUID tenant, UUID invoice, CreditNoteRequest request) {
         stepUp.require();
-        return inside(tenant, "CREDIT_NOTE", request.reason(), () -> refunds.issue(invoice, request));
+        CreditNoteResponse note = inside(tenant, "CREDIT_NOTE", request.reason(), () -> refunds.issue(invoice, request));
+        // Committed first, so the credit note and its refund exist whatever Cashfree answers, or if it never does.
+        if (note.refund() != null && "PENDING".equals(note.refund().status())) {
+            outside(tenant, () -> refunds.send(note.refund().id()));
+            return inside(tenant, refunds::list).stream().filter(found -> found.id().equals(note.id()))
+                    .findFirst().orElseThrow();
+        }
+        return note;
     }
 
     public List<CreditNoteResponse> creditNotes(UUID tenant) {
@@ -178,7 +185,7 @@ public class PlatformService {
     }
 
     public RefundView refreshRefund(UUID tenant, UUID refund) {
-        return inside(tenant, () -> refunds.refresh(refund));
+        return outside(tenant, () -> refunds.reconcile(refund));
     }
 
     /** Payments the gateway took that no invoice could take, across organisations. */
@@ -187,12 +194,14 @@ public class PlatformService {
                 new UnappliedPayment(row.getObject("tenant_id", UUID.class), row.getString("organisation"),
                         row.getObject("order_id", UUID.class), row.getString("gateway_order_id"),
                         row.getString("invoice_number"), row.getBigDecimal("amount"),
-                        row.getTimestamp("since").toInstant())));
+                        row.getTimestamp("since").toInstant(), row.getString("status"),
+                        row.getString("refund_status"), row.getString("refund_failure"))));
     }
 
     public RefundView refundUnapplied(UUID tenant, UUID order, String reason) {
         stepUp.require();
-        return inside(tenant, "REFUND_PAYMENT", reason, () -> refunds.refundUnapplied(order, reason));
+        UUID refund = inside(tenant, "REFUND_PAYMENT", reason, () -> refunds.reserveUnapplied(order, reason));
+        return outside(tenant, () -> refunds.send(refund));
     }
 
     public SubscriptionResponse extend(UUID tenant, int days, String reason) {
@@ -239,6 +248,11 @@ public class PlatformService {
             audit.record("PLATFORM_ACTION", "Organisation", tenant, null, Map.of("action", action, "reason", reason));
             return result;
         });
+    }
+
+    /** Under the organisation, with no transaction open, for work that asks Cashfree and records the answer itself. */
+    private <T> T outside(UUID tenant, Supplier<T> work) {
+        return TenantContext.callAs(tenant, TenantContext.getCurrentUserId(), work);
     }
 
     private <T> T inside(UUID tenant, Supplier<T> work) {

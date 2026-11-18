@@ -427,8 +427,12 @@ public final class SubscriptionDtos {
     }
 
     /** A payment the gateway took that no invoice could take, waiting for a platform administrator. */
+    /**
+     * @param status NEEDS_REVIEW, waiting for a decision, or REFUND_PENDING, refunded but not yet confirmed by Cashfree
+     * @param refundStatus how the latest refund of it stands, if any: a FAILED one leaves the payment to review again
+     */
     public record UnappliedPayment(
             UUID tenantId, String organisation, UUID orderId, String gatewayOrderId, String invoiceNumber,
-            BigDecimal amount, Instant since) {
+            BigDecimal amount, Instant since, String status, String refundStatus, String refundFailure) {
     }
 }

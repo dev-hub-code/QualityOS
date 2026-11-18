@@ -1279,19 +1279,23 @@ export interface Overview {
   from: string;
   to: string;
   kpis: Kpis;
-  inspectionTrend: {
-    month: string;
-    passed: number;
-    failed: number;
-    rejectedLots: number;
-  }[] | null;
+  inspectionTrend:
+    | {
+        month: string;
+        passed: number;
+        failed: number;
+        rejectedLots: number;
+      }[]
+    | null;
   suppliers: SupplierScore[] | null;
-  defects: {
-    category: string;
-    ncrs: number;
-    share: number;
-    cumulativeShare: number;
-  }[] | null;
+  defects:
+    | {
+        category: string;
+        ncrs: number;
+        share: number;
+        cumulativeShare: number;
+      }[]
+    | null;
   products: QualityShare[] | null;
   facilities: QualityShare[] | null;
   ncrAgeing: { label: string; ncrs: number }[] | null;
@@ -2909,6 +2913,11 @@ export interface UnappliedPayment {
   invoiceNumber: string;
   amount: number;
   since: string;
+  /** Waiting for a decision, or refunded and waiting for Cashfree to confirm it. */
+  status: "NEEDS_REVIEW" | "REFUND_PENDING";
+  /** How its latest refund stands, if it has one. A failed one leaves it to review again. */
+  refundStatus: "PENDING" | "SUCCEEDED" | "FAILED" | null;
+  refundFailure: string | null;
 }
 
 /** A report exported to Excel in the background, for the person who asked. */

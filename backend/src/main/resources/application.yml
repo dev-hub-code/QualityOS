@@ -125,6 +125,9 @@ qualityos:
     report-exports:
       initial-delay: PT3M
       interval: PT15M
+    refunds:
+      initial-delay: PT4M
+      interval: PT15M
     monitor:
       interval: PT15M
   storage:

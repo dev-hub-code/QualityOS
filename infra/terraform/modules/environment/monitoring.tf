@@ -2,6 +2,7 @@
 # problem reaches us before it reaches them. Each alarm emails alert_email, and emails again when it clears.
 
 resource "aws_sns_topic" "alerts" {
+  #checkov:skip=CKV_AWS_26:CloudWatch alarms cannot publish to a topic encrypted with the AWS-managed key, and alarm text holds no customer data
   name = "${local.prefix}-alerts"
 }
 

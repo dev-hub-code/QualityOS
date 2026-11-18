@@ -11,6 +11,7 @@ resource "aws_ecs_cluster" "main" {
 }
 
 resource "aws_cloudwatch_log_group" "service" {
+  #checkov:skip=CKV_AWS_158:Encrypted by CloudWatch with its own key; a customer-managed key is a production decision
   for_each          = toset(["backend", "frontend", "db-admin"])
   name              = "/qualityos/${var.name}/${each.key}"
   retention_in_days = var.log_retention_days
@@ -149,7 +150,7 @@ resource "aws_ecs_service" "backend" {
   task_definition        = aws_ecs_task_definition.backend.arn
   desired_count          = var.min_instances
   launch_type            = "FARGATE"
-  enable_execute_command = true
+  enable_execute_command = var.enable_exec_command
   propagate_tags         = "SERVICE"
 
   # A new version starts beside the old one; the old one stops only once the new one is healthy.
@@ -183,7 +184,7 @@ resource "aws_ecs_service" "frontend" {
   task_definition        = aws_ecs_task_definition.frontend.arn
   desired_count          = var.min_instances
   launch_type            = "FARGATE"
-  enable_execute_command = true
+  enable_execute_command = var.enable_exec_command
   propagate_tags         = "SERVICE"
 
   deployment_minimum_healthy_percent = 100

@@ -31,6 +31,7 @@ resource "aws_acm_certificate_validation" "main" {
 }
 
 resource "aws_lb" "main" {
+  #checkov:skip=CKV2_AWS_76:The attached WAF runs AWSManagedRulesKnownBadInputsRuleSet, which holds the Log4j rules (waf.tf)
   name               = local.prefix
   load_balancer_type = "application"
   subnets            = aws_subnet.public[*].id
@@ -40,6 +41,14 @@ resource "aws_lb" "main" {
   idle_timeout               = 120
   drop_invalid_header_fields = true
   enable_deletion_protection = var.deletion_protection
+
+  access_logs {
+    bucket  = aws_s3_bucket.logs.id
+    prefix  = "alb"
+    enabled = true
+  }
+
+  depends_on = [aws_s3_bucket_policy.logs]
 }
 
 resource "aws_lb_target_group" "frontend" {

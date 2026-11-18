@@ -47,6 +47,25 @@ class AuthRateLimitFilterTest {
     }
 
     @Test
+    void anAddressOverTheLimitIsRefusedWithoutCountingAgain() throws Exception {
+        int[] counted = {0};
+        InMemoryAttemptCounter memory = new InMemoryAttemptCounter();
+        AttemptCounter counting = (bucket, window) -> {
+            counted[0]++;
+            return memory.increment(bucket, window);
+        };
+        AuthRateLimitFilter filter = new AuthRateLimitFilter(
+                2, JsonMapper.builder().build(), Clock.fixed(START, ZoneOffset.UTC), counting);
+        for (int attempt = 0; attempt < 50; attempt++) {
+            call(filter, "POST", "/api/v1/auth/login", "10.0.0.1");
+        }
+        // Two allowed, the third found over the limit; the other 47 never reach the shared counter.
+        assertThat(counted[0]).isEqualTo(3);
+        assertThat(call(filter, "POST", "/api/v1/auth/login", "10.0.0.1")).isEqualTo(429);
+        assertThat(call(filter, "POST", "/api/v1/auth/login", "10.0.0.2")).isEqualTo(200);
+    }
+
+    @Test
     void countsEachAddressSeparately() throws Exception {
         AuthRateLimitFilter filter = filter(START);
         call(filter, "POST", "/api/v1/auth/login", "10.0.0.1");

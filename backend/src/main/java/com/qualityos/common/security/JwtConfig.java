@@ -83,9 +83,12 @@ public class JwtConfig {
                     "JWT_PREVIOUS_KEY_TRUSTED_UNTIL must be set with JWT_PREVIOUS_PUBLIC_KEY, so the old key retires");
         }
         RSAPublicKey previousKey = RsaKeyConverters.x509().convert(stream(properties.previousPublicKey()));
-        RSAKey previous = named(new RSAKey.Builder(previousKey), null, previousKey);
-        if (previous.getKeyID().equals(signing.getKeyID())) {
+        RSAKey previous = named(new RSAKey.Builder(previousKey), properties.previousKeyId(), previousKey);
+        if (previous.computeThumbprint().equals(signing.computeThumbprint())) {
             throw new IllegalStateException("The previous JWT key is the same as the signing key");
+        }
+        if (previous.getKeyID().equals(signing.getKeyID())) {
+            throw new IllegalStateException("JWT_PREVIOUS_KEY_ID must differ from JWT_KEY_ID, or a token's kid could not tell the keys apart");
         }
         return new JwtKeys(signing, previous, properties.previousKeyTrustedUntil());
     }

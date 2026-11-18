@@ -1204,7 +1204,7 @@ export const DOC_PAGES: DocPage[] = [
           "Your organisation comes from your signed-in session, never from anything a browser sends.",
           "Attachments are only reachable by someone allowed to see the record they belong to.",
           "Critical actions are written to the audit log, with members' sign-in and password events from the day they joined.",
-          "Ten failed sign-ins lock an account for 15 minutes, and a reset link unlocks it.",
+          "Ten failed sign-ins from one place block sign-in from there for 15 minutes. Places the person has signed in from before are not affected, so someone else cannot lock them out. A reset link unlocks it at once.",
           "Change your own password under My account.",
           "ProductionOS support cannot see your records unless an administrator allows it under Settings, Support access, for 24 hours, 3 days or 7 days. Support can only read, unless a 24-hour grant also allows changes, which the audit log then shows as support's. You can withdraw access at any time. Every page support opens is listed there.",
           "An administrator can upload a logo under My account. It shows in the menu, at the top of your organisation's emails and on its PDF reports. Only PNG and JPEG images up to 256 KB are taken, checked by their content.",

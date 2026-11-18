@@ -1163,8 +1163,8 @@ export const DOC_EXAMPLES: Record<string, WorkedExample[]> = {
         {
           who: "Ravi, Inspector",
           action: "Enters the wrong password ten times.",
-          result: "The account locks for 15 minutes.",
-          why: "Locking slows down anyone guessing passwords.",
+          result: "Sign-in from that tablet is blocked for 15 minutes, and Ravi is emailed.",
+          why: "Blocking slows down anyone guessing passwords. It applies only where the wrong passwords came from, so a stranger trying Ravi's email elsewhere cannot keep Ravi out.",
         },
         {
           who: "Ravi, Inspector",

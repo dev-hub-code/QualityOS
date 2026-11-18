@@ -32,6 +32,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.sql.Timestamp;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -49,8 +52,15 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class AuthService {
 
-    private static final int MAX_FAILED_LOGINS = 10;
+    /** Wrong passwords or codes from one address that lock the account for that address only. */
+    private static final int ADDRESS_FAILURE_LIMIT = 10;
+    /**
+     * Wrong passwords from all addresses together that lock the account for every address it has never signed in
+     * from, so that guessing spread over many addresses still stops, while the owner keeps signing in from home.
+     */
+    private static final int ACCOUNT_FAILURE_LIMIT = 50;
     private static final Duration LOCK_DURATION = Duration.ofMinutes(15);
+    private static final String UNKNOWN_ADDRESS = "unknown";
 
     /**
      * A web page can refresh from several requests at once. Within this window, a repeated token is treated as
@@ -209,12 +219,12 @@ public class AuthService {
         }
         UUID userId = UUID.fromString(challenge.getSubject());
         User user = tx.execute(status -> users.findById(userId)).orElseThrow(AuthService::signInExpired);
-        boolean locked = user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now());
-        if (locked || user.getStatus() != User.Status.ACTIVE) {
+        String address = clientAddress();
+        if (locked(user, address) || user.getStatus() != User.Status.ACTIVE) {
             throw invalidCredentials();
         }
         if (!secondFactor.verifyAtLogin(userId, code)) {
-            recordFailedLogin(userId);
+            recordFailedLogin(userId, address);
             throw new QualityOsException(ErrorCode.INVALID_CREDENTIALS, "That code is not right.");
         }
         // The membership is checked again: it may have ended in the minutes since the password was given.
@@ -226,9 +236,15 @@ public class AuthService {
     private TokenResponse startSession(UUID userId, UUID tenantId, Map<String, Object> details) {
         return TenantContext.callAs(tenantId, userId, () -> tx.execute(status -> {
             User current = users.findById(userId).orElseThrow();
+            // An account-wide lock stays until it runs out: it protects other addresses, not this one.
             current.setFailedLoginCount(0);
-            current.setLockedUntil(null);
             current.setLastLoginAt(Instant.now());
+            String address = clientAddress();
+            jdbc.update("DELETE FROM login_failures WHERE user_id = ? AND address = ?", userId, address);
+            jdbc.update("""
+                    INSERT INTO login_addresses (user_id, address, last_success_at) VALUES (?, ?, now())
+                    ON CONFLICT (user_id, address) DO UPDATE SET last_success_at = now()
+                    """, userId, address);
             audit.record("USER_LOGGED_IN", "User", userId, null, details.isEmpty() ? null : details);
             return issueSession(userId, tenantId);
         }));
@@ -258,13 +274,40 @@ public class AuthService {
 
     private void checkPassword(User user, String password) {
         boolean passwordMatches = passwordEncoder.matches(password, user.getPasswordHash());
-        boolean locked = user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now());
+        String address = clientAddress();
+        boolean locked = locked(user, address);
         if (locked || !passwordMatches || user.getStatus() == User.Status.DISABLED) {
             if (!locked && !passwordMatches) {
-                recordFailedLogin(user.getId());
+                recordFailedLogin(user.getId(), address);
             }
             throw invalidCredentials();
         }
+    }
+
+    /**
+     * Locked for this address: by too many failures from it, or by the account-wide lock, which an address the
+     * account has signed in from before is spared.
+     */
+    private boolean locked(User user, String address) {
+        Boolean addressLocked = jdbc.query(
+                "SELECT locked_until > now() FROM login_failures WHERE user_id = ? AND address = ?",
+                rs -> rs.next() ? rs.getBoolean(1) : false, user.getId(), address);
+        if (Boolean.TRUE.equals(addressLocked)) {
+            return true;
+        }
+        boolean accountLocked = user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now());
+        return accountLocked && !Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM login_addresses WHERE user_id = ? AND address = ?"
+                        + " AND last_success_at > now() - interval '90 days')",
+                Boolean.class, user.getId(), address));
+    }
+
+    /** The address the attempt came from, as the proxy reported it. */
+    private static String clientAddress() {
+        return RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes
+                && attributes.getRequest().getRemoteAddr() != null
+                ? attributes.getRequest().getRemoteAddr()
+                : UNKNOWN_ADDRESS;
     }
 
     public TokenResponse refresh(String presentedToken) {
@@ -382,17 +425,49 @@ public class AuthService {
                 .orElse(memberOf.getFirst().id());
     }
 
-    private void recordFailedLogin(UUID userId) {
+    private void recordFailedLogin(UUID userId, String address) {
         TenantContext.runAs(null, userId, () -> tx.executeWithoutResult(status -> {
             User user = users.findById(userId).orElseThrow();
+            // A lock that has run out starts the count again.
+            Integer fromAddress = jdbc.queryForObject("""
+                    INSERT INTO login_failures (user_id, address, failures, updated_at) VALUES (?, ?, 1, now())
+                    ON CONFLICT (user_id, address) DO UPDATE SET
+                        failures = CASE WHEN login_failures.locked_until <= now() THEN 1
+                                        ELSE login_failures.failures + 1 END,
+                        locked_until = CASE WHEN login_failures.locked_until <= now() THEN NULL
+                                            ELSE login_failures.locked_until END,
+                        updated_at = now()
+                    RETURNING failures
+                    """, Integer.class, userId, address);
+            boolean lockedNow = false;
+            boolean emailedLately = false;
+            if (fromAddress != null && fromAddress >= ADDRESS_FAILURE_LIMIT) {
+                // One email per lock period, however many addresses get locked: otherwise each one fills the inbox.
+                emailedLately = Boolean.TRUE.equals(jdbc.queryForObject("""
+                        SELECT EXISTS (SELECT 1 FROM login_failures
+                                       WHERE user_id = ? AND address <> ? AND locked_until > now())
+                        """, Boolean.class, userId, address));
+                jdbc.update("UPDATE login_failures SET failures = 0, locked_until = ? WHERE user_id = ? AND address = ?",
+                        Timestamp.from(Instant.now().plus(LOCK_DURATION)), userId, address);
+                audit.record("USER_LOCKED", "User", userId, null, Map.of("scope", "ADDRESS", "address", address));
+                lockedNow = !emailedLately;
+            }
             int failures = user.getFailedLoginCount() + 1;
             user.setFailedLoginCount(failures);
-            if (failures >= MAX_FAILED_LOGINS) {
+            if (failures >= ACCOUNT_FAILURE_LIMIT) {
                 user.setFailedLoginCount(0);
                 user.setLockedUntil(Instant.now().plus(LOCK_DURATION));
-                audit.record("USER_LOCKED", "User", userId);
+                audit.record("USER_LOCKED", "User", userId, null, Map.of("scope", "ACCOUNT"));
+                lockedNow = true;
+            }
+            if (lockedNow) {
                 accountEmails.sendAccountLocked(user, LOCK_DURATION);
             }
+            // Failures that never led anywhere are forgotten after a day.
+            jdbc.update("""
+                    DELETE FROM login_failures WHERE user_id = ? AND updated_at < now() - interval '1 day'
+                    AND (locked_until IS NULL OR locked_until < now())
+                    """, userId);
             audit.record("LOGIN_FAILED", "User", userId);
         }));
     }

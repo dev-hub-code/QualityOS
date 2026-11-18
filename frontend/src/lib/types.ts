@@ -1240,14 +1240,14 @@ export interface AuditReport {
 }
 
 export interface Kpis {
-  totalInspections: number;
-  passedInspections: number;
-  failedInspections: number;
+  totalInspections: number | null;
+  passedInspections: number | null;
+  failedInspections: number | null;
   inspectionPassRate: number | null;
-  openNcrs: number;
-  closedNcrs: number;
-  openCapas: number;
-  overdueCapas: number;
+  openNcrs: number | null;
+  closedNcrs: number | null;
+  openCapas: number | null;
+  overdueCapas: number | null;
   supplierRejectionRate: number | null;
   materialRejectionRate: number | null;
   defectRate: number | null;
@@ -1271,6 +1271,10 @@ export interface SupplierScore {
   openNcrs: number;
 }
 
+/**
+ * Each figure, chart and kind of recent activity is null, or left out, for someone without the view permission of
+ * its records.
+ */
 export interface Overview {
   from: string;
   to: string;
@@ -1280,22 +1284,22 @@ export interface Overview {
     passed: number;
     failed: number;
     rejectedLots: number;
-  }[];
-  suppliers: SupplierScore[];
+  }[] | null;
+  suppliers: SupplierScore[] | null;
   defects: {
     category: string;
     ncrs: number;
     share: number;
     cumulativeShare: number;
-  }[];
-  products: QualityShare[];
-  facilities: QualityShare[];
-  ncrAgeing: { label: string; ncrs: number }[];
-  capaTrend: { month: string; opened: number; closed: number }[];
+  }[] | null;
+  products: QualityShare[] | null;
+  facilities: QualityShare[] | null;
+  ncrAgeing: { label: string; ncrs: number }[] | null;
+  capaTrend: { month: string; opened: number; closed: number }[] | null;
   pending: {
-    inspectionsAwaitingApproval: number;
-    ncrsAwaitingClosure: number;
-    auditsAwaitingClosure: number;
+    inspectionsAwaitingApproval: number | null;
+    ncrsAwaitingClosure: number | null;
+    auditsAwaitingClosure: number | null;
   };
   recent: {
     kind: string;
@@ -1304,7 +1308,7 @@ export interface Overview {
     status: string;
     on: string;
   }[];
-  production: ProductionFigures;
+  production: ProductionFigures | null;
 }
 
 /** Production in the period. Open and late work orders are as of now. */
@@ -1315,7 +1319,8 @@ export interface ProductionFigures {
   onTimeRate: number | null;
   /** Rejected and scrapped of everything processed on the shop floor. */
   lossRate: number | null;
-  unplannedDowntimeMinutes: number;
+  /** Null without the manufacturing view permission. */
+  unplannedDowntimeMinutes: number | null;
 }
 
 export interface ReportTable {

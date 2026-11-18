@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { Kpis } from "@/lib/types";
+import { figureAccess } from "@/lib/analytics-access";
 import { KpiTiles } from "./kpi-tiles";
 
 const KPIS: Kpis = {
@@ -25,5 +26,13 @@ describe("KpiTiles", () => {
   it("keeps the opening page to the four key figures", () => {
     render(<KpiTiles kpis={KPIS} />);
     expect(screen.getAllByRole("definition")).toHaveLength(4);
+  });
+
+  it("leaves out figures whose records this person may not view", () => {
+    render(<KpiTiles kpis={KPIS} all access={figureAccess(["REPORT_VIEW", "INSPECTION_VIEW"])} />);
+    expect(screen.getByText("Pass rate")).toBeInTheDocument();
+    expect(screen.queryByText("Open NCRs")).not.toBeInTheDocument();
+    expect(screen.queryByText("Overdue CAPAs")).not.toBeInTheDocument();
+    expect(screen.queryByText("Supplier lot rejection")).not.toBeInTheDocument();
   });
 });

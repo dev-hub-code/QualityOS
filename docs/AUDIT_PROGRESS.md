@@ -70,7 +70,8 @@ Phase 11 is on hold until you ask for it.
   logo in the app, its emails and PDFs (#105, #110)
 - [x] Pickers list every record (#82), and archived records can be restored (#81)
 - [x] Background report exports beyond 5,000 rows: streamed to Excel, up to 1,000,000 rows, kept 7 days
-- [ ] Separate permissions for report totals and detail
+- [x] Dashboard and analytics figures follow the view permission of their records, as reports do; the server leaves out
+  what a person may not view
 - [x] Audit every change to child records, with before and after values: edits keep only the fields that changed,
   child lines (PO items, BOM lines, routing steps, plan lines, checklist items, template parameters) as they were and
   are; specifications and categories keep what was added, renamed or removed

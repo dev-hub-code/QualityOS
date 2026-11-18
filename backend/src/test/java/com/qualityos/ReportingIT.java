@@ -314,4 +314,44 @@ class ReportingIT extends TraceabilityFixture {
             assertThat(row.getCell(1).getRawValue()).startsWith("=HYPERLINK");
         }
     }
+
+    @Test
+    void eachFigureShowsOnlyToThoseWhoMayViewItsRecords() throws Exception {
+        decideLot("30", "25.0", "REJECT");
+        String role = idOf(body(as(owner, postJson("/api/v1/roles", Map.of(
+                        "name", "Inspection figures " + code(),
+                        "permissions", java.util.List.of("REPORT_VIEW", "INSPECTION_VIEW"))))
+                .andExpect(status().isCreated())));
+        Session analyst = addMember(owner, "VIEWER");
+        as(owner, org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/api/v1/users/" + membershipId(owner, analyst.userId()) + "/roles")
+                        .contentType("application/json")
+                        .content(json.writeValueAsString(Map.of("roleIds", java.util.List.of(role)))))
+                .andExpect(status().isOk());
+
+        as(analyst, get(OVERVIEW))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.kpis.totalInspections").value(1))
+                .andExpect(jsonPath("$.data.kpis.materialRejectionRate").value(100.0))
+                .andExpect(jsonPath("$.data.inspectionTrend").isArray())
+                .andExpect(jsonPath("$.data.pending.inspectionsAwaitingApproval").isNumber())
+                // No NCR, CAPA, supplier, audit or production figures without those permissions.
+                .andExpect(jsonPath("$.data.kpis.openNcrs").isEmpty())
+                .andExpect(jsonPath("$.data.kpis.overdueCapas").isEmpty())
+                .andExpect(jsonPath("$.data.kpis.supplierRejectionRate").isEmpty())
+                .andExpect(jsonPath("$.data.defects").isEmpty())
+                .andExpect(jsonPath("$.data.ncrAgeing").isEmpty())
+                .andExpect(jsonPath("$.data.capaTrend").isEmpty())
+                .andExpect(jsonPath("$.data.suppliers").isEmpty())
+                .andExpect(jsonPath("$.data.pending.ncrsAwaitingClosure").isEmpty())
+                .andExpect(jsonPath("$.data.pending.auditsAwaitingClosure").isEmpty())
+                .andExpect(jsonPath("$.data.production").isEmpty())
+                .andExpect(jsonPath("$.data.recent[*].kind").value(org.hamcrest.Matchers.everyItem(
+                        org.hamcrest.Matchers.is("Inspection"))));
+
+        // The owner, asking for the same kept figures, still sees them all.
+        as(owner, get(OVERVIEW))
+                .andExpect(jsonPath("$.data.kpis.openNcrs").value(1))
+                .andExpect(jsonPath("$.data.recent[*].kind").value(org.hamcrest.Matchers.hasItem("NCR")));
+    }
 }

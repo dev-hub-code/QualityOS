@@ -2,27 +2,39 @@ import { expect, test, type Locator } from "@playwright/test";
 import { apiCaller, signUp } from "./helpers";
 import { prepare, step } from "./trace-setup";
 
-const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+const day = (offset: number) =>
+  new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
 
-test("an instrument is registered, calibrated and failed, and a failure shows in its record", async ({ page }) => {
+test("an instrument is registered, calibrated and failed, and a failure shows in its record", async ({
+  page,
+}) => {
   await signUp(page);
-  await apiCaller(page)("POST", "/facilities", { code: "PUNE", name: "Pune Plant" });
+  await apiCaller(page)("POST", "/facilities", {
+    code: "PUNE",
+    name: "Pune Plant",
+  });
 
   await page.goto("/calibration");
   await step(page, "Register instrument", async (dialog: Locator) => {
     await dialog.getByLabel("Instrument ID").fill("VC-101");
     await dialog.getByLabel("Name").fill("Vernier caliper");
     await dialog.getByLabel("Category").fill("Dimensional");
-    await dialog.getByLabel("Facility").selectOption({ label: "PUNE – Pune Plant" });
+    await dialog
+      .getByLabel("Facility")
+      .selectOption({ label: "PUNE – Pune Plant" });
     await dialog.getByLabel("Calibrate every (days)").fill("180");
     await dialog.getByLabel("Next calibration due").fill(day(-3));
   });
-  await expect(page.getByRole("row", { name: /VC-101/ })).toContainText("overdue");
+  await expect(page.getByRole("row", { name: /VC-101/ })).toContainText(
+    "overdue",
+  );
   await page.getByRole("link", { name: "VC-101" }).click();
 
   const qr = page.getByRole("img", { name: "QR code for VC-101" });
   await expect(qr).toBeVisible();
-  await expect.poll(() => qr.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+  await expect
+    .poll(() => qr.evaluate((image: HTMLImageElement) => image.naturalWidth))
+    .toBeGreaterThan(0);
 
   await step(page, "Record calibration", async (dialog: Locator) => {
     await dialog.getByLabel("Calibrated on").fill(day(0));
@@ -49,15 +61,26 @@ test("an instrument is registered, calibrated and failed, and a failure shows in
   await expect(page.getByText("out of service").first()).toBeVisible();
 });
 
-test("a failed calibration raises an NCR, and a decision to reinspect holds the goods", async ({ page }) => {
+test("a failed calibration raises an NCR, and a decision to reinspect holds the goods", async ({
+  page,
+}) => {
   test.setTimeout(60_000);
   await signUp(page);
   await prepare(page);
   const call = apiCaller(page);
-  const facilities: { items: { id: string }[] } = await call("GET", "/facilities");
+  const facilities: { items: { id: string }[] } = await call(
+    "GET",
+    "/facilities",
+  );
   const products: { items: { id: string }[] } = await call("GET", "/products");
-  const lots: { itemId: string }[] = await call("GET", "/material-receipts/released-lots");
-  const templates: { items: { id: string }[] } = await call("GET", "/inspection-templates");
+  const lots: { itemId: string }[] = await call(
+    "GET",
+    "/material-receipts/released-lots",
+  );
+  const templates: { items: { id: string }[] } = await call(
+    "GET",
+    "/inspection-templates",
+  );
   const instrument = await call("POST", "/instruments", {
     instrumentCode: "MIC-7",
     name: "Micrometer",
@@ -76,13 +99,20 @@ test("a failed calibration raises an NCR, and a decision to reinspect holds the 
     facilityId: facilities.items[0].id,
     plannedQuantity: "10",
   });
-  await call("POST", `/production-batches/${made.batch.id}/consume`, { receiptItemId: lots[0].itemId, quantity: "10" });
-  await call("POST", `/production-batches/${made.batch.id}/complete`, { producedQuantity: "10" });
+  await call("POST", `/production-batches/${made.batch.id}/consume`, {
+    receiptItemId: lots[0].itemId,
+    quantity: "10",
+  });
+  await call("POST", `/production-batches/${made.batch.id}/complete`, {
+    producedQuantity: "10",
+  });
   const inspection = await call("POST", "/inspections", {
     productionBatchId: made.batch.id,
     templateId: templates.items[0].id,
   });
-  await call("POST", `/inspections/${inspection.id}/instruments`, { instrumentIds: [instrument.id] });
+  await call("POST", `/inspections/${inspection.id}/instruments`, {
+    instrumentIds: [instrument.id],
+  });
   await call("PUT", "/organizations/current/settings", {
     singlePersonReview: true,
     capaRequiredFrom: "MAJOR",
@@ -90,20 +120,35 @@ test("a failed calibration raises an NCR, and a decision to reinspect holds the 
     version: null,
   });
   await call("POST", `/inspections/${inspection.id}/execute`, {
-    results: [{ parameterCode: "DIA", sampleNumber: 1, valueNumeric: "20.0" }],
+    results: [
+      {
+        parameterCode: "DIA",
+        sampleNumber: 1,
+        valueNumeric: "20.0",
+        instrumentId: instrument.id,
+      },
+    ],
   });
   await call("POST", `/inspections/${inspection.id}/submit`);
-  await call("POST", `/inspections/${inspection.id}/approve`, { note: "Only member" });
-  await call("POST", `/inspections/${inspection.id}/disposition`, { disposition: "ACCEPT", note: "Only member" });
+  await call("POST", `/inspections/${inspection.id}/approve`, {
+    note: "Only member",
+  });
+  await call("POST", `/inspections/${inspection.id}/disposition`, {
+    disposition: "ACCEPT",
+    note: "Only member",
+  });
 
   await page.goto(`/calibration/${instrument.id}`);
-  await expect(page.getByText("No failed calibration has put a measurement in doubt.")).toBeVisible();
+  await expect(
+    page.getByText("No failed calibration has put a measurement in doubt."),
+  ).toBeVisible();
   await step(page, "Record calibration", async (dialog: Locator) => {
     await dialog.getByLabel("Calibrated on").fill(day(0));
     await dialog.getByLabel("Result").selectOption("FAIL");
     await dialog.getByLabel("Performed by").fill("NABL Lab");
   });
   await expect(page.getByText("1 waiting for a decision")).toBeVisible();
+  await expect(page.getByText(/measured DIA/)).toBeVisible();
   await expect(page.getByRole("link", { name: /^NCR-/ })).toBeVisible();
 
   await step(page, "Decide", async (dialog: Locator) => {
@@ -111,11 +156,31 @@ test("a failed calibration raises an NCR, and a decision to reinspect holds the 
     await dialog.getByLabel("Why").fill("Drift exceeds the diameter tolerance");
   });
   await expect(page.getByText("all decided")).toBeVisible();
+  // The new inspection started on its own, with nothing left to do but carry it out.
+  const again = page.getByText("Checked again by").getByRole("link");
+  await expect(again).toHaveText(/^INS-/);
+  const reinspection = await again.textContent();
 
-  await page.getByRole("link", { name: inspection.inspectionNumber, exact: true }).first().click();
-  await expect(page.getByRole("heading", { name: inspection.inspectionNumber })).toBeVisible();
+  await page
+    .getByRole("link", { name: inspection.inspectionNumber, exact: true })
+    .first()
+    .click();
+  await expect(
+    page.getByRole("heading", { name: inspection.inspectionNumber }),
+  ).toBeVisible();
   await expect(page.getByText("reinspect", { exact: true })).toBeVisible();
+  await page.getByRole("link", { name: reinspection! }).click();
+  await expect(
+    page.getByRole("heading", { name: reinspection! }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      `${inspection.inspectionNumber}, put in doubt by a failed calibration`,
+    ),
+  ).toBeVisible();
 
   await page.goto(`/production-batches/${made.batch.id}`);
-  await expect(page.getByText("on hold", { exact: true }).first()).toBeVisible();
+  await expect(
+    page.getByText("on hold", { exact: true }).first(),
+  ).toBeVisible();
 });

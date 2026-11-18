@@ -38,14 +38,19 @@ public class OrganizationSettingsController {
     @PutMapping
     @PreAuthorize("hasAuthority('" + Permissions.TENANT_MANAGE + "')")
     public ApiResponse<OrganizationSettings> update(@Valid @RequestBody UpdateOrganizationSettingsRequest request) {
+        TenantSettingsService.Settings current = settings.get();
         boolean evidence = request.actionEvidenceRequired() != null
                 ? request.actionEvidenceRequired()
-                : settings.get().actionEvidenceRequired();
+                : current.actionEvidenceRequired();
+        int escalation = request.capaEscalationDays() != null
+                ? request.capaEscalationDays()
+                : current.capaEscalationDays();
         return ApiResponse.ok(view(settings.update(new TenantSettingsService.Settings(
                 request.singlePersonReview(),
                 request.capaRequiredFrom(),
                 request.effectivenessRequiredFrom(),
                 evidence,
+                escalation,
                 request.version()))));
     }
 
@@ -58,6 +63,7 @@ public class OrganizationSettingsController {
                 saved.capaRequiredFrom(),
                 saved.effectivenessRequiredFrom(),
                 saved.actionEvidenceRequired(),
+                saved.capaEscalationDays(),
                 saved.version());
     }
 }

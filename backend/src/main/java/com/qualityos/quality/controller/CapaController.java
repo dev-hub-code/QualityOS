@@ -55,8 +55,9 @@ public class CapaController {
         return ApiResponse.ok(capas.list(q, status, ncrId, Pages.of(page, size, sort, SORTABLE, "capaNumber")));
     }
 
+    /** Also open to whoever owns the CAPA or one of its actions: the service checks which applies. */
     @GetMapping("/{id}")
-    @PreAuthorize(Require.CAPA_VIEW)
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<CapaDetail> get(@PathVariable UUID id) {
         return ApiResponse.ok(capas.get(id));
     }
@@ -98,8 +99,9 @@ public class CapaController {
         return ApiResponse.ok(capas.startImplementation(id));
     }
 
+    /** The action's owner may complete it without managing CAPAs: the service checks which applies. */
     @PostMapping("/{id}/actions/{actionId}/complete")
-    @PreAuthorize(Require.CAPA_MANAGE)
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<CapaDetail> completeAction(
             @PathVariable UUID id, @PathVariable UUID actionId, @Valid @RequestBody CompleteActionRequest request) {
         return ApiResponse.ok(capas.completeAction(id, actionId, request.note()));

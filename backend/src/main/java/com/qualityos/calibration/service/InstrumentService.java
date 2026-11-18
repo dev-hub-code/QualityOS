@@ -54,6 +54,8 @@ import java.util.function.Function;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.HashMap;
+import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.stream.Collectors;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
@@ -86,6 +88,7 @@ public class InstrumentService implements AttachmentPolicy {
     private final NcrService ncrs;
     private final ApplicationEventPublisher events;
     private final List<InstrumentUseSource> sources;
+    private final JdbcTemplate jdbc;
 
     InstrumentService(
             InstrumentRepository instruments,
@@ -100,7 +103,9 @@ public class InstrumentService implements AttachmentPolicy {
             CalibrationImpactReviewRepository reviews,
             NcrService ncrs,
             ApplicationEventPublisher events,
-            List<InstrumentUseSource> sources) {
+            List<InstrumentUseSource> sources,
+            JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
         this.events = events;
         this.sources = sources;
         this.reviews = reviews;
@@ -277,10 +282,12 @@ public class InstrumentService implements AttachmentPolicy {
         Map<UUID, CalibrationRecord> calibrations = history.stream()
                 .collect(Collectors.toMap(CalibrationRecord::getId, record -> record));
         Map<UUID, String> members = access.names();
+        Map<UUID, List<String>> measured = measuredBy(id);
         return elsewhere.entrySet().stream().map(entry -> {
             NcrOutcome ncr = raised.get(entry.getKey());
             List<ImpactReviewResponse> items = byCalibration.getOrDefault(entry.getKey(), List.of()).stream()
-                    .map(review -> toResponse(review, members)).toList();
+                    .map(review -> toResponse(review, members,
+                            measured.getOrDefault(review.getInspectionId(), List.of()))).toList();
             return new ImpactReviewGroup(
                     entry.getKey(),
                     calibrations.get(entry.getKey()).getCalibratedOn(),
@@ -307,10 +314,37 @@ public class InstrumentService implements AttachmentPolicy {
         if (review.getDecision() == CalibrationImpactReview.Decision.REINSPECT) {
             events.publishEvent(new ReinspectionRequired(review.getInspectionId(), instrument.getInstrumentCode()));
         }
-        return toResponse(review, access.names());
+        return toResponse(review, access.names(), measuredBy(id).getOrDefault(review.getInspectionId(), List.of()));
     }
 
-    private static ImpactReviewResponse toResponse(CalibrationImpactReview review, Map<UUID, String> members) {
+    /** For each inspection, the parameters this instrument measured, as its results record. */
+    private Map<UUID, List<String>> measuredBy(UUID instrumentId) {
+        Map<UUID, List<String>> measured = new HashMap<>();
+        jdbc.query("SELECT DISTINCT inspection_id, parameter_code FROM inspection_results WHERE instrument_id = ?"
+                        + " ORDER BY parameter_code",
+                row -> {
+                    measured.computeIfAbsent(row.getObject(1, UUID.class), key -> new ArrayList<>())
+                            .add(row.getString(2));
+                },
+                instrumentId);
+        return measured;
+    }
+
+    /** For each instrument, the parameters it measured on one inspection. */
+    private Map<UUID, List<String>> measuredOn(UUID inspectionId) {
+        Map<UUID, List<String>> measured = new HashMap<>();
+        jdbc.query("SELECT DISTINCT instrument_id, parameter_code FROM inspection_results"
+                        + " WHERE inspection_id = ? AND instrument_id IS NOT NULL ORDER BY parameter_code",
+                row -> {
+                    measured.computeIfAbsent(row.getObject(1, UUID.class), key -> new ArrayList<>())
+                            .add(row.getString(2));
+                },
+                inspectionId);
+        return measured;
+    }
+
+    private static ImpactReviewResponse toResponse(
+            CalibrationImpactReview review, Map<UUID, String> members, List<String> parameters) {
         return new ImpactReviewResponse(
                 review.getId(),
                 review.getInspectionId(),
@@ -319,7 +353,8 @@ public class InstrumentService implements AttachmentPolicy {
                 review.getDecision() == null ? null : review.getDecision().name(),
                 review.getNote(),
                 review.getDecidedBy() == null ? null : members.getOrDefault(review.getDecidedBy(), "Former member"),
-                review.getDecidedAt());
+                review.getDecidedAt(),
+                parameters);
     }
 
     /** With a failure as the latest result, whatever was measured since the last good calibration is in doubt. */
@@ -457,9 +492,11 @@ public class InstrumentService implements AttachmentPolicy {
         Map<UUID, List<CalibrationImpactReview>> reviewed = reviews.findByInspectionIdAndInstrumentIdIn(
                         inspectionId, used.stream().map(Instrument::getId).toList()).stream()
                 .collect(Collectors.groupingBy(CalibrationImpactReview::getInstrumentId));
+        Map<UUID, List<String>> measured = measuredOn(inspectionId);
         return used.stream()
                 .map(i -> new UsedInstrument(i.getId(), i.getInstrumentCode(), i.getName(), i.getNextDueOn(),
-                        reviewState(reviewed.getOrDefault(i.getId(), List.of()))))
+                        reviewState(reviewed.getOrDefault(i.getId(), List.of())),
+                        measured.getOrDefault(i.getId(), List.of())))
                 .toList();
     }
 

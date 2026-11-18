@@ -2,7 +2,12 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { InstrumentUsage } from "./calibration-history";
 
-const inspection = (id: string, number: string, usedOn: string, suspect: boolean) => ({
+const inspection = (
+  id: string,
+  number: string,
+  usedOn: string,
+  suspect: boolean,
+) => ({
   inspectionId: id,
   inspectionNumber: number,
   label: number,
@@ -29,16 +34,24 @@ describe("InstrumentUsage", () => {
         ]}
       />,
     );
-    expect(screen.getByText(/2 record\(s\) used this instrument/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "INS-1" })).toHaveAttribute("href", "/inspections/a");
-    expect(screen.getByRole("link", { name: "WO-2026-00001 operation 10" })).toHaveAttribute(
+    expect(
+      screen.getByText(/2 record\(s\) used this instrument/),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "INS-1" })).toHaveAttribute(
       "href",
-      "/manufacturing/shop-floor/op",
+      "/inspections/a",
     );
+    expect(
+      screen.getByRole("link", { name: "WO-2026-00001 operation 10" }),
+    ).toHaveAttribute("href", "/manufacturing/shop-floor/op");
   });
 
   it("stays quiet when nothing is in doubt", () => {
-    render(<InstrumentUsage uses={[inspection("a", "INS-1", "2026-10-01", false)]} />);
+    render(
+      <InstrumentUsage
+        uses={[inspection("a", "INS-1", "2026-10-01", false)]}
+      />,
+    );
     expect(screen.queryByText(/Review them/)).not.toBeInTheDocument();
   });
 });

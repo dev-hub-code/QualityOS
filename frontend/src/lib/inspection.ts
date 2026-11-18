@@ -8,10 +8,14 @@ export const samplesOf = (parameter: ParameterSpec, sampleSize: number) =>
 
 /** The requirement in words, shown beside the input. */
 export function requirement(parameter: ParameterSpec): string {
-  const { minValue, maxValue, nominalValue, tolerance, expectedText } = parameter;
-  if (parameter.dataType !== "NUMERIC") return expectedText ?? "Reviewer decides";
-  if (minValue && maxValue) return `${formatQuantity(minValue)} to ${formatQuantity(maxValue)}`;
-  if (nominalValue && tolerance) return `${formatQuantity(nominalValue)} ± ${formatQuantity(tolerance)}`;
+  const { minValue, maxValue, nominalValue, tolerance, expectedText } =
+    parameter;
+  if (parameter.dataType !== "NUMERIC")
+    return expectedText ?? "Reviewer decides";
+  if (minValue && maxValue)
+    return `${formatQuantity(minValue)} to ${formatQuantity(maxValue)}`;
+  if (nominalValue && tolerance)
+    return `${formatQuantity(nominalValue)} ± ${formatQuantity(tolerance)}`;
   if (minValue) return `At least ${formatQuantity(minValue)}`;
   if (maxValue) return `At most ${formatQuantity(maxValue)}`;
   return nominalValue ? formatQuantity(nominalValue) : "Reviewer decides";
@@ -23,10 +27,27 @@ export function resultValue(result: InspectionResult): string {
   return result.valueDate ?? result.valueText ?? "";
 }
 
-export function toFormValues(results: InspectionResult[]): Record<string, string> {
+export function toFormValues(
+  results: InspectionResult[],
+): Record<string, string> {
   return Object.fromEntries(
-    results.map((result) => [sampleKey(result.parameterCode, result.sampleNumber), resultValue(result)]),
+    results.map((result) => [
+      sampleKey(result.parameterCode, result.sampleNumber),
+      resultValue(result),
+    ]),
   );
+}
+
+/** For each parameter, the instrument its saved results name. */
+export function toMeasuredWith(
+  results: InspectionResult[],
+): Record<string, string> {
+  const measured: Record<string, string> = {};
+  for (const result of results) {
+    if (result.instrumentId && !measured[result.parameterCode])
+      measured[result.parameterCode] = result.instrumentId;
+  }
+  return measured;
 }
 
 export interface ResultEntry {
@@ -36,6 +57,7 @@ export interface ResultEntry {
   valueText?: string;
   valueBoolean?: boolean;
   valueDate?: string;
+  instrumentId?: string;
 }
 
 /** Entries for every filled input. A partial entry is fine: the backend checks completeness on submission. */
@@ -43,6 +65,7 @@ export function toEntries(
   parameters: ParameterSpec[],
   sampleSize: number,
   values: Record<string, string>,
+  measuredWith: Record<string, string> = {},
 ): { entries: ResultEntry[]; invalid: string[] } {
   const entries: ResultEntry[] = [];
   const invalid: string[] = [];
@@ -50,7 +73,12 @@ export function toEntries(
     for (let sample = 1; sample <= samplesOf(parameter, sampleSize); sample++) {
       const value = values[sampleKey(parameter.code, sample)]?.trim();
       if (!value) continue;
-      const entry: ResultEntry = { parameterCode: parameter.code, sampleNumber: sample };
+      const entry: ResultEntry = {
+        parameterCode: parameter.code,
+        sampleNumber: sample,
+      };
+      if (measuredWith[parameter.code])
+        entry.instrumentId = measuredWith[parameter.code];
       if (parameter.dataType === "NUMERIC") {
         const digits = value.replace(/^-/, "");
         if (!DECIMAL_PATTERN.test(digits)) {

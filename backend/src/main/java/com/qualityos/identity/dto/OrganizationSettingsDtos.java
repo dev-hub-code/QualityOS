@@ -14,6 +14,7 @@ public final class OrganizationSettingsDtos {
      * @param capaRequiredFrom the least severe NCR that needs a closed CAPA before verification
      * @param effectivenessRequiredFrom the least severe NCR whose CAPA must have its fix verified
      * @param actionEvidenceRequired a CAPA action needs a file attached before it can be completed
+     * @param capaEscalationDays a CAPA or action this many days late is escalated to CAPA approvers; 0 never
      * @param version null until first saved; send it back unchanged on update
      */
     public record OrganizationSettings(
@@ -23,18 +24,20 @@ public final class OrganizationSettingsDtos {
             SeverityThreshold capaRequiredFrom,
             SeverityThreshold effectivenessRequiredFrom,
             boolean actionEvidenceRequired,
+            int capaEscalationDays,
             Long version) {
     }
 
     /**
-     * Every rule is sent, so that a save never depends on what the server holds besides the version. The evidence rule,
-     * added later, may be left out by an older client, and then stays as it is.
+     * Every rule is sent, so that a save never depends on what the server holds besides the version. The evidence and
+     * escalation rules, added later, may be left out by an older client, and then stay as they are.
      */
     public record UpdateOrganizationSettingsRequest(
             @NotNull Boolean singlePersonReview,
             @NotNull SeverityThreshold capaRequiredFrom,
             @NotNull SeverityThreshold effectivenessRequiredFrom,
             Boolean actionEvidenceRequired,
+            @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(90) Integer capaEscalationDays,
             Long version) {
     }
 }

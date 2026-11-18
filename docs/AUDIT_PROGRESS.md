@@ -36,17 +36,16 @@ Phase 11 is on hold until you ask for it.
 
 - [x] **Inspection sampling and routing**: AQL (ISO 2859-1) sampling with special levels, switching rules and double
   sampling (#103, #114, #117), and the template chosen by material, product or operation
-- [ ] **CAPA execution**, remaining: an action owner without `CAPA_MANAGE` cannot complete their own action, and
-  there is no escalation. Done: evidence before an action completes (#101), a reminder for each late action (#80),
-  and a new action needed after an ineffective verification
+- [x] **CAPA execution**: evidence before an action completes (#101), a reminder for each late action (#80), a new
+  action needed after an ineffective verification, an action's owner completing it without `CAPA_MANAGE`, and
+  escalation to CAPA approvers once a CAPA or action is a chosen number of days late (#129)
 - [x] **More NCR sources**: customer complaints and quality returns (#104, #113), production rejects, and supplier
   issues and process incidents (at a line, work centre or machine) raised as sources of their own (#130)
 - [ ] **Recall**, remaining: a regulatory report pack, and escalation when customers do not respond. Done: one recall
   for several batches, and linking its CAPA later (#57)
-- [ ] **Calibration, remaining**:
-  - recall goods that were already used or dispatched;
-  - start the new inspection automatically after *Reinspect*;
-  - link instruments to each measurement, not to the whole inspection.
+- [x] **Calibration follow-ups** (#132): the new inspection starts on its own after *Reinspect*; the review shows the
+  batches and customers the goods already reached, with a recall report for each batch; and each measurement names the
+  instrument that took it, so a failure names the parameters in doubt.
 - [ ] **Transfers between plants**: a stock transfer with in-transit and received states, and dispatches split by plant
 - [x] Material receipt notifies inspectors (#79)
 

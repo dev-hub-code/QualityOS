@@ -54,6 +54,7 @@ public class Inspection extends TenantOwnedEntity {
     private UUID receiptItemId;
     private UUID productionBatchId;
     private UUID returnItemId;
+    private UUID reinspectionOf;
     private UUID supplierId;
     private UUID facilityId;
     private UUID materialId;
@@ -107,6 +108,11 @@ public class Inspection extends TenantOwnedEntity {
         this.batchNumber = batchNumber;
         this.quantity = quantity;
         this.sampleSize = sampleSize;
+    }
+
+    /** This inspection checks again goods an earlier one released, because a failed calibration put it in doubt. */
+    public void reinspects(UUID earlierInspectionId) {
+        this.reinspectionOf = earlierInspectionId;
     }
 
     public void forReturnedGoods(UUID returnItemId) {

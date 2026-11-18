@@ -4,7 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
-import { AttachmentList, AttachmentPanel } from "@/components/records/attachment-panel";
+import {
+  AttachmentList,
+  AttachmentPanel,
+} from "@/components/records/attachment-panel";
 import { CapaAnalysisForm } from "@/components/records/capa-analysis-form";
 import {
   Details,
@@ -22,7 +25,10 @@ import { StatusHistory } from "@/components/records/status-history";
 import { Button } from "@/components/ui/button";
 import { SelfReviewNotice } from "@/components/app/review-policy";
 import { useMe, usePermission } from "@/hooks/use-me";
-import { useOrganizationSettings, useSelfReviewInEffect } from "@/hooks/use-organization-settings";
+import {
+  useOrganizationSettings,
+  useSelfReviewInEffect,
+} from "@/hooks/use-organization-settings";
 import { api } from "@/lib/api";
 import { FISHBONE_BRANCHES, isReadyForVerification } from "@/lib/capa";
 import type { FieldDef } from "@/lib/record-form";
@@ -35,7 +41,12 @@ interface Step {
   build?: (values: Record<string, unknown>) => unknown;
 }
 
-const noteField = (label: string): FieldDef => ({ name: "note", label, type: "textarea", required: true });
+const noteField = (label: string): FieldDef => ({
+  name: "note",
+  label,
+  type: "textarea",
+  required: true,
+});
 
 export default function CapaPage() {
   const { id } = useParams<{ id: string }>();
@@ -43,13 +54,17 @@ export default function CapaPage() {
   const refresh = useRefresh();
   const { data: me } = useMe();
   const selfReviewInEffect = useSelfReviewInEffect();
-  const evidenceRequired = useOrganizationSettings().data?.actionEvidenceRequired ?? false;
+  const evidenceRequired =
+    useOrganizationSettings().data?.actionEvidenceRequired ?? false;
   const canManage = usePermission("CAPA_MANAGE");
   const canApprove = usePermission("CAPA_APPROVE");
   const assignees = useAssignees();
   const { run, pending, message } = useAction();
   const [step, setStep] = useState<Step | null>(null);
-  const { data: capa, error } = useQuery({ queryKey: [path], queryFn: () => api.get<Capa>(path) });
+  const { data: capa, error } = useQuery({
+    queryKey: [path],
+    queryFn: () => api.get<Capa>(path),
+  });
   if (!capa) return <QueryState error={error} />;
 
   const { status } = capa;
@@ -74,9 +89,25 @@ export default function CapaPage() {
           { value: "PREVENTIVE", label: "Preventive" },
         ],
       },
-      { name: "description", label: "Description", type: "textarea", required: true },
-      { name: "ownerId", label: "Owner", type: "select", required: true, options: assignees },
-      { name: "targetDate", label: "Target date", type: "date", required: true },
+      {
+        name: "description",
+        label: "Description",
+        type: "textarea",
+        required: true,
+      },
+      {
+        name: "ownerId",
+        label: "Owner",
+        type: "select",
+        required: true,
+        options: assignees,
+      },
+      {
+        name: "targetDate",
+        label: "Target date",
+        type: "date",
+        required: true,
+      },
     ],
   };
   const complete = (action: CapaAction): Step => ({
@@ -126,52 +157,94 @@ export default function CapaPage() {
             <Button variant="outline" onClick={() => setStep(addAction)}>
               Add action
             </Button>
-            <Button disabled={pending} onClick={() => post("start-implementation")}>
+            <Button
+              disabled={pending}
+              onClick={() => post("start-implementation")}
+            >
               Start implementation
             </Button>
           </>
         )}
-        {canManage && status === "IMPLEMENTATION" && isReadyForVerification(capa.actions) && (
-          <Button disabled={pending} onClick={() => post("submit-verification")}>
-            Submit for verification
-          </Button>
-        )}
-        {canApprove && status === "EFFECTIVENESS_VERIFICATION" && (independent || selfReview) && (
-          <>
-            <Button variant={verified ? "outline" : "default"} onClick={() => setStep(verify)}>
-              Verify effectiveness
+        {canManage &&
+          status === "IMPLEMENTATION" &&
+          isReadyForVerification(capa.actions) && (
+            <Button
+              disabled={pending}
+              onClick={() => post("submit-verification")}
+            >
+              Submit for verification
             </Button>
-            {verified && (
+          )}
+        {canApprove &&
+          status === "EFFECTIVENESS_VERIFICATION" &&
+          (independent || selfReview) && (
+            <>
               <Button
-                onClick={() => setStep({ title: "Close CAPA", path: `${path}/close`, fields: [noteField("Closure note")] })}
+                variant={verified ? "outline" : "default"}
+                onClick={() => setStep(verify)}
               >
-                Close CAPA
+                Verify effectiveness
               </Button>
-            )}
-          </>
-        )}
+              {verified && (
+                <Button
+                  onClick={() =>
+                    setStep({
+                      title: "Close CAPA",
+                      path: `${path}/close`,
+                      fields: [noteField("Closure note")],
+                    })
+                  }
+                >
+                  Close CAPA
+                </Button>
+              )}
+            </>
+          )}
         {canApprove && !finished && (
           <Button
             variant="outline"
-            onClick={() => setStep({ title: "Cancel CAPA", path: `${path}/cancel`, fields: [noteField("Reason")] })}
+            onClick={() =>
+              setStep({
+                title: "Cancel CAPA",
+                path: `${path}/cancel`,
+                fields: [noteField("Reason")],
+              })
+            }
           >
             Cancel CAPA
           </Button>
         )}
       </PageHeader>
       <FormError message={message} />
-      {status === "EFFECTIVENESS_VERIFICATION" && canApprove && !independent && !selfReview && (
-        <p className="text-sm text-muted-foreground">Someone other than the CAPA owner must verify this.</p>
+      {status === "EFFECTIVENESS_VERIFICATION" &&
+        canApprove &&
+        !independent &&
+        !selfReview && (
+          <p className="text-sm text-muted-foreground">
+            Someone other than the CAPA owner must verify this.
+          </p>
+        )}
+      {status === "EFFECTIVENESS_VERIFICATION" && canApprove && selfReview && (
+        <SelfReviewNotice />
       )}
-      {status === "EFFECTIVENESS_VERIFICATION" && canApprove && selfReview && <SelfReviewNotice />}
       <Section title="Details">
         <Details
           items={[
             ["Problem", capa.problemStatement],
-            ["NCR", capa.ncrId && <RecordLink href={`/ncrs/${capa.ncrId}`}>{capa.ncrNumber}</RecordLink>],
+            [
+              "NCR",
+              capa.ncrId && (
+                <RecordLink href={`/ncrs/${capa.ncrId}`}>
+                  {capa.ncrNumber}
+                </RecordLink>
+              ),
+            ],
             ["Owner", capa.ownerName],
             ["Target date", capa.targetDate],
-            ["Effectiveness check", capa.effectivenessRequired ? "Required" : "Not required"],
+            [
+              "Effectiveness check",
+              capa.effectivenessRequired ? "Required" : "Not required",
+            ],
             ["Outcome", capa.outcomeNote],
           ]}
         />
@@ -189,39 +262,64 @@ export default function CapaPage() {
                 ))}
               </ol>
             )}
-            {FISHBONE_BRANCHES.filter((branch) => capa.fishbone[branch]).map((branch) => (
-              <p key={branch} className="mt-2 text-sm">
-                <span className="font-medium">{branch}:</span> {capa.fishbone[branch].join("; ")}
-              </p>
-            ))}
+            {FISHBONE_BRANCHES.filter((branch) => capa.fishbone[branch]).map(
+              (branch) => (
+                <p key={branch} className="mt-2 text-sm">
+                  <span className="font-medium">{branch}:</span>{" "}
+                  {capa.fishbone[branch].join("; ")}
+                </p>
+              ),
+            )}
           </Section>
         )
       )}
       <Section title="Actions">
-        {capa.actions.length === 0 && <p className="text-sm text-muted-foreground">No actions yet.</p>}
+        {capa.actions.length === 0 && (
+          <p className="text-sm text-muted-foreground">No actions yet.</p>
+        )}
         <ul className="divide-y text-sm">
           {capa.actions.map((action) => (
             <li key={action.id} className="space-y-2 py-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <span>
-                  <span className="font-medium">{action.actionType === "CORRECTIVE" ? "Corrective" : "Preventive"}:</span>{" "}
-                  {action.description} · {action.ownerName} · due {action.targetDate}
+                  <span className="font-medium">
+                    {action.actionType === "CORRECTIVE"
+                      ? "Corrective"
+                      : "Preventive"}
+                    :
+                  </span>{" "}
+                  {action.description} · {action.ownerName} · due{" "}
+                  {action.targetDate}
                   {action.completionNote && ` · done: ${action.completionNote}`}
                 </span>
-                {canManage && status === "IMPLEMENTATION" && !action.completedAt && (
-                  <Button variant="outline" size="sm" onClick={() => setStep(complete(action))}>
-                    Complete
-                  </Button>
-                )}
+                {(canManage || action.ownerId === me?.user.id) &&
+                  status === "IMPLEMENTATION" &&
+                  !action.completedAt && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setStep(complete(action))}
+                    >
+                      Complete
+                    </Button>
+                  )}
               </div>
               <div className="border-l-2 pl-3">
                 <p className="text-xs font-medium text-muted-foreground">
-                  Evidence{evidenceRequired && !action.completedAt && " (required before it can be completed)"}
+                  Evidence
+                  {evidenceRequired &&
+                    !action.completedAt &&
+                    " (required before it can be completed)"}
                 </p>
                 <AttachmentList
                   entityType="CAPA_ACTION"
                   entityId={action.id}
-                  canManage={canManage && !finished}
+                  canManage={
+                    (canManage ||
+                      (action.ownerId === me?.user.id &&
+                        !action.completedAt)) &&
+                    !finished
+                  }
                   uploadLabel={`Upload evidence for: ${action.description}`}
                   emptyMessage="No evidence yet."
                 />
@@ -235,21 +333,30 @@ export default function CapaPage() {
           <ul className="divide-y text-sm">
             {capa.verifications.map((verdict) => (
               <li key={verdict.at} className="py-2">
-                {verdict.effective ? "Effective" : "Not effective"} ({verdict.method}): {verdict.note}. Checked by{" "}
+                {verdict.effective ? "Effective" : "Not effective"} (
+                {verdict.method}): {verdict.note}. Checked by{" "}
                 {verdict.verifiedBy}
               </li>
             ))}
           </ul>
         </Section>
       )}
-      <AttachmentPanel entityType="CAPA" entityId={id} canManage={canManage && !finished} />
+      <AttachmentPanel
+        entityType="CAPA"
+        entityId={id}
+        canManage={canManage && !finished}
+      />
       <StatusHistory changes={capa.history} />
       {step && (
         <RecordDialog
           title={step.title}
           fields={step.fields}
           onClose={() => setStep(null)}
-          onSubmit={(values) => api.post(step.path, step.build ? step.build(values) : values).then(refresh)}
+          onSubmit={(values) =>
+            api
+              .post(step.path, step.build ? step.build(values) : values)
+              .then(refresh)
+          }
         />
       )}
     </div>

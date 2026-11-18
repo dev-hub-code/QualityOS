@@ -6,6 +6,7 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -381,5 +382,48 @@ public final class SubscriptionDtos {
     public record TenantSubscription(UUID tenantId, String organizationName, SubscriptionResponse subscription,
             List<InvoiceResponse> openInvoices, String gstin, String contactEmail, Instant registeredAt,
             UUID subscriptionId, Instant suspendedAt, LocalDate nextDue) {
+    }
+
+    /** How money goes back: through the gateway that took it, or by bank transfer, made outside and recorded here. */
+    public enum RefundRoute { GATEWAY, BANK }
+
+    /**
+     * @param amount before GST; the GST on it is worked out at the invoice's rate and split as the invoice was
+     * @param reference the bank's reference, for a refund by bank
+     * @param refundedOn when the bank transfer was made, for a refund by bank
+     * @param endAccess the refund covers the period being paid for, so it ends now
+     */
+    public record CreditNoteRequest(
+            @NotNull @Positive @Digits(integer = 10, fraction = 2) BigDecimal amount,
+            @NotBlank @Size(max = 1000) String reason,
+            @NotNull RefundRoute refundBy,
+            @Size(max = 100) String reference,
+            LocalDate refundedOn,
+            boolean endAccess) {
+    }
+
+    public record RefundView(
+            UUID id, String provider, String reference, BigDecimal amount, String status, String failureReason,
+            LocalDate refundedOn) {
+    }
+
+    public record CreditNoteResponse(
+            UUID id,
+            String creditNoteNumber,
+            UUID invoiceId,
+            String invoiceNumber,
+            BigDecimal amount,
+            BigDecimal taxAmount,
+            BigDecimal total,
+            String reason,
+            LocalDate issuedOn,
+            boolean endsAccess,
+            RefundView refund) {
+    }
+
+    /** A payment the gateway took that no invoice could take, waiting for a platform administrator. */
+    public record UnappliedPayment(
+            UUID tenantId, String organisation, UUID orderId, String gatewayOrderId, String invoiceNumber,
+            BigDecimal amount, Instant since) {
     }
 }

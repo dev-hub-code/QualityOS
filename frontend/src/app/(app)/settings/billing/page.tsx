@@ -2,14 +2,39 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { CreditNotes } from "@/components/billing/credit-notes";
 import { PayOnline } from "@/components/billing/pay-online";
-import { formatDate, formatMoney } from "@/components/billing/subscription-banner";
-import { PageHeader, QueryState, Section, StatusBadge, useAction } from "@/components/records/parts";
+import {
+  formatDate,
+  formatMoney,
+} from "@/components/billing/subscription-banner";
+import {
+  PageHeader,
+  QueryState,
+  Section,
+  StatusBadge,
+  useAction,
+} from "@/components/records/parts";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { api } from "@/lib/api";
 import { storageText, usageText } from "@/lib/usage";
-import type { BillingCycle, Invoice, OrderConfirmation, Payment, PaymentGateway, Plan, Subscription } from "@/lib/types";
+import type {
+  BillingCycle,
+  Invoice,
+  OrderConfirmation,
+  Payment,
+  PaymentGateway,
+  Plan,
+  Subscription,
+} from "@/lib/types";
 
 const STATE: Record<Subscription["state"], string> = {
   TRIAL: "Trial",
@@ -20,10 +45,14 @@ const STATE: Record<Subscription["state"], string> = {
 
 const RETURNED: Record<OrderConfirmation["status"], string> = {
   PAID: "Payment received. Thank you.",
-  CREATING: "This payment has not reached us yet. If money left your account, it will show here shortly. Please do not pay again.",
-  ACTIVE: "This payment has not reached us yet. If money left your account, it will show here shortly. Please do not pay again.",
-  NEEDS_REVIEW: "We received a payment that could not be applied to this invoice. Please contact support. You do not need to pay again.",
-  ABANDONED: "This payment was not completed, and no money was taken for it. You can pay the invoice again.",
+  CREATING:
+    "This payment has not reached us yet. If money left your account, it will show here shortly. Please do not pay again.",
+  ACTIVE:
+    "This payment has not reached us yet. If money left your account, it will show here shortly. Please do not pay again.",
+  NEEDS_REVIEW:
+    "We received a payment that could not be applied to this invoice. Please contact support. You do not need to pay again.",
+  ABANDONED:
+    "This payment was not completed, and no money was taken for it. You can pay the invoice again.",
 };
 
 function limit(used: number, max: number | null) {
@@ -51,17 +80,28 @@ function PlanCard({
       <p className="text-xl font-semibold">
         {price === null ? "Custom" : formatMoney(price)}
         {price !== null && (
-          <span className="text-sm font-normal text-muted-foreground"> a {cycle === "ANNUAL" ? "year" : "month"}, plus GST</span>
+          <span className="text-sm font-normal text-muted-foreground">
+            {" "}
+            a {cycle === "ANNUAL" ? "year" : "month"}, plus GST
+          </span>
         )}
       </p>
       <p className="text-sm text-muted-foreground">
-        {plan.maxUsers ?? "Unlimited"} users, {plan.maxFacilities ?? "unlimited"} facilities
+        {plan.maxUsers ?? "Unlimited"} users,{" "}
+        {plan.maxFacilities ?? "unlimited"} facilities
       </p>
       <div className="mt-auto pt-2">
         {price === null ? (
-          <p className="text-sm text-muted-foreground">Contact us to agree this plan.</p>
+          <p className="text-sm text-muted-foreground">
+            Contact us to agree this plan.
+          </p>
         ) : (
-          <Button size="sm" variant={current ? "default" : "outline"} disabled={pending} onClick={onChoose}>
+          <Button
+            size="sm"
+            variant={current ? "default" : "outline"}
+            disabled={pending}
+            onClick={onChoose}
+          >
             {current ? "Renew" : `Choose ${plan.name}`}
           </Button>
         )}
@@ -73,12 +113,17 @@ function PlanCard({
 export default function BillingPage() {
   const { run, pending, message } = useAction();
   const [cycle, setCycle] = useState<BillingCycle>("MONTHLY");
-  const get = <T,>(path: string) => ({ queryKey: [path], queryFn: () => api.get<T>(path) });
+  const get = <T,>(path: string) => ({
+    queryKey: [path],
+    queryFn: () => api.get<T>(path),
+  });
   const subscription = useQuery(get<Subscription>("/subscription"));
   const plans = useQuery(get<Plan[]>("/subscription/plans"));
   const invoices = useQuery(get<Invoice[]>("/subscription/invoices"));
   const payments = useQuery(get<Payment[]>("/subscription/payments"));
-  const gateway = useQuery(get<PaymentGateway>("/subscription/payment-gateway"));
+  const gateway = useQuery(
+    get<PaymentGateway>("/subscription/payment-gateway"),
+  );
   const queryClient = useQueryClient();
   const [returned, setReturned] = useState("");
 
@@ -88,7 +133,9 @@ export default function BillingPage() {
     if (!orderId) return;
     window.history.replaceState(null, "", window.location.pathname);
     api
-      .post<OrderConfirmation>(`/subscription/gateway-orders/${encodeURIComponent(orderId)}/confirm`)
+      .post<OrderConfirmation>(
+        `/subscription/gateway-orders/${encodeURIComponent(orderId)}/confirm`,
+      )
       .then(({ status }) => setReturned(RETURNED[status]))
       .catch((error: Error) => setReturned(error.message))
       .finally(() => queryClient.invalidateQueries());
@@ -96,14 +143,18 @@ export default function BillingPage() {
 
   const current = subscription.data;
   if (!current) return <QueryState error={subscription.error} />;
-  const number = (invoiceId: string) => invoices.data?.find((invoice) => invoice.id === invoiceId)?.invoiceNumber;
+  const number = (invoiceId: string) =>
+    invoices.data?.find((invoice) => invoice.id === invoiceId)?.invoiceNumber;
   const open = invoices.data?.find((invoice) => invoice.status === "ISSUED");
   return (
     <div className="space-y-6">
       <PageHeader title="Billing" subtitle={`${current.planName} plan`} />
       {message && <p className="text-sm text-destructive">{message}</p>}
       {returned && (
-        <p role="status" className="rounded-md border bg-muted px-3 py-2 text-sm">
+        <p
+          role="status"
+          className="rounded-md border bg-muted px-3 py-2 text-sm"
+        >
           {returned}
         </p>
       )}
@@ -114,11 +165,15 @@ export default function BillingPage() {
             <dd>{STATE[current.state]}</dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">{current.cancelledAt ? "Ends" : "Renews or ends"}</dt>
+            <dt className="text-muted-foreground">
+              {current.cancelledAt ? "Ends" : "Renews or ends"}
+            </dt>
             <dd>{formatDate(current.endsAt)}</dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Users, with pending invitations</dt>
+            <dt className="text-muted-foreground">
+              Users, with pending invitations
+            </dt>
             <dd>{limit(current.users, current.maxUsers)}</dd>
           </div>
           <div>
@@ -131,7 +186,12 @@ export default function BillingPage() {
           </div>
           <div>
             <dt className="text-muted-foreground">Inspections this month</dt>
-            <dd>{usageText(current.inspectionsThisMonth, current.maxMonthlyInspections)}</dd>
+            <dd>
+              {usageText(
+                current.inspectionsThisMonth,
+                current.maxMonthlyInspections,
+              )}
+            </dd>
           </div>
           <div>
             <dt className="text-muted-foreground">Attachments</dt>
@@ -141,13 +201,25 @@ export default function BillingPage() {
         <div className="mt-4">
           {current.cancelledAt ? (
             <>
-              <p className="mb-2 text-sm text-muted-foreground">Cancelled. It runs until the date above.</p>
-              <Button size="sm" variant="outline" disabled={pending} onClick={() => run(() => api.post("/subscription/resume"))}>
+              <p className="mb-2 text-sm text-muted-foreground">
+                Cancelled. It runs until the date above.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pending}
+                onClick={() => run(() => api.post("/subscription/resume"))}
+              >
                 Keep subscription
               </Button>
             </>
           ) : (
-            <Button size="sm" variant="outline" disabled={pending} onClick={() => run(() => api.post("/subscription/cancel"))}>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={pending}
+              onClick={() => run(() => api.post("/subscription/cancel"))}
+            >
               Cancel subscription
             </Button>
           )}
@@ -156,10 +228,16 @@ export default function BillingPage() {
       {open && (
         <div className="rounded-md border bg-muted px-3 py-2 text-sm">
           <p role="status">
-            Invoice {open.invoiceNumber} for {formatMoney(open.total)} is due by {open.dueOn}. The {open.planName} plan starts
-            once it is paid. Choosing another plan replaces this invoice.
+            Invoice {open.invoiceNumber} for {formatMoney(open.total)} is due by{" "}
+            {open.dueOn}. The {open.planName} plan starts once it is paid.
+            Choosing another plan replaces this invoice.
           </p>
-          {gateway.data?.available && <PayOnline invoice={open} testMode={gateway.data.mode === "sandbox"} />}
+          {gateway.data?.available && (
+            <PayOnline
+              invoice={open}
+              testMode={gateway.data.mode === "sandbox"}
+            />
+          )}
         </div>
       )}
       <Section title="Plans">
@@ -167,7 +245,12 @@ export default function BillingPage() {
           <legend className="sr-only">Billing period</legend>
           {(["MONTHLY", "ANNUAL"] as const).map((value) => (
             <label key={value} className="flex items-center gap-1.5">
-              <input type="radio" name="cycle" checked={cycle === value} onChange={() => setCycle(value)} />
+              <input
+                type="radio"
+                name="cycle"
+                checked={cycle === value}
+                onChange={() => setCycle(value)}
+              />
               {value === "MONTHLY" ? "Monthly" : "Annual"}
             </label>
           ))}
@@ -180,7 +263,11 @@ export default function BillingPage() {
               cycle={cycle}
               current={plan.code === current.planCode}
               pending={pending}
-              onChoose={() => run(() => api.post("/subscription/plan", { planId: plan.id, cycle }))}
+              onChoose={() =>
+                run(() =>
+                  api.post("/subscription/plan", { planId: plan.id, cycle }),
+                )
+              }
             />
           ))}
         </div>
@@ -210,9 +297,14 @@ export default function BillingPage() {
                     <TableCell>
                       <StatusBadge status={invoice.status} />
                     </TableCell>
-                    <TableCell className="text-right">{formatMoney(invoice.total)}</TableCell>
+                    <TableCell className="text-right">
+                      {formatMoney(invoice.total)}
+                    </TableCell>
                     <TableCell>
-                      <a className="underline" href={`/api/v1/subscription/invoices/${invoice.id}/pdf`}>
+                      <a
+                        className="underline"
+                        href={`/api/v1/subscription/invoices/${invoice.id}/pdf`}
+                      >
                         PDF
                       </a>
                     </TableCell>
@@ -223,13 +315,17 @@ export default function BillingPage() {
           </div>
         )}
       </Section>
+      <CreditNotes path="/subscription" />
       <Section title="Payment history">
         {payments.data?.length === 0 ? (
           <p className="text-sm text-muted-foreground">No payments yet.</p>
         ) : (
           <ul className="divide-y text-sm">
             {payments.data?.map((payment) => (
-              <li key={payment.id} className="flex flex-wrap items-center gap-2 py-1.5">
+              <li
+                key={payment.id}
+                className="flex flex-wrap items-center gap-2 py-1.5"
+              >
                 <span>{formatDate(payment.occurredAt)}</span>
                 <span>{formatMoney(payment.amount)}</span>
                 <StatusBadge status={payment.status} />

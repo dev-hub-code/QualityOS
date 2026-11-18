@@ -333,4 +333,73 @@ class PlatformBillingIT extends AbstractIntegrationTest {
         as(admin, get(PLATFORM + "/trials/summary"))
                 .andExpect(jsonPath("$.data.convertedThisMonth").value((int) before + 1));
     }
+
+    private ResultActions credit(String invoice, Map<String, Object> request) throws Exception {
+        return as(admin, postJson(organisation(owner) + "/invoices/" + invoice + "/credit-notes", request));
+    }
+
+    private Map<String, Object> byBank(String amount, String reference) {
+        return Map.of("amount", amount, "reason", "Charged twice", "refundBy", "BANK", "reference", reference,
+                "refundedOn", LocalDate.now().minusDays(1).toString(), "endAccess", false);
+    }
+
+    @Test
+    void creditNotesTakeBackAPaidInvoiceWithItsGstAndNeverMore() throws Exception {
+        String invoice = invoice(owner);
+        credit(invoice, byBank("100", reference())).andExpect(status().isUnprocessableContent());
+        pay(owner, invoice, reference(), "1180.00", LocalDate.now()).andExpect(status().isCreated());
+
+        String bank = reference();
+        credit(invoice, byBank("400", bank)).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.creditNoteNumber").value(org.hamcrest.Matchers.startsWith("CN-")))
+                .andExpect(jsonPath("$.data.taxAmount").value(72.0))
+                .andExpect(jsonPath("$.data.total").value(472.0))
+                .andExpect(jsonPath("$.data.refund.status").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.data.refund.reference").value(bank));
+        // The same bank reference refunds once.
+        credit(invoice, byBank("100", bank)).andExpect(status().isConflict());
+        credit(invoice, byBank("600.01", reference())).andExpect(status().isUnprocessableContent())
+                .andExpect(content().string(containsString("600")));
+        // What is left takes exactly the GST left, so the two notes add up to the invoice.
+        credit(invoice, byBank("600", reference())).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.taxAmount").value(108.0))
+                .andExpect(jsonPath("$.data.total").value(708.0));
+        credit(invoice, byBank("0.01", reference())).andExpect(status().isUnprocessableContent());
+
+        as(owner, get("/api/v1/subscription/credit-notes")).andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].invoiceId").value(invoice));
+        String note = JsonPath.read(body(as(owner, get("/api/v1/subscription/credit-notes"))), "$.data[0].id");
+        byte[] pdf = as(owner, get("/api/v1/subscription/credit-notes/" + note + "/pdf"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        assertThat(new String(pdf, 0, 4, java.nio.charset.StandardCharsets.US_ASCII)).isEqualTo("%PDF");
+        as(admin, get(organisation(owner) + "/credit-notes")).andExpect(jsonPath("$.data.length()").value(2));
+        assertThat(audited(owner, "CREDIT_NOTE_ISSUED")).isEqualTo(2);
+        assertThat(asDatabaseSuperuser().queryForObject(
+                "SELECT count(*)::int FROM notifications WHERE tenant_id = ? AND type = 'REFUND_ISSUED'", Integer.class,
+                owner.tenantId())).isPositive();
+        // Credit notes are documents of record.
+        assertThatThrownBy(() -> asDatabaseSuperuser().update("UPDATE credit_notes SET reason = 'x'"))
+                .isInstanceOf(DataAccessException.class);
+    }
+
+    @Test
+    void aRefundNeedsItsRouteAndCanEndThePeriodPaidFor() throws Exception {
+        String invoice = invoice(owner);
+        pay(owner, invoice, reference(), "1180.00", LocalDate.now()).andExpect(status().isCreated());
+        // Paid by hand, so not through the gateway; and a bank refund needs its reference.
+        credit(invoice, Map.of("amount", "100", "reason", "x", "refundBy", "GATEWAY", "endAccess", false))
+                .andExpect(status().isUnprocessableContent());
+        credit(invoice, Map.of("amount", "100", "reason", "x", "refundBy", "BANK", "endAccess", false))
+                .andExpect(status().isUnprocessableContent());
+
+        Map<String, Object> ending = new java.util.HashMap<>(byBank("1000", reference()));
+        ending.put("endAccess", true);
+        credit(invoice, ending).andExpect(status().isCreated()).andExpect(jsonPath("$.data.endsAccess").value(true));
+        assertThat(asDatabaseSuperuser().queryForObject(
+                "SELECT current_period_ends_at <= now() FROM subscriptions WHERE tenant_id = ?", Boolean.class,
+                owner.tenantId())).isTrue();
+        // Only billing operators issue them, and the organisation only reads them.
+        as(owner, postJson("/api/v1/platform/organisations/" + owner.tenantId() + "/invoices/" + invoice
+                + "/credit-notes", byBank("1", reference()))).andExpect(status().isForbidden());
+    }
 }

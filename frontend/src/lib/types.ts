@@ -2860,3 +2860,39 @@ export interface StockTransfer {
   createdAt: string;
   items: TransferLine[];
 }
+
+export interface RefundView {
+  id: string;
+  provider: "CASHFREE" | "MANUAL";
+  reference: string;
+  amount: number;
+  status: "PENDING" | "SUCCEEDED" | "FAILED";
+  failureReason: string | null;
+  refundedOn: string | null;
+}
+
+/** Takes back part or all of a paid invoice, with its GST, and the refund that went with it. */
+export interface CreditNote {
+  id: string;
+  creditNoteNumber: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  amount: number;
+  taxAmount: number;
+  total: number;
+  reason: string;
+  issuedOn: string;
+  endsAccess: boolean;
+  refund: RefundView | null;
+}
+
+/** A payment the gateway took that no invoice could take. */
+export interface UnappliedPayment {
+  tenantId: string;
+  organisation: string;
+  orderId: string;
+  gatewayOrderId: string;
+  invoiceNumber: string;
+  amount: number;
+  since: string;
+}

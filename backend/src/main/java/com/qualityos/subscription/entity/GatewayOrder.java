@@ -24,7 +24,7 @@ public class GatewayOrder extends TenantOwnedEntity {
      * not be applied, so a person must decide what happens to it. ABANDONED: Cashfree has no such order, or it expired
      * there unpaid; a payment that still reaches it is applied all the same.
      */
-    public enum Status { CREATING, ACTIVE, PAID, NEEDS_REVIEW, ABANDONED }
+    public enum Status { CREATING, ACTIVE, PAID, NEEDS_REVIEW, ABANDONED, REFUNDED }
 
     private UUID invoiceId;
     private String provider;

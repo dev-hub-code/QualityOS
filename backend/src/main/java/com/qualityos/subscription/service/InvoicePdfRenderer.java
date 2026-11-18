@@ -1,6 +1,8 @@
 package com.qualityos.subscription.service;
 
 import com.qualityos.common.report.HtmlPdf;
+import com.qualityos.subscription.entity.CreditNote;
+import com.qualityos.subscription.entity.Refund;
 import com.qualityos.subscription.entity.Subscription;
 import com.qualityos.subscription.entity.SubscriptionInvoice;
 import com.samskivert.mustache.Template;
@@ -18,6 +20,7 @@ public class InvoicePdfRenderer {
 
     private final HtmlPdf pdf;
     private final Template template;
+    private final Template creditNoteTemplate;
     private final String sellerName;
     private final String sellerGstin;
     private final String sellerAddress;
@@ -34,6 +37,7 @@ public class InvoicePdfRenderer {
             @Value("${qualityos.billing.seller-address:}") String sellerAddress) {
         this.pdf = pdf;
         this.template = HtmlPdf.template("report-templates/invoice.html");
+        this.creditNoteTemplate = HtmlPdf.template("report-templates/credit-note.html");
         this.sellerName = sellerName;
         this.sellerGstin = sellerGstin;
         this.sellerAddress = sellerAddress;
@@ -63,6 +67,38 @@ public class InvoicePdfRenderer {
         model.put("buyerAddress", present(invoice.getBuyerAddress()));
         model.put("footerName", HtmlPdf.cssString(sellerName));
         return pdf.render(template.execute(model));
+    }
+
+    /** A credit note against {@code invoice}, with the refund that went with it when there is one. */
+    public byte[] render(CreditNote note, SubscriptionInvoice invoice, Refund refund) {
+        Map<String, Object> model = new HashMap<>();
+        model.put("note", note);
+        model.put("invoice", invoice);
+        model.put("amount", money(note.getAmount()));
+        model.put("tax", money(note.getTaxAmount()));
+        model.put("cgst", amount(note.getCgstAmount()));
+        model.put("sgst", amount(note.getSgstAmount()));
+        model.put("igst", amount(note.getIgstAmount()));
+        model.put("singleLine", note.getCgstAmount() == null && note.getIgstAmount() == null);
+        model.put("halfPercent", invoice.getTaxPercent().divide(BigDecimal.valueOf(2)).stripTrailingZeros().toPlainString());
+        model.put("total", money(note.getTotal()));
+        model.put("placeOfSupply", present(invoice.getPlaceOfSupply()));
+        model.put("sacCode", present(invoice.getSacCode()));
+        model.put("sellerName", sellerName);
+        model.put("sellerGstin", present(sellerGstin));
+        model.put("sellerAddress", present(sellerAddress));
+        model.put("buyerGstin", present(invoice.getBuyerGstin()));
+        model.put("buyerAddress", present(invoice.getBuyerAddress()));
+        model.put("refund", refund == null ? List.of() : List.of(Map.of(
+                "how", Refund.GATEWAY.equals(refund.getProvider()) ? "to the original payment method" : "by bank transfer",
+                "state", switch (refund.getStatus()) {
+                    case SUCCEEDED -> "made on " + refund.getRefundedOn();
+                    case PENDING -> "in progress";
+                    case FAILED -> "failed";
+                },
+                "reference", refund.getRefundReference())));
+        model.put("footerName", HtmlPdf.cssString(sellerName));
+        return pdf.render(creditNoteTemplate.execute(model));
     }
 
     /** A section in a template runs for an empty string, which would print a label with nothing after it. */

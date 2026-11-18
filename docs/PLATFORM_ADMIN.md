@@ -15,7 +15,6 @@ A page joins the navigation only once it works.
 
 Not built yet:
 
-- Refunds. A refund is made in Cashfree or the bank, and nothing in ProductionOS records it.
 - Partial payments and automatic renewal. Each invoice is paid in full, and each renewal is a new invoice.
 
 ## Online payment
@@ -27,8 +26,22 @@ with live keys, and point the Cashfree webhook at `<APP_URL>/api/webhooks/cashfr
 The amount comes from the invoice, and a payment counts only after ProductionOS has asked Cashfree about it. Neither the
 customer's return nor a webhook's contents settle anything alone. Payments appear under Payments with provider `CASHFREE`.
 
-Search the audit log for `PAYMENT_NEEDS_REVIEW`. It means money was taken but could not be applied, usually because the
-invoice was replaced or already paid. Refund it in Cashfree, or record it by hand against the right invoice.
+A payment that was taken but could not be applied, usually because the invoice was replaced or already paid, is listed
+under Payments as waiting for review. Refund sends the whole amount back through Cashfree and marks the order
+`REFUNDED`. It is never revenue, so it gets no credit note.
+
+## Credit notes and refunds
+
+On an organisation, a paid invoice has a Credit note action (billing operators, with a recent sign-in). It takes an
+amount before GST, up to what is left of the invoice; its GST is worked out at the invoice's rate and split as the
+invoice was, and crediting all that is left takes exactly the GST left. Each credit note carries one refund:
+
+- Back to the card or UPI, when the invoice was paid through Cashfree. The refund stays in progress until Cashfree
+  reports it through its webhook, or an operator presses Check refund.
+- By bank transfer, made outside ProductionOS and recorded with its reference and date. A bank reference is used once.
+
+Ending the period this invoice paid for is optional, and allowed only for the current period. Credit notes cannot be
+changed. The organisation sees them, with PDFs, on its billing page, and its billing users are notified.
 
 ## Signing in
 

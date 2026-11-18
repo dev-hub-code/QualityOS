@@ -3,19 +3,44 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { formatDate, formatMoney } from "@/components/billing/subscription-banner";
-import { EXTEND_FIELDS, ReasonDialog, RecordPaymentDialog } from "@/components/platform/billing-dialogs";
+import {
+  formatDate,
+  formatMoney,
+} from "@/components/billing/subscription-banner";
+import {
+  CreditNoteDialog,
+  CreditNotes,
+} from "@/components/billing/credit-notes";
+import {
+  EXTEND_FIELDS,
+  ReasonDialog,
+  RecordPaymentDialog,
+} from "@/components/platform/billing-dialogs";
 import { SupportSessionControl } from "@/components/platform/support-session";
-import { Details, PageHeader, QueryState, Section, useRefresh } from "@/components/records/parts";
+import {
+  Details,
+  PageHeader,
+  QueryState,
+  Section,
+  useRefresh,
+} from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import type { Invoice, OrganisationDetail } from "@/lib/types";
 
 const megabytes = (bytes: number) => `${(bytes / 1_048_576).toFixed(1)} MB`;
-const used = (count: number, limit: number | null) => (limit === null ? String(count) : `${count} of ${limit}`);
+const used = (count: number, limit: number | null) =>
+  limit === null ? String(count) : `${count} of ${limit}`;
 
 export default function PlatformOrganisationPage() {
   const billing = usePermission("PLATFORM_BILLING_MANAGE");
@@ -26,7 +51,11 @@ export default function PlatformOrganisationPage() {
   const [action, setAction] = useState<[string, string] | null>(null);
   const [extending, setExtending] = useState(false);
   const [paying, setPaying] = useState<Invoice | null>(null);
-  const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<OrganisationDetail>(path) });
+  const [crediting, setCrediting] = useState<Invoice | null>(null);
+  const { data, error } = useQuery({
+    queryKey: [path],
+    queryFn: () => api.get<OrganisationDetail>(path),
+  });
   if (!data) return <QueryState error={error} />;
   const { subscription, usage } = data;
   const trialRunning = subscription.state === "TRIAL";
@@ -35,45 +64,78 @@ export default function PlatformOrganisationPage() {
     .reduce((sum, invoice) => sum + invoice.total, 0);
   return (
     <div className="space-y-6">
-      <PageHeader title={data.name} subtitle="Figures only. The content of this organisation's quality records is not shown here.">
+      <PageHeader
+        title={data.name}
+        subtitle="Figures only. The content of this organisation's quality records is not shown here."
+      >
         {(billing || support) && (
           <Button variant="outline" onClick={() => setExtending(true)}>
             Extend
           </Button>
         )}
         {(billing || support) && trialRunning && (
-          <Button variant="outline" onClick={() => setAction(["End trial", `${path}/trial/end`])}>
+          <Button
+            variant="outline"
+            onClick={() => setAction(["End trial", `${path}/trial/end`])}
+          >
             End trial
           </Button>
         )}
         {billing &&
           (subscription.cancelledAt ? (
-            <Button variant="outline" onClick={() => setAction(["Resume subscription", `${path}/resume`])}>
+            <Button
+              variant="outline"
+              onClick={() =>
+                setAction(["Resume subscription", `${path}/resume`])
+              }
+            >
               Resume
             </Button>
           ) : (
-            <Button variant="outline" onClick={() => setAction(["Cancel subscription", `${path}/cancel`])}>
+            <Button
+              variant="outline"
+              onClick={() =>
+                setAction(["Cancel subscription", `${path}/cancel`])
+              }
+            >
               Cancel subscription
             </Button>
           ))}
         {support &&
           (data.suspendedAt ? (
-            <Button onClick={() => setAction(["Reactivate organisation", `${path}/reactivate`])}>Reactivate</Button>
+            <Button
+              onClick={() =>
+                setAction(["Reactivate organisation", `${path}/reactivate`])
+              }
+            >
+              Reactivate
+            </Button>
           ) : (
-            <Button variant="destructive" onClick={() => setAction(["Suspend organisation", `${path}/suspend`])}>
+            <Button
+              variant="destructive"
+              onClick={() =>
+                setAction(["Suspend organisation", `${path}/suspend`])
+              }
+            >
               Suspend
             </Button>
           ))}
       </PageHeader>
       {data.suspendedAt && (
-        <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm">
-          Suspended on {formatDate(data.suspendedAt)}: {data.suspensionReason}. Members cannot sign in. Their records are
-          untouched.
+        <p
+          role="alert"
+          className="rounded-md border border-destructive/40 p-3 text-sm"
+        >
+          Suspended on {formatDate(data.suspendedAt)}: {data.suspensionReason}.
+          Members cannot sign in. Their records are untouched.
         </p>
       )}
       <Section title="Support access">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <SupportSessionControl organisationId={organisationId} canOpen={support} />
+          <SupportSessionControl
+            organisationId={organisationId}
+            canOpen={support}
+          />
         </div>
       </Section>
       <div className="grid gap-4 xl:grid-cols-2">
@@ -95,10 +157,18 @@ export default function PlatformOrganisationPage() {
             items={[
               ["Plan", subscription.planName],
               ["State", subscription.state.replace("_", " ").toLowerCase()],
-              ["Billing", subscription.billingCycle?.toLowerCase() ?? "Not yet billed"],
+              [
+                "Billing",
+                subscription.billingCycle?.toLowerCase() ?? "Not yet billed",
+              ],
               ["Ends", formatDate(subscription.endsAt)],
               ["Read-only from", formatDate(subscription.readOnlyFrom)],
-              ["Cancelled", subscription.cancelledAt ? formatDate(subscription.cancelledAt) : "No"],
+              [
+                "Cancelled",
+                subscription.cancelledAt
+                  ? formatDate(subscription.cancelledAt)
+                  : "No",
+              ],
             ]}
           />
         </Section>
@@ -106,24 +176,35 @@ export default function PlatformOrganisationPage() {
           <Details
             items={[
               ["Users", used(subscription.users, subscription.maxUsers)],
-              ["Facilities", used(subscription.facilities, subscription.maxFacilities)],
+              [
+                "Facilities",
+                used(subscription.facilities, subscription.maxFacilities),
+              ],
               ["Inspections", usage.inspections],
               ["NCRs", usage.ncrs],
               ["CAPAs", usage.capas],
-              ["Attachments", `${usage.attachments} (${megabytes(usage.attachmentBytes)})`],
+              [
+                "Attachments",
+                `${usage.attachments} (${megabytes(usage.attachmentBytes)})`,
+              ],
             ]}
           />
         </Section>
         <Section title="Recent activity">
           {data.activity.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nothing recorded yet.</p>
+            <p className="text-sm text-muted-foreground">
+              Nothing recorded yet.
+            </p>
           ) : (
             <ul className="space-y-1 text-sm">
-              {data.activity.map(({ action, entityType, occurredAt }, index) => (
-                <li key={index}>
-                  {formatDate(occurredAt)} {action.replaceAll("_", " ").toLowerCase()} ({entityType})
-                </li>
-              ))}
+              {data.activity.map(
+                ({ action, entityType, occurredAt }, index) => (
+                  <li key={index}>
+                    {formatDate(occurredAt)}{" "}
+                    {action.replaceAll("_", " ").toLowerCase()} ({entityType})
+                  </li>
+                ),
+              )}
             </ul>
           )}
         </Section>
@@ -148,15 +229,33 @@ export default function PlatformOrganisationPage() {
                   <TableCell>{invoice.planName}</TableCell>
                   <TableCell>{invoice.status.toLowerCase()}</TableCell>
                   <TableCell>{formatDate(invoice.dueOn)}</TableCell>
-                  <TableCell className="text-right">{formatMoney(invoice.total)}</TableCell>
+                  <TableCell className="text-right">
+                    {formatMoney(invoice.total)}
+                  </TableCell>
                   <TableCell className="text-right min-w-36 whitespace-normal [&>*]:m-0.5">
                     {billing && invoice.status === "ISSUED" && (
-                      <Button size="sm" variant="outline" onClick={() => setPaying(invoice)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPaying(invoice)}
+                      >
                         Record payment
                       </Button>
                     )}
+                    {billing && invoice.status === "PAID" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setCrediting(invoice)}
+                      >
+                        Credit note
+                      </Button>
+                    )}
                     <a
-                      className={buttonVariants({ size: "sm", variant: "outline" })}
+                      className={buttonVariants({
+                        size: "sm",
+                        variant: "outline",
+                      })}
                       href={`/api/v1${path}/invoices/${invoice.id}/pdf`}
                     >
                       PDF
@@ -168,6 +267,7 @@ export default function PlatformOrganisationPage() {
           </Table>
         </div>
       </Section>
+      <CreditNotes path={path} canRefresh={billing} />
       <Section title="Payments">
         {data.payments.length === 0 ? (
           <p className="text-sm text-muted-foreground">No payments yet.</p>
@@ -175,8 +275,8 @@ export default function PlatformOrganisationPage() {
           <ul className="space-y-1 text-sm">
             {data.payments.map((payment) => (
               <li key={payment.id}>
-                {formatDate(payment.paidOn ?? payment.occurredAt)} {formatMoney(payment.amount)}{" "}
-                {payment.status.toLowerCase()},{" "}
+                {formatDate(payment.paidOn ?? payment.occurredAt)}{" "}
+                {formatMoney(payment.amount)} {payment.status.toLowerCase()},{" "}
                 reference {payment.providerReference}
                 {payment.failureReason && `: ${payment.failureReason}`}
               </li>
@@ -184,7 +284,13 @@ export default function PlatformOrganisationPage() {
           </ul>
         )}
       </Section>
-      {action && <ReasonDialog title={action[0]} path={action[1]} onClose={() => setAction(null)} />}
+      {action && (
+        <ReasonDialog
+          title={action[0]}
+          path={action[1]}
+          onClose={() => setAction(null)}
+        />
+      )}
       {extending && (
         <RecordDialog
           title="Extend trial or subscription"
@@ -194,6 +300,13 @@ export default function PlatformOrganisationPage() {
             await api.post(`${path}/extend`, values);
             await refresh();
           }}
+        />
+      )}
+      {crediting && (
+        <CreditNoteDialog
+          path={path}
+          invoice={crediting}
+          onClose={() => setCrediting(null)}
         />
       )}
       {paying && (

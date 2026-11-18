@@ -3,6 +3,9 @@ package com.qualityos;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
@@ -417,5 +420,85 @@ class CashfreePaymentsIT extends AbstractIntegrationTest {
         webhook(order, "test-secret").andExpect(status().isOk());
 
         as(owner, postJson(BASE + "/invoices/" + invoice + "/checkout", PHONE)).andExpect(status().isConflict());
+    }
+
+    private ResultActions refundWebhook(String order, String refundId) throws Exception {
+        byte[] body = ("{\"type\":\"REFUND_STATUS_WEBHOOK\",\"data\":{\"refund\":{\"order_id\":\"" + order
+                + "\",\"refund_id\":\"" + refundId + "\"}}}").getBytes(StandardCharsets.UTF_8);
+        String timestamp = "1750000000000";
+        Mac mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec("test-secret".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        mac.update(timestamp.getBytes(StandardCharsets.UTF_8));
+        return mvc.perform(post(WEBHOOK).content(body).contentType("application/json")
+                .header("x-webhook-timestamp", timestamp)
+                .header("x-webhook-signature", Base64.getEncoder().encodeToString(mac.doFinal(body))));
+    }
+
+    private Session operator() throws Exception {
+        Session admin = register();
+        makeOperator(admin, "SUPER_ADMIN");
+        return admin;
+    }
+
+    @Test
+    void aCreditNoteOnAGatewayPaymentIsRefundedThroughTheGatewayUntilItSaysItWentThrough() throws Exception {
+        String order = checkout();
+        cashfreeHolds(order, payment("SUCCESS", total));
+        webhook(order, "test-secret").andExpect(status().isOk());
+        assertThat(invoiceStatus()).isEqualTo("PAID");
+        doAnswer(call -> new CashfreeClient.GatewayRefund(call.getArgument(1), "cf-1", "PENDING", null))
+                .when(cashfree).refund(eq(order), anyString(), any(), anyString());
+
+        Session admin = operator();
+        BigDecimal amount = asDatabaseSuperuser().queryForObject(
+                "SELECT amount FROM subscription_invoices WHERE id = ?::uuid", BigDecimal.class, invoice);
+        String created = as(admin, postJson("/api/v1/platform/organisations/" + owner.tenantId() + "/invoices/" + invoice
+                        + "/credit-notes", Map.of("amount", amount.toPlainString(), "reason", "Cancelled in the first week",
+                        "refundBy", "GATEWAY", "endAccess", true)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.refund.status").value("PENDING"))
+                .andReturn().getResponse().getContentAsString();
+        ArgumentCaptor<BigDecimal> refunded = ArgumentCaptor.forClass(BigDecimal.class);
+        ArgumentCaptor<String> refundId = ArgumentCaptor.forClass(String.class);
+        verify(cashfree).refund(eq(order), refundId.capture(), refunded.capture(), anyString());
+        assertThat(refunded.getValue()).isEqualByComparingTo(total);
+        assertThat(refundId.getValue()).matches("[A-Za-z0-9]{3,40}");
+        assertThat((String) JsonPath.read(created, "$.data.refund.reference")).isEqualTo(refundId.getValue());
+
+        doReturn(new CashfreeClient.GatewayRefund(refundId.getValue(), "cf-1", "SUCCESS", null))
+                .when(cashfree).findRefund(order, refundId.getValue());
+        refundWebhook(order, refundId.getValue()).andExpect(status().isOk());
+        as(owner, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(BASE + "/credit-notes"))
+                .andExpect(jsonPath("$.data[0].refund.status").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.data[0].refund.refundedOn").isNotEmpty());
+        assertThat(audited("REFUND_SUCCEEDED")).isEqualTo(1);
+        // Replayed, it changes nothing.
+        refundWebhook(order, refundId.getValue()).andExpect(status().isOk());
+        assertThat(audited("REFUND_SUCCEEDED")).isEqualTo(1);
+    }
+
+    @Test
+    void aPaymentNoInvoiceCouldTakeIsListedAndRefundedWhole() throws Exception {
+        String order = checkout();
+        cashfreeHolds(order, payment("SUCCESS", null));
+        webhook(order, "test-secret").andExpect(status().isOk());
+        assertThat(orderStatus(order)).isEqualTo("NEEDS_REVIEW");
+        doAnswer(call -> new CashfreeClient.GatewayRefund(call.getArgument(1), "cf-2", "SUCCESS", null))
+                .when(cashfree).refund(eq(order), anyString(), any(), anyString());
+
+        Session admin = operator();
+        String listed = as(admin, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                "/api/v1/platform/unapplied-payments")).andExpect(status().isOk()).andReturn().getResponse()
+                .getContentAsString();
+        List<String> ids = JsonPath.read(listed, "$.data[?(@.gatewayOrderId == '" + order + "')].orderId");
+        assertThat(ids).hasSize(1);
+        String refund = "/api/v1/platform/organisations/" + owner.tenantId() + "/gateway-orders/" + ids.getFirst()
+                + "/refund";
+        as(admin, postJson(refund, Map.of("reason", "Paid twice"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SUCCEEDED"));
+        assertThat(orderStatus(order)).isEqualTo("REFUNDED");
+        verify(cashfree).refund(eq(order), anyString(), argThat(value -> value.compareTo(total) == 0), anyString());
+        as(admin, postJson(refund, Map.of("reason", "Again"))).andExpect(status().isConflict());
+        assertThat(audited("PAYMENT_REFUNDED")).isEqualTo(1);
     }
 }

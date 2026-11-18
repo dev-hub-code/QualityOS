@@ -147,4 +147,26 @@ class CashfreeClientTest {
         assertThat(new CashfreeProperties("a", "b", "production", "").apiUrl()).isEqualTo("https://api.cashfree.com/pg");
         assertThat(new CashfreeProperties("", "b", "sandbox", "").configured()).isFalse();
     }
+
+    @Test
+    void asksForARefundOfAnOrderAndReadsWhereItStands() {
+        reply.set("""
+                {"refund_id":"RF1","cf_refund_id":"77","refund_status":"PENDING","refund_amount":1180.00}""");
+        CashfreeClient.GatewayRefund refund = client.refund("QOS-1", "RF1", new BigDecimal("1180.00"), "Credit note CN-1");
+
+        assertThat(refund.status()).isEqualTo("PENDING");
+        assertThat(refund.gatewayRefundId()).isEqualTo("77");
+        assertThat(seen.get().getRequestMethod()).isEqualTo("POST");
+        assertThat(seen.get().getRequestURI().getPath()).isEqualTo("/pg/orders/QOS-1/refunds");
+        JsonNode body = json.readTree(sent.get());
+        assertThat(body.get("refund_amount").decimalValue()).isEqualByComparingTo("1180.00");
+        assertThat(body.get("refund_id").asString()).isEqualTo("RF1");
+        assertThat(body.get("refund_note").asString()).isEqualTo("Credit note CN-1");
+
+        reply.set("""
+                {"refund_id":"RF1","cf_refund_id":"77","refund_status":"SUCCESS"}""");
+        assertThat(client.findRefund("QOS-1", "RF1").status()).isEqualTo("SUCCESS");
+        assertThat(seen.get().getRequestMethod()).isEqualTo("GET");
+        assertThat(seen.get().getRequestURI().getPath()).isEqualTo("/pg/orders/QOS-1/refunds/RF1");
+    }
 }

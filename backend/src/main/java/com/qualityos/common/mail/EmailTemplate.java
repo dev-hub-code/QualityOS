@@ -27,6 +27,7 @@ public enum EmailTemplate {
     AUDIT_DUE_SOON("audit/due-soon"),
     SUBSCRIPTION_EXPIRY("subscription/expiry"),
     PAYMENT_CONFIRMATION("subscription/payment-confirmation"),
+    REFUND_ISSUED("subscription/refund-issued"),
     PRODUCTION_APPROVAL("production/approval"),
     PRODUCTION_SENT_BACK("production/sent-back"),
     PRODUCTION_STOPPED("production/stopped"),

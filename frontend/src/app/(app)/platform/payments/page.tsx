@@ -3,12 +3,23 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
-import { formatDate, formatMoney } from "@/components/billing/subscription-banner";
+import {
+  formatDate,
+  formatMoney,
+} from "@/components/billing/subscription-banner";
+import { UnappliedPayments } from "@/components/platform/unapplied-payments";
 import { PageHeader, QueryState } from "@/components/records/parts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { api } from "@/lib/api";
 import type { PaymentList } from "@/lib/types";
 
@@ -18,7 +29,9 @@ const NO_FILTER = { q: "", status: "", from: "", to: "" };
 export default function PlatformPaymentsPage() {
   const [filter, setFilter] = useState(NO_FILTER);
   const [page, setPage] = useState(0);
-  const chosen = new URLSearchParams(Object.entries(filter).filter(([, value]) => value)).toString();
+  const chosen = new URLSearchParams(
+    Object.entries(filter).filter(([, value]) => value),
+  ).toString();
   const path = `/platform/payments?${chosen}${chosen ? "&" : ""}page=${page}&size=${PAGE_SIZE}`;
   const { data, error } = useQuery({
     queryKey: [path],
@@ -35,10 +48,15 @@ export default function PlatformPaymentsPage() {
         title="Payments"
         subtitle="Payments are recorded by hand from Invoices, and must match the invoice total. Failed ones need following up."
       />
+      <UnappliedPayments />
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="payment-search">UTR, invoice or organisation</Label>
-          <Input id="payment-search" value={filter.q} onChange={(event) => narrow({ q: event.target.value })} />
+          <Input
+            id="payment-search"
+            value={filter.q}
+            onChange={(event) => narrow({ q: event.target.value })}
+          />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="payment-status">Status</Label>
@@ -64,7 +82,12 @@ export default function PlatformPaymentsPage() {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="payment-to">Paid to</Label>
-          <Input id="payment-to" type="date" value={filter.to} onChange={(event) => narrow({ to: event.target.value })} />
+          <Input
+            id="payment-to"
+            type="date"
+            value={filter.to}
+            onChange={(event) => narrow({ to: event.target.value })}
+          />
         </div>
       </div>
       {!data ? (
@@ -74,7 +97,8 @@ export default function PlatformPaymentsPage() {
       ) : (
         <>
           <p role="status" className="text-sm">
-            {data.total} {data.total === 1 ? "payment" : "payments"}, page {page + 1}
+            {data.total} {data.total === 1 ? "payment" : "payments"}, page{" "}
+            {page + 1}
           </p>
           <div className="overflow-x-auto">
             <Table>
@@ -92,18 +116,30 @@ export default function PlatformPaymentsPage() {
               <TableBody>
                 {data.items.map((row) => (
                   <TableRow key={row.id}>
-                    <TableCell className="whitespace-nowrap">{formatDate(row.paidOn ?? row.recordedAt)}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {formatDate(row.paidOn ?? row.recordedAt)}
+                    </TableCell>
                     <TableCell>
-                      <Link className="underline" href={`/platform/organisations/${row.tenantId}`}>
+                      <Link
+                        className="underline"
+                        href={`/platform/organisations/${row.tenantId}`}
+                      >
                         {row.organisation}
                       </Link>
-                      <div className="text-sm text-muted-foreground">{row.invoiceNumber}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {row.invoiceNumber}
+                      </div>
                     </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">{formatMoney(row.amount)}</TableCell>
+                    <TableCell className="text-right whitespace-nowrap">
+                      {formatMoney(row.amount)}
+                    </TableCell>
                     <TableCell>
-                      {row.method?.replace("_", " ").toLowerCase() ?? "Not recorded"}
+                      {row.method?.replace("_", " ").toLowerCase() ??
+                        "Not recorded"}
                       {row.reference && (
-                        <div className="text-sm text-muted-foreground">{row.reference}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {row.reference}
+                        </div>
                       )}
                     </TableCell>
                     <TableCell>
@@ -111,9 +147,13 @@ export default function PlatformPaymentsPage() {
                       {row.failureReason && `: ${row.failureReason}`}
                     </TableCell>
                     <TableCell>
-                      <div className="whitespace-nowrap">{formatDate(row.recordedAt)}</div>
+                      <div className="whitespace-nowrap">
+                        {formatDate(row.recordedAt)}
+                      </div>
                       <div className="text-sm [overflow-wrap:anywhere] text-muted-foreground">
-                        {row.recordedBy ? `by ${row.recordedBy}` : "By: not recorded"}
+                        {row.recordedBy
+                          ? `by ${row.recordedBy}`
+                          : "By: not recorded"}
                       </div>
                     </TableCell>
                     <TableCell>{row.notes}</TableCell>
@@ -123,10 +163,18 @@ export default function PlatformPaymentsPage() {
             </Table>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" disabled={page === 0} onClick={() => setPage(page - 1)}>
+            <Button
+              variant="outline"
+              disabled={page === 0}
+              onClick={() => setPage(page - 1)}
+            >
               Previous
             </Button>
-            <Button variant="outline" disabled={(page + 1) * PAGE_SIZE >= data.total} onClick={() => setPage(page + 1)}>
+            <Button
+              variant="outline"
+              disabled={(page + 1) * PAGE_SIZE >= data.total}
+              onClick={() => setPage(page + 1)}
+            >
               Next
             </Button>
           </div>

@@ -269,7 +269,10 @@ review shows it beside each `REINSPECT` decision, with a link to each batch's re
 Each result sent to `POST /inspections/{id}/execute` may carry `measuredAt`, when it was measured, for one recorded
 without a connection and sent later; none, or one in the future, means now. Results return `measuredAt`. A result
 whose `measuredAt` is earlier than the one already saved for that parameter and sample leaves the saved one in place,
-audited as `INSPECTION_RESULT_SUPERSEDED`, so the same offline results can be sent twice safely.
+audited as `INSPECTION_RESULT_SUPERSEDED`, so the same offline results can be sent twice safely. `measuredAt` is what
+the device reports, not a verified time: a device with a wrong clock sends a wrong time. The result's `updated_at` keeps
+when it reached the server. The browser keeps offline results per organisation, person and inspection, and sends only
+the signed-in person's.
 
 Each result sent to `POST /inspections/{id}/execute` may name the `instrumentId` that took it. The instrument is then
 recorded as used on the inspection, with the same checks as `POST /inspections/{id}/instruments` (active, within its

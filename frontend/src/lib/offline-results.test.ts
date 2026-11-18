@@ -6,6 +6,7 @@ import {
   queueResults,
   queued,
   queuedBy,
+  queuedFor,
   sendQueued,
   type QueuedEntry,
 } from "@/lib/offline-results";
@@ -83,5 +84,82 @@ describe("offline results", () => {
     expect(queuedBy(me)).toEqual([
       expect.not.objectContaining({ error: expect.anything() }),
     ]);
+  });
+
+  it("never mixes two people's values for the same inspection on a shared device", async () => {
+    const a = { userId: "inspector-a", tenantId: "t-1" };
+    const b = { userId: "inspector-b", tenantId: "t-1" };
+    queueResults({ ...owner, ...a }, [
+      entry(1, "20.01", "2026-11-18T09:00:00Z"),
+    ]);
+    queueResults({ ...owner, ...b }, [
+      entry(2, "20.02", "2026-11-18T09:05:00Z"),
+    ]);
+
+    expect(
+      queuedFor(a, "i-1")?.entries.map((item) => item.valueNumeric),
+    ).toEqual(["20.01"]);
+    expect(
+      queuedFor(b, "i-1")?.entries.map((item) => item.valueNumeric),
+    ).toEqual(["20.02"]);
+
+    const post = vi.fn<(path: string, body: unknown) => Promise<undefined>>(
+      async () => undefined,
+    );
+    expect(await sendQueued(b, post)).toEqual(["i-1"]);
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post.mock.calls[0][1]).toEqual({
+      results: [entry(2, "20.02", "2026-11-18T09:05:00Z")],
+    });
+    // A's values stay on the device, untouched, for A to send.
+    expect(
+      queuedFor(a, "i-1")?.entries.map((item) => item.valueNumeric),
+    ).toEqual(["20.01"]);
+    expect(queuedFor(b, "i-1")).toBeUndefined();
+  });
+
+  it("keeps the same person's values apart in another organisation", () => {
+    queueResults(owner, [entry(1, "20", "2026-11-18T10:00:00Z")]);
+    queueResults({ ...owner, tenantId: "t-2" }, [
+      entry(1, "21", "2026-11-18T11:00:00Z"),
+    ]);
+    expect(queuedBy(me).map((item) => item.entries[0].valueNumeric)).toEqual([
+      "20",
+    ]);
+    expect(
+      queuedBy({ ...me, tenantId: "t-2" }).map(
+        (item) => item.entries[0].valueNumeric,
+      ),
+    ).toEqual(["21"]);
+  });
+
+  it("files values kept before queues were per person under the person who kept them", () => {
+    window.localStorage.setItem(
+      "qualityos.offline-results",
+      JSON.stringify({
+        "i-1": {
+          ...owner,
+          entries: [entry(1, "20", "2026-11-18T10:00:00Z")],
+          savedAt: "x",
+        },
+      }),
+    );
+    expect(queuedFor(me, "i-1")?.entries).toHaveLength(1);
+    expect(queuedFor({ ...me, userId: "u-2" }, "i-1")).toBeUndefined();
+  });
+
+  it("says when the device could not keep the values", () => {
+    const setItem = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new DOMException("full", "QuotaExceededError");
+      });
+    expect(queueResults(owner, [entry(1, "20", "2026-11-18T10:00:00Z")])).toBe(
+      false,
+    );
+    setItem.mockRestore();
+    expect(queueResults(owner, [entry(1, "20", "2026-11-18T10:00:00Z")])).toBe(
+      true,
+    );
   });
 });

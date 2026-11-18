@@ -22,25 +22,48 @@ export interface QueuedInspection {
 const KEY = "qualityos.offline-results";
 export const CHANGED_EVENT = "qualityos:offline-results";
 
+/** Whose kept results these are. Every read and write is limited to one owner. */
+export interface Owner {
+  userId: string;
+  tenantId: string;
+}
+
+/** Each person's results for an inspection are kept apart, so two people on one device never mix. */
 type Queue = Record<string, QueuedInspection>;
+
+const slot = (owner: Owner, inspectionId: string) =>
+  `${owner.tenantId}/${owner.userId}/${inspectionId}`;
+
+const owns = (owner: Owner, item: QueuedInspection) =>
+  item.userId === owner.userId && item.tenantId === owner.tenantId;
 
 function read(): Queue {
   try {
     const raw = window.localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Queue) : {};
+    const stored = raw ? (JSON.parse(raw) as Queue) : {};
+    // Results kept before queues were per person are filed under the person who kept them.
+    return Object.fromEntries(
+      Object.values(stored).map((item) => [
+        slot(item, item.inspectionId),
+        item,
+      ]),
+    );
   } catch {
     return {};
   }
 }
 
-function write(queue: Queue) {
+/** @return false when the device would not keep them, such as with storage full or blocked */
+function write(queue: Queue): boolean {
+  let kept = true;
   try {
     if (Object.keys(queue).length === 0) window.localStorage.removeItem(KEY);
     else window.localStorage.setItem(KEY, JSON.stringify(queue));
   } catch {
-    // Storage full or blocked: what was queued before stays as it was.
+    kept = false;
   }
   window.dispatchEvent(new Event(CHANGED_EVENT));
+  return kept;
 }
 
 /** True when a request failed for want of a connection, not because the server refused it. */
@@ -72,18 +95,27 @@ export function mergeEntries(
   return [...byKey.values()];
 }
 
+/**
+ * Keeps results for one person. Only what that same person kept for the inspection is merged with them.
+ *
+ * @return false when the device could not keep them, so the screen must say they are not saved
+ */
 export function queueResults(
   owner: Omit<QueuedInspection, "entries" | "savedAt" | "error">,
   entries: QueuedEntry[],
-) {
+): boolean {
   const queue = read();
-  const kept = queue[owner.inspectionId];
-  queue[owner.inspectionId] = {
+  const key = slot(owner, owner.inspectionId);
+  const kept = queue[key];
+  queue[key] = {
     ...owner,
-    entries: mergeEntries(kept?.entries ?? [], entries),
+    entries: mergeEntries(
+      kept && owns(owner, kept) ? kept.entries : [],
+      entries,
+    ),
     savedAt: new Date().toISOString(),
   };
-  write(queue);
+  return write(queue);
 }
 
 export function queued(): QueuedInspection[] {
@@ -91,29 +123,29 @@ export function queued(): QueuedInspection[] {
 }
 
 /** What this person kept on this device, in this organisation. Another person's stays hidden. */
-export function queuedBy(me: {
-  userId: string;
-  tenantId: string;
-}): QueuedInspection[] {
-  return queued().filter(
-    (item) => item.userId === me.userId && item.tenantId === me.tenantId,
-  );
+export function queuedBy(owner: Owner): QueuedInspection[] {
+  return queued().filter((item) => owns(owner, item));
 }
 
-export function queuedFor(inspectionId: string): QueuedInspection | undefined {
-  return read()[inspectionId];
+export function queuedFor(
+  owner: Owner,
+  inspectionId: string,
+): QueuedInspection | undefined {
+  const item = read()[slot(owner, inspectionId)];
+  return item && owns(owner, item) ? item : undefined;
 }
 
-export function discard(inspectionId: string) {
+export function discard(owner: Owner, inspectionId: string) {
   const queue = read();
-  delete queue[inspectionId];
+  delete queue[slot(owner, inspectionId)];
   write(queue);
 }
 
-function markRefused(inspectionId: string, error: string) {
+function markRefused(owner: Owner, inspectionId: string, error: string) {
   const queue = read();
-  if (queue[inspectionId]) {
-    queue[inspectionId] = { ...queue[inspectionId], error };
+  const key = slot(owner, inspectionId);
+  if (queue[key]) {
+    queue[key] = { ...queue[key], error };
     write(queue);
   }
 }
@@ -125,7 +157,7 @@ function markRefused(inspectionId: string, error: string) {
  * @return the inspections whose results reached the server
  */
 export async function sendQueued(
-  me: { userId: string; tenantId: string },
+  me: Owner,
   post: (path: string, body: unknown) => Promise<unknown>,
   retryRefused = false,
 ): Promise<string[]> {
@@ -136,11 +168,12 @@ export async function sendQueued(
       await post(`/inspections/${item.inspectionId}/execute`, {
         results: item.entries,
       });
-      discard(item.inspectionId);
+      discard(me, item.inspectionId);
       sent.push(item.inspectionId);
     } catch (error) {
       if (isConnectionLost(error)) break;
       markRefused(
+        me,
         item.inspectionId,
         error instanceof Error ? error.message : "The results were refused.",
       );

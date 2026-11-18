@@ -2,6 +2,7 @@
 
 import { PlatformNotices } from "@/components/app/platform-notices";
 import { OfflineResults } from "@/components/inspections/offline-results";
+import { queuedBy } from "@/lib/offline-results";
 import { SubscriptionBanner } from "@/components/billing/subscription-banner";
 import { ArrowLeft, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Search, ShieldCheck, X } from "lucide-react";
 import Link from "next/link";
@@ -115,6 +116,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    // Results kept offline are sent only by the person who saved them, so say so before they leave.
+    const waiting = me ? queuedBy({ userId: me.user.id, tenantId: me.tenantId }) : [];
+    if (
+      waiting.length > 0 &&
+      !window.confirm(
+        `${waiting.map((item) => item.inspectionNumber).join(", ")} ${waiting.length === 1 ? "has" : "have"} inspection values not sent yet. They stay on this device and are sent only when you sign in here again. Sign out anyway?`,
+      )
+    ) {
+      return;
+    }
     await session.post("logout", {});
     hardNavigate("/login");
   }

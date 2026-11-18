@@ -17,7 +17,7 @@ account emails a real customer needs.
 | 10 Subscription | Plans, trials, limits, invoices | Limits enforced, prices editable by admin | **Done** |
 | 12 Control Center | Platform dashboard, plans, organisations, then billing, entitlements, operators and support. See [PLATFORM_ADMIN.md](PLATFORM_ADMIN.md) | Every acceptance item in the owner's brief | **All 5 phases built** |
 | 13 Manufacturing | BOMs, recipes, routings, work centres and machines, then work orders, inventory, shop floor, quality gates, completion and advanced analytics. See [MANUFACTURING.md](MANUFACTURING.md) | Each of its seven phases tested and documented | **All 7 phases built** |
-| 11 Production | Terraform, ECS, RDS, S3, Secrets Manager, CI/CD, monitoring, backups | Deployed and restore-tested | **In progress**: UAT first |
+| 11 Production | Terraform, ECS, RDS, S3, Secrets Manager, CI/CD, monitoring, backups | Deployed and restore-tested | **In progress**: UAT Terraform written, not applied. See [DEPLOYMENT.md](DEPLOYMENT.md) |
 
 Later: Module 12 (AI) after Phase 9, because it depends on accumulated data. SMS and WhatsApp stay behind
 a notification channel interface.
@@ -30,9 +30,8 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 
 | Gap | Planned |
 |---|---|
-| The client address is only as reliable as the proxy in front of the web app, which must append `X-Forwarded-For`. The backend must not be reachable directly | With production work |
+| The client address is only as reliable as the proxy in front of the web app, which must append `X-Forwarded-For`. In AWS the load balancer does, and the backend has no route from it (see [DEPLOYMENT.md](DEPLOYMENT.md)) | Done in the UAT Terraform |
 | Lockout is per address (10 failures, 15 minutes), with an account-wide limit of 50 that spares addresses the owner signed in from, so a stranger cannot lock the owner out. A CAPTCHA or growing delay is still open | Before public launch |
-| The IP rate limit is held per backend instance, so several instances multiply it. Shared limits need Redis or the load balancer | With production work |
 | An expired sign-up is emptied after 30 days, not deleted, because its audit rows cannot be removed. Its suspended organisation row stays. With unverified login allowed, nothing is expired | By design |
 | The bell updates live over server-sent events, with a 5-minute poll behind it. Connections are held per instance, so running several instances needs a shared channel (such as PostgreSQL `LISTEN`/`NOTIFY`) before every page hears every change. Only email and in-app channels exist | When a user needs it |
 | An administrator can upload a PNG or JPEG logo (up to 256 KB). It shows in the menu, on the organisation's emails and at the top of its PDF reports (inspection, production record, audit, recall and the report exports). Invoices are ProductionOS's own documents and carry none. There are no brand colours | When a user needs it |
@@ -65,7 +64,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A decision to reinspect after a failed calibration holds the goods that are left and starts the new inspection. What was already used or dispatched is shown, with its recall report, but recalling it is a person's decision | By design |
 | A recorded audit finding cannot be edited. A wrong one is handled by cancelling its NCR, and it stays on the report | Review after real use |
 | `tenant_settings` holds the review rule, the two NCR and CAPA rules and the action evidence rule so far | Grows as rules are added |
-| Dashboard figures are kept for 60 seconds per organisation, period and facility scope. Anything written to the audit log clears them at once on the same instance. Other changes, and changes on another instance, show within 60 seconds | With production work: use a shared cache if the figures must agree across instances |
+| Dashboard figures are kept for 60 seconds per organisation, period and facility scope. Anything written to the audit log clears them at once on the same instance. Other changes, and changes on another instance, show within 60 seconds | When figures must agree across instances: a shared cache, or PostgreSQL `NOTIFY` to clear them |
 | Key figures and charts need `REPORT_VIEW` and the view permission of their records, like reports. The figures are worked out once per organisation and kept; what a person may not view is taken out on each request | By design |
 | The material rejection rate converts quantities to the base unit of their kind. Kinds that cannot be added together, such as kilograms and pieces, each get a rate, and the figure weighs those rates by their lots. The material rejection report shows each material in its own unit | Review after real use |
 | NCRs raised before unit conversion keep their rejected quantity without a unit | By design |

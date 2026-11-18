@@ -23,6 +23,8 @@ instances must share them. Set `STORAGE_S3_BUCKET`, and optionally `STORAGE_S3_P
 `STORAGE_S3_REGION` (the task's own region by default). Credentials come from the ECS task role; no access keys are
 set. The application streams every download itself after its permission checks and never hands out S3 links.
 
+UAT's AWS infrastructure and how to deploy it are in [DEPLOYMENT.md](DEPLOYMENT.md).
+
 Promoting a change: merge `dev` into `sit` once it passes on dev, and `sit` into `uat` once integration testing passes.
 
 ## Email

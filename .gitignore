@@ -12,3 +12,11 @@ node_modules/
 
 # Third-party reference material, kept locally only.
 docs/Scale-1-User-to-1-Crore.pdf
+
+# Terraform: providers, state and per-account settings stay on the machine that applies.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+terraform.tfvars
+backend.hcl

@@ -30,7 +30,15 @@ public class NonConformance extends TenantOwnedEntity {
         }
     }
 
-    public enum Source { INSPECTION, MANUAL, AUDIT, CALIBRATION, PRODUCTION, CUSTOMER_RETURN, CUSTOMER_COMPLAINT }
+    /** SUPPLIER and PROCESS, like MANUAL, are raised by hand: a supplier issue, or an incident at a line or machine. */
+    public enum Source {
+        INSPECTION, MANUAL, AUDIT, CALIBRATION, PRODUCTION, CUSTOMER_RETURN, CUSTOMER_COMPLAINT, SUPPLIER, PROCESS;
+
+        /** Raised by a person, not by another record, so it may be cancelled as raised in error. */
+        public boolean byHand() {
+            return this == MANUAL || this == SUPPLIER || this == PROCESS;
+        }
+    }
 
     public enum Severity { CRITICAL, MAJOR, MINOR }
 
@@ -56,6 +64,9 @@ public class NonConformance extends TenantOwnedEntity {
     private UUID dispatchId;
     private UUID supplierId;
     private UUID materialId;
+    private UUID productionLineId;
+    private UUID workCenterId;
+    private UUID machineId;
     private String batchNumber;
     private UUID defectCategoryId;
 
@@ -226,6 +237,14 @@ public class NonConformance extends TenantOwnedEntity {
 
     private BusinessRuleException refused(String action) {
         return new BusinessRuleException("An NCR in status " + status + " cannot be " + action + ".");
+    }
+
+    /** A process incident: where it happened. */
+    public NonConformance at(UUID lineId, UUID centreId, UUID machineId) {
+        this.productionLineId = lineId;
+        this.workCenterId = centreId;
+        this.machineId = machineId;
+        return this;
     }
 
     /** Corrections only. Finished NCRs are left as they were closed. */

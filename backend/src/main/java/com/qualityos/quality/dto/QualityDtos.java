@@ -46,7 +46,20 @@ public final class QualityDtos {
             @PositiveOrZero @Digits(integer = 12, fraction = 6) BigDecimal rejectedQuantity,
             UUID facilityId,
             /* The rejected quantity's unit. Left out, it is the material's. */
-            UUID rejectedUomId) {
+            UUID rejectedUomId,
+            /* MANUAL when left out; SUPPLIER needs supplierId; PROCESS needs at least one of the places below. */
+            NonConformance.Source source,
+            UUID productionLineId,
+            UUID workCenterId,
+            UUID machineId) {
+
+        /** As before the sources and places were added. */
+        public CreateNcrRequest(String title, String description, NonConformance.Severity severity,
+                UUID defectCategoryId, UUID supplierId, UUID materialId, String batchNumber,
+                BigDecimal rejectedQuantity, UUID facilityId, UUID rejectedUomId) {
+            this(title, description, severity, defectCategoryId, supplierId, materialId, batchNumber,
+                    rejectedQuantity, facilityId, rejectedUomId, null, null, null, null);
+        }
     }
 
     /** What an audit hands over when a finding raises an NCR. */
@@ -201,6 +214,10 @@ public final class QualityDtos {
             String supplierName,
             UUID materialId,
             String materialName,
+            UUID productionLineId,
+            UUID workCenterId,
+            UUID machineId,
+            String place,
             String batchNumber,
             UUID defectCategoryId,
             String defectCategoryName,

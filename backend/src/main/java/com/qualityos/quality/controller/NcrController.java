@@ -117,6 +117,13 @@ public class NcrController {
         return ApiResponse.ok(ncrs.get(id));
     }
 
+    /** For raising a process incident, without needing to see manufacturing set-up. */
+    @GetMapping("/ncrs/places")
+    @PreAuthorize(Require.NCR_CREATE)
+    public ApiResponse<com.qualityos.quality.service.NcrPlaces.Options> places() {
+        return ApiResponse.ok(ncrs.places());
+    }
+
     @PostMapping("/ncrs")
     @PreAuthorize(Require.NCR_CREATE)
     @ResponseStatus(HttpStatus.CREATED)

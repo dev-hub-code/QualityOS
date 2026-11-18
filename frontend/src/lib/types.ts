@@ -543,7 +543,23 @@ export interface StatusChange {
   at: string;
 }
 
+/** Where a process incident can be said to have happened. A machine carries its work centre. */
+export interface NcrPlaceOption {
+  id: string;
+  label: string;
+  facilityId: string;
+  workCenterId: string | null;
+}
+
+export interface NcrPlaces {
+  lines: NcrPlaceOption[];
+  workCenters: NcrPlaceOption[];
+  machines: NcrPlaceOption[];
+}
+
 export interface Ncr extends NcrSummary {
+  /** A process incident's line, work centre and machine, as one label. */
+  place: string | null;
   description: string;
   inspectionId: string | null;
   auditId: string | null;

@@ -39,8 +39,8 @@ Phase 11 is on hold until you ask for it.
 - [x] **CAPA execution**: evidence before an action completes (#101), a reminder for each late action (#80), a new
   action needed after an ineffective verification, an action's owner completing it without `CAPA_MANAGE`, and
   escalation to CAPA approvers once a CAPA or action is a chosen number of days late (#129)
-- [ ] **More NCR sources**, remaining: supplier issues and process incidents as sources of their own (today they are
-  raised by hand). Done: customer complaints and quality returns (#104, #113), and production rejects
+- [x] **More NCR sources**: customer complaints and quality returns (#104, #113), production rejects, and supplier
+  issues and process incidents (at a line, work centre or machine) raised as sources of their own (#130)
 - [ ] **Recall**, remaining: a regulatory report pack, and escalation when customers do not respond. Done: one recall
   for several batches, and linking its CAPA later (#57)
 - [x] **Calibration follow-ups** (#132): the new inspection starts on its own after *Reinspect*; the review shows the

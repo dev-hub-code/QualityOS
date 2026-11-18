@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { InspectionInstruments } from "@/components/calibration/inspection-instruments";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { FormError } from "@/components/forms/field";
 import { AttachmentPanel } from "@/components/records/attachment-panel";
 import {
@@ -36,6 +36,13 @@ import {
   toFormValues,
   toMeasuredWith,
 } from "@/lib/inspection";
+import {
+  CHANGED_EVENT,
+  isConnectionLost,
+  queueResults,
+  queuedFor,
+  type QueuedEntry,
+} from "@/lib/offline-results";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type {
   Attachment,
@@ -150,12 +157,34 @@ function Execution({
   editable: boolean;
 }) {
   const units = useUnits();
+  const { data: me } = useMe();
   const path = `/inspections/${inspection.id}`;
   const attachmentsPath = `/attachments?entityType=INSPECTION&entityId=${inspection.id}`;
-  const [values, setValues] = useState(() => toFormValues(inspection.results));
+  // Results kept on this device by this person are shown over the saved ones until they are sent.
+  const [kept, setKept] = useState(() => keptOnDevice(inspection.id, me));
+  const [values, setValues] = useState(() => ({
+    ...toFormValues(inspection.results),
+    ...toFormValues(kept.map(asResult)),
+  }));
   const [measuredWith, setMeasuredWith] = useState(() =>
     toMeasuredWith(inspection.results),
   );
+  // When each value was typed, so one sent after a lost connection keeps its time.
+  const [typedAt, setTypedAt] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      kept.map((entry) => [
+        sampleKey(entry.parameterCode, entry.sampleNumber),
+        entry.measuredAt,
+      ]),
+    ),
+  );
+  const [offlineNote, setOfflineNote] = useState("");
+  // Kept results sent in the background stop showing as kept.
+  useEffect(() => {
+    const refresh = () => setKept(keptOnDevice(inspection.id, me));
+    window.addEventListener(CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(CHANGED_EVENT, refresh);
+  }, [inspection.id, me]);
   const [formError, setFormError] = useState("");
   const { run, pending, message } = useAction();
   const { data: attachments = [] } = useQuery({
@@ -163,6 +192,9 @@ function Execution({
     queryFn: () => api.get<Attachment[]>(attachmentsPath),
   });
   const { parameters } = inspection.specification;
+  const keptKeys = new Set(
+    kept.map((entry) => sampleKey(entry.parameterCode, entry.sampleNumber)),
+  );
 
   /** Saving first means that nothing typed can be lost on submission. */
   function save(thenSubmit: boolean) {
@@ -177,9 +209,46 @@ function Execution({
       return;
     }
     setFormError("");
+    setOfflineNote("");
+    const now = new Date().toISOString();
+    const stamped: QueuedEntry[] = entries.map((entry) => {
+      const key = sampleKey(entry.parameterCode, entry.sampleNumber);
+      const saved = inspection.results.find(
+        (result) =>
+          sampleKey(result.parameterCode, result.sampleNumber) === key,
+      );
+      return { ...entry, measuredAt: typedAt[key] ?? saved?.measuredAt ?? now };
+    });
+    /** Keeps the values on this device until the connection is back. */
+    function keep() {
+      if (!me) return false;
+      queueResults(
+        {
+          inspectionId: inspection.id,
+          inspectionNumber: inspection.inspectionNumber,
+          userId: me.user.id,
+          tenantId: me.tenantId,
+        },
+        stamped,
+      );
+      setKept(keptOnDevice(inspection.id, me));
+      setOfflineNote(
+        thenSubmit
+          ? "No connection. The values are kept on this device and sent when it is back. Submit then."
+          : "No connection. The values are kept on this device and sent when it is back.",
+      );
+      return true;
+    }
+    // Offline, requests wait for the connection rather than fail, so keep the values at once.
+    if (navigator.onLine === false && stamped.length > 0 && keep()) return;
     run(async () => {
-      if (entries.length > 0)
-        await api.post(`${path}/execute`, { results: entries });
+      try {
+        if (stamped.length > 0)
+          await api.post(`${path}/execute`, { results: stamped });
+      } catch (error) {
+        if (isConnectionLost(error) && keep()) return;
+        throw error;
+      }
       if (thenSubmit) await api.post(`${path}/submit`);
     });
   }
@@ -251,11 +320,21 @@ function Execution({
                     id={id}
                     value={values[key] ?? ""}
                     disabled={!editable}
-                    onChange={(value) =>
-                      setValues((current) => ({ ...current, [key]: value }))
-                    }
+                    onChange={(value) => {
+                      setValues((current) => ({ ...current, [key]: value }));
+                      setTypedAt((current) => ({
+                        ...current,
+                        [key]: new Date().toISOString(),
+                      }));
+                    }}
                   />
-                  {saved && <StatusBadge status={saved.evaluation} />}
+                  {keptKeys.has(key) ? (
+                    <p className="text-xs text-amber-700">
+                      On this device, not sent yet
+                    </p>
+                  ) : (
+                    saved && <StatusBadge status={saved.evaluation} />
+                  )}
                 </div>
               );
             })}
@@ -269,6 +348,11 @@ function Execution({
           )}
         </Section>
       ))}
+      {offlineNote && (
+        <p role="status" className="text-sm text-amber-700">
+          {offlineNote}
+        </p>
+      )}
       <FormError message={formError || message} />
       {editable && (
         <div className="sticky bottom-0 flex gap-3 border-t bg-background py-3">
@@ -291,6 +375,37 @@ function Execution({
       )}
     </div>
   );
+}
+
+/** What this person kept on this device for the inspection, waiting to be sent. */
+function keptOnDevice(
+  inspectionId: string,
+  me: { user: { id: string }; tenantId: string } | undefined,
+): QueuedEntry[] {
+  const item =
+    typeof window === "undefined" ? undefined : queuedFor(inspectionId);
+  return item &&
+    me &&
+    item.userId === me.user.id &&
+    item.tenantId === me.tenantId
+    ? item.entries
+    : [];
+}
+
+/** A kept entry in the shape of a saved result, to fill the form with. */
+function asResult(entry: QueuedEntry): Inspection["results"][number] {
+  return {
+    parameterCode: entry.parameterCode,
+    sampleNumber: entry.sampleNumber,
+    valueNumeric: entry.valueNumeric ?? null,
+    valueText: entry.valueText ?? null,
+    valueBoolean: entry.valueBoolean ?? null,
+    valueDate: entry.valueDate ?? null,
+    evaluation: "PENDING_REVIEW",
+    remarks: null,
+    instrumentId: entry.instrumentId ?? null,
+    measuredAt: entry.measuredAt,
+  };
 }
 
 type Dialog = "approve" | "send-back" | "disposition" | null;

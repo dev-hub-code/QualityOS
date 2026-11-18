@@ -93,6 +93,7 @@ describe("toFormValues", () => {
       evaluation: "FAIL",
       remarks: null,
       instrumentId: null,
+      measuredAt: "2026-11-18T09:00:00Z",
     };
     expect(toFormValues([saved])).toEqual({ "OK#1": "false" });
   });
@@ -119,6 +120,7 @@ describe("toFormValues", () => {
       evaluation: "PASS",
       remarks: null,
       instrumentId,
+      measuredAt: "2026-11-18T09:00:00Z",
     });
     expect(toMeasuredWith([saved("DIA", "mic-1"), saved("LEN", null)])).toEqual(
       { DIA: "mic-1" },

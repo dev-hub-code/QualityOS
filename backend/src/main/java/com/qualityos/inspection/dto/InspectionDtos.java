@@ -46,11 +46,13 @@ public final class InspectionDtos {
             LocalDate valueDate,
             @Size(max = 1000) String remarks,
             /* The instrument that took the measurement. It is recorded as used on the inspection, if not already. */
-            UUID instrumentId) {
+            UUID instrumentId,
+            /* When it was measured, for a result recorded offline and sent later. Null means now. */
+            Instant measuredAt) {
 
         public ResultRequest(String parameterCode, int sampleNumber, BigDecimal valueNumeric, String valueText,
                 Boolean valueBoolean, LocalDate valueDate, String remarks) {
-            this(parameterCode, sampleNumber, valueNumeric, valueText, valueBoolean, valueDate, remarks, null);
+            this(parameterCode, sampleNumber, valueNumeric, valueText, valueBoolean, valueDate, remarks, null, null);
         }
     }
 
@@ -120,7 +122,8 @@ public final class InspectionDtos {
             LocalDate valueDate,
             String evaluation,
             String remarks,
-            UUID instrumentId) {
+            UUID instrumentId,
+            Instant measuredAt) {
     }
 
     public record DecisionResponse(String decision, String note, UUID decidedBy, Instant decidedAt) {

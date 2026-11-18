@@ -60,6 +60,9 @@ Rules enforced in the database as well as in code:
 - `disposition = 'ACCEPT'` requires `final_result = 'PASS'`, as a check constraint.
 - `inspections.spec_snapshot JSONB` stores the full specification at execution time. It is one of the
   few legitimate JSONB uses: an immutable historical document.
+- `inspection_results.measured_at` is when a value was measured, which for one recorded offline is before it reached
+  the server. A value sent with an earlier `measured_at` than the one stored is not saved, and is audited as
+  `INSPECTION_RESULT_SUPERSEDED` with both values.
 - `inspection_results` keeps evaluation (`PASS`, `FAIL`, `PENDING_REVIEW`). Disposition (`ACCEPT`, `REJECT`,
   `HOLD`, `REWORK`, `CONDITIONAL_ACCEPTANCE`) is a separate column on `inspections`, and the two never mix.
 - `actual_value` is stored as typed columns (`value_numeric NUMERIC(18,6)`, `value_text`, `value_boolean`,

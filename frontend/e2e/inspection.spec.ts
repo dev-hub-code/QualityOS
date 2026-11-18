@@ -434,3 +434,57 @@ test("under double sampling an inconclusive first sample asks for a second, coun
     page.getByText("submitted", { exact: true }).first(),
   ).toBeVisible();
 });
+
+test("results saved without a connection are kept on the device and sent when it is back", async ({
+  page,
+  context,
+}) => {
+  await signUp(page);
+  await receiveMaterial(page);
+  await page.goto("/inspection-templates");
+  await dialogAdd(page, "Add template", async (dialog) => {
+    await dialog.getByLabel("Code", { exact: true }).fill("BAR-OFF");
+    await dialog.getByLabel("Name", { exact: true }).fill("Bar on the floor");
+    await dialog.getByLabel("Type").selectOption("IQC");
+  });
+  await expect(page).toHaveURL(/inspection-templates\//);
+  await page.getByRole("button", { name: "Add parameter" }).click();
+  await page.getByLabel("Parameter code").fill("DIA");
+  await page.getByLabel("Parameter name").fill("Diameter");
+  await page.getByLabel("Minimum").fill("19.9");
+  await page.getByLabel("Maximum").fill("20.1");
+  await page.getByRole("button", { name: "Save draft" }).click();
+  await expect(page.getByText("Saved")).toBeVisible();
+  await page.getByRole("button", { name: "Publish" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("button", { name: "New version" })).toBeVisible();
+
+  await page.goto("/inspections");
+  await page.getByRole("button", { name: "Inspect" }).click();
+  await page
+    .getByLabel("Template")
+    .selectOption({ label: "BAR-OFF – Bar on the floor" });
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page).toHaveURL(/inspections\//);
+
+  await context.setOffline(true);
+  await page.getByLabel("DIA sample 1", { exact: true }).fill("20.02");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(
+    page.getByText("The values are kept on this device", { exact: false }),
+  ).toBeVisible();
+  await expect(page.getByText("On this device, not sent yet")).toBeVisible();
+  await expect(
+    page.getByText("No connection. Results you save are kept on this device", {
+      exact: false,
+    }),
+  ).toBeVisible();
+
+  await context.setOffline(false);
+  await expect(page.getByText("On this device, not sent yet")).toHaveCount(0);
+  await expect(page.getByText("waiting to be sent")).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByLabel("DIA sample 1", { exact: true })).toHaveValue(
+    "20.02",
+  );
+});

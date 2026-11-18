@@ -426,6 +426,8 @@ export interface InspectionResult {
   remarks: string | null;
   /** The instrument that took the measurement, when the inspector said which. */
   instrumentId: string | null;
+  /** When it was measured, which for a result recorded offline is before it was sent. */
+  measuredAt: string;
 }
 
 export interface InspectionDecision {

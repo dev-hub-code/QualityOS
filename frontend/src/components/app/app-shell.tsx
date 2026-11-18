@@ -1,6 +1,7 @@
 "use client";
 
 import { PlatformNotices } from "@/components/app/platform-notices";
+import { OfflineResults } from "@/components/inspections/offline-results";
 import { SubscriptionBanner } from "@/components/billing/subscription-banner";
 import { ArrowLeft, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Search, ShieldCheck, X } from "lucide-react";
 import Link from "next/link";
@@ -316,6 +317,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {!me.user.emailVerified && <VerifyEmailBanner email={me.user.email} />}
         {!controlCenter && <PlatformNotices />}
         {me.hasSubscription && <SubscriptionBanner />}
+        {!controlCenter && <OfflineResults />}
         {children}
       </main>
     </div>

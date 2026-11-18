@@ -266,6 +266,11 @@ returns `reinspectionOf` and `reinspectedBy` (`id`, `inspectionNumber`, `status`
 them or what was made from them (`customers`), and `recallable`, the production batches a recall would cover. The
 review shows it beside each `REINSPECT` decision, with a link to each batch's recall report.
 
+Each result sent to `POST /inspections/{id}/execute` may carry `measuredAt`, when it was measured, for one recorded
+without a connection and sent later; none, or one in the future, means now. Results return `measuredAt`. A result
+whose `measuredAt` is earlier than the one already saved for that parameter and sample leaves the saved one in place,
+audited as `INSPECTION_RESULT_SUPERSEDED`, so the same offline results can be sent twice safely.
+
 Each result sent to `POST /inspections/{id}/execute` may name the `instrumentId` that took it. The instrument is then
 recorded as used on the inspection, with the same checks as `POST /inspections/{id}/instruments` (active, within its
 calibration: `422` otherwise). A result saved again without one keeps the instrument named before. Results return

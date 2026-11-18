@@ -475,6 +475,17 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
       {
+        title: "Without a connection",
+        list: [
+          "Open the inspection while you are online. If the connection drops, keep entering values and select Save: they stay on this device, marked as not sent yet.",
+          "A notice at the top of every page says when you are offline and which inspections have values waiting.",
+          "When the connection is back, the values are sent on their own, each with the time it was measured. Select Send now to send them at once.",
+          "If someone saved a newer measurement for the same sample meanwhile, theirs is kept. If the inspection was submitted or closed meanwhile, the values are not accepted, and you can discard them.",
+          "Values stay with the person who saved them: someone else signing in on the same device does not send them.",
+          "Submit for approval once the values are sent.",
+        ],
+      },
+      {
         title: "Dispositions",
         terms: [
           ["Accept", "The material is released."],

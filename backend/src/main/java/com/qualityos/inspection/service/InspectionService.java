@@ -51,6 +51,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import java.util.Objects;
@@ -494,6 +495,8 @@ public class InspectionService implements AttachmentPolicy {
         results.findByInspectionIdOrderByParameterCodeAscSampleNumberAsc(id)
                 .forEach(result -> existing.put(key(result.getParameterCode(), result.getSampleNumber()), result));
 
+        // To the database's precision, so that a time sent again compares equal to the one stored.
+        Instant now = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         for (ResultRequest entry : request.results()) {
             ParameterSpec parameter = parameters.get(entry.parameterCode());
             if (parameter == null) {
@@ -506,12 +509,23 @@ public class InspectionService implements AttachmentPolicy {
             }
             Value value = typedValue(parameter, entry);
             InspectionResult result = existing.get(key(entry.parameterCode(), entry.sampleNumber()));
+            // A device that was offline sends when it measured, never later than now.
+            Instant measuredAt = entry.measuredAt() == null || entry.measuredAt().isAfter(now)
+                    ? now : entry.measuredAt().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+            if (result != null && result.getMeasuredAt().isAfter(measuredAt)) {
+                audit.record("INSPECTION_RESULT_SUPERSEDED", ENTITY, id,
+                        Map.of("parameter", parameter.code(), "sample", entry.sampleNumber(),
+                                "value", String.valueOf(firstNonNull(value)), "measuredAt", measuredAt.toString()),
+                        Map.of("value", String.valueOf(result.displayValue()),
+                                "measuredAt", result.getMeasuredAt().toString()));
+                continue;
+            }
             String previous = result == null ? null : result.displayValue();
             if (result == null) {
                 result = new InspectionResult(id, parameter.code(), entry.sampleNumber());
             }
             result.record(value.numeric(), value.text(), value.bool(), value.date(),
-                    EvaluationEngine.evaluate(parameter, value), entry.remarks());
+                    EvaluationEngine.evaluate(parameter, value), entry.remarks(), measuredAt);
             result.measuredWith(entry.instrumentId());
             results.save(result);
             if (previous != null && !previous.equals(result.displayValue())) {
@@ -523,6 +537,11 @@ public class InspectionService implements AttachmentPolicy {
         results.flush();
         audit.record("INSPECTION_EXECUTED", ENTITY, id);
         return toDetail(inspection);
+    }
+
+    private static Object firstNonNull(Value value) {
+        return value.numeric() != null ? value.numeric().stripTrailingZeros().toPlainString()
+                : value.bool() != null ? value.bool() : value.date() != null ? value.date() : value.text();
     }
 
     @Transactional
@@ -809,7 +828,8 @@ public class InspectionService implements AttachmentPolicy {
                                 result.getValueDate(),
                                 result.getEvaluation().name(),
                                 result.getRemarks(),
-                                result.getInstrumentId()))
+                                result.getInstrumentId(),
+                                result.getMeasuredAt()))
                         .toList(),
                 approvals.findByInspectionIdOrderByCreatedAtAsc(inspection.getId()).stream()
                         .map(decision -> new DecisionResponse(

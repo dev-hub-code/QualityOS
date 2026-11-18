@@ -689,4 +689,96 @@ class InspectionIT extends MasterDataFixture {
                 "SELECT count(*) FROM audit_logs WHERE entity_id = ? AND action = 'INSPECTION_RESULT_CHANGED'",
                 Integer.class, inspection)).isZero();
     }
+
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder offline(Session session,
+            String inspection, List<Map<String, Object>> results) throws Exception {
+        return postJson("/api/v1/inspections/" + inspection + "/execute", Map.of("results", results))
+                .header(org.springframework.http.HttpHeaders.AUTHORIZATION, "Bearer " + session.accessToken());
+    }
+
+    private static Map<String, Object> measured(String code, int sample, String value, String at) {
+        return Map.of("parameterCode", code, "sampleNumber", sample, "valueNumeric", value, "measuredAt", at);
+    }
+
+    @Test
+    void twoTabsSendingTheSameOfflineResultsAtOnceStoreThemOnce() throws Exception {
+        Session owner = register();
+        String inspection = startInspection(owner, shaftTemplate(owner));
+        String at = java.time.Instant.now().minus(java.time.Duration.ofMinutes(20)).toString();
+        List<Map<String, Object>> results = List.of(measured("DIA", 1, "20.01", at), measured("DIA", 2, "19.98", at));
+
+        // Both tabs come back online together and send what the device kept.
+        java.util.concurrent.CyclicBarrier together = new java.util.concurrent.CyclicBarrier(2);
+        java.util.concurrent.Callable<Integer> send = () -> {
+            together.await(10, java.util.concurrent.TimeUnit.SECONDS);
+            return mvc.perform(offline(owner, inspection, results)).andReturn().getResponse().getStatus();
+        };
+        java.util.concurrent.ExecutorService tabs = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            List<java.util.concurrent.Future<Integer>> sent = tabs.invokeAll(List.of(send, send));
+            for (java.util.concurrent.Future<Integer> each : sent) {
+                assertThat(each.get(30, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo(200);
+            }
+        } finally {
+            tabs.shutdownNow();
+        }
+
+        assertThat(asDatabaseSuperuser().queryForObject(
+                "SELECT count(*) FROM inspection_results WHERE inspection_id = ?::uuid", Integer.class, inspection))
+                .isEqualTo(2);
+        assertThat(asDatabaseSuperuser().queryForObject(
+                "SELECT count(*) FROM audit_logs WHERE entity_id = ? AND action IN"
+                        + " ('INSPECTION_RESULT_CHANGED', 'INSPECTION_RESULT_SUPERSEDED')",
+                Integer.class, inspection)).isZero();
+        as(owner, get("/api/v1/inspections/" + inspection))
+                .andExpect(jsonPath("$.data.results[?(@.sampleNumber == 1)].valueNumeric").value("20.010000"));
+    }
+
+    @Test
+    void offlineResultsForAnInspectionSubmittedMeanwhileAreRefusedAndChangeNothing() throws Exception {
+        Session owner = register();
+        // While the tablet was offline, the inspection was finished and submitted from the bench.
+        String inspection = submittedInspection(owner, shaftTemplate(owner), "20.00", "20.00");
+        String earlier = java.time.Instant.now().minus(java.time.Duration.ofMinutes(30)).toString();
+
+        String refused = mvc.perform(offline(owner, inspection, List.of(measured("DIA", 1, "19.50", earlier))))
+                .andExpect(status().is4xxClientError())
+                .andReturn().getResponse().getContentAsString();
+
+        // The tablet keeps them with this reason, which must say something a person can act on.
+        assertThat(JsonPath.<String>read(refused, "$.error.message")).isNotBlank();
+        as(owner, get("/api/v1/inspections/" + inspection))
+                .andExpect(jsonPath("$.data.status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.data.results[?(@.sampleNumber == 1)].valueNumeric").value("20.000000"));
+    }
+
+    @Test
+    void offlineResultsSentAfterTheTemplateChangedAreJudgedByTheVersionTheInspectionStartedWith() throws Exception {
+        Session owner = register();
+        String template = shaftTemplate(owner);
+        String inspection = startInspection(owner, template);
+        String earlier = java.time.Instant.now().minus(java.time.Duration.ofMinutes(30)).toString();
+
+        // While the tablet was offline, the template gained a parameter, more samples and new limits.
+        as(owner, postJson("/api/v1/inspection-templates/" + template + "/versions", Map.of()))
+                .andExpect(status().isCreated());
+        saveDraft(owner, template, draft(5, 0, List.of(parameter("DIA", "CRITICAL", "1", "2"),
+                parameter("THK", "MAJOR", "1", "2")))).andExpect(status().isOk());
+        publish(owner, template, TODAY).andExpect(status().isOk());
+
+        mvc.perform(offline(owner, inspection, List.of(measured("DIA", 1, "20.00", earlier),
+                        measured("DIA", 2, "20.02", earlier))))
+                .andExpect(status().isOk());
+        // What the new version added is not part of this inspection.
+        mvc.perform(offline(owner, inspection, List.of(measured("THK", 1, "1.5", earlier))))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value("THK is not part of this inspection."));
+        mvc.perform(offline(owner, inspection, List.of(measured("DIA", 3, "20.00", earlier))))
+                .andExpect(status().isUnprocessableContent());
+
+        // Judged by the limits it started with, 19.9 to 20.1, so it passes.
+        submit(owner, inspection).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.specification.versionNumber").value(1))
+                .andExpect(jsonPath("$.data.evaluatedResult").value("PASS"));
+    }
 }

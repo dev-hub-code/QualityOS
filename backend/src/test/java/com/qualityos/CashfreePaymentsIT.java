@@ -643,4 +643,163 @@ class CashfreePaymentsIT extends AbstractIntegrationTest {
         verify(cashfree, times(1)).refund(eq(order), anyString(), any(), anyString());
         assertThat(orderStatus(order)).isEqualTo("REFUNDED");
     }
+
+    private static com.qualityos.common.exception.QualityOsException noAnswer() {
+        return new com.qualityos.common.exception.QualityOsException(
+                com.qualityos.common.exception.ErrorCode.PAYMENT_GATEWAY_UNAVAILABLE, "No answer");
+    }
+
+    private String onlyRefund(String column) {
+        return asDatabaseSuperuser().queryForObject(
+                "SELECT " + column + "::text FROM refunds WHERE tenant_id = ?", String.class, owner.tenantId());
+    }
+
+    /** Runs the same work on two threads at once, under this organisation, and waits for both. */
+    private void twiceAtOnce(java.util.function.Supplier<?> work) throws Exception {
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            List<java.util.concurrent.Future<?>> running = List.of(
+                    pool.submit(() -> com.qualityos.common.tenant.TenantContext.callAs(owner.tenantId(), null, work)),
+                    pool.submit(() -> com.qualityos.common.tenant.TenantContext.callAs(owner.tenantId(), null, work)));
+            for (java.util.concurrent.Future<?> each : running) {
+                each.get(30, java.util.concurrent.TimeUnit.SECONDS);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void aWebhookArrivingWhileTheRefundIsStillBeingSentIsAppliedOnce() throws Exception {
+        String order = checkout();
+        String path = unappliedRefundPath(order);
+        doAnswer(call -> java.util.Optional.of(
+                new CashfreeClient.GatewayRefund(call.getArgument(1), "cf-7", "SUCCESS", null)))
+                .when(cashfree).lookupRefund(eq(order), anyString());
+        // Cashfree takes the refund and calls the webhook before its answer to the request comes back.
+        doAnswer(call -> {
+            String reference = call.getArgument(1);
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try {
+                    refundWebhook(order, reference).andExpect(status().isOk());
+                } catch (Exception e) {
+                    throw new IllegalStateException(e);
+                }
+            }).get(30, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(orderStatus(order)).isEqualTo("REFUNDED");
+            return new CashfreeClient.GatewayRefund(reference, "cf-7", "SUCCESS", null);
+        }).when(cashfree).refund(eq(order), anyString(), any(), anyString());
+
+        as(operator(), postJson(path, Map.of("reason", "Paid twice"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SUCCEEDED"));
+
+        verify(cashfree, times(1)).refund(eq(order), anyString(), any(), anyString());
+        assertThat(orderStatus(order)).isEqualTo("REFUNDED");
+        assertThat(audited("REFUND_SUCCEEDED")).isEqualTo(1);
+        assertThat(audited("PAYMENT_REFUNDED")).isEqualTo(1);
+    }
+
+    @Test
+    void twoChecksOfTheSameRefundAtOnceApplyTheAnswerOnce() throws Exception {
+        String order = checkout();
+        String path = unappliedRefundPath(order);
+        doAnswer(call -> {
+            throw noAnswer();
+        }).when(cashfree).refund(eq(order), anyString(), any(), anyString());
+        as(operator(), postJson(path, Map.of("reason", "Paid twice"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PENDING"));
+        UUID refundId = UUID.fromString(onlyRefund("id"));
+
+        // Both checks read the refund as waiting before either records Cashfree's answer.
+        java.util.concurrent.CyclicBarrier bothAsked = new java.util.concurrent.CyclicBarrier(2);
+        doAnswer(call -> {
+            bothAsked.await(10, java.util.concurrent.TimeUnit.SECONDS);
+            return java.util.Optional.of(new CashfreeClient.GatewayRefund(call.getArgument(1), "cf-8", "SUCCESS", null));
+        }).when(cashfree).lookupRefund(eq(order), anyString());
+
+        twiceAtOnce(() -> billingRefunds.reconcile(refundId));
+
+        verify(cashfree, times(1)).refund(eq(order), anyString(), any(), anyString());
+        assertThat(onlyRefund("status")).isEqualTo("SUCCEEDED");
+        assertThat(orderStatus(order)).isEqualTo("REFUNDED");
+        assertThat(audited("REFUND_SUCCEEDED")).isEqualTo(1);
+        assertThat(audited("PAYMENT_REFUNDED")).isEqualTo(1);
+    }
+
+    @Test
+    void twoChecksThatBothFindNothingSendItAgainOnlyUnderItsOwnReference() throws Exception {
+        String order = checkout();
+        String path = unappliedRefundPath(order);
+        doAnswer(call -> {
+            throw noAnswer();
+        }).when(cashfree).refund(eq(order), anyString(), any(), anyString());
+        as(operator(), postJson(path, Map.of("reason", "Paid twice"))).andExpect(status().isOk());
+        UUID refundId = UUID.fromString(onlyRefund("id"));
+        String reference = onlyRefund("refund_reference");
+
+        java.util.concurrent.CyclicBarrier bothAsked = new java.util.concurrent.CyclicBarrier(2);
+        doAnswer(call -> {
+            bothAsked.await(10, java.util.concurrent.TimeUnit.SECONDS);
+            return java.util.Optional.empty();
+        }).when(cashfree).lookupRefund(eq(order), anyString());
+        doAnswer(call -> new CashfreeClient.GatewayRefund(call.getArgument(1), "cf-9", "SUCCESS", null))
+                .when(cashfree).refund(eq(order), anyString(), any(), anyString());
+
+        twiceAtOnce(() -> billingRefunds.reconcile(refundId));
+
+        // Cashfree refunds a reference once, however often it is sent, so every send must carry the same one.
+        ArgumentCaptor<String> sent = ArgumentCaptor.forClass(String.class);
+        verify(cashfree, org.mockito.Mockito.atLeast(2)).refund(eq(order), sent.capture(), any(), anyString());
+        assertThat(sent.getAllValues()).containsOnly(reference);
+        assertThat(asDatabaseSuperuser().queryForObject(
+                "SELECT count(*) FROM refunds WHERE tenant_id = ?", Long.class, owner.tenantId())).isEqualTo(1);
+        assertThat(audited("REFUND_SUCCEEDED")).isEqualTo(1);
+        assertThat(audited("PAYMENT_REFUNDED")).isEqualTo(1);
+    }
+
+    @Test
+    void aCreditNoteRefundIsSentAtOnceShowsWaitingIfCashfreeIsSilentAndIsFinishedByTheJob() throws Exception {
+        String order = checkout();
+        cashfreeHolds(order, payment("SUCCESS", total));
+        webhook(order, "test-secret").andExpect(status().isOk());
+        doAnswer(call -> {
+            throw noAnswer();
+        }).when(cashfree).refund(eq(order), anyString(), any(), anyString());
+        BigDecimal amount = asDatabaseSuperuser().queryForObject(
+                "SELECT amount FROM subscription_invoices WHERE id = ?::uuid", BigDecimal.class, invoice);
+
+        // The credit note stands even though Cashfree did not answer: the refund was asked for in the same request.
+        as(operator(), postJson("/api/v1/platform/organisations/" + owner.tenantId() + "/invoices/" + invoice
+                        + "/credit-notes", Map.of("amount", amount.toPlainString(), "reason", "Cancelled",
+                        "refundBy", "GATEWAY", "endAccess", false)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.refund.status").value("PENDING"));
+        verify(cashfree, times(1)).refund(eq(order), anyString(), any(), anyString());
+        // The customer sees it as waiting, with no date yet.
+        as(owner, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(BASE + "/credit-notes"))
+                .andExpect(jsonPath("$.data[0].refund.status").value("PENDING"))
+                .andExpect(jsonPath("$.data[0].refund.refundedOn").doesNotExist());
+
+        // The job leaves it alone while it may still be on its way, so it is never sent twice side by side.
+        UUID refundId = UUID.fromString(onlyRefund("id"));
+        java.time.Instant settle = java.time.Instant.now().minus(java.time.Duration.ofMinutes(2));
+        assertThat(com.qualityos.common.tenant.TenantContext.callAs(owner.tenantId(), null,
+                () -> billingRefunds.waiting(settle))).isEmpty();
+
+        // Two minutes on, the job picks it up, finds Cashfree never got it, and sends it under the same reference.
+        asDatabaseSuperuser().update("UPDATE refunds SET created_at = now() - INTERVAL '3 minutes' WHERE id = ?",
+                refundId);
+        assertThat(com.qualityos.common.tenant.TenantContext.callAs(owner.tenantId(), null,
+                () -> billingRefunds.waiting(settle))).containsExactly(refundId);
+        doReturn(java.util.Optional.empty()).when(cashfree).lookupRefund(eq(order), anyString());
+        doAnswer(call -> new CashfreeClient.GatewayRefund(call.getArgument(1), "cf-10", "SUCCESS", null))
+                .when(cashfree).refund(eq(order), anyString(), any(), anyString());
+        com.qualityos.common.tenant.TenantContext.callAs(owner.tenantId(), null,
+                () -> billingRefunds.reconcile(refundId));
+
+        verify(cashfree, times(2)).refund(eq(order), eq(onlyRefund("refund_reference")), any(), anyString());
+        as(owner, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(BASE + "/credit-notes"))
+                .andExpect(jsonPath("$.data[0].refund.status").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.data[0].refund.refundedOn").isNotEmpty());
+    }
 }

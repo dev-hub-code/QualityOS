@@ -353,7 +353,7 @@ export const NAV_ITEMS: NavItem[] = [
     anyPermission: ["SUBSCRIPTION_MANAGE"],
   },
   {
-    label: "Organisation settings",
+    label: "Settings",
     href: "/settings/organisation",
     icon: Building2,
   },

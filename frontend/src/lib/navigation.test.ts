@@ -73,7 +73,7 @@ describe("visibleNavItems", () => {
   it("hides administration from users without permissions", () => {
     expect(labels([])).toEqual([
       "Dashboard",
-      "Organisation settings",
+      "Settings",
       "My account",
       "Support",
       "Documentation",
@@ -85,7 +85,7 @@ describe("visibleNavItems", () => {
       "Dashboard",
       "Purchase orders",
       "Receipts",
-      "Organisation settings",
+      "Settings",
       "My account",
       "Support",
       "Documentation",
@@ -97,7 +97,7 @@ describe("visibleNavItems", () => {
       "Dashboard",
       "Users",
       "Roles",
-      "Organisation settings",
+      "Settings",
       "My account",
       "Support",
       "Documentation",
@@ -105,7 +105,7 @@ describe("visibleNavItems", () => {
     expect(labels(["ROLE_MANAGE"])).toEqual([
       "Dashboard",
       "Roles",
-      "Organisation settings",
+      "Settings",
       "My account",
       "Support",
       "Documentation",
@@ -116,7 +116,7 @@ describe("visibleNavItems", () => {
     expect(labels(["AUDIT_LOG_VIEW"])).toEqual([
       "Dashboard",
       "Audit log",
-      "Organisation settings",
+      "Settings",
       "My account",
       "Support",
       "Documentation",

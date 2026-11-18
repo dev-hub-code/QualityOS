@@ -51,16 +51,14 @@ test("an administrator uploads the organisation's logo, which the menu shows", a
   page,
 }) => {
   await signUp(page);
-  await page.goto("/settings/organisation");
+  await page.goto("/settings");
   await expect(page.getByText("No logo yet.")).toBeVisible();
 
-  await page
-    .getByLabel("Logo file")
-    .setInputFiles({
-      name: "notes.png",
-      mimeType: "image/png",
-      buffer: Buffer.from("not an image"),
-    });
+  await page.getByLabel("Logo file").setInputFiles({
+    name: "notes.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("not an image"),
+  });
   await expect(
     page.getByText("The logo must be a PNG or JPEG image."),
   ).toBeVisible();

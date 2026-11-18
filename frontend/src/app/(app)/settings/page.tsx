@@ -1,16 +1,20 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { NotificationPreferences } from "@/components/app/notification-preferences";
+import { OrganizationForm } from "@/components/app/organization-form";
+import { OrganizationLogoSettings } from "@/components/app/organization-logo";
 import { applyServerErrors } from "@/components/forms/apply-server-errors";
 import { Field, FormError } from "@/components/forms/field";
 import { Button } from "@/components/ui/button";
-import { useMe } from "@/hooks/use-me";
+import { useMe, usePermission } from "@/hooks/use-me";
 import { api, hardNavigate } from "@/lib/api";
 import { changePasswordSchema, type ChangePasswordValues } from "@/lib/schemas";
+import type { Organization } from "@/lib/types";
 
 function ChangePasswordForm() {
   const [formError, setFormError] = useState("");
@@ -62,9 +66,19 @@ function ChangePasswordForm() {
   );
 }
 
-/** What belongs to the person, wherever they work: the organisation's own settings are under Organisation settings. */
+/**
+ * The person's own sign-in and emails, with the organisation's profile and logo. The organisation's rules are under
+ * Settings. An operator of a platform organisation has no organisation profile to keep, so sees only their own.
+ */
 export default function AccountSettingsPage() {
   const { data: me } = useMe();
+  const canManage = usePermission("TENANT_MANAGE");
+  const customer = Boolean(me?.hasSubscription);
+  const { data: organization } = useQuery({
+    queryKey: ["organization", me?.tenantId],
+    queryFn: () => api.get<Organization>(`/organizations/${me?.tenantId}`),
+    enabled: customer,
+  });
   return (
     <div className="max-w-2xl space-y-6 [&>section]:glass [&>section]:rounded-2xl [&>section]:p-5 sm:[&>section]:p-6">
       <div>
@@ -72,35 +86,60 @@ export default function AccountSettingsPage() {
           My account
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {me?.hasSubscription ? (
+          {customer ? (
             <>
-              Your own sign-in and emails. The organisation&apos;s profile and
-              rules are under{" "}
+              Your sign-in and emails, and your organisation&apos;s profile. How
+              the organisation works is under{" "}
               <Link className="underline" href="/settings/organisation">
-                Organisation settings
+                Settings
               </Link>
               .
             </>
           ) : me?.permissions.includes("PLATFORM_ADMIN") ? (
             <>
-              Your own sign-in and emails. Settings for the whole platform are
-              under{" "}
+              Your sign-in. Settings for the whole platform are under{" "}
               <Link className="underline" href="/platform/settings">
                 Platform settings
               </Link>{" "}
               in the Control Center.
             </>
           ) : (
-            "Your own sign-in and emails."
+            "Your sign-in and emails."
           )}
         </p>
       </div>
       {me && (
         <section className="space-y-2 text-sm">
-          <h2 className="text-base font-semibold text-[#1b2a55]">Profile</h2>
+          <h2 className="text-base font-semibold text-[#1b2a55]">You</h2>
           <p>{me.user.fullName}</p>
           <p className="text-muted-foreground">{me.user.email}</p>
         </section>
+      )}
+      {customer && (
+        <section className="space-y-4">
+          <h2 className="text-base font-semibold text-[#1b2a55]">
+            Organisation profile
+          </h2>
+          {!canManage && (
+            <p className="text-sm text-muted-foreground">
+              Only an administrator can change the profile and logo.
+            </p>
+          )}
+          {organization && (
+            <OrganizationForm
+              key={organization.version}
+              organization={organization}
+              submitLabel="Save changes"
+              readOnly={!canManage}
+            />
+          )}
+        </section>
+      )}
+      {customer && me && (
+        <OrganizationLogoSettings
+          tenantId={me.tenantId}
+          canManage={canManage}
+        />
       )}
       <section className="space-y-4">
         <h2 className="text-base font-semibold text-[#1b2a55]">
@@ -108,7 +147,7 @@ export default function AccountSettingsPage() {
         </h2>
         <ChangePasswordForm />
       </section>
-      {me?.hasSubscription && (
+      {customer && (
         <section>
           <NotificationPreferences />
         </section>

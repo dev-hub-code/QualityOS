@@ -142,7 +142,7 @@ or bank details are replaced with `[hidden]` when shown or exported, and each ex
   cannot make them answer for an ordinary member.
 - Anything about one organisation is read under that organisation's own tenant context. Row-level security stays on.
 - The organisation page shows counts and event names, not the content of quality records.
-- Support access: only after an organisation's administrator grants it under Organisation settings (24 hours, 3 days or 7 days,
+- Support access: only after an organisation's administrator grants it under Settings (24 hours, 3 days or 7 days,
   withdrawable at any time) can an operator with `PLATFORM_CUSTOMER_MANAGE` open a read-only support view, giving a
   reason and their password again. The session's token is held by the web tier, names the grant, and is checked on
   every request, so withdrawing access or losing the role ends it at once. It carries only the `*_VIEW` permissions

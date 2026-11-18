@@ -41,7 +41,7 @@ import {
   SearchCheck,
   Send,
   ArrowLeftRight,
-  Settings,
+  UserRound,
   ShieldCheck,
   SquareCheckBig,
   ShieldEllipsis,
@@ -352,7 +352,12 @@ export const NAV_ITEMS: NavItem[] = [
     icon: CreditCard,
     anyPermission: ["SUBSCRIPTION_MANAGE"],
   },
-  { label: "Settings", href: "/settings", icon: Settings },
+  {
+    label: "Organisation settings",
+    href: "/settings/organisation",
+    icon: Building2,
+  },
+  { label: "My account", href: "/settings", icon: UserRound },
   { label: "Support", href: "/support", icon: LifeBuoy },
   { label: "Documentation", href: "/docs", icon: BookOpen },
   {
@@ -406,7 +411,7 @@ export const CONTROL_CENTER_NAV: { heading: string; items: NavItem[] }[] = [
     items: [
       { label: "Features", href: "/platform/features", icon: ToggleRight },
       {
-        label: "Settings",
+        label: "Platform settings",
         href: "/platform/settings",
         icon: SlidersHorizontal,
       },
@@ -446,7 +451,7 @@ export const CONTROL_CENTER_NAV: { heading: string; items: NavItem[] }[] = [
   },
 ];
 
-/** Settings alone, because the billing page beneath it belongs to a customer. */
+/** My account alone: billing and organisation settings beneath it belong to a customer. */
 const isAccountPage = (pathname: string) =>
   pathname === "/settings" ||
   ["/docs", "/platform"].some(

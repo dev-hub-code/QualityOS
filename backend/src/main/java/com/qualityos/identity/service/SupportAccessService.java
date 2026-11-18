@@ -179,7 +179,7 @@ public class SupportAccessService {
                         operatorName + " from ProductionOS support started a session that can make changes. Reason: "
                                 + reason.strip() + ". Each change is in the support log, and you can withdraw access "
                                 + "at any time.",
-                        "/settings", null);
+                        "/settings/organisation", null);
             }
         }));
         Instant ends = Instant.now().plus(SESSION);

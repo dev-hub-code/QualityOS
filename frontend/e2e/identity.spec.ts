@@ -46,7 +46,8 @@ test("an owner adds a viewer, whose navigation is restricted", async ({ page, br
   const viewerEmail = `viewer-${unique()}@example.com`;
   await inviteUser(page, viewerEmail, "Viewer");
   const viewer = await acceptInvitation(browser, viewerEmail, "Vikram Shah", PASSWORD);
-  await expect(viewer.getByRole("link", { name: "Settings" })).toBeVisible();
+  await expect(viewer.getByRole("link", { name: "My account" })).toBeVisible();
+  await expect(viewer.getByRole("link", { name: "Organisation settings" })).toBeVisible();
   await expect(viewer.getByRole("link", { name: "Users" })).toHaveCount(0);
 
   await viewer.goto("/users");

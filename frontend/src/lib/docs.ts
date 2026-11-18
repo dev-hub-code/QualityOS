@@ -355,7 +355,7 @@ export const DOC_PAGES: DocPage[] = [
       {
         title: "Good to know",
         list: [
-          "The reviewer must be someone other than the inspector. An organisation with one member can allow self-review under Settings, with a reason each time.",
+          "The reviewer must be someone other than the inspector. An organisation with one member can allow self-review under Organisation settings, with a reason each time.",
           "A changed result leaves an audit event.",
           "Failed material always gets an NCR, however it is disposed of.",
           "An instrument that is overdue or out of service cannot be recorded on an inspection.",
@@ -405,13 +405,13 @@ export const DOC_PAGES: DocPage[] = [
           ["Rejected", "A reviewer found it was not a real non-conformance."],
           ["Cancelled", "Withdrawn while still Open. One raised by an inspection can only be rejected."],
         ],
-        text: "These are the standard names. An administrator can give them your own under Settings, NCR status names, such as Quarantine for Containment. The steps and their rules stay the same.",
+        text: "These are the standard names. An administrator can give them your own under Organisation settings, NCR status names, such as Quarantine for Containment. The steps and their rules stay the same.",
       },
       {
         title: "Closing rules",
         list: [
           "The person who closes an NCR must differ from the person who requested verification.",
-          "By default, a critical or major NCR needs a closed CAPA. An administrator can change which NCRs need one under Settings.",
+          "By default, a critical or major NCR needs a closed CAPA. An administrator can change which NCRs need one under Organisation settings.",
           "Every linked CAPA must be closed or cancelled first.",
           "A reviewer can send an NCR back if the work is not good enough.",
         ],
@@ -453,12 +453,12 @@ export const DOC_PAGES: DocPage[] = [
         list: [
           "Record the root cause before moving on, and add at least one action.",
           "Every action must be complete before verification.",
-          "Someone other than the CAPA owner must verify it. An organisation with one member can allow self-review under Settings, with a reason each time.",
-          "By default, a CAPA on a critical or major NCR needs an effectiveness check. An administrator can change this under Settings.",
+          "Someone other than the CAPA owner must verify it. An organisation with one member can allow self-review under Organisation settings, with a reason each time.",
+          "By default, a CAPA on a critical or major NCR needs an effectiveness check. An administrator can change this under Organisation settings.",
           "Reminders go out 3 days before the target date, and again once it is overdue.",
           "Completing an action needs the CAPA manage permission.",
           "Evidence can be attached to the CAPA as a whole or to each action.",
-          "An administrator can require evidence on each action before it is completed, under Settings. A file on the CAPA as a whole does not count.",
+          "An administrator can require evidence on each action before it is completed, under Organisation settings. A file on the CAPA as a whole does not count.",
         ],
       },
     ],
@@ -1086,7 +1086,7 @@ export const DOC_PAGES: DocPage[] = [
     group: "Insight",
     title: "Notifications",
     summary: "What you are told, and how to control it.",
-    menu: "Bell icon, Settings",
+    menu: "Bell icon, My account",
     roles: "Everyone",
     plan: EVERY_PLAN,
     sections: [
@@ -1105,7 +1105,7 @@ export const DOC_PAGES: DocPage[] = [
         title: "Good to know",
         list: [
           "Every notification appears in the app under the bell. The count updates as soon as something new arrives.",
-          "In Settings you can turn off email for each type. In-app notifications stay on.",
+          "In My account you can turn off email for each type. In-app notifications stay on.",
           "The app and its email are in English.",
         ],
       },
@@ -1113,7 +1113,7 @@ export const DOC_PAGES: DocPage[] = [
     example: {
       title: "Quieter email",
       steps: [
-        { who: "Meera, Quality Manager", action: "In Settings, turns off email for inspections awaiting approval.", result: "Those stop arriving by email, and still appear under the bell." },
+        { who: "Meera, Quality Manager", action: "In My account, turns off email for inspections awaiting approval.", result: "Those stop arriving by email, and still appear under the bell." },
       ],
     },
   },
@@ -1167,7 +1167,7 @@ export const DOC_PAGES: DocPage[] = [
     group: "Account",
     title: "Security and your data",
     summary: "How your records are protected, and what is logged.",
-    menu: "Settings",
+    menu: "My account, Organisation settings",
     roles: "Everyone",
     plan: EVERY_PLAN,
     sections: [
@@ -1179,9 +1179,9 @@ export const DOC_PAGES: DocPage[] = [
           "Attachments are only reachable by someone allowed to see the record they belong to.",
           "Critical actions are written to the audit log, with members' sign-in and password events from the day they joined.",
           "Ten failed sign-ins lock an account for 15 minutes, and a reset link unlocks it.",
-          "Change your own password under Settings.",
-          "ProductionOS support cannot see your records unless an administrator allows it under Settings, Support access, for 24 hours, 3 days or 7 days. Support can only read, never change, and you can withdraw access at any time. Every page support opens is listed there.",
-          "An administrator can upload a logo under Settings. It shows in the menu, at the top of your organisation's emails and on its PDF reports. Only PNG and JPEG images up to 256 KB are taken, checked by their content.",
+          "Change your own password under My account.",
+          "ProductionOS support cannot see your records unless an administrator allows it under Organisation settings, Support access, for 24 hours, 3 days or 7 days. Support can only read, never change, and you can withdraw access at any time. Every page support opens is listed there.",
+          "An administrator can upload a logo under Organisation settings. It shows in the menu, at the top of your organisation's emails and on its PDF reports. Only PNG and JPEG images up to 256 KB are taken, checked by their content.",
         ],
       },
       {

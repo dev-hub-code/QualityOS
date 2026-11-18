@@ -1,0 +1,9 @@
+# SIT: system integration testing. Built on local; every email is caught by Mailpit and none leaves.
+qualityos:
+  environment: SIT
+  mail:
+    provider: smtp
+spring:
+  mail:
+    host: ${SMTP_HOST:mailpit}
+    port: ${SMTP_PORT:1025}

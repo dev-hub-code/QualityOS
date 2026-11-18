@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -49,6 +50,11 @@ public class InvoicePdfRenderer {
         model.put("cycle", invoice.getBillingCycle() == Subscription.Cycle.ANNUAL
                 ? "annual" : "monthly");
         model.put("amount", money(invoice.getAmount()));
+        model.put("listPrice", money(Objects.requireNonNullElse(invoice.getListPrice(), invoice.getAmount())));
+        model.put("credit", invoice.getProrationCredit() == null ? List.of() : List.of(Map.of(
+                "note", invoice.getProrationNote(), "amount", money(invoice.getProrationCredit()),
+                "taxable", money(invoice.getAmount()),
+                "extraDays", invoice.getExtraDays() > 0 ? List.of(invoice.getExtraDays()) : List.of())));
         model.put("tax", money(invoice.getTaxAmount()));
         model.put("cgst", amount(invoice.getCgstAmount()));
         model.put("sgst", amount(invoice.getSgstAmount()));

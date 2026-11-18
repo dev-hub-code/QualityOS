@@ -24,6 +24,8 @@ import com.qualityos.subscription.entity.Subscription;
 import com.qualityos.subscription.entity.SubscriptionInvoice;
 import com.qualityos.subscription.entity.FeatureDefinition;
 import com.qualityos.subscription.entity.SubscriptionPlan;
+import com.qualityos.subscription.entity.CreditNote;
+import com.qualityos.subscription.repository.CreditNoteRepository;
 import com.qualityos.subscription.repository.FeatureDefinitionRepository;
 import com.qualityos.subscription.repository.PaymentTransactionRepository;
 import com.qualityos.subscription.repository.SubscriptionInvoiceRepository;
@@ -35,6 +37,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -54,6 +58,8 @@ public class SubscriptionService {
     private static final String LINK = "/settings/billing";
     private static final int PAYMENT_TERMS_DAYS = 7;
     private static final long MEGABYTE = 1_048_576L;
+    /** How long before a paid period ends its renewal invoice is raised. */
+    private static final Duration RENEWAL_NOTICE = Duration.ofDays(7);
     private static final List<Integer> NOTICE_DAYS = List.of(7, 3, 1, 0);
     /** The database index that keeps a payment reference to one invoice across the platform. */
     private static final String REFERENCE_INDEX = "uq_payments_reference";
@@ -69,6 +75,7 @@ public class SubscriptionService {
     private final JdbcTemplate jdbc;
     private final AuditService audit;
     private final FeatureDefinitionRepository features;
+    private final CreditNoteRepository creditNotes;
     private final String sellerGstin;
     private final String sacCode;
 
@@ -85,7 +92,9 @@ public class SubscriptionService {
             AuditService audit,
             FeatureDefinitionRepository features,
             @Value("${qualityos.billing.seller-gstin:}") String sellerGstin,
-            @Value("${qualityos.billing.sac-code:}") String sacCode) {
+            @Value("${qualityos.billing.sac-code:}") String sacCode,
+            CreditNoteRepository creditNotes) {
+        this.creditNotes = creditNotes;
         this.plans = plans;
         this.subscriptions = subscriptions;
         this.invoices = invoices;
@@ -178,7 +187,112 @@ public class SubscriptionService {
         if (price == null) {
             throw new BusinessRuleException("This plan is agreed with our team. Contact us to set it up.");
         }
-        return toResponse(raise(plan, request.cycle(), price));
+        Subscription subscription = subscriptions.lockCurrent().orElseThrow(SubscriptionService::missing);
+        SubscriptionInvoice invoice = raise(plan, request.cycle(), price, prorate(subscription, plan, request.cycle(), price),
+                null, true);
+        if (invoice.getTotal().signum() == 0) {
+            markPaid(subscription, invoice);
+            invoices.saveAndFlush(invoice);
+            audit.record("INVOICE_SETTLED_BY_CREDIT", "SubscriptionInvoice", invoice.getId(), null, Map.of(
+                    "credit", invoice.getProrationCredit().toPlainString(), "extraDays", invoice.getExtraDays()));
+        }
+        return toResponse(invoice);
+    }
+
+    /** What was paid and not yet used, before GST. */
+    record Proration(BigDecimal credit, String note, int extraDays) {
+    }
+
+    /**
+     * Changing to another plan while a paid period runs credits what is left of every paid period, at the value it was
+     * bought for less anything credited back since. Only the new plan is charged for, from now. A credit larger than
+     * the new price becomes extra days at the new plan's rate. Renewing the same plan needs none: it adds to the time.
+     */
+    private Proration prorate(Subscription subscription, SubscriptionPlan plan, Subscription.Cycle cycle, BigDecimal price) {
+        Instant now = Instant.now();
+        if (subscription.getStatus() != Subscription.Status.ACTIVE || subscription.getPlanId().equals(plan.getId())
+                || !subscription.getCurrentPeriodEndsAt().isAfter(now)) {
+            return null;
+        }
+        BigDecimal credit = BigDecimal.ZERO;
+        List<String> from = new ArrayList<>();
+        for (SubscriptionInvoice paid : invoices.findByStatusAndPeriodEndsAtAfter(SubscriptionInvoice.Status.PAID, now)) {
+            if (paid.getPeriodStartsAt() == null) {
+                continue;
+            }
+            BigDecimal value = paid.getAmount()
+                    .add(Objects.requireNonNullElse(paid.getProrationCredit(), BigDecimal.ZERO))
+                    .subtract(creditNotes.findByInvoiceId(paid.getId()).stream()
+                            .map(CreditNote::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add));
+            long whole = Duration.between(paid.getPeriodStartsAt(), paid.getPeriodEndsAt()).toSeconds();
+            Instant unusedFrom = paid.getPeriodStartsAt().isAfter(now) ? paid.getPeriodStartsAt() : now;
+            long unused = Duration.between(unusedFrom, paid.getPeriodEndsAt()).toSeconds();
+            if (whole <= 0 || value.signum() <= 0) {
+                continue;
+            }
+            BigDecimal part = value.multiply(BigDecimal.valueOf(unused))
+                    .divide(BigDecimal.valueOf(whole), 2, RoundingMode.DOWN);
+            if (part.signum() > 0) {
+                credit = credit.add(part);
+                from.add(paid.getInvoiceNumber());
+            }
+        }
+        if (credit.signum() == 0) {
+            return null;
+        }
+        int extraDays = 0;
+        if (credit.compareTo(price) > 0 && price.signum() > 0) {
+            var start = now.atOffset(ZoneOffset.UTC);
+            long days = Duration.between(start, cycle == Subscription.Cycle.ANNUAL ? start.plusYears(1) : start.plusMonths(1))
+                    .toDays();
+            extraDays = credit.subtract(price).multiply(BigDecimal.valueOf(days))
+                    .divide(price, 0, RoundingMode.DOWN).intValue();
+        }
+        return new Proration(credit, "Unused time on " + String.join(", ", from), extraDays);
+    }
+
+    /**
+     * Raises the invoice renewing the paid period that ends within a week, unless the organisation cancelled, already
+     * has an invoice open, or this period was renewed on its own before. The plan's price now; for a plan no longer
+     * offered, or agreed with our team, the price last paid for it. Cashfree cannot take it without the customer, so
+     * the customer pays it as any other. Runs under the current tenant.
+     */
+    @Transactional
+    public int raiseRenewal() {
+        Subscription subscription = subscriptions.lockCurrent().orElseThrow(SubscriptionService::missing);
+        Instant now = Instant.now();
+        Instant ends = subscription.getCurrentPeriodEndsAt();
+        if (subscription.getStatus() != Subscription.Status.ACTIVE || subscription.getCancelledAt() != null
+                || !ends.isAfter(now) || ends.isAfter(now.plus(RENEWAL_NOTICE))
+                || invoices.findByStatus(SubscriptionInvoice.Status.ISSUED).isPresent()
+                || invoices.existsByRenewsPeriodEnding(ends)) {
+            return 0;
+        }
+        SubscriptionPlan plan = plans.findById(subscription.getPlanId()).orElseThrow();
+        Subscription.Cycle cycle = subscription.getBillingCycle();
+        BigDecimal price = plan.isActive() ? plan.priceFor(cycle) : null;
+        if (price == null) {
+            price = invoices.findFirstByStatusAndPlanIdAndBillingCycleOrderByPaidAtDesc(
+                            SubscriptionInvoice.Status.PAID, plan.getId(), cycle)
+                    .map(paid -> Objects.requireNonNullElse(paid.getListPrice(), paid.getAmount()))
+                    .orElse(null);
+        }
+        if (price == null) {
+            return 0;
+        }
+        SubscriptionInvoice invoice = raise(plan, cycle, price, null, ends, false);
+        ZoneId zone = ZoneId.of(organizations.getCurrent().timezone());
+        LocalDate due = LocalDate.ofInstant(ends, zone);
+        invoice.setDueOn(due.isBefore(invoice.getIssuedOn()) ? invoice.getIssuedOn() : due);
+        invoices.saveAndFlush(invoice);
+        notifications.notify(access.holdersOf(PlanAccess.SUBSCRIPTION_MANAGE), NotificationType.RENEWAL_INVOICE,
+                "Renewal invoice", "Invoice " + invoice.getInvoiceNumber() + " for ₹" + invoice.getTotal()
+                        + " renews the " + plan.getName() + " plan. Pay it by " + invoice.getDueOn()
+                        + " to keep working without a break.", LINK,
+                new EmailContent(EmailTemplate.RENEWAL_INVOICE, Map.of(
+                        "invoiceNumber", invoice.getInvoiceNumber(), "amount", "₹" + invoice.getTotal(),
+                        "planName", plan.getName(), "dueDate", invoice.getDueOn().toString())));
+        return 1;
     }
 
     /** Runs under the tenant being invoiced. */
@@ -190,12 +304,17 @@ public class SubscriptionService {
         if (amount == null) {
             throw new BusinessRuleException("This plan has no list price, so enter the agreed amount.");
         }
-        return toResponse(raise(plan, request.cycle(), amount));
+        return toResponse(raise(plan, request.cycle(), amount, null, null, true));
     }
 
-    private SubscriptionInvoice raise(SubscriptionPlan plan, Subscription.Cycle cycle, BigDecimal amount) {
+    /** A renewal is not held back by limits: nothing is taken away by carrying on. */
+    private SubscriptionInvoice raise(SubscriptionPlan plan, Subscription.Cycle cycle, BigDecimal listPrice,
+            Proration proration, Instant renews, boolean checkLimits) {
         Subscription subscription = subscriptions.lockCurrent().orElseThrow(SubscriptionService::missing);
-        requireFits(plan);
+        if (checkLimits) {
+            requireFits(plan);
+        }
+        BigDecimal amount = proration == null ? listPrice : listPrice.subtract(proration.credit()).max(BigDecimal.ZERO);
         invoices.findByStatus(SubscriptionInvoice.Status.ISSUED).ifPresent(open -> {
             open.setStatus(SubscriptionInvoice.Status.VOID);
             invoices.saveAndFlush(open);
@@ -226,6 +345,13 @@ public class SubscriptionService {
         invoice.setSellerGstin(sellerGstin.isBlank() ? null : sellerGstin);
         invoice.setIssuedOn(today);
         invoice.setDueOn(today.plusDays(PAYMENT_TERMS_DAYS));
+        invoice.setListPrice(listPrice.setScale(2, RoundingMode.HALF_UP));
+        invoice.setRenewsPeriodEnding(renews);
+        if (proration != null) {
+            invoice.setProrationCredit(proration.credit());
+            invoice.setProrationNote(proration.note());
+            invoice.setExtraDays(proration.extraDays());
+        }
         invoices.saveAndFlush(invoice);
         audit.record("INVOICE_ISSUED", "SubscriptionInvoice", invoice.getId(), null, Map.of(
                 "plan", plan.getCode(), "cycle", cycle.name(), "total", invoice.getTotal().toPlainString()));
@@ -380,6 +506,9 @@ public class SubscriptionService {
         Instant now = Instant.now();
         UUID previousPlan = subscription.getPlanId();
         Instant start = subscription.activate(invoice.getPlanId(), invoice.getBillingCycle(), now);
+        if (invoice.getExtraDays() > 0) {
+            subscription.extend(Duration.ofDays(invoice.getExtraDays()));
+        }
         if (!previousPlan.equals(invoice.getPlanId())) {
             notifications.notify(access.holdersOf(PlanAccess.SUBSCRIPTION_MANAGE), NotificationType.PLAN_CHANGED,
                     "Plan changed", "Your organisation is now on the " + invoice.getPlanName() + " plan.", LINK,
@@ -389,6 +518,9 @@ public class SubscriptionService {
         invoice.setPaidAt(now);
         invoice.setPeriodStartsAt(start);
         invoice.setPeriodEndsAt(subscription.getCurrentPeriodEndsAt());
+        if (invoice.getTotal().signum() == 0) {
+            return;
+        }
         notifications.notify(access.holdersOf(PlanAccess.SUBSCRIPTION_MANAGE), NotificationType.PAYMENT_RECEIVED,
                 "Payment received", "Thank you. Invoice " + invoice.getInvoiceNumber() + " is paid.", LINK,
                 new EmailContent(EmailTemplate.PAYMENT_CONFIRMATION, Map.of("amount", "₹" + invoice.getTotal())));
@@ -428,7 +560,9 @@ public class SubscriptionService {
                     + " and exported. Renew to carry on working.";
         } else if (now.isBefore(endsAt)) {
             stage = NOTICE_DAYS.stream().filter(days -> left < days).reduce((first, second) -> second).orElse(null);
-            body = "Your subscription ends soon. Renew to keep working without a break.";
+            body = invoices.findByStatus(SubscriptionInvoice.Status.ISSUED).isPresent()
+                    ? "Your subscription ends soon. Pay the open invoice to keep working without a break."
+                    : "Your subscription ends soon. Renew to keep working without a break.";
         } else {
             stage = 0;
             body = "Your subscription has ended. ProductionOS turns read-only after " + plan.getGraceDays() + " days.";
@@ -458,6 +592,8 @@ public class SubscriptionService {
                 invoice.getTotal(), invoice.getStatus().name(), invoice.getIssuedOn(), invoice.getDueOn(),
                 invoice.getPaidAt(), invoice.getTaxTreatment(), invoice.getPlaceOfSupply(), invoice.getCgstAmount(),
                 invoice.getSgstAmount(), invoice.getIgstAmount(), invoice.getSacCode(), invoice.getSellerGstin(),
-                invoice.getBuyerName(), invoice.getBuyerGstin(), invoice.getPeriodStartsAt(), invoice.getPeriodEndsAt());
+                invoice.getBuyerName(), invoice.getBuyerGstin(), invoice.getPeriodStartsAt(), invoice.getPeriodEndsAt(),
+                invoice.getListPrice(), invoice.getProrationCredit(), invoice.getProrationNote(), invoice.getExtraDays(),
+                invoice.getRenewsPeriodEnding() != null);
     }
 }

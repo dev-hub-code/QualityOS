@@ -333,7 +333,7 @@ Reading `/api/v1/subscription` needs only membership. Everything else here needs
 |---|---|---|
 | GET | `/api/v1/subscription` | Plan, state (`TRIAL`, `ACTIVE`, `GRACE`, `READ_ONLY`), usage and limits |
 | GET | `/api/v1/subscription/plans` | Plans on offer |
-| POST | `/api/v1/subscription/plan` | Raises an invoice, voiding any open one. Takes effect when paid. Also how to renew |
+| POST | `/api/v1/subscription/plan` | Raises an invoice, voiding any open one. Takes effect when paid. Also how to renew. Another plan, chosen while a paid period runs, is charged less the unused value (`listPrice`, `prorationCredit`, `prorationNote`); a credit that covers it settles the invoice at once (`PAID`, total 0) and the rest is `extraDays`. Invoices raised on their own to renew have `renewal: true` |
 | POST | `/api/v1/subscription/cancel`, `/resume` | Cancelling runs to the end of the period |
 | GET | `/api/v1/subscription/invoices`, `/invoices/{id}/pdf`, `/payments` | Billing history |
 

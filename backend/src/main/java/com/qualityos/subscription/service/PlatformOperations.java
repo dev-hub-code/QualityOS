@@ -52,7 +52,7 @@ public class PlatformOperations {
     private static final int MAX_EXPORT = 5000;
     private static final Set<String> ROLES = Set.of("SUPER_ADMIN", "BILLING_ADMIN", "SUPPORT_ADMIN", "READ_ONLY_AUDITOR");
     private static final Set<String> NOTICES = Set.of("SUBSCRIPTION_EXPIRY", "PAYMENT_RECEIVED", "INVOICE_OVERDUE",
-            "PLAN_CHANGED", "REFUND_ISSUED");
+            "PLAN_CHANGED", "REFUND_ISSUED", "RENEWAL_INVOICE");
     private static final Pattern SENSITIVE = Pattern.compile(
             "(?i).*(password|secret|token|hash|otp|credential|gstin|bank|utr).*");
     private static final String HIDDEN = "[hidden]";

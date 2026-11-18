@@ -10,6 +10,7 @@ import {
 import {
   CreditNoteDialog,
   CreditNotes,
+  InvoiceNote,
 } from "@/components/billing/credit-notes";
 import {
   EXTEND_FIELDS,
@@ -226,7 +227,10 @@ export default function PlatformOrganisationPage() {
               {data.invoices.map((invoice) => (
                 <TableRow key={invoice.id}>
                   <TableCell>{invoice.invoiceNumber}</TableCell>
-                  <TableCell>{invoice.planName}</TableCell>
+                  <TableCell className="whitespace-normal">
+                    {invoice.planName}
+                    <InvoiceNote invoice={invoice} />
+                  </TableCell>
                   <TableCell>{invoice.status.toLowerCase()}</TableCell>
                   <TableCell>{formatDate(invoice.dueOn)}</TableCell>
                   <TableCell className="text-right">

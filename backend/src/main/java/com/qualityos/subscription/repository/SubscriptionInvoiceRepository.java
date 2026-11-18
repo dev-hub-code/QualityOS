@@ -11,4 +11,11 @@ public interface SubscriptionInvoiceRepository extends JpaRepository<Subscriptio
     List<SubscriptionInvoice> findAllByOrderByCreatedAtDesc();
 
     Optional<SubscriptionInvoice> findByStatus(SubscriptionInvoice.Status status);
+
+    List<SubscriptionInvoice> findByStatusAndPeriodEndsAtAfter(SubscriptionInvoice.Status status, java.time.Instant after);
+
+    boolean existsByRenewsPeriodEnding(java.time.Instant periodEnding);
+
+    Optional<SubscriptionInvoice> findFirstByStatusAndPlanIdAndBillingCycleOrderByPaidAtDesc(
+            SubscriptionInvoice.Status status, UUID planId, com.qualityos.subscription.entity.Subscription.Cycle cycle);
 }

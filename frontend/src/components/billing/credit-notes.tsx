@@ -152,3 +152,20 @@ export function CreditNoteDialog({
     />
   );
 }
+
+/** Why an invoice is for less than the plan's price, or that it was raised on its own to renew. */
+export function InvoiceNote({ invoice }: { invoice: Invoice }) {
+  if (invoice.prorationCredit != null) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {formatMoney(invoice.listPrice ?? invoice.amount)} less{" "}
+        {formatMoney(invoice.prorationCredit)} credit for{" "}
+        {invoice.prorationNote?.replace(/^Unused/, "unused")}
+        {invoice.extraDays > 0 && `, with ${invoice.extraDays} extra days`}
+      </p>
+    );
+  }
+  return invoice.renewal ? (
+    <p className="text-xs text-muted-foreground">Renewal</p>
+  ) : null;
+}

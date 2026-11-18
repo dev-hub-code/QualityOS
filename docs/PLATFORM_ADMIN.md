@@ -15,7 +15,22 @@ A page joins the navigation only once it works.
 
 Not built yet:
 
-- Partial payments and automatic renewal. Each invoice is paid in full, and each renewal is a new invoice.
+- Partial payments and automatic debits. Each invoice is paid in full by the customer; there are no saved cards or
+  mandates.
+
+## Plan changes and renewal
+
+A customer who changes to another plan while a paid period runs is charged the new plan's price less what is left of
+what they paid, before GST, less anything credited back since. The new period starts when the invoice is paid. A credit
+larger than the new price settles the invoice at once and the rest becomes extra days at the new plan's rate. Renewing
+the same plan is not prorated: paying early adds to the time left. A credit is worked out when the invoice is raised, so
+an invoice paid days later still carries the credit for those days.
+
+A week before a paid period ends, a renewal invoice is raised on its own for the same plan and cycle, due on the day the
+period ends, and the organisation's billing users are told. It is not raised for a trial, a cancelled subscription, an
+organisation with an invoice already open, or a period renewed this way before. The price is the plan's price now, or
+for a plan no longer offered or agreed with our team, the price last paid for it. Custom invoices raised here are not
+prorated: enter the amount agreed.
 
 ## Online payment
 

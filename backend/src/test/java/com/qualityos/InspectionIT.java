@@ -656,4 +656,37 @@ class InspectionIT extends MasterDataFixture {
 
         as(owner, get("/api/v1/ncrs")).andExpect(jsonPath("$.data.totalItems").value(0));
     }
+
+    @Test
+    void aResultRecordedOfflineArrivesLateWithoutReplacingANewerOne() throws Exception {
+        Session owner = register();
+        String inspection = startInspection(owner, shaftTemplate(owner));
+        String hourAgo = java.time.Instant.now().minus(java.time.Duration.ofHours(1)).toString();
+        String later = java.time.Instant.now().minus(java.time.Duration.ofMinutes(10)).toString();
+
+        // Sample 1 was measured on the bench a few minutes ago, after the tablet that went offline measured it.
+        record(owner, inspection, "DIA", 1, "20.05").andExpect(status().isOk());
+        as(owner, postJson("/api/v1/inspections/" + inspection + "/execute", Map.of("results", List.of(
+                        Map.of("parameterCode", "DIA", "sampleNumber", 1, "valueNumeric", "19.95",
+                                "measuredAt", hourAgo),
+                        Map.of("parameterCode", "DIA", "sampleNumber", 2, "valueNumeric", "20.00",
+                                "measuredAt", later)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[?(@.sampleNumber == 1)].valueNumeric").value("20.050000"))
+                .andExpect(jsonPath("$.data.results[?(@.sampleNumber == 2)].valueNumeric").value("20.00"))
+                .andExpect(jsonPath("$.data.results[?(@.sampleNumber == 2)].measuredAt")
+                        .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.startsWith(later.substring(0, 16)))));
+
+        // Sending the same offline results again changes nothing.
+        as(owner, postJson("/api/v1/inspections/" + inspection + "/execute", Map.of("results", List.of(
+                        Map.of("parameterCode", "DIA", "sampleNumber", 2, "valueNumeric", "20.00",
+                                "measuredAt", later)))))
+                .andExpect(status().isOk());
+        assertThat(asDatabaseSuperuser().queryForObject(
+                "SELECT count(*) FROM audit_logs WHERE entity_id = ? AND action = 'INSPECTION_RESULT_SUPERSEDED'",
+                Integer.class, inspection)).isEqualTo(1);
+        assertThat(asDatabaseSuperuser().queryForObject(
+                "SELECT count(*) FROM audit_logs WHERE entity_id = ? AND action = 'INSPECTION_RESULT_CHANGED'",
+                Integer.class, inspection)).isZero();
+    }
 }

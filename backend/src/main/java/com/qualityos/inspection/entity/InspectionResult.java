@@ -6,6 +6,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -33,6 +34,8 @@ public class InspectionResult extends TenantOwnedEntity {
     private String remarks;
     /* The instrument that took this measurement, when the inspector said which. */
     private UUID instrumentId;
+    /* When it was measured: for a result recorded offline, before it reached the server. */
+    private Instant measuredAt;
 
     public InspectionResult(UUID inspectionId, String parameterCode, int sampleNumber) {
         this.inspectionId = inspectionId;
@@ -46,7 +49,9 @@ public class InspectionResult extends TenantOwnedEntity {
             Boolean bool,
             LocalDate date,
             Inspection.Evaluation evaluation,
-            String remarks) {
+            String remarks,
+            Instant measuredAt) {
+        this.measuredAt = measuredAt;
         this.valueNumeric = numeric;
         this.valueText = text;
         this.valueBoolean = bool;

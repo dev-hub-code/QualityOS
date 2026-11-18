@@ -74,7 +74,8 @@ Phase 11 is on hold until you ask for it.
 - [x] Audit every change to child records, with before and after values: edits keep only the fields that changed,
   child lines (PO items, BOM lines, routing steps, plan lines, checklist items, template parameters) as they were and
   are; specifications and categories keep what was added, renamed or removed
-- [ ] Offline inspection on the shop floor
+- [x] Offline inspection on the shop floor: results saved without a connection stay on the device and are sent when it
+  is back, each with when it was measured; a late one never replaces a newer measurement
 - Not planned: translations. The app is English only (#89).
 
 ## Notes

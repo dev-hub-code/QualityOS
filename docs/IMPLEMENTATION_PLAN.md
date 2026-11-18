@@ -17,12 +17,12 @@ account emails a real customer needs.
 | 10 Subscription | Plans, trials, limits, invoices | Limits enforced, prices editable by admin | **Done** |
 | 12 Control Center | Platform dashboard, plans, organisations, then billing, entitlements, operators and support. See [PLATFORM_ADMIN.md](PLATFORM_ADMIN.md) | Every acceptance item in the owner's brief | **All 5 phases built** |
 | 13 Manufacturing | BOMs, recipes, routings, work centres and machines, then work orders, inventory, shop floor, quality gates, completion and advanced analytics. See [MANUFACTURING.md](MANUFACTURING.md) | Each of its seven phases tested and documented | **All 7 phases built** |
-| 11 Production | Terraform, ECS, RDS, S3, Secrets Manager, CI/CD, monitoring, backups | Deployed and restore-tested | Deferred |
+| 11 Production | Terraform, ECS, RDS, S3, Secrets Manager, CI/CD, monitoring, backups | Deployed and restore-tested | **In progress**: UAT first |
 
 Later: Module 12 (AI) after Phase 9, because it depends on accumulated data. SMS and WhatsApp stay behind
 a notification channel interface.
 
-Phase 11 is deferred until the owner asks for it. Until then, development targets the local Docker Compose stack only.
+Phase 11 started on 18 November 2026, with UAT first. It follows the rule of adding each scaling layer only when its bottleneck appears: two app instances behind a load balancer and a database with a standby now; caching, read replicas, a message queue and sharding only when measurements call for them.
 
 ## Known gaps
 
@@ -85,7 +85,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Operators sign in with a password and an authenticator code, and the Control Center stays closed until they set one up. There are no backup codes: a Super Admin resets a lost authenticator (see [PLATFORM_ADMIN.md](PLATFORM_ADMIN.md)). Members of customer organisations sign in with a password only | Review after real use |
 | Duplicate references are checked before saving, so two identical references saved at the same moment for different organisations could both pass | With a payment gateway |
 | `NCR_CAPA`, `REPORTS`, `ADVANCED` and `MANUFACTURING` are enforced. A feature added in the Control Center is listed but restricts nothing until code enforces it | When a feature is sold |
-| Attachments use local disk; S3 sits behind `FileStorage` and is not implemented | With production work |
+| Attachments and report exports use local disk locally, in dev and in SIT, and S3 in UAT (`STORAGE_PROVIDER=s3`). S3 storage is tested against an S3-compatible server, not yet against AWS | With the first AWS deployment |
 | All seven manufacturing phases are built, through finished-goods receipt and OEE. Each phase's own limits are listed in [MANUFACTURING.md](MANUFACTURING.md) | Review after real use |
 
 ## Definition of done for each phase

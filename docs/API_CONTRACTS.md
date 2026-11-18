@@ -234,6 +234,22 @@ used or dispatched stays where it is. It is `422` on an inspection that is not c
 cannot be cancelled, only rejected, and cannot close while any of its inspections has no decision. Each instrument on an
 inspection carries `impactReview`: `PENDING`, `RESULT_STANDS`, `REINSPECT` or null.
 
+Once a `REINSPECT` decision commits, the new inspection starts on its own, in a separate transaction, with the template
+the doubted inspection used (an outgoing inspection's held batch takes the inspection due for it). It is audited as
+`INSPECTION_REINSPECTION_STARTED`. If it cannot start, because of the plan's monthly limit, a plant the person cannot
+reach, or an archived template, the decision and the hold stand and the goods wait in the queue as before. An inspection
+returns `reinspectionOf` and `reinspectedBy` (`id`, `inspectionNumber`, `status`, or null). `GET
+/traceability/inspections/{id}/reach` (`TRACEABILITY_VIEW`) says what the goods already went into (`usedIn`), who holds
+them or what was made from them (`customers`), and `recallable`, the production batches a recall would cover. The
+review shows it beside each `REINSPECT` decision, with a link to each batch's recall report.
+
+Each result sent to `POST /inspections/{id}/execute` may name the `instrumentId` that took it. The instrument is then
+recorded as used on the inspection, with the same checks as `POST /inspections/{id}/instruments` (active, within its
+calibration: `422` otherwise). A result saved again without one keeps the instrument named before. Results return
+`instrumentId`; each instrument on an inspection returns `parameters`, the parameters it measured; and each impact
+review returns `parameters`, the parameters the failed instrument measured. Empty means no result named it, so the
+whole inspection is in doubt.
+
 | Audits | Permission |
 |---|---|
 | `GET /audit-checklists`, `GET /audit-checklists/{id}`, `GET /audits`, `GET /audits/{id}`, `/report`, `/report.pdf` | `AUDIT_VIEW` |

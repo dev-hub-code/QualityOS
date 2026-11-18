@@ -10,14 +10,23 @@ import { api, type PageResponse } from "@/lib/api";
 import type { Inspection, Instrument, UsedInstrument } from "@/lib/types";
 
 /** Shown beside an instrument that failed calibration after this inspection used it. */
-const IMPACT_LABELS: Record<NonNullable<UsedInstrument["impactReview"]>, string> = {
+const IMPACT_LABELS: Record<
+  NonNullable<UsedInstrument["impactReview"]>,
+  string
+> = {
   PENDING: "CALIBRATION_REVIEW_PENDING",
   RESULT_STANDS: "RESULT_STANDS",
   REINSPECT: "REINSPECT",
 };
 
 /** The list offers only instruments in date, and the server refuses any other. */
-export function InspectionInstruments({ inspection, editable }: { inspection: Inspection; editable: boolean }) {
+export function InspectionInstruments({
+  inspection,
+  editable,
+}: {
+  inspection: Inspection;
+  editable: boolean;
+}) {
   const canExecute = usePermission("INSPECTION_EXECUTE");
   const { run, pending, message } = useAction();
   const [chosen, setChosen] = useState("");
@@ -26,16 +35,25 @@ export function InspectionInstruments({ inspection, editable }: { inspection: In
     queryFn: () => api.get<PageResponse<Instrument>>("/instruments/usable"),
     enabled: editable && canExecute,
   });
-  const used = new Set(inspection.instruments.map((instrument) => instrument.id));
-  const options = (data?.items ?? []).filter((instrument) => !used.has(instrument.id));
+  const used = new Set(
+    inspection.instruments.map((instrument) => instrument.id),
+  );
+  const options = (data?.items ?? []).filter(
+    (instrument) => !used.has(instrument.id),
+  );
   return (
     <Section title="Instruments used">
       <FormError message={message} />
-      {inspection.instruments.length === 0 && <p className="text-sm text-muted-foreground">None recorded.</p>}
+      {inspection.instruments.length === 0 && (
+        <p className="text-sm text-muted-foreground">None recorded.</p>
+      )}
       <ul className="text-sm">
         {inspection.instruments.map((instrument) => (
           <li key={instrument.id}>
-            {instrument.instrumentCode} – {instrument.name}, calibration due {instrument.nextDueOn}
+            {instrument.instrumentCode} – {instrument.name}, calibration due{" "}
+            {instrument.nextDueOn}
+            {instrument.parameters.length > 0 &&
+              `, measured ${instrument.parameters.join(", ")}`}
             {instrument.impactReview && (
               <span className="ml-2">
                 <StatusBadge status={IMPACT_LABELS[instrument.impactReview]} />
@@ -63,7 +81,11 @@ export function InspectionInstruments({ inspection, editable }: { inspection: In
             variant="outline"
             disabled={!chosen || pending}
             onClick={() => {
-              run(() => api.post(`/inspections/${inspection.id}/instruments`, { instrumentIds: [chosen] }));
+              run(() =>
+                api.post(`/inspections/${inspection.id}/instruments`, {
+                  instrumentIds: [chosen],
+                }),
+              );
               setChosen("");
             }}
           >

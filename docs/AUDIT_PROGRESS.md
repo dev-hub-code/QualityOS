@@ -43,10 +43,9 @@ Phase 11 is on hold until you ask for it.
   raised by hand). Done: customer complaints and quality returns (#104, #113), and production rejects
 - [ ] **Recall**, remaining: a regulatory report pack, and escalation when customers do not respond. Done: one recall
   for several batches, and linking its CAPA later (#57)
-- [ ] **Calibration, remaining**:
-  - recall goods that were already used or dispatched;
-  - start the new inspection automatically after *Reinspect*;
-  - link instruments to each measurement, not to the whole inspection.
+- [x] **Calibration follow-ups** (#132): the new inspection starts on its own after *Reinspect*; the review shows the
+  batches and customers the goods already reached, with a recall report for each batch; and each measurement names the
+  instrument that took it, so a failure names the parameters in doubt.
 - [ ] **Transfers between plants**: a stock transfer with in-transit and received states, and dispatches split by plant
 - [x] Material receipt notifies inspectors (#79)
 

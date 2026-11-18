@@ -18,6 +18,9 @@ public interface InspectionRepository extends JpaRepository<Inspection, UUID>, J
     @Query("select i from Inspection i where i.id = :id")
     Optional<Inspection> findForUpdate(UUID id);
 
+    /** Re-inspections of an earlier inspection, newest first. */
+    List<Inspection> findByReinspectionOfOrderByCreatedAtDesc(UUID earlierInspectionId);
+
     List<Inspection> findByReceiptItemIdInOrProductionBatchIdInOrderByCreatedAt(
             Collection<UUID> receiptItemIds, Collection<UUID> productionBatchIds);
 

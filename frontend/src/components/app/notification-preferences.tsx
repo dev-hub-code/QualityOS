@@ -27,7 +27,9 @@ const LABELS: Record<string, string> = {
   CAPA_ACTION_OVERDUE: "An action I own, or on my CAPA, is overdue",
   CAPA_ESCALATED: "A CAPA or one of its actions is long overdue (for CAPA approvers)",
   CAPA_CLOSED: "My CAPA is closed",
-  DISPATCH_SHIPMENT_UNCONFIRMED: "Dispatches are waiting for shipment confirmation",
+  RECALL_UNANSWERED: "Customers on a recall have not acknowledged it in time",
+  DISPATCH_SHIPMENT_UNCONFIRMED:
+    "Dispatches are waiting for shipment confirmation",
   CALIBRATION_DUE_SOON: "An instrument is due for calibration",
   CALIBRATION_OVERDUE: "An instrument is overdue for calibration",
   CALIBRATION_FAILED: "An instrument fails calibration",
@@ -47,21 +49,28 @@ const LABELS: Record<string, string> = {
   PLAN_LINE_OVERDUE: "A production plan line is past its due date",
   ANNOUNCEMENT: "ProductionOS sends an announcement",
   SUPPORT_TICKET_UPDATED: "Support replies to my request or changes its status",
-  SUPPORT_CHANGES_STARTED: "Support starts a session that can make changes in our organisation",
+  SUPPORT_CHANGES_STARTED:
+    "Support starts a session that can make changes in our organisation",
 };
 const PATH = "/notifications/preferences";
 
 export function NotificationPreferences() {
   const queryClient = useQueryClient();
-  const { data } = useQuery({ queryKey: [PATH], queryFn: () => api.get<NotificationPreference[]>(PATH) });
+  const { data } = useQuery({
+    queryKey: [PATH],
+    queryFn: () => api.get<NotificationPreference[]>(PATH),
+  });
   const update = useMutation({
-    mutationFn: (preference: NotificationPreference) => api.put(PATH, preference),
+    mutationFn: (preference: NotificationPreference) =>
+      api.put(PATH, preference),
     onSettled: () => queryClient.invalidateQueries({ queryKey: [PATH] }),
   });
   return (
     <section className="space-y-3">
       <h2 className="text-base font-semibold text-[#1b2a55]">Email me when</h2>
-      <p className="text-sm text-muted-foreground">These always appear under Notifications in the app.</p>
+      <p className="text-sm text-muted-foreground">
+        These always appear under Notifications in the app.
+      </p>
       <FormError message={update.error?.message} />
       {data?.map(({ type, emailEnabled }) => (
         <div key={type} className="flex items-center gap-2">
@@ -69,7 +78,9 @@ export function NotificationPreferences() {
             id={`email-${type}`}
             checked={emailEnabled}
             disabled={update.isPending}
-            onCheckedChange={(checked) => update.mutate({ type, emailEnabled: checked === true })}
+            onCheckedChange={(checked) =>
+              update.mutate({ type, emailEnabled: checked === true })
+            }
           />
           <Label htmlFor={`email-${type}`} className="font-normal">
             {LABELS[type] ?? type}

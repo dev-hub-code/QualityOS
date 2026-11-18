@@ -48,6 +48,11 @@ public class RecallContact extends TenantOwnedEntity {
     private String exceptionReason;
     private UUID exceptionBy;
     private Instant exceptionAt;
+    private Instant escalatedAt;
+
+    public void escalated(Instant now) {
+        escalatedAt = now;
+    }
 
     public RecallContact(UUID recallId, UUID customerId, String contactPerson, String contactDetails) {
         this.recallId = recallId;

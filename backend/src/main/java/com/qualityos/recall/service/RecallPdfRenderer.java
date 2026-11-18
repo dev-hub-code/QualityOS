@@ -13,10 +13,32 @@ public class RecallPdfRenderer {
 
     private final HtmlPdf pdf;
     private final Template template;
+    private final Template regulatory;
 
     public RecallPdfRenderer(HtmlPdf pdf) {
         this.pdf = pdf;
         template = HtmlPdf.template("report-templates/recall.html");
+        regulatory = HtmlPdf.template("report-templates/recall-regulatory.html");
+    }
+
+    public byte[] renderRegulatory(com.qualityos.recall.dto.RecallDtos.RegulatoryReport pack) {
+        RecallReport report = pack.report();
+        Map<String, Object> model = new HashMap<>();
+        model.put("pack", pack);
+        model.put("report", report);
+        model.put("kind", pack.finalReport() ? "Final" : "Interim");
+        model.put("hazard", report.recall().hazardClass() == null ? "Not yet classified"
+                : switch (report.recall().hazardClass()) {
+                    case "CLASS_I" -> "Class I: may cause serious harm or death";
+                    case "CLASS_II" -> "Class II: may cause temporary or reversible harm";
+                    default -> "Class III: unlikely to cause harm";
+                });
+        model.put("hasUnanswered", !pack.unanswered().isEmpty());
+        model.put("dispatched", plain(report.recall().review().dispatchedQuantity()));
+        model.put("returned", plain(report.recall().review().returnedQuantity()));
+        model.put("outstanding", plain(report.recall().review().outstandingQuantity()));
+        model.put("footerName", HtmlPdf.cssString(report.organizationName()));
+        return pdf.render(regulatory.execute(model));
     }
 
     public byte[] render(RecallReport report) {

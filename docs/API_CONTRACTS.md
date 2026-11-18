@@ -202,7 +202,8 @@ a member's facilities answer 404.
 
 | Recalls | Permission |
 |---|---|
-| `GET /recalls`, `GET /recalls/{id}`, `/customers`, `/contact-history`, `/dashboard`, `/report`, `/report.pdf` | `RECALL_VIEW` |
+| `GET /recalls`, `GET /recalls/{id}`, `/customers`, `/contact-history`, `/dashboard`, `/report`, `/report.pdf`, `/regulatory-report.pdf` | `RECALL_VIEW` |
+| `PUT /recalls/{id}/regulatory` | `RECALL_MANAGE` |
 | `POST /recalls`, `PUT /recalls/{id}/customers/{customerId}`, `POST .../contact-attempts`, `POST .../status`, `POST /recalls/{id}/acknowledgements`, `POST /recalls/{id}/request-closure`, `POST /recalls/{id}/batches`, `PUT /recalls/{id}/capa` | `RECALL_MANAGE` |
 | `POST /recalls/{id}/customers/{customerId}/exception`, `POST /recalls/{id}/send-back`, `POST /recalls/{id}/close` | `RECALL_CLOSE` |
 
@@ -216,6 +217,19 @@ While a recall is open, `POST /recalls/{id}/batches` adds batches found later (`
 customers get contact records as at the start, a batch already in the recall is skipped, and adding none is a 422. It is
 audited as `RECALL_BATCHES_ADDED` with the numbers and reason. `PUT /recalls/{id}/capa` links, changes or (with an empty
 `capaId`) unlinks the CAPA, audited as `RECALL_CAPA_LINKED`.
+
+`PUT /recalls/{id}/regulatory` records what the regulator is told: `hazardClass` (`CLASS_I`, `CLASS_II`, `CLASS_III` or
+null), `regulator`, `regulatorReference`, `regulatorNotifiedOn` (not before the recall date) and `responseDays` (1 to 60,
+default 3). Every field is sent; it may change at any time, after closure too, and is audited as
+`RECALL_REGULATORY_UPDATED` with before and after. `GET /recalls/{id}/regulatory-report.pdf` is the report for the
+regulator: interim while the recall is open and final once closed, with the class and reference, products and batches,
+reason and the linked CAPA's root cause, quantities and the share recovered, how many customers were reached and
+acknowledged, the customers who have not acknowledged, every customer's status, and a declaration to sign.
+
+The `recall-escalations` job runs hourly. A customer on an open recall who has not acknowledged it more than
+`responseDays` after the recall date, and is neither resolved nor covered by an exception, is escalated once: one
+notification per recall (`RECALL_UNANSWERED`, by email too) to every `RECALL_CLOSE` holder and to whoever is assigned
+those customers, audited as `RECALL_CUSTOMERS_ESCALATED`. Being reached is not acknowledging.
 
 | Calibration | Permission |
 |---|---|

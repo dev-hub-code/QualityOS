@@ -41,8 +41,8 @@ Phase 11 is on hold until you ask for it.
   escalation to CAPA approvers once a CAPA or action is a chosen number of days late (#129)
 - [x] **More NCR sources**: customer complaints and quality returns (#104, #113), production rejects, and supplier
   issues and process incidents (at a line, work centre or machine) raised as sources of their own (#130)
-- [ ] **Recall**, remaining: a regulatory report pack, and escalation when customers do not respond. Done: one recall
-  for several batches, and linking its CAPA later (#57)
+- [x] **Recall**: one recall for several batches, and linking its CAPA later (#57), a report for the regulator with the
+  hazard class and their reference, and escalation to recall approvers when customers do not acknowledge in time (#131)
 - [x] **Calibration follow-ups** (#132): the new inspection starts on its own after *Reinspect*; the review shows the
   batches and customers the goods already reached, with a recall report for each batch; and each measurement names the
   instrument that took it, so a failure names the parameters in doubt.

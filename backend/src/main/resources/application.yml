@@ -99,6 +99,9 @@ qualityos:
     audit-reminders:
       initial-delay: PT5M
       interval: PT1H
+    recall-escalations:
+      initial-delay: PT5M
+      interval: PT1H
     announcement-emails:
       initial-delay: PT2M
       interval: PT15M

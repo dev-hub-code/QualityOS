@@ -121,7 +121,45 @@ public final class RecallDtos {
             Instant closureRequestedAt,
             String closedBy,
             Instant closedAt,
-            ClosureReview review) {
+            ClosureReview review,
+            String hazardClass,
+            String regulator,
+            String regulatorReference,
+            LocalDate regulatorNotifiedOn,
+            int responseDays) {
+    }
+
+    /**
+     * What a regulator is told about the recall. Every field is sent; blanks clear.
+     *
+     * @param responseDays days after the recall date that customers have to acknowledge it before its approvers hear
+     */
+    public record RegulatoryRequest(
+            com.qualityos.recall.entity.Recall.HazardClass hazardClass,
+            @jakarta.validation.constraints.Size(max = 100) String regulator,
+            @jakarta.validation.constraints.Size(max = 100) String regulatorReference,
+            LocalDate regulatorNotifiedOn,
+            @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(60) int responseDays) {
+    }
+
+    /** The linked CAPA, as a regulator's report shows it. */
+    public record ReportCapa(String number, String title, String status, String rootCause) {
+    }
+
+    /** The recall report, with what a regulator asks besides. @param capa null when none is linked */
+    public record RegulatoryReport(
+            RecallReport report,
+            ReportCapa capa,
+            boolean finalReport,
+            int reached,
+            int acknowledged,
+            int resolved,
+            int unreachable,
+            int exceptions,
+            String reachedPercent,
+            String acknowledgedPercent,
+            String recoveredPercent,
+            List<ReportCustomer> unanswered) {
     }
 
     public record ContactView(

@@ -1,0 +1,9 @@
+Subject: {{recallNumber}}: customers have not acknowledged the recall
+
+Customers have not acknowledged a recall
+
+Hello {{recipientName}},
+{{count}} customer(s) on recall {{recallNumber}} have not acknowledged it: {{summary}}
+Chase them, or record why they need not be.
+
+Open recall: {{actionUrl}}

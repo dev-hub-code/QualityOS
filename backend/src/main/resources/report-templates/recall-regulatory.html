@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Regulatory recall report {{report.recall.recallNumber}}</title>
+<meta name="author" content="{{report.organizationName}}"/>
+<meta name="subject" content="{{kind}} recall report for the regulator"/>
+<style>
+@page {
+  size: A4;
+  margin: 18mm 12mm 16mm 12mm;
+  @top-left { content: "{{report.recall.recallNumber}} · {{kind}} report"; font: 8pt "Report Sans"; color: #555; }
+  @top-right { content: "Generated {{report.generatedLabel}}"; font: 8pt "Report Sans"; color: #555; }
+  @bottom-left { content: "{{footerName}}"; font: 8pt "Report Sans"; color: #555; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt "Report Sans"; color: #555; }
+}
+body { font-family: "Report Sans", sans-serif; font-size: 9pt; color: #111; line-height: 1.35; }
+h1 { font-size: 17pt; margin: 0 0 2pt 0; }
+h2 { font-size: 11pt; margin: 14pt 0 5pt 0; border-bottom: 0.75pt solid #333; padding-bottom: 2pt; page-break-after: avoid;
+     -fs-page-break-min-height: 32mm; }
+p { margin: 0 0 5pt 0; }
+.muted { color: #555; }
+.pre { white-space: pre-wrap; }
+table { width: 100%; border-collapse: collapse; -fs-table-paginate: paginate; table-layout: fixed; }
+thead { display: table-header-group; }
+tr { page-break-inside: avoid; }
+th { background: #e8e8e8; text-align: left; font-weight: 700; font-size: 7.5pt; }
+th, td { border: 0.5pt solid #888; padding: 2.5pt 4pt; vertical-align: top; }
+td { font-size: 8.5pt; overflow-wrap: break-word; word-wrap: break-word; }
+.num { text-align: right; }
+.meta td { border: none; padding: 1pt 8pt 1pt 0; }
+.meta .label { width: 28mm; color: #555; }
+.totals td { text-align: center; font-size: 13pt; font-weight: 700; border: 0.5pt solid #888; padding: 5pt; }
+.totals span { display: block; font-size: 8pt; font-weight: 400; color: #555; }
+.serials { font-size: 8pt; overflow-wrap: anywhere; }
+  .organisation-logo { height: 12mm; margin-bottom: 3mm; }
+.sign td { border: none; padding: 18pt 12pt 0 0; vertical-align: bottom; }
+.sign .line { border-bottom: 0.5pt solid #333; height: 14pt; }
+</style>
+</head>
+<body>
+<!--organisation-logo-->
+<h1>{{kind}} recall report for the regulator</h1>
+<p class="muted">{{report.organizationName}}{{#report.organizationLegalName}} ({{.}}){{/report.organizationLegalName}}{{#report.organizationAddress}}, {{.}}{{/report.organizationAddress}}{{#report.organizationGstin}}, GSTIN {{.}}{{/report.organizationGstin}}</p>
+
+<h2>1. Recall</h2>
+<table class="meta">
+<tr><td class="label">Recall reference</td><td>{{report.recall.recallNumber}}</td><td class="label">Status</td><td>{{report.recall.status}}</td></tr>
+<tr><td class="label">Recall started</td><td>{{report.recall.recallDate}}</td><td class="label">Hazard class</td><td>{{hazard}}</td></tr>
+<tr><td class="label">Regulator</td><td>{{#report.recall.regulator}}{{.}}{{/report.recall.regulator}}{{^report.recall.regulator}}Not recorded{{/report.recall.regulator}}</td><td class="label">Their reference</td><td>{{#report.recall.regulatorReference}}{{.}}{{/report.recall.regulatorReference}}{{^report.recall.regulatorReference}}Not recorded{{/report.recall.regulatorReference}}</td></tr>
+<tr><td class="label">Regulator told on</td><td>{{#report.recall.regulatorNotifiedOn}}{{.}}{{/report.recall.regulatorNotifiedOn}}{{^report.recall.regulatorNotifiedOn}}Not recorded{{/report.recall.regulatorNotifiedOn}}</td><td class="label">Report as of</td><td>{{report.generatedLabel}}</td></tr>
+{{#report.recall.closedAt}}<tr><td class="label">Closed</td><td>{{.}}</td><td class="label">Closed by</td><td>{{report.recall.closedBy}}</td></tr>{{/report.recall.closedAt}}
+</table>
+
+<h2>2. Products and batches</h2>
+<table>
+<thead><tr><th style="width:20%">Product code</th><th>Product</th><th style="width:26%">Batch</th><th style="width:16%">Batch status</th></tr></thead>
+<tbody>{{#report.products}}<tr><td>{{code}}</td><td>{{name}}</td><td>{{batchNumber}}</td><td>{{status}}</td></tr>{{/report.products}}</tbody>
+</table>
+
+<h2>3. Problem and cause</h2>
+<p><b>Reason for the recall.</b></p>
+<p class="pre">{{report.recall.reason}}</p>
+<p><b>What customers were asked to do.</b></p>
+<p class="pre">{{report.recall.instructions}}</p>
+{{#pack.capa}}<p><b>Corrective action {{number}}</b>, {{title}} ({{status}}).</p>
+<p class="pre">Root cause: {{#rootCause}}{{.}}{{/rootCause}}{{^rootCause}}not yet found{{/rootCause}}</p>{{/pack.capa}}
+{{^pack.capa}}<p>No corrective action is linked yet.</p>{{/pack.capa}}
+
+<h2>4. Distribution and recovery</h2>
+<table class="totals"><tr>
+<td>{{dispatched}}<span>Dispatched</span></td>
+<td>{{returned}}<span>Returned</span></td>
+<td>{{outstanding}}<span>Still with customers</span></td>
+<td>{{pack.recoveredPercent}}<span>Recovered</span></td>
+</tr></table>
+
+<h2>5. Customers told and their response</h2>
+<table class="totals"><tr>
+<td>{{report.recall.review.customers}}<span>Customers</span></td>
+<td>{{pack.reached}}<span>Reached ({{pack.reachedPercent}})</span></td>
+<td>{{pack.acknowledged}}<span>Acknowledged ({{pack.acknowledgedPercent}})</span></td>
+<td>{{pack.resolved}}<span>Resolved</span></td>
+<td>{{pack.unreachable}}<span>Unreachable</span></td>
+<td>{{pack.exceptions}}<span>Closed by exception</span></td>
+</tr></table>
+<p class="muted">Customers had {{report.recall.responseDays}} days from the recall date to acknowledge it.</p>
+
+{{#hasUnanswered}}<h2>6. Customers who have not acknowledged</h2>
+<table>
+<thead><tr><th style="width:30%">Customer</th><th>Contact</th><th style="width:16%">Status</th><th style="width:10%">Attempts</th><th class="num" style="width:13%">Outstanding</th></tr></thead>
+<tbody>{{#pack.unanswered}}<tr><td>{{name}} <span class="muted">({{code}})</span></td><td>{{contactPerson}}{{#phone}}, {{.}}{{/phone}}{{#email}}<br/>{{.}}{{/email}}</td><td>{{statusLabel}}</td><td>{{attempts}}</td><td class="num">{{outstandingLabel}}</td></tr>{{/pack.unanswered}}</tbody>
+</table>{{/hasUnanswered}}
+{{^hasUnanswered}}<h2>6. Customers who have not acknowledged</h2>
+<p>None. Every customer has acknowledged the recall or been closed by a recorded exception.</p>{{/hasUnanswered}}
+
+<h2>7. Every customer</h2>
+<table>
+<thead><tr><th style="width:26%">Customer</th><th style="width:16%">Status</th><th style="width:15%">Acknowledged</th><th class="num">Dispatched</th><th class="num">Returned</th><th class="num">Outstanding</th></tr></thead>
+<tbody>{{#report.customers}}<tr><td>{{name}} <span class="muted">({{code}})</span>{{#exceptionReason}}<br/><span class="muted">Exception: {{.}}</span>{{/exceptionReason}}</td><td>{{statusLabel}}</td><td>{{acknowledgedOn}}</td><td class="num">{{quantityLabel}}</td><td class="num">{{returnedLabel}}</td><td class="num">{{outstandingLabel}}</td></tr>{{/report.customers}}</tbody>
+</table>
+
+{{#report.recall.closureNote}}<h2>8. Closure</h2>
+<p class="pre">{{.}}</p>{{/report.recall.closureNote}}
+
+<h2>Declaration</h2>
+<p>The information in this report is true and complete to the best of our knowledge as of {{report.generatedLabel}}. The full contact history and dispatch references are in the recall report {{report.recall.recallNumber}}.</p>
+<table class="sign"><tr>
+<td style="width:40%"><div class="line"></div>Name and designation</td>
+<td style="width:35%"><div class="line"></div>Signature</td>
+<td><div class="line"></div>Date</td>
+</tr></table>
+</body>
+</html>

@@ -21,6 +21,9 @@ public class Recall extends TenantOwnedEntity {
 
     public enum Status { OPEN, PENDING_CLOSURE, CLOSED }
 
+    /** As regulators grade recalls: I may cause serious harm or death, II temporary harm, III is unlikely to harm. */
+    public enum HazardClass { CLASS_I, CLASS_II, CLASS_III }
+
     private String recallNumber;
     private LocalDate recallDate;
     private String reason;
@@ -36,12 +39,32 @@ public class Recall extends TenantOwnedEntity {
     private UUID closedBy;
     private Instant closedAt;
 
+    @Enumerated(EnumType.STRING)
+    private HazardClass hazardClass;
+    private String regulator;
+    private String regulatorReference;
+    private LocalDate regulatorNotifiedOn;
+    private int responseDays = 3;
+
     public Recall(String recallNumber, LocalDate recallDate, String reason, String instructions, UUID capaId) {
         this.recallNumber = recallNumber;
         this.recallDate = recallDate;
         this.reason = reason;
         this.instructions = instructions;
         this.capaId = capaId;
+    }
+
+    /** What a regulator is told, which may arrive or change at any point, after closure too. */
+    public void describeForRegulator(HazardClass hazardClass, String regulator, String reference, LocalDate notifiedOn,
+            int responseDays) {
+        if (notifiedOn != null && notifiedOn.isBefore(recallDate)) {
+            throw new BusinessRuleException("The regulator cannot have been told before the recall started.");
+        }
+        this.hazardClass = hazardClass;
+        this.regulator = regulator;
+        this.regulatorReference = reference;
+        this.regulatorNotifiedOn = notifiedOn;
+        this.responseDays = responseDays;
     }
 
     public void linkCapa(UUID capaId) {

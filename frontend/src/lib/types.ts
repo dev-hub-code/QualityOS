@@ -922,6 +922,12 @@ export interface RecallDetail {
   closedBy: string | null;
   closedAt: string | null;
   review: ClosureReview;
+  hazardClass: "CLASS_I" | "CLASS_II" | "CLASS_III" | null;
+  regulator: string | null;
+  regulatorReference: string | null;
+  regulatorNotifiedOn: string | null;
+  /** Days after the recall date that customers have to acknowledge it before its approvers are told. */
+  responseDays: number;
 }
 
 export interface RecallDashboard {

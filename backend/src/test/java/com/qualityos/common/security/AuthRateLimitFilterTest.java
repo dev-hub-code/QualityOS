@@ -27,7 +27,7 @@ class AuthRateLimitFilterTest {
     }
 
     private AuthRateLimitFilter filter(Instant now) {
-        return new AuthRateLimitFilter(2, JsonMapper.builder().build(), Clock.fixed(now, ZoneOffset.UTC));
+        return new AuthRateLimitFilter(2, JsonMapper.builder().build(), Clock.fixed(now, ZoneOffset.UTC), new InMemoryAttemptCounter());
     }
 
     @Test
@@ -81,7 +81,7 @@ class AuthRateLimitFilterTest {
             public Instant instant() {
                 return clock[0].instant();
             }
-        });
+        }, new InMemoryAttemptCounter());
         call(filter, "POST", "/api/v1/auth/login", "10.0.0.1");
         assertThat(call(filter, "POST", "/api/v1/auth/login", "10.0.0.1")).isEqualTo(429);
         clock[0] = Clock.fixed(START.plusSeconds(60), ZoneOffset.UTC);

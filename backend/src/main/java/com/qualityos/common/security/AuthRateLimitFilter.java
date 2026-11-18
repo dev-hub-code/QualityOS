@@ -9,18 +9,17 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Limits how fast one address can try credentials or trigger emails. Counts are per minute and per instance, so
- * running several instances multiplies the effective limit.
+ * Limits how fast one address can try credentials or trigger emails. Counts are per minute, kept by an
+ * {@link AttemptCounter}: in production the database, so every instance shares one limit and a restart does not reset
+ * it. A known account is protected separately: ten wrong passwords lock it for 15 minutes, from any address.
  */
 public class AuthRateLimitFilter extends OncePerRequestFilter {
 
@@ -37,13 +36,13 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     private final int limit;
     private final JsonMapper json;
     private final Clock clock;
-    private final Map<String, AtomicInteger> counts = new ConcurrentHashMap<>();
-    private volatile long currentWindow;
+    private final AttemptCounter counter;
 
-    public AuthRateLimitFilter(int limit, JsonMapper json, Clock clock) {
+    public AuthRateLimitFilter(int limit, JsonMapper json, Clock clock, AttemptCounter counter) {
         this.limit = limit;
         this.json = json;
         this.clock = clock;
+        this.counter = counter;
     }
 
     @Override
@@ -55,12 +54,8 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        long window = clock.millis() / WINDOW_MILLIS;
-        if (window != currentWindow) {
-            currentWindow = window;
-            counts.clear();
-        }
-        if (counts.computeIfAbsent(request.getRemoteAddr(), key -> new AtomicInteger()).incrementAndGet() > limit) {
+        Instant window = Instant.ofEpochMilli(clock.millis() / WINDOW_MILLIS * WINDOW_MILLIS);
+        if (counter.increment("address:" + request.getRemoteAddr(), window) > limit) {
             response.setStatus(ErrorCode.TOO_MANY_REQUESTS.status().value());
             response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(RETRY_AFTER_SECONDS));
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);

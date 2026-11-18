@@ -144,6 +144,11 @@ qualityos:
       refresh-token-ttl: 14d
       private-key: ${JWT_PRIVATE_KEY:}
       public-key: ${JWT_PUBLIC_KEY:}
+      # Rotation: names the signing key in each token; blank uses the key's thumbprint.
+      key-id: ${JWT_KEY_ID:}
+      # The key signed with before the last rotation, verified until the date given, then refused.
+      previous-public-key: ${JWT_PREVIOUS_PUBLIC_KEY:}
+      previous-key-trusted-until: ${JWT_PREVIOUS_KEY_TRUSTED_UNTIL:}
 
 management:
   health:

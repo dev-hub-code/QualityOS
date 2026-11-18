@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -45,6 +46,7 @@ public class SecurityConfig {
             TenantJwtAuthenticationConverter jwtConverter,
             TenantAccessResolver accessResolver,
             JsonMapper json,
+            JdbcTemplate jdbc,
             @Value("${qualityos.security.auth-rate-limit-per-minute}") int authRateLimit) throws Exception {
         AuthenticationEntryPoint unauthenticated = (request, response, ex) ->
                 writeError(response, json, ErrorCode.UNAUTHENTICATED, "Authentication is required.");
@@ -73,7 +75,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(unauthenticated)
                         .accessDeniedHandler(denied))
                 .addFilterBefore(
-                        new AuthRateLimitFilter(authRateLimit, json, Clock.systemUTC()),
+                        new AuthRateLimitFilter(authRateLimit, json, Clock.systemUTC(), new DatabaseAttemptCounter(jdbc)),
                         BearerTokenAuthenticationFilter.class)
                 .addFilterAfter(new TenantContextFilter(), BearerTokenAuthenticationFilter.class)
                 .addFilterAfter(new SupportSessionFilter(accessResolver, json), TenantContextFilter.class)

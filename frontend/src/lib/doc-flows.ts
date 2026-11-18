@@ -773,7 +773,7 @@ export const DOC_FLOWS: Record<string, Flow[]> = {
           label: "May support make changes?",
           branches: [
             { when: "No", then: "Support can only read.", tone: "neutral" },
-            { when: "Yes", then: "Their changes show as support's in the audit log." },
+            { when: "Yes, on a 24-hour grant only", then: "Their changes show as support's in the audit log." },
           ],
         },
         { label: "Support works within the time allowed" },

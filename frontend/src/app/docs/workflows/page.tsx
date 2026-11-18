@@ -16,7 +16,7 @@ export default function WorkflowsPage() {
       <h1 className="mt-2 text-3xl font-semibold tracking-tight">Every workflow</h1>
       <p className="mt-3 max-w-2xl text-muted-foreground">
         Each part of ProductionOS as a flowchart: the steps down the left, who does them, and at each decision what
-        happens either way. Open a topic for the detail and a worked example.
+        happens either way. Open a topic for the detail and worked examples.
       </p>
       <nav aria-label="Jump to a topic" className="mt-6 flex flex-wrap gap-2 print:hidden">
         {DOC_PAGES.map((page) => (

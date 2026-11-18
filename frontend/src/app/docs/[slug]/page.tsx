@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FlowChart } from "@/components/docs/flow-chart";
+import { WorkedExample } from "@/components/docs/worked-example";
+import { DOC_EXAMPLES } from "@/lib/doc-examples";
 import { DOC_FLOWS } from "@/lib/doc-flows";
 import { DOC_PAGES, docPage, type DocSection } from "@/lib/docs";
 
@@ -52,6 +54,7 @@ export default async function DocsTopic({ params }: Props) {
   const index = DOC_PAGES.indexOf(page);
   const previous = DOC_PAGES[index - 1];
   const next = DOC_PAGES[index + 1];
+  const examples = DOC_EXAMPLES[page.slug];
 
   return (
     <article className="max-w-3xl">
@@ -88,23 +91,21 @@ export default async function DocsTopic({ params }: Props) {
         <Section key={section.title} section={section} />
       ))}
 
-      <section className="mt-10 rounded-lg bg-muted/50 p-5">
-        <p className="text-sm font-medium text-primary">Worked example</p>
-        <h2 className="mt-1 text-xl font-semibold">{page.example.title}</h2>
-        <ol className="mt-4 space-y-4">
-          {page.example.steps.map((step, position) => (
-            <li key={step.action} className="flex gap-3">
-              <span aria-hidden className="font-semibold text-muted-foreground tabular-nums">
-                {position + 1}
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-medium">{step.who}</p>
-                <p>{step.action}</p>
-                <p className="mt-1 text-sm text-muted-foreground">Result: {step.result}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+      <section className="mt-10" aria-labelledby="worked-examples">
+        <h2 id="worked-examples" className="text-2xl font-semibold">
+          {examples.length > 1 ? "Worked examples" : "Worked example"}
+        </h2>
+        <p className="mt-2 max-w-prose text-sm text-muted-foreground">
+          Step by step, with who does each step, what ProductionOS does in return, and why. The people, companies and
+          figures are made up.
+        </p>
+        {examples.map((example, index) => (
+          <WorkedExample
+            key={example.title}
+            example={example}
+            label={examples.length > 1 ? `Worked example ${index + 1} of ${examples.length}` : undefined}
+          />
+        ))}
       </section>
 
       <nav aria-label="Next and previous" className="mt-8 flex justify-between gap-4 border-t pt-4 text-sm">

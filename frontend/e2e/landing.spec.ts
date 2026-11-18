@@ -37,7 +37,8 @@ test("a visitor reaches the documentation and every topic has an example", async
   for (const topic of topics) {
     await page.goto(topic);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await expect(page.getByText("Worked example")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: /^Worked examples?$/ })).toBeVisible();
+    await expect(page.getByText("Why:").first()).toBeVisible();
     await expect(page.getByRole("figure").first()).toBeVisible();
     await expectFlowchartsDrawn(page);
   }

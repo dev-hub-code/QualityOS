@@ -5,7 +5,7 @@ import { buttonVariants } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: { default: "Documentation | ProductionOS", template: "%s | ProductionOS docs" },
-  description: "How each part of ProductionOS works, with a worked example.",
+  description: "How each part of ProductionOS works, with worked examples.",
 };
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {

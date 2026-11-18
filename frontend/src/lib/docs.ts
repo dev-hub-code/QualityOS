@@ -1,10 +1,3 @@
-/** One step of a worked example: who acts, what they do, and what the system does in return. */
-export interface ExampleStep {
-  who: string;
-  action: string;
-  result: string;
-}
-
 export interface DocSection {
   title: string;
   text?: string;
@@ -25,7 +18,6 @@ export interface DocPage {
   /** The lowest plan that includes it. */
   plan: string;
   sections: DocSection[];
-  example: { title: string; steps: ExampleStep[] };
 }
 
 const EVERY_PLAN = "Every plan";
@@ -63,29 +55,6 @@ export const DOC_PAGES: DocPage[] = [
         text: "A new organisation starts on a trial of the Professional plan, so every feature on these pages is available from the first day. No card is needed.",
       },
     ],
-    example: {
-      title: "Acme Forgings gets started",
-      steps: [
-        {
-          who: "Asha, Owner",
-          action: "Registers Acme Forgings and confirms the email address.",
-          result:
-            "The organisation exists, with Asha as its owner and a trial running.",
-        },
-        {
-          who: "Asha, Owner",
-          action: "Adds the facility Pune Plant under Facilities.",
-          result:
-            "Pune Plant can now be chosen on orders, receipts and batches.",
-        },
-        {
-          who: "Asha, Owner",
-          action:
-            "Invites Meera as Quality Manager and Ravi as Quality Inspector.",
-          result: "Each receives an email, and joins by setting a password.",
-        },
-      ],
-    },
   },
   {
     slug: "users-and-roles",
@@ -136,28 +105,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "Giving an inspector the right access",
-      steps: [
-        {
-          who: "Asha, Owner",
-          action:
-            "Under Users, invites ravi@acme.example as Quality Inspector.",
-          result: "An invitation email goes out, and one user place is taken.",
-        },
-        {
-          who: "Ravi, Inspector",
-          action: "Opens the link, sets a password and signs in.",
-          result:
-            "Ravi sees Inspections and Receipts, but cannot approve an inspection.",
-        },
-        {
-          who: "Asha, Owner",
-          action: "Limits Ravi to Pune Plant.",
-          result: "Ravi's traces and instruments now show Pune Plant only.",
-        },
-      ],
-    },
   },
   {
     slug: "facilities",
@@ -192,21 +139,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "Describing Pune Plant",
-      steps: [
-        {
-          who: "Asha, Owner",
-          action: "Adds the facility Pune Plant.",
-          result: "It can now be chosen on batches and audits.",
-        },
-        {
-          who: "Asha, Owner",
-          action: "Opens it, and adds Line 1 and the Morning shift.",
-          result: "The plant's structure is on record.",
-        },
-      ],
-    },
   },
   {
     slug: "suppliers",
@@ -237,22 +169,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "Approving a steel supplier",
-      steps: [
-        {
-          who: "Kiran, Supplier Manager",
-          action:
-            "Adds Konkan Bar Mills with code KB-01 and sends it for approval.",
-          result: "The supplier shows as Pending approval.",
-        },
-        {
-          who: "Meera, Quality Manager",
-          action: "Reviews it and approves.",
-          result: "Konkan Bar Mills can now be chosen on purchase orders.",
-        },
-      ],
-    },
   },
   {
     slug: "materials-and-products",
@@ -286,22 +202,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "Setting up a bar and a shaft",
-      steps: [
-        {
-          who: "Dev, Quality Engineer",
-          action:
-            "Adds material EN8 Steel Bar, measured in kilograms, with inspection required.",
-          result: "Every received lot of it will wait for inspection.",
-        },
-        {
-          who: "Dev, Quality Engineer",
-          action: "Adds the finished product Drive Shaft.",
-          result: "Production batches can now be started for it.",
-        },
-      ],
-    },
   },
   {
     slug: "inspection-templates",
@@ -351,29 +251,6 @@ export const DOC_PAGES: DocPage[] = [
         text: "A template starts as a draft, then is published with an effective date. A published version can never be changed. To change it, create a new version, and the old one becomes superseded. Inspections already carried out stay tied to the version they used. The name, and the material or product a template is for, can be changed with Edit; this changes only which items it is offered for from then on.",
       },
     ],
-    example: {
-      title: "A diameter check on steel bar",
-      steps: [
-        {
-          who: "Meera, Quality Manager",
-          action:
-            "Creates IQC template Bar Check, with a critical parameter DIA from 19.9 to 20.1 mm, fixed sample of 5 and acceptance number 0.",
-          result: "The template is a draft, so it cannot be used yet.",
-        },
-        {
-          who: "Meera, Quality Manager",
-          action: "Publishes it, effective today.",
-          result:
-            "Version 1 is available to inspectors and can no longer be edited.",
-        },
-        {
-          who: "Meera, Quality Manager",
-          action: "Later, widens the limit by creating version 2.",
-          result:
-            "New inspections use version 2. Past ones still show version 1 limits.",
-        },
-      ],
-    },
   },
   {
     slug: "purchase-orders-and-receipts",
@@ -413,29 +290,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "A steel delivery arrives",
-      steps: [
-        {
-          who: "Kiran, Supplier Manager",
-          action:
-            "Raises an order on Konkan Bar Mills for 500 kg of EN8 Steel Bar and issues it.",
-          result: "The order is Issued and open for receiving.",
-        },
-        {
-          who: "Ravi, Inspector",
-          action:
-            "Receives 300 kg against it, with the supplier's batch number.",
-          result:
-            "GRN-2026-00001 and lot LOT-2026-00001 are created, and the order shows Partially received.",
-        },
-        {
-          who: "Dev, Quality Engineer",
-          action: "Tries to use the lot in production.",
-          result: "Refused: the lot has not been released for use.",
-        },
-      ],
-    },
   },
   {
     slug: "inspections",
@@ -514,30 +368,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "A lot fails on diameter",
-      steps: [
-        {
-          who: "Ravi, Inspector",
-          action:
-            "Starts an inspection of LOT-2026-00001 with Bar Check. INS-2026-00001 is created.",
-          result: "Five samples are asked for.",
-        },
-        {
-          who: "Ravi, Inspector",
-          action:
-            "On a phone, enters 20.0, 20.0, 20.1, 20.0 and 20.4 mm, then submits.",
-          result:
-            "20.4 is over 20.1. DIA is critical, so the evaluation is Fail, and managers are alerted.",
-        },
-        {
-          who: "Meera, Quality Manager",
-          action: "Reviews and approves the result, then records Reject.",
-          result:
-            "The lot stays blocked, and NCR-2026-00001 is raised with 300 kg rejected.",
-        },
-      ],
-    },
   },
   {
     slug: "ncrs",
@@ -606,34 +436,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "Working the diameter failure",
-      steps: [
-        {
-          who: "Meera, Quality Manager",
-          action:
-            "Assigns NCR-2026-00001 to Dev, and picks the Dimensional category.",
-          result: "Dev is notified.",
-        },
-        {
-          who: "Dev, Quality Engineer",
-          action:
-            "Records containment: the 300 kg is moved to the reject area.",
-          result: "The containment is on the record.",
-        },
-        {
-          who: "Dev, Quality Engineer",
-          action: "Records the root cause, then raises a CAPA for it.",
-          result:
-            "The NCR is critical, so it cannot close until that CAPA is closed.",
-        },
-        {
-          who: "Meera, Quality Manager",
-          action: "After the CAPA closes, closes the NCR.",
-          result: "Closed by someone other than Dev, so the rule is met.",
-        },
-      ],
-    },
   },
   {
     slug: "capas",
@@ -676,35 +478,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "Stopping oversize bar",
-      steps: [
-        {
-          who: "Dev, Quality Engineer",
-          action:
-            "Raises a CAPA on NCR-2026-00001, with Dev as owner, due in 30 days.",
-          result: "The CAPA is Open.",
-        },
-        {
-          who: "Dev, Quality Engineer",
-          action:
-            "Records the cause: the supplier's rolling tolerance is too wide. Adds a corrective action to reject the lot, and a preventive one to agree a tighter tolerance.",
-          result:
-            "The plan is on the record, and the CAPA moves to Implementation.",
-        },
-        {
-          who: "Dev, Quality Engineer",
-          action: "Completes both actions, and submits for verification.",
-          result: "The CAPA waits at Effectiveness verification.",
-        },
-        {
-          who: "Meera, Quality Manager",
-          action:
-            "Checks the next three lots, finds them in limits, records the fix as effective, and closes the CAPA.",
-          result: "The CAPA is Closed, and the NCR can now close.",
-        },
-      ],
-    },
   },
   {
     slug: "production",
@@ -740,29 +513,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "Making 100 shafts",
-      steps: [
-        {
-          who: "Dev, Quality Engineer",
-          action:
-            "Starts PB-2026-00001 for Drive Shaft at Pune Plant, and consumes 40 kg of a released lot, LOT-2026-00002.",
-          result: "The batch records exactly what it used.",
-        },
-        {
-          who: "Dev, Quality Engineer",
-          action:
-            "Completes the batch with 100 produced, and registers serial numbers SH-0001 to SH-0100.",
-          result: "The batch is Completed.",
-        },
-        {
-          who: "Ravi, Inspector",
-          action:
-            "Runs the FQC inspection, and it passes. Meera approves and records Accept.",
-          result: "The batch is Released.",
-        },
-      ],
-    },
   },
   {
     slug: "manufacturing-setup",
@@ -819,28 +569,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "Defining how a shaft is made",
-      steps: [
-        {
-          who: "Arjun, Production Manager",
-          action: "Adds work centre WC-TURN at Pune Plant, with lathe M-01.",
-          result: "Turning can now be scheduled and costed.",
-        },
-        {
-          who: "Arjun, Production Manager",
-          action:
-            "Drafts BOM revision 1 for Drive Shaft, with 1.05 kg of EN8 bar, and submits it.",
-          result: "Meera is notified that it needs approval.",
-        },
-        {
-          who: "Meera, Quality Manager",
-          action:
-            "Approves the BOM with today's date. Arjun drafts the routing, turn then grind, and Meera approves that too.",
-          result: "Work orders for Drive Shaft can now be released.",
-        },
-      ],
-    },
   },
   {
     slug: "work-orders",
@@ -908,35 +636,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "Making 200 shafts next week",
-      steps: [
-        {
-          who: "Kavya, Production Planner",
-          action:
-            "Plans 200 Drive Shafts at Pune Plant, due Friday. Arjun approves the plan.",
-          result: "Work orders can be raised from the plan line.",
-        },
-        {
-          who: "Kavya, Production Planner",
-          action: "Raises WO-2026-00014 for 200 from the line, and submits it.",
-          result: "Arjun is notified that it needs approval.",
-        },
-        {
-          who: "Arjun, Production Manager",
-          action:
-            "Approves and releases the order, then reserves what is free.",
-          result:
-            "The BOM and routing are frozen onto the order, and 210 kg of bar is set aside.",
-        },
-        {
-          who: "Arjun, Production Manager",
-          action: "Starts the order.",
-          result:
-            "Batch PB-2026-00031 opens, and the first operation is ready on the shop floor.",
-        },
-      ],
-    },
   },
   {
     slug: "shop-floor",
@@ -997,36 +696,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "A stop and a hold on WO-2026-00014",
-      steps: [
-        {
-          who: "Suresh, Production Operator",
-          action:
-            "Starts operation 10 on lathe M-01 and reports 120 processed: 116 good, 4 rejected.",
-          result: "Operation 20 can take the 116 good shafts.",
-        },
-        {
-          who: "Suresh, Production Operator",
-          action: "Pauses with Machine breakdown: spindle seized.",
-          result:
-            "M-01 goes to Breakdown, a stop opens, and Arjun is notified.",
-        },
-        {
-          who: "Meera, Quality Manager",
-          action: "Puts the order on quality hold: suspect gauge.",
-          result:
-            "Everything running pauses, and the batch is on hold until an in-process reinspection.",
-        },
-        {
-          who: "Dev, Quality Engineer",
-          action:
-            "Raises a rework order for the 4 rejected, which Meera approves.",
-          result:
-            "Approvers are notified, and the rework closes when its reinspection passes.",
-        },
-      ],
-    },
   },
   {
     slug: "production-completion",
@@ -1069,27 +738,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "Closing WO-2026-00014",
-      steps: [
-        {
-          who: "Arjun, Production Manager",
-          action: "Receives 196 shafts, with the reason 4 rejected at turning.",
-          result: "The batch is completed, and its reservations are released.",
-        },
-        {
-          who: "Ravi, Inspector",
-          action: "Runs the final inspection. Meera records Accept.",
-          result: "The batch is released for dispatch.",
-        },
-        {
-          who: "Arjun, Production Manager",
-          action: "Closes the order.",
-          result:
-            "It is Completed. Its cost and OEE appear in Production analytics.",
-        },
-      ],
-    },
   },
   {
     slug: "dispatches-and-returns",
@@ -1142,33 +790,6 @@ export const DOC_PAGES: DocPage[] = [
         text: "Returned goods never go back into stock automatically. They need an inspection first. A customer who returned everything still shows as having received the batch, so that a recall reaches them.",
       },
     ],
-    example: {
-      title: "Shipping, and a part return",
-      steps: [
-        {
-          who: "Dev, Quality Engineer",
-          action:
-            "Dispatches 60 shafts of PB-2026-00001 to Sahyadri Auto, as DSP-2026-00001.",
-          result: "The batch shows 40 still available.",
-        },
-        {
-          who: "Dev, Quality Engineer",
-          action: "Confirms the shipment, with the carrier reference.",
-          result: "The dispatch counts as shipped.",
-        },
-        {
-          who: "Dev, Quality Engineer",
-          action: "Records a return of 5 shafts when they arrive.",
-          result:
-            "RET-2026-00001 waits for inspection, and the 5 are not yet available.",
-        },
-        {
-          who: "Ravi, Inspector",
-          action: "Inspects them, and Meera records the decision.",
-          result: "The return closes, with the outcome on each line.",
-        },
-      ],
-    },
   },
   {
     slug: "traceability",
@@ -1212,27 +833,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "A customer reports a cracked shaft",
-      steps: [
-        {
-          who: "Meera, Quality Manager",
-          action: "Enters serial SH-0042 in Serial search.",
-          result: "It belongs to PB-2026-00001, shipped to Sahyadri Auto.",
-        },
-        {
-          who: "Meera, Quality Manager",
-          action: "Opens the batch's backward trace.",
-          result: "It shows LOT-2026-00002, from Konkan Bar Mills.",
-        },
-        {
-          who: "Meera, Quality Manager",
-          action: "Runs a forward trace on that lot.",
-          result:
-            "This shows every other batch and customer that the same steel reached.",
-        },
-      ],
-    },
   },
   {
     slug: "recalls",
@@ -1278,33 +878,6 @@ export const DOC_PAGES: DocPage[] = [
         text: "The recall report is a PDF showing the batches, customers, contact history and quantities still out. It is your own record, and sending any regulatory notice remains your responsibility.",
       },
     ],
-    example: {
-      title: "Recalling a batch",
-      steps: [
-        {
-          who: "Meera, Quality Manager",
-          action: "Starts RCL-2026-00001 from PB-2026-00001.",
-          result:
-            "Sahyadri Auto is listed from the dispatch records, with 55 shafts out.",
-        },
-        {
-          who: "Meera, Quality Manager",
-          action: "Logs a phone call, then Sahyadri Auto' acknowledgement.",
-          result: "The contact history is recorded with dates.",
-        },
-        {
-          who: "Dev, Quality Engineer",
-          action:
-            "Records the 55 shafts as a customer return, and resolves the customer.",
-          result: "Nothing is left out, so no blockers remain.",
-        },
-        {
-          who: "Meera, Quality Manager",
-          action: "Requests closure, and Asha approves it.",
-          result: "The recall is Closed, and the PDF report is ready.",
-        },
-      ],
-    },
   },
   {
     slug: "corrections",
@@ -1352,30 +925,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "A quantity was mistyped",
-      steps: [
-        {
-          who: "Dev, Quality Engineer",
-          action:
-            "Finds LOT-2026-00002 was entered as 400 kg, but the delivery note says 300 kg. Raises MC-2026-00001.",
-          result:
-            "The correction waits for approval, and the lot is unchanged.",
-        },
-        {
-          who: "Meera, Quality Manager",
-          action:
-            "Approves. The lot has been inspected, so a second approver is needed.",
-          result: "It still waits.",
-        },
-        {
-          who: "Asha, Owner",
-          action: "Gives the second approval.",
-          result:
-            "The quantity becomes 300 kg, and the original stays in the lot's history.",
-        },
-      ],
-    },
   },
   {
     slug: "calibration",
@@ -1418,34 +967,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "A caliper fails calibration",
-      steps: [
-        {
-          who: "Dev, Quality Engineer",
-          action:
-            "Registers caliper VC-9 with a 180-day frequency, and prints its QR label.",
-          result: "VC-9 is Active, with a due date.",
-        },
-        {
-          who: "Ravi, Inspector",
-          action: "Records VC-9 on an inspection.",
-          result: "The inspection shows which instrument was used.",
-        },
-        {
-          who: "Dev, Quality Engineer",
-          action: "Records a calibration on VC-9 with result Fail.",
-          result:
-            "VC-9 goes out of service, and an NCR is raised for the inspections it was used on.",
-        },
-        {
-          who: "Dev, Quality Engineer",
-          action:
-            "Opens Inspections in doubt on VC-9, and decides each one with a reason.",
-          result: "Each inspection shows Result stands or Reinspect.",
-        },
-      ],
-    },
   },
   {
     slug: "audits",
@@ -1498,32 +1019,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "An internal audit finds a missing label",
-      steps: [
-        {
-          who: "Priya, Auditor",
-          action:
-            "Builds a Measurement checklist, and plans an internal audit of Pune Plant.",
-          result: "The audit is Planned, and the lead auditor is told.",
-        },
-        {
-          who: "Priya, Auditor",
-          action: "Answers the checklist, marking one question nonconforming.",
-          result: "Caliper VC-9 was in use without a calibration label.",
-        },
-        {
-          who: "Priya, Auditor",
-          action: "Records a minor nonconformity, and raises its NCR.",
-          result: "An NCR with source Audit follows the normal closing rules.",
-        },
-        {
-          who: "Meera, Quality Manager",
-          action: "Approves the closure Priya requested.",
-          result: "The audit is Closed, and its PDF report is available.",
-        },
-      ],
-    },
   },
   {
     slug: "analytics",
@@ -1576,29 +1071,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "Finding the worst supplier",
-      steps: [
-        {
-          who: "Meera, Quality Manager",
-          action: "Opens Analytics, and sets the last quarter for Pune Plant.",
-          result:
-            "Supplier scorecards show Konkan Bar Mills with 1 of 4 lots rejected: 25%.",
-        },
-        {
-          who: "Meera, Quality Manager",
-          action: "Looks at the Defect Pareto.",
-          result: "Dimensional leads, with most of the running total.",
-        },
-        {
-          who: "Meera, Quality Manager",
-          action:
-            "Downloads the Supplier quality report for the review meeting.",
-          result:
-            "An Excel file with the same figures, and the export is audited.",
-        },
-      ],
-    },
   },
   {
     slug: "reports",
@@ -1638,22 +1110,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "Preparing for a customer visit",
-      steps: [
-        {
-          who: "Meera, Quality Manager",
-          action: "Chooses the Calibration report for Pune Plant.",
-          result: "Every active instrument shows, soonest due first.",
-        },
-        {
-          who: "Meera, Quality Manager",
-          action:
-            "Chooses the NCR report for six months, and downloads the PDF.",
-          result: "A landscape PDF with page numbers and repeated headings.",
-        },
-      ],
-    },
   },
   {
     slug: "notifications",
@@ -1684,18 +1140,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "Quieter email",
-      steps: [
-        {
-          who: "Meera, Quality Manager",
-          action:
-            "In My account, turns off email for inspections awaiting approval.",
-          result:
-            "Those stop arriving by email, and still appear under the bell.",
-        },
-      ],
-    },
   },
   {
     slug: "billing",
@@ -1716,10 +1160,12 @@ export const DOC_PAGES: DocPage[] = [
         list: [
           "Choosing a plan raises an invoice. It takes effect only once that invoice is paid.",
           "To renew, choose your current plan. Paying early adds to the time left.",
-          "A different plan starts on payment, and unused time on the old plan is not refunded.",
+          "A different plan starts on payment. Unused time already paid for on the old plan is taken off its price, and a credit larger than the price adds days instead.",
           "Choosing again replaces any unpaid invoice.",
           "A move to a smaller plan is refused if you are over its limits.",
-          "We record each payment for you, as there is no online payment yet.",
+          "Pay online from the invoice, or by bank transfer, which we record for you.",
+          "A renewal invoice is raised 7 days before a paid period ends.",
+          "Money returned to you is shown as a credit note, with its PDF.",
         ],
       },
       {
@@ -1741,22 +1187,6 @@ export const DOC_PAGES: DocPage[] = [
         text: "Records made under a larger plan stay readable, but you cannot add to them. Dashboards and reports go with the plan that includes them.",
       },
     ],
-    example: {
-      title: "Moving from the trial to Growth",
-      steps: [
-        {
-          who: "Asha, Owner",
-          action: "Under Billing, picks Annual and chooses Growth.",
-          result: "BILL-2026-00001 is issued, and the trial carries on.",
-        },
-        {
-          who: "Asha, Owner",
-          action: "Downloads the invoice PDF and pays it.",
-          result:
-            "Once the payment is recorded, Growth starts and the invoice shows Paid.",
-        },
-      ],
-    },
   },
   {
     slug: "security",
@@ -1776,7 +1206,7 @@ export const DOC_PAGES: DocPage[] = [
           "Critical actions are written to the audit log, with members' sign-in and password events from the day they joined.",
           "Ten failed sign-ins lock an account for 15 minutes, and a reset link unlocks it.",
           "Change your own password under My account.",
-          "ProductionOS support cannot see your records unless an administrator allows it under Settings, Support access, for 24 hours, 3 days or 7 days. Support can only read, never change, and you can withdraw access at any time. Every page support opens is listed there.",
+          "ProductionOS support cannot see your records unless an administrator allows it under Settings, Support access, for 24 hours, 3 days or 7 days. Support can only read, unless a 24-hour grant also allows changes, which the audit log then shows as support's. You can withdraw access at any time. Every page support opens is listed there.",
           "An administrator can upload a logo under My account. It shows in the menu, at the top of your organisation's emails and on its PDF reports. Only PNG and JPEG images up to 256 KB are taken, checked by their content.",
         ],
       },
@@ -1785,22 +1215,6 @@ export const DOC_PAGES: DocPage[] = [
         text: "ProductionOS helps you run a quality system and keep its records. It does not certify your organisation or confer regulatory approval. Whether your use of it meets a particular standard is for you and your certifier to decide.",
       },
     ],
-    example: {
-      title: "A locked account",
-      steps: [
-        {
-          who: "Ravi, Inspector",
-          action: "Enters the wrong password ten times.",
-          result: "The account locks for 15 minutes.",
-        },
-        {
-          who: "Ravi, Inspector",
-          action:
-            "Uses Forgot password, and sets a new one from the emailed link.",
-          result: "The account is unlocked straight away.",
-        },
-      ],
-    },
   },
   {
     slug: "platform",
@@ -1850,18 +1264,6 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
     ],
-    example: {
-      title: "Recording a bank transfer",
-      steps: [
-        {
-          who: "A platform administrator",
-          action:
-            "Finds Acme Forgings under Organisations, with BILL-2026-00001 unpaid, and records the payment.",
-          result:
-            "The invoice shows Paid, the plan starts, and Acme's owner is told.",
-        },
-      ],
-    },
   },
 ];
 

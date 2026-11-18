@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars (git-ignored). image_tag is set by infra/scripts/deploy.sh.
+domain_name       = "uat.example.com"
+route53_zone_name = "example.com"
+alert_email       = "alerts@example.com"
+mail_from         = "ProductionOS UAT <no-reply@example.com>"
+
+app_environment = {
+  BILLING_SELLER_NAME    = "ProductionOS"
+  BILLING_SELLER_GSTIN   = ""
+  BILLING_SELLER_ADDRESS = ""
+  BILLING_SAC_CODE       = ""
+}

@@ -5,9 +5,12 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+/** Files on local disk, for one machine: locally, and in dev and SIT. The default. */
 @Component
+@ConditionalOnProperty(name = "qualityos.storage.provider", havingValue = "local", matchIfMissing = true)
 class LocalFileStorage implements FileStorage {
 
     private final Path root;

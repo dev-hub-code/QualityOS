@@ -1,0 +1,9 @@
+Subject: {{capaNumber}} is {{daysLate}} days late
+
+A CAPA needs your attention
+
+Hello {{recipientName}},
+{{lateItem}} on {{capaNumber}}, {{capaTitle}}, was due on {{dueDate}} and is still not done.
+It is owned by {{ownerName}}. You are told because you approve CAPAs.
+
+Open CAPA: {{actionUrl}}

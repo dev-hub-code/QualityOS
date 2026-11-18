@@ -62,6 +62,8 @@ export interface OrganizationSettings {
   effectivenessRequiredFrom: SeverityThreshold;
   /** A CAPA action needs a file attached before it can be completed. */
   actionEvidenceRequired: boolean;
+  /** Days late before a CAPA or action is escalated to CAPA approvers; 0 never. */
+  capaEscalationDays: number;
   version: number | null;
 }
 
@@ -422,6 +424,8 @@ export interface InspectionResult {
   valueDate: string | null;
   evaluation: string;
   remarks: string | null;
+  /** The instrument that took the measurement, when the inspector said which. */
+  instrumentId: string | null;
 }
 
 export interface InspectionDecision {
@@ -471,6 +475,10 @@ export interface Inspection {
   };
   results: InspectionResult[];
   instruments: UsedInstrument[];
+  /** The earlier inspection this one checks again, after a failed calibration. */
+  reinspectionOf: InspectionLink | null;
+  /** The latest inspection checking this one's goods again. */
+  reinspectedBy: InspectionLink | null;
   decisions: InspectionDecision[];
 }
 
@@ -535,7 +543,23 @@ export interface StatusChange {
   at: string;
 }
 
+/** Where a process incident can be said to have happened. A machine carries its work centre. */
+export interface NcrPlaceOption {
+  id: string;
+  label: string;
+  facilityId: string;
+  workCenterId: string | null;
+}
+
+export interface NcrPlaces {
+  lines: NcrPlaceOption[];
+  workCenters: NcrPlaceOption[];
+  machines: NcrPlaceOption[];
+}
+
 export interface Ncr extends NcrSummary {
+  /** A process incident's line, work centre and machine, as one label. */
+  place: string | null;
   description: string;
   inspectionId: string | null;
   auditId: string | null;
@@ -579,6 +603,7 @@ export interface CapaAction {
   id: string;
   actionType: "CORRECTIVE" | "PREVENTIVE";
   description: string;
+  ownerId: string;
   ownerName: string | null;
   targetDate: string;
   completedAt: string | null;
@@ -1013,6 +1038,23 @@ export interface UsedInstrument {
   nextDueOn: string;
   /** Where the inspection stands if the instrument later failed calibration. Null when it was never in doubt. */
   impactReview: "PENDING" | "RESULT_STANDS" | "REINSPECT" | null;
+  /** The parameters it measured. Empty when no result names it. */
+  parameters: string[];
+}
+
+/** Where the goods an inspection checked went, for a failed calibration's review. */
+export interface InspectionReach {
+  inspected: string;
+  usedIn: string[];
+  customers: string[];
+  /** The production batches a recall would cover. */
+  recallable: string[];
+}
+
+export interface InspectionLink {
+  id: string;
+  inspectionNumber: string;
+  status: string;
 }
 
 export interface ImpactReview {
@@ -1024,6 +1066,8 @@ export interface ImpactReview {
   note: string | null;
   decidedByName: string | null;
   decidedAt: string | null;
+  /** The parameters the failed instrument measured. Empty when no result names it, so all are in doubt. */
+  parameters: string[];
 }
 
 /** The inspections in doubt after one failed calibration, and the NCR it raised. */

@@ -56,6 +56,9 @@ public class CorrectiveAction extends TenantOwnedEntity {
     @Setter
     private Instant dueRemindedAt;
 
+    @Setter
+    private Instant escalatedAt;
+
     private String outcomeNote;
     private Instant closedAt;
     private UUID closedBy;

@@ -97,7 +97,10 @@ public final class CalibrationDtos {
      * @param impactReview where this inspection stands after the instrument failed calibration: {@code PENDING},
      *     {@code RESULT_STANDS} or {@code REINSPECT}. Null when it was never in doubt
      */
-    public record UsedInstrument(UUID id, String instrumentCode, String name, LocalDate nextDueOn, String impactReview) {
+    /** @param parameters the parameters this instrument measured; empty when no result names it */
+    public record UsedInstrument(
+            UUID id, String instrumentCode, String name, LocalDate nextDueOn, String impactReview,
+            List<String> parameters) {
     }
 
     /** @param decision null while the inspection waits for a decision */
@@ -109,7 +112,9 @@ public final class CalibrationDtos {
             String decision,
             String note,
             String decidedByName,
-            Instant decidedAt) {
+            Instant decidedAt,
+            /* The parameters the failed instrument measured; empty when no result names it, so all are in doubt. */
+            List<String> parameters) {
     }
 
     /** The inspections in doubt after one failed calibration, and the NCR it raised. */

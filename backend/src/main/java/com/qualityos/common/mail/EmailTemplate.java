@@ -35,6 +35,7 @@ public enum EmailTemplate {
     CAPA_ACTION_ASSIGNED("capa/action-assigned"),
     CAPA_ACTION_OVERDUE("capa/action-overdue"),
     RECALL_UNANSWERED("recall/unanswered"),
+    CAPA_ESCALATED("capa/escalated"),
     CAPA_VERIFICATION("capa/verification"),
     INSPECTION_SENT_BACK("inspection/sent-back"),
     INSPECTION_DISPOSITION("inspection/disposition"),

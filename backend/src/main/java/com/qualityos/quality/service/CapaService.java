@@ -37,6 +37,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -134,7 +135,19 @@ public class CapaService implements AttachmentPolicy {
 
     @Transactional(readOnly = true)
     public CapaDetail get(UUID id) {
-        return toDetail(load(id));
+        CorrectiveAction capa = load(id);
+        if (!holds(Permissions.CAPA_VIEW) && !involved(capa)) {
+            // As if it did not exist, as for any record the caller may not see.
+            throw new ResourceNotFoundException("CAPA", id);
+        }
+        return toDetail(capa);
+    }
+
+    /** The caller owns the CAPA or one of its actions, so may follow it without seeing every CAPA. */
+    private boolean involved(CorrectiveAction capa) {
+        UUID caller = TenantContext.getCurrentUserId();
+        return caller.equals(capa.getOwnerId()) || actions.findByCapaIdOrderByCreatedAt(capa.getId()).stream()
+                .anyMatch(action -> caller.equals(action.getOwnerId()));
     }
 
     @Transactional
@@ -219,9 +232,24 @@ public class CapaService implements AttachmentPolicy {
     @Transactional
     public CapaDetail completeAction(UUID id, UUID actionId, String note) {
         CorrectiveAction capa = lock(id);
-        capa.requireImplementation();
         CapaAction action = actions.findByIdAndCapaId(actionId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Action", actionId));
+        // Whoever manages CAPAs, or the person the action was given to: the work is theirs to report, as long as the
+        // plan still allows CAPA work at all.
+        if (!holds(Permissions.CAPA_MANAGE)) {
+            if (!action.getOwnerId().equals(TenantContext.getCurrentUserId())) {
+                if (!holds(Permissions.CAPA_VIEW) && !involved(capa)) {
+                    throw new ResourceNotFoundException("CAPA", id);
+                }
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "Only the action's owner, or someone who manages CAPAs, may complete it.");
+            }
+            if (!access.planAllows(Permissions.CAPA_MANAGE)) {
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "Your organisation's plan does not include CAPAs, or it is read-only.");
+            }
+        }
+        capa.requireImplementation();
         if (!action.isDone() && rules.actionEvidenceRequired() && !attachments.hasAny("CAPA_ACTION", actionId)) {
             throw new BusinessRuleException("Attach evidence to this action before completing it.");
         }
@@ -306,6 +334,39 @@ public class CapaService implements AttachmentPolicy {
         return late.size();
     }
 
+    /**
+     * Escalates, once, each open CAPA and each open action of one that is the organisation's chosen number of days
+     * late, to whoever approves CAPAs. Nothing when the organisation has turned escalation off.
+     */
+    @Transactional
+    public int escalateLate() {
+        int days = rules.escalationDays();
+        if (days == 0) {
+            return 0;
+        }
+        Instant now = Instant.now();
+        LocalDate today = today();
+        LocalDate dueBy = today.minusDays(days);
+        List<CorrectiveAction> lateCapas = capas.findToEscalate(dueBy);
+        lateCapas.forEach(capa -> {
+            alerts.capaEscalated(capa, null, ChronoUnit.DAYS.between(capa.getTargetDate(), today));
+            capa.setEscalatedAt(now);
+            audit.record("CAPA_ESCALATED", ENTITY, capa.getId(), null, Map.of("dueDate", capa.getTargetDate().toString()));
+        });
+        List<CapaAction> lateActions = actions.findToEscalate(dueBy);
+        Map<UUID, CorrectiveAction> parents = capas.findAllById(lateActions.stream().map(CapaAction::getCapaId)
+                .collect(java.util.stream.Collectors.toSet())).stream()
+                .collect(java.util.stream.Collectors.toMap(CorrectiveAction::getId, capa -> capa));
+        lateActions.forEach(action -> {
+            CorrectiveAction capa = parents.get(action.getCapaId());
+            alerts.capaEscalated(capa, action, ChronoUnit.DAYS.between(action.getTargetDate(), today));
+            action.escalated(now);
+            audit.record("CAPA_ACTION_ESCALATED", ENTITY, capa.getId(), null,
+                    Map.of("action", action.getId(), "dueDate", action.getTargetDate().toString()));
+        });
+        return lateCapas.size() + lateActions.size();
+    }
+
     /** Reminds each owner once, shortly before the date. Runs under the current tenant. */
     @Transactional
     public int remindDueSoon() {
@@ -378,6 +439,12 @@ public class CapaService implements AttachmentPolicy {
         CorrectiveAction capa = capas.findById(id).orElseThrow(() -> new ResourceNotFoundException("CAPA", id));
         scope.requireAllowed(capa.getFacilityId(), "CAPA", id.toString());
         return capa;
+    }
+
+    private static boolean holds(String permission) {
+        var caller = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        return caller != null && caller.getAuthorities().stream()
+                .anyMatch(held -> permission.equals(held.getAuthority()));
     }
 
     private CorrectiveAction lock(UUID id) {

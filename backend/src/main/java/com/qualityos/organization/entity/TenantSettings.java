@@ -32,4 +32,7 @@ public class TenantSettings extends TenantOwnedEntity {
 
     /** A CAPA action needs a file attached to it before it can be completed. */
     private boolean actionEvidenceRequired;
+
+    /** A CAPA, or an action of one, this many days late is escalated to whoever approves CAPAs. 0: never. */
+    private int capaEscalationDays = 7;
 }

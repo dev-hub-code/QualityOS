@@ -10,6 +10,7 @@ import com.qualityos.notification.service.NotificationType;
 import com.qualityos.quality.entity.CapaAction;
 import com.qualityos.quality.entity.CorrectiveAction;
 import com.qualityos.quality.entity.NonConformance;
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -88,6 +89,30 @@ class QualityAlerts {
                 "An action on " + capa.getCapaNumber() + " is overdue",
                 action.getDescription() + ". It was due on " + action.getTargetDate() + ".",
                 actionEmail(EmailTemplate.CAPA_ACTION_OVERDUE, capa, action));
+    }
+
+    /**
+     * Tells whoever approves CAPAs at the plant, besides the people already chased, that a CAPA or one of its actions
+     * is well past its date.
+     *
+     * @param action the late action, or null when the CAPA itself is late
+     */
+    void capaEscalated(CorrectiveAction capa, CapaAction action, long daysLate) {
+        Set<UUID> recipients = new HashSet<>(access.holdersOf(Permissions.CAPA_APPROVE));
+        UUID owner = action == null ? capa.getOwnerId() : action.getOwnerId();
+        String ownerName = access.names().getOrDefault(owner, "a former member");
+        String lateItem = action == null ? "The CAPA itself" : "The action \"" + action.getDescription() + "\"";
+        LocalDate due = action == null ? capa.getTargetDate() : action.getTargetDate();
+        capa(recipients, NotificationType.CAPA_ESCALATED, capa,
+                capa.getCapaNumber() + " is " + daysLate + " days late",
+                lateItem + " was due on " + due + " and is still not done. It is owned by " + ownerName + ".",
+                new EmailContent(EmailTemplate.CAPA_ESCALATED, Map.of(
+                        "capaNumber", capa.getCapaNumber(),
+                        "capaTitle", capa.getTitle(),
+                        "lateItem", lateItem,
+                        "dueDate", due.toString(),
+                        "daysLate", Long.toString(daysLate),
+                        "ownerName", ownerName)));
     }
 
     void capaOverdue(CorrectiveAction capa) {

@@ -148,9 +148,12 @@ public class AttachmentService {
         if (policy == null || !policy.parentExists(entityId)) {
             throw new ResourceNotFoundException("Record", entityId);
         }
-        boolean allowed = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+        java.util.Set<String> held = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
-                .anyMatch(permission.apply(policy)::equals);
+                .collect(java.util.stream.Collectors.toSet());
+        boolean manage = permission.apply(policy).equals(policy.managePermission());
+        boolean allowed = held.contains(permission.apply(policy))
+                || (manage ? policy.callerMayManage(entityId) : policy.callerMayView(entityId));
         if (!allowed) {
             throw new AccessDeniedException("Missing " + permission.apply(policy));
         }

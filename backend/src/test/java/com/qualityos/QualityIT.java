@@ -480,6 +480,94 @@ class QualityIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.data.actionEvidenceRequired").value(true));
     }
 
+    private String addActionFor(String capa, Session actionOwner, String target) throws Exception {
+        String body = act(owner, "/capas/" + capa + "/actions", Map.of(
+                        "actionType", "CORRECTIVE", "description", "Change the fixture", "ownerId", actionOwner.userId(),
+                        "targetDate", target))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return JsonPath.read(body, "$.data.actions[-1].id");
+    }
+
+    @Test
+    void anActionOwnerWhoCannotSeeCapasCanStillReportTheirOwnAction() throws Exception {
+        Session production = addMember(owner, "PRODUCTION_MANAGER");
+        Session bystander = addMember(owner, "PRODUCTION_MANAGER");
+        String capa = capa(null, manager);
+        analyse(capa);
+        String theirs = addActionFor(capa, production, FUTURE);
+        String others = addAction(capa, "CORRECTIVE");
+
+        as(production, get("/api/v1/capas/" + capa)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.actions.length()").value(2));
+        as(bystander, get("/api/v1/capas/" + capa)).andExpect(status().isNotFound());
+        as(production, get("/api/v1/capas")).andExpect(status().isForbidden());
+
+        // Not until the plan is being carried out.
+        act(production, "/capas/" + capa + "/actions/" + theirs + "/complete", Map.of("note", "Done"))
+                .andExpect(status().isUnprocessableContent());
+        act(owner, "/capas/" + capa + "/start-implementation", Map.of()).andExpect(status().isOk());
+
+        uploadEvidence(production, theirs).andExpect(status().isCreated());
+        as(production, get("/api/v1/attachments").param("entityType", "CAPA_ACTION").param("entityId", theirs))
+                .andExpect(jsonPath("$.data.length()").value(1));
+        uploadEvidence(production, others).andExpect(status().isForbidden());
+        uploadEvidence(bystander, theirs).andExpect(status().isForbidden());
+
+        act(production, "/capas/" + capa + "/actions/" + others + "/complete", Map.of("note", "Done"))
+                .andExpect(status().isForbidden());
+        act(bystander, "/capas/" + capa + "/actions/" + theirs + "/complete", Map.of("note", "Done"))
+                .andExpect(status().isNotFound());
+        act(production, "/capas/" + capa + "/actions/" + theirs + "/complete", Map.of("note", "Fixture changed"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.actions[0].completionNote").value("Fixture changed"));
+        // The rest of the CAPA stays with those who manage it.
+        act(production, "/capas/" + capa + "/submit-verification", Map.of()).andExpect(status().isForbidden());
+        // Done evidence is part of the record now.
+        uploadEvidence(production, theirs).andExpect(status().isForbidden());
+    }
+
+    private int escalate() {
+        return TenantContext.callAs(owner.tenantId(), null, capaService::escalateLate);
+    }
+
+    @Test
+    void aCapaOrActionLongLateIsEscalatedOnceToWhoeverApprovesCapas() throws Exception {
+        Session engineer = addMember(owner, "QUALITY_ENGINEER");
+        Session plant = addMember(owner, "PLANT_MANAGER");
+        String capa = capa(null, engineer);
+        String number = read(as(owner, get("/api/v1/capas/" + capa)), "$.data.capaNumber");
+        analyse(capa);
+        String action = addActionFor(capa, engineer, FUTURE);
+        asAppRole(owner.tenantId(), sql -> {
+            sql.update("UPDATE corrective_actions SET target_date = current_date - 3 WHERE id = ?", UUID.fromString(capa));
+            sql.update("UPDATE capa_actions SET target_date = current_date - 3 WHERE id = ?", UUID.fromString(action));
+        });
+        // Late, but not by the default seven days.
+        assertThat(escalate()).isZero();
+
+        asAppRole(owner.tenantId(), sql -> {
+            sql.update("UPDATE corrective_actions SET target_date = current_date - 8 WHERE id = ?", UUID.fromString(capa));
+            sql.update("UPDATE capa_actions SET target_date = current_date - 10 WHERE id = ?", UUID.fromString(action));
+        });
+        updateSettings(owner, Map.of("capaEscalationDays", 0));
+        assertThat(escalate()).isZero();
+        updateSettings(owner, Map.of("capaEscalationDays", 7));
+        as(owner, get("/api/v1/organizations/current/settings"))
+                .andExpect(jsonPath("$.data.capaEscalationDays").value(7));
+
+        assertThat(escalate()).isEqualTo(2);
+        assertThat(escalate()).isZero();
+        assertThat(titles(plant)).containsOnlyOnce(number + " is 8 days late").containsOnlyOnce(number + " is 10 days late");
+        assertThat(titles(manager)).contains(number + " is 8 days late");
+        assertThat(titles(engineer)).doesNotContain(number + " is 8 days late");
+        assertThat(emailedSubjects(plant)).contains(number + " is 10 days late");
+        assertThat(inTransactionAs(owner.tenantId(), null, () -> jdbc.queryForObject(
+                "SELECT count(*) FROM audit_logs WHERE action IN ('CAPA_ESCALATED', 'CAPA_ACTION_ESCALATED')",
+                Long.class))).isEqualTo(2);
+
+        updateSettings(owner, Map.of("capaEscalationDays", 91), status().isBadRequest());
+    }
+
     @Test
     void eachActionKeepsItsOwnEvidenceUntilTheCapaIsFinished() throws Exception {
         String capa = capa(null, owner);

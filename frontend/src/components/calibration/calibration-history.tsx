@@ -6,9 +6,18 @@ import { RecordLink, StatusBadge } from "@/components/records/parts";
 import { Button } from "@/components/ui/button";
 import type { CalibrationRecord, InstrumentUse } from "@/lib/types";
 
-export function CalibrationHistory({ records, canManage }: { records: CalibrationRecord[]; canManage: boolean }) {
+export function CalibrationHistory({
+  records,
+  canManage,
+}: {
+  records: CalibrationRecord[];
+  canManage: boolean;
+}) {
   const [open, setOpen] = useState<string | null>(null);
-  if (records.length === 0) return <p className="text-sm text-muted-foreground">Not calibrated here yet.</p>;
+  if (records.length === 0)
+    return (
+      <p className="text-sm text-muted-foreground">Not calibrated here yet.</p>
+    );
   return (
     <ul className="divide-y text-sm">
       {records.map((record) => (
@@ -17,14 +26,25 @@ export function CalibrationHistory({ records, canManage }: { records: Calibratio
             {record.calibratedOn}
             <StatusBadge status={record.result} />
             {record.performedBy}
-            {record.certificateNumber && ` · Certificate ${record.certificateNumber}`}
-            <Button size="sm" variant="ghost" onClick={() => setOpen(open === record.id ? null : record.id)}>
+            {record.certificateNumber &&
+              ` · Certificate ${record.certificateNumber}`}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setOpen(open === record.id ? null : record.id)}
+            >
               Certificates
             </Button>
           </div>
-          {record.notes && <p className="text-muted-foreground">{record.notes}</p>}
+          {record.notes && (
+            <p className="text-muted-foreground">{record.notes}</p>
+          )}
           {open === record.id && (
-            <AttachmentPanel entityType="CALIBRATION_RECORD" entityId={record.id} canManage={canManage} />
+            <AttachmentPanel
+              entityType="CALIBRATION_RECORD"
+              entityId={record.id}
+              canManage={canManage}
+            />
           )}
         </li>
       ))}
@@ -33,13 +53,19 @@ export function CalibrationHistory({ records, canManage }: { records: Calibratio
 }
 
 export function InstrumentUsage({ uses }: { uses: InstrumentUse[] }) {
-  if (uses.length === 0) return <p className="text-sm text-muted-foreground">Nothing has recorded this instrument.</p>;
+  if (uses.length === 0)
+    return (
+      <p className="text-sm text-muted-foreground">
+        Nothing has recorded this instrument.
+      </p>
+    );
   const suspect = uses.filter((use) => use.suspect).length;
   return (
     <>
       {suspect > 0 && (
         <p className="mb-2 text-sm text-destructive">
-          {suspect} record(s) used this instrument since its last good calibration. Review them.
+          {suspect} record(s) used this instrument since its last good
+          calibration. Review them.
         </p>
       )}
       <ul className="divide-y text-sm">

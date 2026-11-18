@@ -100,6 +100,14 @@ public final class TraceabilityDtos {
     public record CorrectionImpact(boolean inspected, List<String> batches, List<String> customers) {
     }
 
+    /**
+     * Where the goods an inspection checked went: the production batches they became part of, and the customers who
+     * still hold them or what was made from them. Recalls start from production batches, so {@code recallable} lists
+     * the batches a recall would cover, the inspected batch first when it is one.
+     */
+    public record InspectionReach(String inspected, List<String> usedIn, List<String> customers, List<String> recallable) {
+    }
+
     public record CorrectionSummary(
             UUID id,
             String correctionNumber,

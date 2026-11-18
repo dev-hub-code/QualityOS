@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { requirement, toEntries, toFormValues } from "./inspection";
+import {
+  requirement,
+  toEntries,
+  toFormValues,
+  toMeasuredWith,
+} from "./inspection";
 import type { ParameterSpec } from "./types";
 
 const parameter = (overrides: Partial<ParameterSpec>): ParameterSpec => ({
@@ -24,18 +29,32 @@ const parameter = (overrides: Partial<ParameterSpec>): ParameterSpec => ({
 
 describe("requirement", () => {
   it("describes numeric limits", () => {
-    expect(requirement(parameter({ minValue: "19.900000", maxValue: "20.100000" }))).toBe("19.9 to 20.1");
-    expect(requirement(parameter({ nominalValue: "20.000000", tolerance: "0.100000" }))).toBe("20 ± 0.1");
-    expect(requirement(parameter({ minValue: "50.000000" }))).toBe("At least 50");
+    expect(
+      requirement(parameter({ minValue: "19.900000", maxValue: "20.100000" })),
+    ).toBe("19.9 to 20.1");
+    expect(
+      requirement(
+        parameter({ nominalValue: "20.000000", tolerance: "0.100000" }),
+      ),
+    ).toBe("20 ± 0.1");
+    expect(requirement(parameter({ minValue: "50.000000" }))).toBe(
+      "At least 50",
+    );
     expect(requirement(parameter({}))).toBe("Reviewer decides");
   });
 });
 
 describe("toEntries", () => {
   it("skips blanks and types each value", () => {
-    const parameters = [parameter({}), parameter({ code: "OK", dataType: "BOOLEAN", perSample: false })];
+    const parameters = [
+      parameter({}),
+      parameter({ code: "OK", dataType: "BOOLEAN", perSample: false }),
+    ];
 
-    const { entries, invalid } = toEntries(parameters, 2, { "DIA#2": " 20.05 ", "OK#1": "false" });
+    const { entries, invalid } = toEntries(parameters, 2, {
+      "DIA#2": " 20.05 ",
+      "OK#1": "false",
+    });
 
     expect(invalid).toEqual([]);
     expect(entries).toEqual([
@@ -45,9 +64,15 @@ describe("toEntries", () => {
   });
 
   it("reports numbers that cannot be stored exactly", () => {
-    expect(toEntries([parameter({})], 1, { "DIA#1": "1.0000001" }).invalid).toEqual(["DIA sample 1"]);
-    expect(toEntries([parameter({})], 1, { "DIA#1": "abc" }).entries).toEqual([]);
-    expect(toEntries([parameter({})], 1, { "DIA#1": "-40" }).invalid).toEqual([]);
+    expect(
+      toEntries([parameter({})], 1, { "DIA#1": "1.0000001" }).invalid,
+    ).toEqual(["DIA sample 1"]);
+    expect(toEntries([parameter({})], 1, { "DIA#1": "abc" }).entries).toEqual(
+      [],
+    );
+    expect(toEntries([parameter({})], 1, { "DIA#1": "-40" }).invalid).toEqual(
+      [],
+    );
   });
 
   it("does not offer a second sample for a per-lot parameter", () => {
@@ -67,7 +92,36 @@ describe("toFormValues", () => {
       valueDate: null,
       evaluation: "FAIL",
       remarks: null,
+      instrumentId: null,
     };
     expect(toFormValues([saved])).toEqual({ "OK#1": "false" });
+  });
+
+  it("names each parameter's instrument on every entry, and restores it", () => {
+    const parameters = [parameter({}), parameter({ code: "LEN" })];
+    const { entries } = toEntries(
+      parameters,
+      1,
+      { "DIA#1": "20", "LEN#1": "5" },
+      { DIA: "mic-1" },
+    );
+    expect(entries.map((entry) => entry.instrumentId)).toEqual([
+      "mic-1",
+      undefined,
+    ]);
+    const saved = (parameterCode: string, instrumentId: string | null) => ({
+      parameterCode,
+      sampleNumber: 1,
+      valueNumeric: "1",
+      valueText: null,
+      valueBoolean: null,
+      valueDate: null,
+      evaluation: "PASS",
+      remarks: null,
+      instrumentId,
+    });
+    expect(toMeasuredWith([saved("DIA", "mic-1"), saved("LEN", null)])).toEqual(
+      { DIA: "mic-1" },
+    );
   });
 });

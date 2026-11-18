@@ -44,7 +44,14 @@ public final class InspectionDtos {
             @Size(max = 500) String valueText,
             Boolean valueBoolean,
             LocalDate valueDate,
-            @Size(max = 1000) String remarks) {
+            @Size(max = 1000) String remarks,
+            /* The instrument that took the measurement. It is recorded as used on the inspection, if not already. */
+            UUID instrumentId) {
+
+        public ResultRequest(String parameterCode, int sampleNumber, BigDecimal valueNumeric, String valueText,
+                Boolean valueBoolean, LocalDate valueDate, String remarks) {
+            this(parameterCode, sampleNumber, valueNumeric, valueText, valueBoolean, valueDate, remarks, null);
+        }
     }
 
     public record ApproveRequest(Inspection.Result result, @Size(max = 1000) String note) {
@@ -94,7 +101,14 @@ public final class InspectionDtos {
             SpecSnapshot specification,
             List<ResultResponse> results,
             List<DecisionResponse> decisions,
-            List<UsedInstrument> instruments) {
+            List<UsedInstrument> instruments,
+            /* The earlier inspection this one checks again, after a failed calibration; else null. */
+            InspectionLink reinspectionOf,
+            /* The latest inspection checking this one's goods again; else null. */
+            InspectionLink reinspectedBy) {
+    }
+
+    public record InspectionLink(UUID id, String inspectionNumber, String status) {
     }
 
     public record ResultResponse(
@@ -105,7 +119,8 @@ public final class InspectionDtos {
             Boolean valueBoolean,
             LocalDate valueDate,
             String evaluation,
-            String remarks) {
+            String remarks,
+            UUID instrumentId) {
     }
 
     public record DecisionResponse(String decision, String note, UUID decidedBy, Instant decidedAt) {

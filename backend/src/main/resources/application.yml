@@ -3,6 +3,12 @@ spring:
     name: qualityos-backend
   profiles:
     default: local
+    # Each environment is one profile. dev and SIT keep local's conveniences, and mail goes to Mailpit; UAT runs as
+    # production does, and mail is real, through SendGrid. See docs/ENVIRONMENTS.md.
+    group:
+      dev: local
+      sit: local
+      uat: prod
   datasource:
     url: ${DB_URL}
     # Runtime role: no ownership and no BYPASSRLS, so row-level security applies to it.
@@ -62,6 +68,8 @@ app:
 qualityos:
   # The address users reach the web application on, used for links in emails.
   app-url: ${APP_URL:http://localhost:3000}
+  # DEV, SIT or UAT, set by each environment's profile; empty locally and in production. Prefixes email subjects.
+  environment: ${QUALITYOS_ENVIRONMENT:}
   # Online payment. Left empty, customers see no pay button and invoices are recorded by hand.
   payments:
     razorpay:
@@ -87,6 +95,13 @@ qualityos:
   mail:
     from: ${MAIL_FROM:ProductionOS <no-reply@qualityos.local>}
     retry-delay: ${MAIL_RETRY_DELAY:5s}
+    # smtp (Mailpit locally, in dev and in SIT) or sendgrid (UAT). Each environment's profile sets it.
+    provider: ${MAIL_PROVIDER:smtp}
+    sendgrid:
+      api-key: ${SENDGRID_API_KEY:}
+      base-url: ${SENDGRID_BASE_URL:https://api.sendgrid.com}
+      # Checks each request without delivering it, for trying a key safely.
+      sandbox: ${SENDGRID_SANDBOX:false}
   jobs:
     enabled: ${JOBS_ENABLED:true}
     # Each job waits initial-delay after startup, then interval after the end of each run.

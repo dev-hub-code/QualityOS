@@ -1,0 +1,7 @@
+# UAT: user acceptance testing, run as production is (the prod profile comes with it), with real email through
+# SendGrid. It does not start without SENDGRID_API_KEY, a verified MAIL_FROM sender, real JWT keys and
+# SECOND_FACTOR_KEY.
+qualityos:
+  environment: UAT
+  mail:
+    provider: ${MAIL_PROVIDER:sendgrid}

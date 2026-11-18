@@ -5,12 +5,15 @@ import jakarta.mail.internet.MimeMessage;
 import org.springframework.core.io.ByteArrayResource;
 import java.nio.charset.StandardCharsets;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
+/** Mail through an SMTP server: Mailpit locally and in dev and SIT, which catches every message. The default. */
 @Component
+@ConditionalOnProperty(name = "qualityos.mail.provider", havingValue = "smtp", matchIfMissing = true)
 class SmtpMailGateway implements MailGateway {
 
     private final JavaMailSender sender;

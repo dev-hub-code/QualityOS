@@ -115,7 +115,7 @@ export function OfflineResults() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => discard(item.inspectionId)}
+                  onClick={() => discard(item, item.inspectionId)}
                 >
                   Discard
                 </Button>

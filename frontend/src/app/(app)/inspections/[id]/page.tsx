@@ -222,7 +222,7 @@ function Execution({
     /** Keeps the values on this device until the connection is back. */
     function keep() {
       if (!me) return false;
-      queueResults(
+      const stored = queueResults(
         {
           inspectionId: inspection.id,
           inspectionNumber: inspection.inspectionNumber,
@@ -232,6 +232,13 @@ function Execution({
         stamped,
       );
       setKept(keptOnDevice(inspection.id, me));
+      if (!stored) {
+        setOfflineNote("");
+        setFormError(
+          "No connection, and this device could not keep the values. They are not saved: stay on this page until the connection is back, then select Save.",
+        );
+        return true;
+      }
       setOfflineNote(
         thenSubmit
           ? "No connection. The values are kept on this device and sent when it is back. Submit then."
@@ -382,14 +389,11 @@ function keptOnDevice(
   inspectionId: string,
   me: { user: { id: string }; tenantId: string } | undefined,
 ): QueuedEntry[] {
-  const item =
-    typeof window === "undefined" ? undefined : queuedFor(inspectionId);
-  return item &&
-    me &&
-    item.userId === me.user.id &&
-    item.tenantId === me.tenantId
-    ? item.entries
-    : [];
+  if (typeof window === "undefined" || !me) return [];
+  return (
+    queuedFor({ userId: me.user.id, tenantId: me.tenantId }, inspectionId)
+      ?.entries ?? []
+  );
 }
 
 /** A kept entry in the shape of a saved result, to fill the form with. */

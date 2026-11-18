@@ -36,8 +36,8 @@ class EndpointAuthorizationIT extends AbstractIntegrationTest {
             // Open to everyone, and hold no organisation data.
             "GET /api/v1/public/plans",
             "GET /api/v1/system/info",
-            // Cashfree holds no session. Each request is checked by its signature instead.
-            "POST /api/v1/public/webhooks/cashfree",
+            // Razorpay holds no session. Each request is checked by its signature instead.
+            "POST /api/v1/public/webhooks/razorpay",
             // The caller's own notifications.
             // Any member: an NCR's status shows outside the NCR pages too.
             "GET /api/v1/ncr-status-labels",

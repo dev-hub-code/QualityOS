@@ -254,7 +254,7 @@ public class SubscriptionService {
     /**
      * Raises the invoice renewing the paid period that ends within a week, unless the organisation cancelled, already
      * has an invoice open, or this period was renewed on its own before. The plan's price now; for a plan no longer
-     * offered, or agreed with our team, the price last paid for it. Cashfree cannot take it without the customer, so
+     * offered, or agreed with our team, the price last paid for it. Razorpay cannot take it without the customer, so
      * the customer pays it as any other. Runs under the current tenant.
      */
     @Transactional

@@ -8,9 +8,19 @@ export interface PaymentGateway {
   mode: "sandbox" | "production" | null;
 }
 
+/** What Razorpay's checkout needs. The key id is public; the secret stays on the server. */
 export interface Checkout {
+  /** Ours, to ask the server about afterwards. */
   orderId: string;
-  paymentSessionId: string;
+  gatewayOrderId: string;
+  keyId: string;
+  /** In paise. */
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  customerName: string;
+  customerEmail: string;
   mode: "sandbox" | "production";
 }
 
@@ -2881,7 +2891,7 @@ export interface StockTransfer {
 
 export interface RefundView {
   id: string;
-  provider: "CASHFREE" | "MANUAL";
+  provider: "RAZORPAY" | "CASHFREE" | "MANUAL";
   reference: string;
   amount: number;
   status: "PENDING" | "SUCCEEDED" | "FAILED";
@@ -2913,7 +2923,7 @@ export interface UnappliedPayment {
   invoiceNumber: string;
   amount: number;
   since: string;
-  /** Waiting for a decision, or refunded and waiting for Cashfree to confirm it. */
+  /** Waiting for a decision, or refunded and waiting for Razorpay to confirm it. */
   status: "NEEDS_REVIEW" | "REFUND_PENDING";
   /** How its latest refund stands, if it has one. A failed one leaves it to review again. */
   refundStatus: "PENDING" | "SUCCEEDED" | "FAILED" | null;

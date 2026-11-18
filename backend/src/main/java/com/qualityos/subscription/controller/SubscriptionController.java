@@ -5,7 +5,6 @@ import com.qualityos.subscription.service.BillingRefunds;
 import com.qualityos.common.response.ApiResponse;
 import com.qualityos.common.security.Permissions.Require;
 import com.qualityos.subscription.dto.SubscriptionDtos.ChangePlanRequest;
-import com.qualityos.subscription.dto.SubscriptionDtos.CheckoutRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.CheckoutResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.InvoiceResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.OrderConfirmation;
@@ -14,7 +13,7 @@ import com.qualityos.subscription.dto.SubscriptionDtos.PaymentResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.PlanResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.SubscriptionResponse;
 import com.qualityos.subscription.entity.SubscriptionInvoice;
-import com.qualityos.subscription.service.CashfreePayments;
+import com.qualityos.subscription.service.RazorpayPayments;
 import com.qualityos.subscription.service.InvoicePdfRenderer;
 import com.qualityos.subscription.service.SubscriptionService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,10 +42,10 @@ public class SubscriptionController {
 
     private final SubscriptionService subscriptions;
     private final InvoicePdfRenderer invoices;
-    private final CashfreePayments gateway;
+    private final RazorpayPayments gateway;
     private final BillingRefunds refunds;
 
-    SubscriptionController(SubscriptionService subscriptions, InvoicePdfRenderer invoices, CashfreePayments gateway,
+    SubscriptionController(SubscriptionService subscriptions, InvoicePdfRenderer invoices, RazorpayPayments gateway,
             BillingRefunds refunds) {
         this.refunds = refunds;
         this.subscriptions = subscriptions;
@@ -98,8 +97,8 @@ public class SubscriptionController {
     }
 
     @PostMapping("/invoices/{id}/checkout")
-    public ApiResponse<CheckoutResponse> checkout(@PathVariable UUID id, @Valid @RequestBody CheckoutRequest request) {
-        return ApiResponse.ok(gateway.checkout(id, request));
+    public ApiResponse<CheckoutResponse> checkout(@PathVariable UUID id) {
+        return ApiResponse.ok(gateway.checkout(id));
     }
 
     /** Asks the gateway what happened. Nothing the browser says about the payment is taken into account. */

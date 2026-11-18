@@ -799,11 +799,11 @@ export const DOC_FLOWS: Record<string, Flow[]> = {
           label: "How does the money go back?",
           branches: [
             { when: "By bank", then: "Made outside, recorded with its reference and date.", tone: "good" },
-            { when: "Through the gateway", then: "Saved first, then sent to Cashfree." },
+            { when: "Through the gateway", then: "Saved first, then sent to Razorpay." },
           ],
         },
         {
-          label: "What does Cashfree say?",
+          label: "What does Razorpay say?",
           next: "Success",
           branches: [
             { when: "No answer yet", then: "Pending. Its webhook, Check refund or the refunds job finds out." },
@@ -818,12 +818,12 @@ export const DOC_FLOWS: Record<string, Flow[]> = {
       steps: [
         { label: "Listed under Payments waiting for review" },
         { label: "Refund it, with a reason", who: "Billing operator" },
-        { label: "Refund pending", note: "Saved with its reference before Cashfree is asked." },
+        { label: "Refund pending", note: "Saved with its reference before Razorpay is asked." },
         {
-          label: "What does Cashfree say?",
+          label: "What does Razorpay say?",
           next: "Success",
           branches: [
-            { when: "No answer", then: "Looked up later. Sent again under the same reference only if Cashfree never got it." },
+            { when: "No answer", then: "Looked up later. Sent again under the same reference only if Razorpay never got it." },
             { when: "Failed", then: "Back to review with the reason, to refund again.", tone: "stop" },
           ],
         },

@@ -24,7 +24,7 @@ public class Refund extends TenantOwnedEntity {
 
     public enum Status { PENDING, SUCCEEDED, FAILED }
 
-    public static final String GATEWAY = "CASHFREE";
+    public static final String GATEWAY = "RAZORPAY";
     public static final String MANUAL = "MANUAL";
 
     private UUID creditNoteId;

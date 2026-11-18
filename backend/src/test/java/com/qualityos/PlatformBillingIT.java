@@ -308,7 +308,7 @@ class PlatformBillingIT extends AbstractIntegrationTest {
         var request = new RecordPaymentRequest(utr.toLowerCase(), new BigDecimal("1180.00"), false, null,
                 PaymentMethod.UPI, on, null);
         assertThatThrownBy(() -> TenantContext.runAs(other.tenantId(), other.userId(),
-                () -> subscriptions.settle(UUID.fromString(theirs), "CASHFREE", request)))
+                () -> subscriptions.settle(UUID.fromString(theirs), "RAZORPAY", request)))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("already used on another invoice");
 

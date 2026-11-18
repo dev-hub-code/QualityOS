@@ -145,19 +145,72 @@ test("a new operator sets up an authenticator before the Control Center opens, a
 
 test("an open invoice offers online payment only when a gateway is set up", async ({ page }) => {
   await signUp(page);
+  const gateway = { available: false, mode: "sandbox" };
+  await page.route("**/api/v1/subscription/payment-gateway", (route) =>
+    route.fulfill({ json: { success: true, data: gateway } }),
+  );
   await page.goto("/settings/billing");
   await page.getByRole("button", { name: "Choose Growth" }).click();
   await expect(page.getByText(/The Growth plan starts\s+once it is paid/)).toBeVisible();
   await expect(page.getByRole("button", { name: /online/ })).toHaveCount(0);
 
+  gateway.available = true;
+  await page.reload();
+  await expect(page.getByText("Test mode: no real money moves.")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Pay .* online/ })).toBeVisible();
+});
+
+test("paying online opens Razorpay's checkout with the server's order, and the server says what happened", async ({
+  page,
+}) => {
+  await signUp(page);
   await page.route("**/api/v1/subscription/payment-gateway", (route) =>
     route.fulfill({ json: { success: true, data: { available: true, mode: "sandbox" } } }),
   );
-  await page.reload();
-  await expect(page.getByText("Test mode: no real money moves.")).toBeVisible();
-  await page.getByLabel("Mobile number").fill("12345");
-  await page.getByRole("button", { name: /online/ }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "10-digit" })).toBeVisible();
+  await page.route("**/api/v1/subscription/invoices/*/checkout", (route) =>
+    route.fulfill({
+      json: {
+        success: true,
+        data: {
+          orderId: "QOS-e2e",
+          gatewayOrderId: "order_e2e",
+          keyId: "rzp_test_e2e",
+          amount: 707882,
+          currency: "INR",
+          name: "ProductionOS",
+          description: "Invoice BILL-1",
+          customerName: "Asha Rao",
+          customerEmail: "asha@example.com",
+          mode: "sandbox",
+        },
+      },
+    }),
+  );
+  // Razorpay's script, replaced by one that records what it was given and reports a payment at once.
+  await page.route("https://checkout.razorpay.com/v1/checkout.js", (route) =>
+    route.fulfill({
+      contentType: "application/javascript",
+      body: `window.Razorpay = function (options) {
+        window.opened = options;
+        return { open: function () { setTimeout(options.handler, 10); }, on: function () {} };
+      };`,
+    }),
+  );
+  let confirmed = "";
+  await page.route("**/api/v1/subscription/gateway-orders/*/confirm", (route) => {
+    confirmed = new URL(route.request().url()).pathname;
+    return route.fulfill({ json: { success: true, data: { status: "PAID" } } });
+  });
+
+  await page.goto("/settings/billing");
+  await page.getByRole("button", { name: "Choose Growth" }).click();
+  await page.getByRole("button", { name: /Pay .* online/ }).click();
+
+  await expect(page.getByRole("status").filter({ hasText: "Payment received. Thank you." })).toBeVisible();
+  // Checkout got the public key and Razorpay's order, and the server was asked about our order.
+  const opened = await page.evaluate(() => (window as unknown as { opened: Record<string, unknown> }).opened);
+  expect(opened).toMatchObject({ key: "rzp_test_e2e", order_id: "order_e2e", amount: 707882, currency: "INR" });
+  expect(confirmed).toMatch(/\/gateway-orders\/QOS-e2e\/confirm$/);
 });
 
 test("an operator of a platform organisation has no workspace to land in", async ({ page }) => {

@@ -8,7 +8,6 @@ import com.qualityos.common.exception.QualityOsException;
 import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.organization.service.OrganizationService;
-import com.qualityos.subscription.dto.SubscriptionDtos.CheckoutRequest;
 import com.qualityos.subscription.dto.SubscriptionDtos.CheckoutResponse;
 import com.qualityos.subscription.dto.SubscriptionDtos.PaymentGateway;
 import com.qualityos.subscription.dto.SubscriptionDtos.PaymentMethod;
@@ -20,7 +19,6 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.HexFormat;
 import java.util.List;
@@ -29,41 +27,42 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Online payment of an invoice. The amount always comes from the invoice, and whether money arrived always comes from
- * asking Cashfree: the browser's return and the webhook's contents only say that it is worth asking.
- * Calls to Cashfree stay outside transactions, so that a slow response holds no database lock.
+ * Online payment of an invoice through Razorpay. The amount always comes from the invoice, and whether money arrived
+ * always comes from asking Razorpay: the browser's callback and the webhook's contents only say that it is worth
+ * asking. Calls to Razorpay stay outside transactions, so that a slow response holds no database lock.
  */
 @Slf4j
 @Service
-public class CashfreePayments {
+public class RazorpayPayments {
 
-    public static final String PROVIDER = "CASHFREE";
+    public static final String PROVIDER = "RAZORPAY";
 
-    /** Short, because a replaced invoice cannot cancel an order that is still open at Cashfree. */
+    /**
+     * How long checkout goes on with one order before starting another. Razorpay orders never expire, so one paid late
+     * is still applied, or kept for review if the invoice was paid meanwhile.
+     */
     private static final Duration ORDER_LIFETIME = Duration.ofMinutes(30);
 
-    private static final ZoneId CHECKOUT_ZONE = ZoneId.of("Asia/Kolkata");
     private static final Set<String> FAILED = Set.of("FAILED");
     private static final int MAX_REASON = 300;
     private static final String PAYER = "SELECT email, full_name FROM users WHERE id = ?";
+    private static final String BUSINESS_NAME = "ProductionOS";
 
     private record Payer(String email, String name) {
     }
 
     /**
-     * How long an order may stay reserved without Cashfree knowing it before it is taken for abandoned: longer than a
-     * create call can take (CashfreeClient's connect and read timeouts).
+     * How long an order may stay reserved without Razorpay knowing it before it is taken for abandoned: longer than a
+     * create call can take (RazorpayClient's connect and read timeouts).
      */
     private static final Duration CREATE_GRACE = Duration.ofMinutes(2);
 
@@ -75,8 +74,8 @@ public class CashfreePayments {
     private record Prepared(SubscriptionInvoice invoice, Payer payer, GatewayOrder order, boolean reserved) {
     }
 
-    private final CashfreeProperties properties;
-    private final CashfreeClient cashfree;
+    private final RazorpayProperties properties;
+    private final RazorpayClient razorpay;
     private final GatewayOrderRepository orders;
     private final SubscriptionService subscriptions;
     private final OrganizationService organizations;
@@ -84,12 +83,11 @@ public class CashfreePayments {
     private final JdbcTemplate jdbc;
     private final JsonMapper json;
     private final TransactionTemplate tx;
-    private final String appUrl;
     private final BillingRefunds refunds;
 
-    CashfreePayments(
-            CashfreeProperties properties,
-            CashfreeClient cashfree,
+    RazorpayPayments(
+            RazorpayProperties properties,
+            RazorpayClient razorpay,
             GatewayOrderRepository orders,
             SubscriptionService subscriptions,
             OrganizationService organizations,
@@ -97,11 +95,10 @@ public class CashfreePayments {
             JdbcTemplate jdbc,
             JsonMapper json,
             PlatformTransactionManager transactionManager,
-            @Value("${qualityos.app-url}") String appUrl,
             BillingRefunds refunds) {
         this.refunds = refunds;
         this.properties = properties;
-        this.cashfree = cashfree;
+        this.razorpay = razorpay;
         this.orders = orders;
         this.subscriptions = subscriptions;
         this.organizations = organizations;
@@ -109,7 +106,6 @@ public class CashfreePayments {
         this.jdbc = jdbc;
         this.json = json;
         this.tx = new TransactionTemplate(transactionManager);
-        this.appUrl = appUrl;
     }
 
     public PaymentGateway gateway() {
@@ -118,50 +114,51 @@ public class CashfreePayments {
 
     /**
      * Continues the invoice's open order rather than starting another, so that it cannot be paid twice. The order is
-     * reserved under the invoice's row lock before Cashfree is asked to create it: a second checkout at the same moment
+     * reserved under the invoice's row lock before Razorpay is asked to create it: a second checkout at the same moment
      * finds the reservation and shares that order, or is asked to try again while it is being created. If the
-     * application stops after Cashfree created an order but before recording it, the next checkout finds the order at
-     * Cashfree and carries on with it.
+     * application stops after Razorpay created an order but before recording it, the next checkout finds the order at
+     * Razorpay by its receipt and carries on with it.
      */
-    public CheckoutResponse checkout(UUID invoiceId, CheckoutRequest request) {
+    public CheckoutResponse checkout(UUID invoiceId) {
         requireConfigured();
-        // Twice at most: once more after setting aside an order Cashfree no longer has open.
+        // Twice at most: once more after setting aside an order Razorpay never created.
         for (int attempt = 0; attempt < 2; attempt++) {
             Prepared prepared = tx.execute(status -> prepare(invoiceId));
             if (prepared.reserved()) {
-                return create(prepared, request);
+                return create(prepared);
             }
             GatewayOrder open = prepared.order();
             String reference = open.getGatewayOrderId();
-            Optional<CashfreeClient.Order> found = cashfree.findOrder(reference);
-            if (found.isPresent() && "PAID".equals(found.get().status())) {
+            Optional<RazorpayClient.Order> found = razorpay.findOrder(reference);
+            if (found.isPresent() && "paid".equals(found.get().status())) {
                 opened(reference);
                 reconcile(reference);
                 throw new ConflictException("This invoice has just been paid.");
             }
-            if (found.isPresent() && "ACTIVE".equals(found.get().status()) && found.get().paymentSessionId() != null) {
+            if (found.isPresent()) {
                 opened(reference);
-                return new CheckoutResponse(reference, found.get().paymentSessionId(), properties.mode());
+                return response(prepared, found.get());
             }
             if (found.isEmpty() && open.getStatus() == GatewayOrder.Status.CREATING
                     && open.getCreatedAt().isAfter(Instant.now().minus(CREATE_GRACE))) {
                 throw new ConflictException("A payment for this invoice is being started. Try again in a moment.");
             }
-            // Expired or ended at Cashfree, or never created there: nothing more can be paid on it.
+            // Never created at Razorpay: nothing can be paid on it.
             abandon(reference);
         }
         throw new ConflictException("A payment for this invoice is being started. Try again in a moment.");
     }
 
-    private CheckoutResponse create(Prepared prepared, CheckoutRequest request) {
+    private CheckoutResponse create(Prepared prepared) {
         String reference = prepared.order().getGatewayOrderId();
-        CashfreeClient.Order created;
+        RazorpayClient.Order created;
         try {
-            created = cashfree.createOrder(newOrder(prepared, request));
+            created = razorpay.createOrder(reference, prepared.invoice().getTotal(),
+                    "Invoice " + prepared.invoice().getInvoiceNumber());
         } catch (RuntimeException e) {
-            // Cashfree may have created it before the failure. If it plainly has not, the next checkout need not wait.
+            // Razorpay may have created it before the failure. If it plainly has not, the next checkout need not wait.
             try {
-                if (cashfree.findOrder(reference).isEmpty()) {
+                if (razorpay.findOrder(reference).isEmpty()) {
                     abandon(reference);
                 }
             } catch (RuntimeException unknown) {
@@ -170,26 +167,19 @@ public class CashfreePayments {
             throw e;
         }
         opened(reference);
-        return new CheckoutResponse(reference, created.paymentSessionId(), properties.mode());
+        return response(prepared, created);
     }
 
-    private CashfreeClient.NewOrder newOrder(Prepared prepared, CheckoutRequest request) {
+    /** What the browser needs to open Razorpay's checkout. The key id is public; the secret never leaves here. */
+    private CheckoutResponse response(Prepared prepared, RazorpayClient.Order order) {
         SubscriptionInvoice invoice = prepared.invoice();
-        GatewayOrder reserved = prepared.order();
-        String reference = reserved.getGatewayOrderId();
-        return new CashfreeClient.NewOrder(
-                reference,
-                invoice.getTotal(),
-                new CashfreeClient.Customer(
-                        TenantContext.getCurrentTenantId().toString().replace("-", ""),
-                        prepared.payer().name(), prepared.payer().email(), request.phone()),
-                UriComponentsBuilder.fromUriString(appUrl).path("/settings/billing")
-                        .queryParam("order_id", reference).toUriString(),
-                OffsetDateTime.ofInstant(reserved.getExpiresAt(), CHECKOUT_ZONE),
-                "Invoice " + invoice.getInvoiceNumber());
+        return new CheckoutResponse(prepared.order().getGatewayOrderId(), order.id(), properties.keyId(),
+                RazorpayClient.paise(invoice.getTotal()), CURRENCY, BUSINESS_NAME,
+                "Invoice " + invoice.getInvoiceNumber(), prepared.payer().name(), prepared.payer().email(),
+                properties.mode());
     }
 
-    /** Cashfree holds the order: a reservation becomes open. Audited once, when it does. */
+    /** Razorpay holds the order: a reservation becomes open. Audited once, when it does. */
     private void opened(String reference) {
         tx.executeWithoutResult(status -> {
             GatewayOrder order = orders.lockByProviderAndGatewayOrderId(PROVIDER, reference).orElseThrow();
@@ -219,64 +209,71 @@ public class CashfreePayments {
         return reconcile(reference);
     }
 
-    /** The signature proves Cashfree sent this. It can be replayed harmlessly, because settling is idempotent. */
-    public void receiveWebhook(byte[] body, String timestamp, String signature) {
-        if (!properties.configured()) {
+    /**
+     * The signature proves Razorpay sent this. It can be replayed harmlessly, because settling is idempotent, and the
+     * outcome is always asked of Razorpay rather than taken from the body.
+     */
+    public void receiveWebhook(byte[] body, String signature) {
+        if (!properties.webhooksConfigured()) {
             throw new ResourceNotFoundException("Webhook", PROVIDER);
         }
-        if (!cashfree.signatureMatches(body, timestamp, signature)) {
+        if (!razorpay.signatureMatches(body, signature)) {
             throw new QualityOsException(ErrorCode.UNAUTHENTICATED, "The webhook signature is not valid.");
         }
-        Optional<String[]> refund = refundIn(body);
-        if (refund.isPresent()) {
-            UUID owner = TenantContext.callAs(null, null, () -> tx.execute(status -> jdbc.queryForObject(
-                    "SELECT gateway_order_tenant(?, ?)", UUID.class, PROVIDER, refund.get()[0])));
-            if (owner != null) {
-                TenantContext.runAs(owner, null, () -> refunds.refreshByReference(refund.get()[0], refund.get()[1]));
+        JsonNode payload;
+        try {
+            payload = json.readTree(body).path("payload");
+        } catch (JacksonException e) {
+            throw new BusinessRuleException("The webhook body is not valid.");
+        }
+        JsonNode refund = payload.path("refund").path("entity");
+        if (refund.isObject()) {
+            // Our order reference and refund id travel in the refund's notes and receipt.
+            JsonNode order = refund.path("notes").path("order");
+            JsonNode id = refund.path("receipt");
+            if (order.isString() && id.isString()) {
+                UUID owner = tenantOf(order.asString());
+                if (owner != null) {
+                    TenantContext.runAs(owner, null, () -> refunds.refreshByReference(order.asString(), id.asString()));
+                }
             }
             return;
         }
-        Optional<String> reference = orderIn(body);
-        if (reference.isEmpty()) {
-            return;
-        }
-        UUID tenant = TenantContext.callAs(null, null, () -> tx.execute(status -> jdbc.queryForObject(
-                "SELECT gateway_order_tenant(?, ?)", UUID.class, PROVIDER, reference.get())));
-        // Otherwise another order on the same Cashfree account, or the dashboard's test event.
-        if (tenant != null) {
-            TenantContext.runAs(tenant, null, () -> reconcile(reference.get()));
-        }
+        Optional<String> reference = referenceIn(payload);
+        // Otherwise another order on the same Razorpay account, or the dashboard's test event.
+        reference.ifPresent(found -> {
+            UUID tenant = tenantOf(found);
+            if (tenant != null) {
+                TenantContext.runAs(tenant, null, () -> reconcile(found));
+            }
+        });
     }
 
-    /** The order and our refund id, when this is news of a refund. Its status is then asked of Cashfree. */
-    private Optional<String[]> refundIn(byte[] body) {
-        try {
-            JsonNode refund = json.readTree(body).path("data").path("refund");
-            JsonNode order = refund.path("order_id");
-            JsonNode id = refund.path("refund_id");
-            return order.isString() && id.isString()
-                    ? Optional.of(new String[] {order.asString(), id.asString()}) : Optional.empty();
-        } catch (JacksonException e) {
-            throw new BusinessRuleException("The webhook body is not valid.");
+    /** Our reference: the order's receipt, read from the event or, for a payment event, asked of Razorpay. */
+    private Optional<String> referenceIn(JsonNode payload) {
+        JsonNode receipt = payload.path("order").path("entity").path("receipt");
+        if (receipt.isString()) {
+            return Optional.of(receipt.asString());
         }
+        JsonNode order = payload.path("payment").path("entity").path("order_id");
+        if (!order.isString()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(razorpay.order(order.asString()).receipt());
     }
 
-    private Optional<String> orderIn(byte[] body) {
-        try {
-            JsonNode order = json.readTree(body).path("data").path("order").path("order_id");
-            return order.isString() ? Optional.of(order.asString()) : Optional.empty();
-        } catch (JacksonException e) {
-            throw new BusinessRuleException("The webhook body is not valid.");
-        }
+    private UUID tenantOf(String reference) {
+        return TenantContext.callAs(null, null, () -> tx.execute(status -> jdbc.queryForObject(
+                "SELECT gateway_order_tenant(?, ?)", UUID.class, PROVIDER, reference)));
     }
 
     /** Runs under the order's tenant. A taken payment that cannot be applied is kept for a person, never dropped. */
     GatewayOrder.Status reconcile(String reference) {
-        List<CashfreeClient.Payment> payments = cashfree.payments(reference);
+        List<RazorpayClient.Payment> payments = captureAuthorized(reference, razorpay.payments(reference));
         try {
             return tx.execute(status -> apply(reference, payments));
         } catch (ConflictException | BusinessRuleException e) {
-            log.error("Cashfree order {} took a payment that could not be applied: {}", reference, e.getMessage());
+            log.error("Razorpay order {} took a payment that could not be applied: {}", reference, e.getMessage());
             tx.executeWithoutResult(status -> {
                 GatewayOrder order = orders.lockByProviderAndGatewayOrderId(PROVIDER, reference).orElseThrow();
                 order.setStatus(GatewayOrder.Status.NEEDS_REVIEW);
@@ -287,14 +284,31 @@ public class CashfreePayments {
         }
     }
 
+    /**
+     * A payment authorised but not yet taken is taken now, if the dashboard does not capture automatically. Only for the
+     * order's own amount in rupees: anything else is left for Razorpay to return, and listed for review once taken.
+     */
+    private List<RazorpayClient.Payment> captureAuthorized(String reference, List<RazorpayClient.Payment> payments) {
+        BigDecimal expected = tx.execute(status -> orders.findByProviderAndGatewayOrderId(PROVIDER, reference))
+                .map(GatewayOrder::getAmount).orElse(null);
+        boolean captured = false;
+        for (RazorpayClient.Payment payment : payments) {
+            if ("AUTHORIZED".equals(payment.status()) && expected != null && payment.amount() != null
+                    && payment.amount().compareTo(expected) == 0 && CURRENCY.equals(payment.currency())) {
+                captured |= razorpay.capture(payment.id(), payment.amount());
+            }
+        }
+        return captured ? razorpay.payments(reference) : payments;
+    }
+
     private static final java.util.Set<GatewayOrder.Status> SETTLED = java.util.EnumSet.of(GatewayOrder.Status.PAID,
             GatewayOrder.Status.NEEDS_REVIEW, GatewayOrder.Status.REFUND_PENDING, GatewayOrder.Status.REFUNDED);
 
-    private GatewayOrder.Status apply(String reference, List<CashfreeClient.Payment> payments) {
+    private GatewayOrder.Status apply(String reference, List<RazorpayClient.Payment> payments) {
         GatewayOrder order = orders.lockByProviderAndGatewayOrderId(PROVIDER, reference)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", reference));
         // An abandoned or still-reserved order can take money all the same: it is applied, never dropped. One already
-        // settled, waiting for review, or being or already refunded is never applied again, however often Cashfree
+        // settled, waiting for review, or being or already refunded is never applied again, however often Razorpay
         // tells us about it.
         if (SETTLED.contains(order.getStatus())) {
             return order.getStatus();
@@ -303,7 +317,7 @@ public class CashfreePayments {
             payments.stream().filter(payment -> FAILED.contains(payment.status()))
                     .forEach(payment -> settle(order, payment, true));
         }
-        Optional<CashfreeClient.Payment> received = payments.stream()
+        Optional<RazorpayClient.Payment> received = payments.stream()
                 .filter(payment -> "SUCCESS".equals(payment.status())).findFirst();
         if (received.isPresent()) {
             settle(order, received.get(), false);
@@ -316,9 +330,9 @@ public class CashfreePayments {
      * A successful payment must say how much was paid, in rupees: one that does not is kept for a person rather than
      * taken as the invoice amount. A failed one moved no money, so the order's amount stands in for a missing figure.
      */
-    private void settle(GatewayOrder order, CashfreeClient.Payment payment, boolean failed) {
+    private void settle(GatewayOrder order, RazorpayClient.Payment payment, boolean failed) {
         if (!failed && payment.amount() == null) {
-            throw new BusinessRuleException("Cashfree did not report how much payment " + payment.id() + " was.");
+            throw new BusinessRuleException("Razorpay did not report how much payment " + payment.id() + " was.");
         }
         if (!failed && payment.currency() != null && !CURRENCY.equals(payment.currency())) {
             throw new BusinessRuleException("Payment " + payment.id() + " was in " + payment.currency()
@@ -328,11 +342,11 @@ public class CashfreePayments {
         LocalDate today = LocalDate.now(ZoneId.of(organizations.getCurrent().timezone()));
         subscriptions.settle(order.getInvoiceId(), PROVIDER, new RecordPaymentRequest(
                 payment.id(), amount, failed, failed ? reason(payment) : null,
-                "upi".equalsIgnoreCase(payment.group()) ? PaymentMethod.UPI : PaymentMethod.OTHER,
+                "upi".equalsIgnoreCase(payment.method()) ? PaymentMethod.UPI : PaymentMethod.OTHER,
                 today, null));
     }
 
-    private static String reason(CashfreeClient.Payment payment) {
+    private static String reason(RazorpayClient.Payment payment) {
         String message = payment.message() == null ? "Payment failed" : payment.message();
         return message.length() > MAX_REASON ? message.substring(0, MAX_REASON) : message;
     }

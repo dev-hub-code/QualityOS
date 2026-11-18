@@ -64,11 +64,12 @@ qualityos:
   app-url: ${APP_URL:http://localhost:3000}
   # Online payment. Left empty, customers see no pay button and invoices are recorded by hand.
   payments:
-    cashfree:
-      client-id: ${CASHFREE_APP_ID:}
-      client-secret: ${CASHFREE_SECRET_KEY:}
-      environment: ${CASHFREE_ENVIRONMENT:sandbox}
-      base-url: ${CASHFREE_BASE_URL:}
+    razorpay:
+      # A rzp_test_ key is test mode. Without a key id and secret, invoices are recorded by hand.
+      key-id: ${RAZORPAY_KEY_ID:}
+      key-secret: ${RAZORPAY_KEY_SECRET:}
+      webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
+      base-url: ${RAZORPAY_BASE_URL:}
   # The seller printed on invoices. Set these for the legal entity that bills before sending one to a customer.
   billing:
     seller-name: ${BILLING_SELLER_NAME:ProductionOS}

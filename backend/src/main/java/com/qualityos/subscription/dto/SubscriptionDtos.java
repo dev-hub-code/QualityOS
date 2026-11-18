@@ -322,16 +322,16 @@ public final class SubscriptionDtos {
     public record PaymentGateway(boolean available, String mode) {
     }
 
-    /** The phone is sent to the gateway, which requires one, and is not stored here. */
-    public record CheckoutRequest(@NotBlank @Pattern(regexp = "[6-9]\\d{9}", message = "Enter a 10-digit mobile number") String phone) {
-
-        @Override
-        public String toString() {
-            return "CheckoutRequest[]";
-        }
-    }
-
-    public record CheckoutResponse(String orderId, String paymentSessionId, String mode) {
+    /**
+     * What the browser needs to open Razorpay's checkout for an invoice.
+     *
+     * @param orderId our reference, to confirm the payment by afterwards
+     * @param gatewayOrderId Razorpay's id for the same order
+     * @param keyId Razorpay's public key id, never its secret
+     * @param amount in paise, as Razorpay's checkout expects
+     */
+    public record CheckoutResponse(String orderId, String gatewayOrderId, String keyId, long amount, String currency,
+            String name, String description, String customerName, String customerEmail, String mode) {
 
         @Override
         public String toString() {
@@ -428,7 +428,7 @@ public final class SubscriptionDtos {
 
     /** A payment the gateway took that no invoice could take, waiting for a platform administrator. */
     /**
-     * @param status NEEDS_REVIEW, waiting for a decision, or REFUND_PENDING, refunded but not yet confirmed by Cashfree
+     * @param status NEEDS_REVIEW, waiting for a decision, or REFUND_PENDING, refunded but not yet confirmed by Razorpay
      * @param refundStatus how the latest refund of it stands, if any: a FAILED one leaves the payment to review again
      */
     public record UnappliedPayment(

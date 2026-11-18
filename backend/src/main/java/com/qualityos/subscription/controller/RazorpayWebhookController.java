@@ -1,6 +1,6 @@
 package com.qualityos.subscription.controller;
 
-import com.qualityos.subscription.service.CashfreePayments;
+import com.qualityos.subscription.service.RazorpayPayments;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -8,15 +8,15 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Public, because Cashfree holds no session. The signature on each request stands in for one. */
+/** Public, because Razorpay holds no session. The signature on each request stands in for one. */
 @RestController
-@RequestMapping("/api/v1/public/webhooks/cashfree")
+@RequestMapping("/api/v1/public/webhooks/razorpay")
 @Tag(name = "Subscription")
-public class CashfreeWebhookController {
+public class RazorpayWebhookController {
 
-    private final CashfreePayments payments;
+    private final RazorpayPayments payments;
 
-    CashfreeWebhookController(CashfreePayments payments) {
+    RazorpayWebhookController(RazorpayPayments payments) {
         this.payments = payments;
     }
 
@@ -24,8 +24,7 @@ public class CashfreeWebhookController {
     @PostMapping
     public void receive(
             @RequestBody byte[] body,
-            @RequestHeader(name = "x-webhook-timestamp", required = false) String timestamp,
-            @RequestHeader(name = "x-webhook-signature", required = false) String signature) {
-        payments.receiveWebhook(body, timestamp, signature);
+            @RequestHeader(name = "x-razorpay-signature", required = false) String signature) {
+        payments.receiveWebhook(body, signature);
     }
 }

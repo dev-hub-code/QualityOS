@@ -465,8 +465,8 @@ class CashfreePaymentsIT extends AbstractIntegrationTest {
         assertThat(refundId.getValue()).matches("[A-Za-z0-9]{3,40}");
         assertThat((String) JsonPath.read(created, "$.data.refund.reference")).isEqualTo(refundId.getValue());
 
-        doReturn(new CashfreeClient.GatewayRefund(refundId.getValue(), "cf-1", "SUCCESS", null))
-                .when(cashfree).findRefund(order, refundId.getValue());
+        doReturn(java.util.Optional.of(new CashfreeClient.GatewayRefund(refundId.getValue(), "cf-1", "SUCCESS", null)))
+                .when(cashfree).lookupRefund(order, refundId.getValue());
         refundWebhook(order, refundId.getValue()).andExpect(status().isOk());
         as(owner, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(BASE + "/credit-notes"))
                 .andExpect(jsonPath("$.data[0].refund.status").value("SUCCEEDED"))
@@ -497,8 +497,150 @@ class CashfreePaymentsIT extends AbstractIntegrationTest {
         as(admin, postJson(refund, Map.of("reason", "Paid twice"))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("SUCCEEDED"));
         assertThat(orderStatus(order)).isEqualTo("REFUNDED");
+        // Cashfree telling us about the payment again never applies it to anything.
+        webhook(order, "test-secret").andExpect(status().isOk());
+        assertThat(orderStatus(order)).isEqualTo("REFUNDED");
         verify(cashfree).refund(eq(order), anyString(), argThat(value -> value.compareTo(total) == 0), anyString());
         as(admin, postJson(refund, Map.of("reason", "Again"))).andExpect(status().isConflict());
         assertThat(audited("PAYMENT_REFUNDED")).isEqualTo(1);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.qualityos.subscription.service.BillingRefunds billingRefunds;
+
+    /** A payment no invoice could take, waiting for review, and the path to refund it. */
+    private String unappliedRefundPath(String order) throws Exception {
+        cashfreeHolds(order, payment("SUCCESS", null));
+        webhook(order, "test-secret").andExpect(status().isOk());
+        String id = asDatabaseSuperuser().queryForObject(
+                "SELECT id::text FROM gateway_orders WHERE gateway_order_id = ?", String.class, order);
+        return "/api/v1/platform/organisations/" + owner.tenantId() + "/gateway-orders/" + id + "/refund";
+    }
+
+    private List<Map<String, Object>> listed(Session admin, String order) throws Exception {
+        String body = as(admin, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                "/api/v1/platform/unapplied-payments")).andExpect(status().isOk()).andReturn().getResponse()
+                .getContentAsString();
+        return JsonPath.read(body, "$.data[?(@.gatewayOrderId == '" + order + "')]");
+    }
+
+    @Test
+    void aRefundStillPendingAtCashfreeLeavesThePaymentRefundPendingUntilItGoesThrough() throws Exception {
+        String order = checkout();
+        String path = unappliedRefundPath(order);
+        doAnswer(call -> new CashfreeClient.GatewayRefund(call.getArgument(1), "cf-3", "PENDING", null))
+                .when(cashfree).refund(eq(order), anyString(), any(), anyString());
+        Session admin = operator();
+
+        as(admin, postJson(path, Map.of("reason", "Paid twice"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PENDING"));
+        assertThat(orderStatus(order)).isEqualTo("REFUND_PENDING");
+        assertThat(listed(admin, order)).singleElement().satisfies(row -> {
+            assertThat(row).containsEntry("status", "REFUND_PENDING").containsEntry("refundStatus", "PENDING");
+        });
+        assertThat(audited("PAYMENT_REFUNDED")).isZero();
+        // A second refund cannot be asked for while this one is under way.
+        as(admin, postJson(path, Map.of("reason", "Again"))).andExpect(status().isConflict());
+
+        String reference = asDatabaseSuperuser().queryForObject(
+                "SELECT refund_reference FROM refunds WHERE tenant_id = ?", String.class, owner.tenantId());
+        doReturn(java.util.Optional.of(new CashfreeClient.GatewayRefund(reference, "cf-3", "SUCCESS", null)))
+                .when(cashfree).lookupRefund(order, reference);
+        refundWebhook(order, reference).andExpect(status().isOk());
+        assertThat(orderStatus(order)).isEqualTo("REFUNDED");
+        assertThat(listed(admin, order)).isEmpty();
+        assertThat(audited("PAYMENT_REFUNDED")).isEqualTo(1);
+    }
+
+    @Test
+    void aFailedRefundPutsThePaymentBackForReviewWithTheReason() throws Exception {
+        String order = checkout();
+        String path = unappliedRefundPath(order);
+        doAnswer(call -> new CashfreeClient.GatewayRefund(call.getArgument(1), null, "FAILED",
+                "Cashfree refused the refund: insufficient balance"))
+                .when(cashfree).refund(eq(order), anyString(), any(), anyString());
+        Session admin = operator();
+
+        as(admin, postJson(path, Map.of("reason", "Paid twice"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("FAILED"));
+        assertThat(orderStatus(order)).isEqualTo("NEEDS_REVIEW");
+        assertThat(listed(admin, order)).singleElement().satisfies(row -> {
+            assertThat(row).containsEntry("status", "NEEDS_REVIEW").containsEntry("refundStatus", "FAILED");
+            assertThat((String) row.get("refundFailure")).contains("insufficient balance");
+        });
+        assertThat(audited("PAYMENT_REFUND_FAILED")).isEqualTo(1);
+
+        // Refunded again, under a new reference, once the first is known to have failed.
+        doAnswer(call -> new CashfreeClient.GatewayRefund(call.getArgument(1), "cf-4", "SUCCESS", null))
+                .when(cashfree).refund(eq(order), anyString(), any(), anyString());
+        as(admin, postJson(path, Map.of("reason", "Paid twice"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SUCCEEDED"));
+        assertThat(orderStatus(order)).isEqualTo("REFUNDED");
+        assertThat(asDatabaseSuperuser().queryForObject(
+                "SELECT count(DISTINCT refund_reference) FROM refunds WHERE tenant_id = ?", Long.class,
+                owner.tenantId())).isEqualTo(2);
+    }
+
+    @Test
+    void aRefundWhoseAnswerNeverCameIsSentAgainUnderTheSameReferenceOnlyIfCashfreeNeverGotIt() throws Exception {
+        String order = checkout();
+        String path = unappliedRefundPath(order);
+        doAnswer(call -> {
+            throw new com.qualityos.common.exception.QualityOsException(
+                    com.qualityos.common.exception.ErrorCode.PAYMENT_GATEWAY_UNAVAILABLE, "No answer");
+        }).when(cashfree).refund(eq(order), anyString(), any(), anyString());
+        Session admin = operator();
+
+        // The refund is kept, waiting, though Cashfree never answered.
+        as(admin, postJson(path, Map.of("reason", "Paid twice"))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PENDING"));
+        assertThat(orderStatus(order)).isEqualTo("REFUND_PENDING");
+        String refundId = asDatabaseSuperuser().queryForObject(
+                "SELECT id::text FROM refunds WHERE tenant_id = ?", String.class, owner.tenantId());
+        String reference = asDatabaseSuperuser().queryForObject(
+                "SELECT refund_reference FROM refunds WHERE tenant_id = ?", String.class, owner.tenantId());
+        asDatabaseSuperuser().update("UPDATE refunds SET created_at = now() - INTERVAL '5 minutes' WHERE id = ?::uuid",
+                refundId);
+
+        // The job finds it waiting. Cashfree never received it, so it is sent again with the same reference.
+        UUID tenant = owner.tenantId();
+        assertThat(com.qualityos.common.tenant.TenantContext.callAs(tenant, null,
+                () -> billingRefunds.waiting(java.time.Instant.now().minusSeconds(120))))
+                .containsExactly(UUID.fromString(refundId));
+        doReturn(java.util.Optional.empty()).when(cashfree).lookupRefund(order, reference);
+        doAnswer(call -> new CashfreeClient.GatewayRefund(call.getArgument(1), "cf-5", "SUCCESS", null))
+                .when(cashfree).refund(eq(order), anyString(), any(), anyString());
+        com.qualityos.common.tenant.TenantContext.callAs(tenant, null,
+                () -> billingRefunds.reconcile(UUID.fromString(refundId)));
+
+        verify(cashfree, times(2)).refund(eq(order), eq(reference), any(), anyString());
+        assertThat(orderStatus(order)).isEqualTo("REFUNDED");
+        assertThat(asDatabaseSuperuser().queryForObject(
+                "SELECT count(*) FROM refunds WHERE tenant_id = ?", Long.class, owner.tenantId())).isEqualTo(1);
+    }
+
+    @Test
+    void aRefundCashfreeTookThoughItsAnswerWasLostIsNeverSentAgain() throws Exception {
+        String order = checkout();
+        String path = unappliedRefundPath(order);
+        doAnswer(call -> {
+            throw new com.qualityos.common.exception.QualityOsException(
+                    com.qualityos.common.exception.ErrorCode.PAYMENT_GATEWAY_UNAVAILABLE, "Timed out");
+        }).when(cashfree).refund(eq(order), anyString(), any(), anyString());
+        Session admin = operator();
+        as(admin, postJson(path, Map.of("reason", "Paid twice"))).andExpect(status().isOk());
+        String refundId = asDatabaseSuperuser().queryForObject(
+                "SELECT id::text FROM refunds WHERE tenant_id = ?", String.class, owner.tenantId());
+        String reference = asDatabaseSuperuser().queryForObject(
+                "SELECT refund_reference FROM refunds WHERE tenant_id = ?", String.class, owner.tenantId());
+
+        doReturn(java.util.Optional.of(new CashfreeClient.GatewayRefund(reference, "cf-6", "SUCCESS", null)))
+                .when(cashfree).lookupRefund(order, reference);
+        as(admin, postJson("/api/v1/platform/organisations/" + owner.tenantId() + "/refunds/" + refundId + "/refresh",
+                        Map.of()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("SUCCEEDED"));
+        verify(cashfree, times(1)).refund(eq(order), anyString(), any(), anyString());
+        assertThat(orderStatus(order)).isEqualTo("REFUNDED");
     }
 }

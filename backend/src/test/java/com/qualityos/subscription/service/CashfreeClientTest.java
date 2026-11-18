@@ -29,6 +29,8 @@ class CashfreeClientTest {
     private final AtomicReference<String> sent = new AtomicReference<>();
     private final AtomicInteger status = new AtomicInteger(200);
     private final AtomicReference<String> reply = new AtomicReference<>("{}");
+    private final java.util.concurrent.ConcurrentLinkedQueue<String[]> queued =
+            new java.util.concurrent.ConcurrentLinkedQueue<>();
     private HttpServer server;
     private CashfreeClient client;
 
@@ -38,8 +40,10 @@ class CashfreeClientTest {
         server.createContext("/", exchange -> {
             seen.set(exchange);
             sent.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            byte[] body = reply.get().getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(status.get(), body.length);
+            // Queued answers go first, one per request, for exchanges of more than one call.
+            String[] next = queued.poll();
+            byte[] body = (next == null ? reply.get() : next[1]).getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(next == null ? status.get() : Integer.parseInt(next[0]), body.length);
             exchange.getResponseBody().write(body);
             exchange.close();
         });
@@ -168,5 +172,41 @@ class CashfreeClientTest {
         assertThat(client.findRefund("QOS-1", "RF1").status()).isEqualTo("SUCCESS");
         assertThat(seen.get().getRequestMethod()).isEqualTo("GET");
         assertThat(seen.get().getRequestURI().getPath()).isEqualTo("/pg/orders/QOS-1/refunds/RF1");
+    }
+
+    @Test
+    void aRefundSentAgainWithTheSameIdAnswersWithTheFirstOne() {
+        queued.add(new String[] {"409", """
+                {"message":"refund with this id already exists","code":"refund_already_exists"}"""});
+        queued.add(new String[] {"200", """
+                {"refund_id":"RF1","cf_refund_id":"77","refund_status":"SUCCESS"}"""});
+        CashfreeClient.GatewayRefund refund = client.refund("QOS-1", "RF1", new BigDecimal("10"), "Credit note CN-1");
+
+        assertThat(refund.status()).isEqualTo("SUCCESS");
+        assertThat(seen.get().getRequestMethod()).isEqualTo("GET");
+        assertThat(seen.get().getRequestURI().getPath()).isEqualTo("/pg/orders/QOS-1/refunds/RF1");
+    }
+
+    @Test
+    void aRefundCashfreeRefusesFailsWithItsReason() {
+        status.set(400);
+        reply.set("""
+                {"message":"refund amount is greater than the amount left","code":"refund_amount_invalid"}""");
+        CashfreeClient.GatewayRefund refund = client.refund("QOS-1", "RF1", new BigDecimal("10"), "Credit note CN-1");
+
+        assertThat(refund.status()).isEqualTo("FAILED");
+        assertThat(refund.message()).contains("greater than the amount left");
+    }
+
+    @Test
+    void aRefundCashfreeNeverReceivedIsNotFoundRatherThanAnError() {
+        status.set(404);
+        reply.set("""
+                {"message":"refund not found"}""");
+        assertThat(client.lookupRefund("QOS-1", "RF1")).isEmpty();
+
+        status.set(500);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> client.lookupRefund("QOS-1", "RF1"))
+                .isInstanceOf(com.qualityos.common.exception.QualityOsException.class);
     }
 }

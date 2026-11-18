@@ -287,11 +287,16 @@ public class CashfreePayments {
         }
     }
 
+    private static final java.util.Set<GatewayOrder.Status> SETTLED = java.util.EnumSet.of(GatewayOrder.Status.PAID,
+            GatewayOrder.Status.NEEDS_REVIEW, GatewayOrder.Status.REFUND_PENDING, GatewayOrder.Status.REFUNDED);
+
     private GatewayOrder.Status apply(String reference, List<CashfreeClient.Payment> payments) {
         GatewayOrder order = orders.lockByProviderAndGatewayOrderId(PROVIDER, reference)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", reference));
-        // An abandoned or still-reserved order can take money all the same: it is applied, never dropped.
-        if (order.getStatus() == GatewayOrder.Status.PAID || order.getStatus() == GatewayOrder.Status.NEEDS_REVIEW) {
+        // An abandoned or still-reserved order can take money all the same: it is applied, never dropped. One already
+        // settled, waiting for review, or being or already refunded is never applied again, however often Cashfree
+        // tells us about it.
+        if (SETTLED.contains(order.getStatus())) {
             return order.getStatus();
         }
         if (subscriptions.invoice(order.getInvoiceId()).getStatus() == SubscriptionInvoice.Status.ISSUED) {

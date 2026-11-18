@@ -17,4 +17,12 @@ public interface RefundRepository extends JpaRepository<Refund, UUID> {
     Optional<Refund> findByProviderAndRefundReference(String provider, String refundReference);
 
     boolean existsByProviderAndRefundReferenceIgnoreCase(String provider, String refundReference);
+
+    @org.springframework.data.jpa.repository.Query(
+            "select r.id from Refund r where r.provider = ?1 and r.refundReference = ?2")
+    Optional<UUID> findIdByProviderAndRefundReference(String provider, String refundReference);
+
+    @org.springframework.data.jpa.repository.Query("select r.id from Refund r where r.provider = ?1 and r.status = ?2"
+            + " and r.createdAt < ?3 order by r.createdAt")
+    List<UUID> findIdsWaiting(String provider, Refund.Status status, java.time.Instant askedBefore);
 }

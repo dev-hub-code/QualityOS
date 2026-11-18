@@ -90,9 +90,9 @@ fields are allow-listed per endpoint. `data` is a `PageResponse`:
 | `GET /subscription/credit-notes/{id}/pdf` | The credit note as a PDF |
 | `POST /platform/organisations/{tenantId}/invoices/{invoiceId}/credit-notes` | Billing operators, with step-up. Takes `amount` (before GST), `reason`, `refundBy` (`GATEWAY` or `BANK`), `reference` and `refundedOn` for a bank refund, and `endAccess`. `422` for an unpaid invoice, more than is left, a gateway refund of an invoice not paid through Cashfree, or ending a period that is not the current one; `409` for a bank reference already used |
 | `GET /platform/organisations/{tenantId}/credit-notes`, `GET .../credit-notes/{id}/pdf` | The same, for an organisation |
-| `POST /platform/organisations/{tenantId}/refunds/{refundId}/refresh` | Asks Cashfree where a pending refund stands |
-| `GET /platform/unapplied-payments` | Gateway orders in `NEEDS_REVIEW`, across organisations |
-| `POST /platform/organisations/{tenantId}/gateway-orders/{orderId}/refund` | Takes `reason`. Refunds a `NEEDS_REVIEW` order whole through Cashfree and marks it `REFUNDED`; `409` otherwise |
+| `POST /platform/organisations/{tenantId}/refunds/{refundId}/refresh` | Asks Cashfree where a pending refund stands. If Cashfree never received it, it is sent again under the same reference |
+| `GET /platform/unapplied-payments` | Gateway orders in `NEEDS_REVIEW` or `REFUND_PENDING`, across organisations, each with `status`, and `refundStatus` and `refundFailure` for its latest refund |
+| `POST /platform/organisations/{tenantId}/gateway-orders/{orderId}/refund` | Takes `reason`. Refunds a `NEEDS_REVIEW` order whole through Cashfree; `409` otherwise. The order moves to `REFUND_PENDING` and the refund is committed before Cashfree is asked. It becomes `REFUNDED` only when Cashfree says the refund went through, and goes back to `NEEDS_REVIEW` when it failed. With no answer from Cashfree, the refund stays `PENDING` and the answer is `200` |
 | `GET /auth/me` | User, current organisation, whether it has a subscription, permissions and memberships. An addition to the brief |
 
 Access token: RS256, 15 minutes, with claims `sub` and `tid` (tenant). Membership and permissions are

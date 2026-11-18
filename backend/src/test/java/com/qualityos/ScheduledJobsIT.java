@@ -127,7 +127,7 @@ class ScheduledJobsIT extends AbstractIntegrationTest {
         assertThat(clock.delays()).containsExactlyInAnyOrder(
                 Duration.ofHours(6), Duration.ofSeconds(30), Duration.ofHours(1), Duration.ofHours(1), Duration.ofHours(1), Duration.ofHours(1),
                 Duration.ofHours(1), Duration.ofHours(1), Duration.ofHours(1), Duration.ofHours(24),
-                Duration.ofMinutes(15), Duration.ofMinutes(15), Duration.ofMinutes(15));
+                Duration.ofMinutes(15), Duration.ofMinutes(15), Duration.ofMinutes(15), Duration.ofMinutes(15));
     }
 
     @Test

@@ -138,20 +138,84 @@ public class CashfreeClient {
     public record GatewayRefund(String refundId, String gatewayRefundId, String status, String message) {
     }
 
-    /** Asks Cashfree to return {@code amount} of what the order took. {@code refundId} is ours, and makes a retry safe. */
+    /**
+     * Asks Cashfree to return {@code amount} of what the order took. {@code refundId} is ours, and makes a retry safe:
+     * sent again, Cashfree refuses a second refund with it, and this answers with the first one.
+     *
+     * <p>A refund Cashfree refuses outright, such as for more than is left of the order, comes back as {@code FAILED}
+     * with Cashfree's reason. No answer at all throws, and the refund stays as it was, to be looked up later.
+     */
     public GatewayRefund refund(String orderId, String refundId, BigDecimal amount, String note) {
         Map<String, Object> body = Map.of(
                 "refund_amount", amount,
                 "refund_id", refundId,
                 "refund_note", note.length() > 100 ? note.substring(0, 100) : note);
-        return parseRefund(call(() -> rest.post().uri("/orders/{id}/refunds", orderId)
-                .contentType(MediaType.APPLICATION_JSON).body(json.writeValueAsString(body)).retrieve()
-                .body(String.class)));
+        try {
+            return parseRefund(call(() -> {
+                try {
+                    return rest.post().uri("/orders/{id}/refunds", orderId)
+                            .contentType(MediaType.APPLICATION_JSON).body(json.writeValueAsString(body)).retrieve()
+                            .body(String.class);
+                } catch (HttpClientErrorException.Conflict e) {
+                    throw new RefundExists();
+                } catch (HttpClientErrorException e) {
+                    throw new RefundRefused(reason(e));
+                }
+            }));
+        } catch (RefundExists e) {
+            return findRefund(orderId, refundId);
+        } catch (RefundRefused e) {
+            return new GatewayRefund(refundId, null, "FAILED", e.getMessage());
+        }
     }
 
     public GatewayRefund findRefund(String orderId, String refundId) {
         return parseRefund(call(() -> rest.get().uri("/orders/{id}/refunds/{refund}", orderId, refundId).retrieve()
                 .body(String.class)));
+    }
+
+    /** Empty when Cashfree never received the refund, so it is safe to send with the same id. */
+    public Optional<GatewayRefund> lookupRefund(String orderId, String refundId) {
+        try {
+            return Optional.of(parseRefund(call(() -> {
+                try {
+                    return rest.get().uri("/orders/{id}/refunds/{refund}", orderId, refundId).retrieve()
+                            .body(String.class);
+                } catch (HttpClientErrorException.NotFound e) {
+                    throw new RefundNotFound();
+                }
+            })));
+        } catch (RefundNotFound e) {
+            return Optional.empty();
+        }
+    }
+
+    /** Cashfree's own words for a refusal, which name no card or account. */
+    private String reason(HttpClientErrorException e) {
+        try {
+            String message = text(json.readTree(e.getResponseBodyAsString()), "message");
+            return message == null ? "Cashfree refused the refund." : "Cashfree refused the refund: " + message;
+        } catch (RuntimeException unreadable) {
+            return "Cashfree refused the refund.";
+        }
+    }
+
+    private static final class RefundExists extends RuntimeException {
+        RefundExists() {
+            super(null, null, false, false);
+        }
+    }
+
+    private static final class RefundNotFound extends RuntimeException {
+        RefundNotFound() {
+            super(null, null, false, false);
+        }
+    }
+
+    private static final class RefundRefused extends RuntimeException {
+        RefundRefused(String reason) {
+            super(reason, null, false, false);
+        }
     }
 
     private GatewayRefund parseRefund(String response) {

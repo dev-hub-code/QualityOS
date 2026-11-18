@@ -136,6 +136,10 @@ delivery job then sends the emails, so members who turned announcements off are 
 `report-exports` runs every 15 minutes as a safety net. Exports start the moment they are requested; the job makes any
 that a restart left waiting, fails any cut off mid-run, and deletes files past their 7 days.
 
+`refunds` runs every 15 minutes. It finds Cashfree refunds still waiting two minutes after they were asked for, looks
+each up at Cashfree, and applies the answer; one Cashfree never received is sent again under its own reference, so it
+can never refund twice. Refunds are saved before Cashfree is asked, outside any transaction, as checkout is.
+
 ## Production module
 
 `com.qualityos.production` holds manufacturing: definitions, plans, work orders, the shop floor, quality gates,

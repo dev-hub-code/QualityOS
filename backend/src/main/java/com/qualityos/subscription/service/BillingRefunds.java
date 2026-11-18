@@ -1,5 +1,9 @@
 package com.qualityos.subscription.service;
 
+import com.qualityos.common.exception.QualityOsException;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
 import com.qualityos.common.audit.AuditService;
 import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ConflictException;
@@ -46,6 +50,7 @@ import org.springframework.util.StringUtils;
  * take is refunded whole, without a credit note, because it was never revenue. Everything here runs under the
  * organisation concerned.
  */
+@lombok.extern.slf4j.Slf4j
 @Service
 public class BillingRefunds {
 
@@ -63,6 +68,11 @@ public class BillingRefunds {
     private final TenantAccessService access;
     private final AuditService audit;
     private final InvoicePdfRenderer renderer;
+    private final TransactionTemplate tx;
+
+    /** What a gateway refund needs to be sent or looked up, read in a transaction of its own. */
+    private record Sending(String gatewayOrderId, String reference, BigDecimal amount, String note) {
+    }
 
     /** A credit note's PDF and the name to save it under. */
     public record Pdf(String fileName, byte[] content) {
@@ -80,8 +90,10 @@ public class BillingRefunds {
             NotificationService notifications,
             TenantAccessService access,
             AuditService audit,
-            InvoicePdfRenderer renderer) {
+            InvoicePdfRenderer renderer,
+            PlatformTransactionManager transactionManager) {
         this.renderer = renderer;
+        this.tx = new TransactionTemplate(transactionManager);
         this.creditNotes = creditNotes;
         this.refunds = refunds;
         this.orders = orders;
@@ -146,10 +158,8 @@ public class BillingRefunds {
         Refund refund = request.refundBy() == RefundRoute.BANK
                 ? Refund.byHand(note.getId(), request.reference().trim(), note.getTotal(), request.refundedOn())
                 : Refund.throughGateway(note.getId(), null, note.getTotal());
+        // A gateway refund is sent once this commits, outside any transaction: see send.
         save(refund);
-        if (paidThrough.isPresent()) {
-            send(refund, paidThrough.get(), "Credit note " + note.getCreditNoteNumber());
-        }
         if (request.endAccess()) {
             subscription.endPaidPeriod(Instant.now());
             subscriptions.saveAndFlush(subscription);
@@ -166,37 +176,100 @@ public class BillingRefunds {
         return responses(List.of(note)).getFirst();
     }
 
-    /** Refunds, whole, a payment that no invoice could take. */
+    /**
+     * Reserves the refund, whole, of a payment that no invoice could take: the order waits in {@code REFUND_PENDING}
+     * and leaves the queue for review only once Cashfree says the refund went through. Locked, so two requests cannot
+     * both refund it. The refund itself is sent once this commits, with {@link #send}.
+     *
+     * @return the refund to send
+     */
     @Transactional
-    public RefundView refundUnapplied(UUID orderId, String reason) {
-        GatewayOrder order = orders.findById(orderId).orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
+    public UUID reserveUnapplied(UUID orderId, String reason) {
+        GatewayOrder order = orders.lockById(orderId).orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
         if (order.getStatus() != GatewayOrder.Status.NEEDS_REVIEW) {
             throw new ConflictException("Only a payment waiting for review can be refunded this way.");
         }
         Refund refund = save(Refund.throughGateway(null, order.getId(), order.getAmount()));
-        send(refund, order, reason.trim());
-        order.setStatus(GatewayOrder.Status.REFUNDED);
+        order.setStatus(GatewayOrder.Status.REFUND_PENDING);
         orders.saveAndFlush(order);
-        audit.record("PAYMENT_REFUNDED", "GatewayOrder", order.getId(), null, Map.of(
-                "order", order.getGatewayOrderId(), "amount", order.getAmount().toPlainString(), "reason", reason.trim()));
-        return view(refund);
+        audit.record("PAYMENT_REFUND_REQUESTED", "GatewayOrder", order.getId(), null, Map.of(
+                "order", order.getGatewayOrderId(), "amount", order.getAmount().toPlainString(), "reason", reason.trim(),
+                "refund", refund.getRefundReference()));
+        return refund.getId();
     }
 
-    /** Asks the gateway where a refund stands. Changes nothing once it went through or failed. */
-    @Transactional
-    public RefundView refresh(UUID refundId) {
-        Refund refund = refunds.findById(refundId).orElseThrow(() -> new ResourceNotFoundException("Refund", refundId));
-        if (Refund.GATEWAY.equals(refund.getProvider()) && refund.getStatus() == Refund.Status.PENDING) {
-            update(refund, cashfree.findRefund(orderOf(refund).getGatewayOrderId(), refund.getRefundReference()));
+    /**
+     * Sends a gateway refund that is waiting, with no transaction open while Cashfree is asked. Its reference was
+     * fixed when it was reserved, so sending again never refunds twice. With no answer, it stays waiting, and
+     * {@link #reconcile} finishes it.
+     */
+    public RefundView send(UUID refundId) {
+        requireNoTransaction();
+        Sending sending = tx.execute(status -> sending(refundId));
+        if (sending != null) {
+            try {
+                CashfreeClient.GatewayRefund reported = cashfree.refund(
+                        sending.gatewayOrderId(), sending.reference(), sending.amount(), sending.note());
+                tx.executeWithoutResult(status -> record(sending.reference(), reported));
+            } catch (QualityOsException e) {
+                log.warn("Refund {} not confirmed yet: {}", sending.reference(), e.getMessage());
+            }
         }
-        return view(refund);
+        return tx.execute(status -> view(refund(refundId)));
+    }
+
+    /**
+     * Finds out where a waiting gateway refund stands. Cashfree may have taken it even though the answer never came
+     * back; if it never received it, it is sent again under the same reference. Changes nothing once it went through
+     * or failed.
+     */
+    public RefundView reconcile(UUID refundId) {
+        requireNoTransaction();
+        Sending sending = tx.execute(status -> sending(refundId));
+        if (sending != null) {
+            Optional<CashfreeClient.GatewayRefund> found =
+                    cashfree.lookupRefund(sending.gatewayOrderId(), sending.reference());
+            if (found.isEmpty()) {
+                return send(refundId);
+            }
+            tx.executeWithoutResult(status -> record(sending.reference(), found.get()));
+        }
+        return tx.execute(status -> view(refund(refundId)));
     }
 
     /** From the gateway's webhook, under the organisation the order belongs to. An unknown refund is not ours. */
-    @Transactional
     public void refreshByReference(String gatewayOrderId, String refundReference) {
-        refunds.findByProviderAndRefundReference(Refund.GATEWAY, refundReference)
-                .ifPresent(refund -> update(refund, cashfree.findRefund(gatewayOrderId, refundReference)));
+        Optional<UUID> id = tx.execute(status -> refunds.findIdByProviderAndRefundReference(Refund.GATEWAY,
+                refundReference));
+        id.ifPresent(this::reconcile);
+    }
+
+    /** Gateway refunds in this organisation still waiting for Cashfree's answer a while after they were asked for. */
+    public List<UUID> waiting(Instant askedBefore) {
+        return tx.execute(status -> refunds.findIdsWaiting(Refund.GATEWAY, Refund.Status.PENDING, askedBefore));
+    }
+
+    /** Null when there is nothing to send: a refund by bank, or one that already went through or failed. */
+    private Sending sending(UUID refundId) {
+        Refund refund = refund(refundId);
+        if (!Refund.GATEWAY.equals(refund.getProvider()) || refund.getStatus() != Refund.Status.PENDING) {
+            return null;
+        }
+        GatewayOrder order = orderOf(refund);
+        String note = refund.getCreditNoteId() != null
+                ? "Credit note " + creditNote(refund.getCreditNoteId()).getCreditNoteNumber()
+                : "Refund of a payment no invoice could take";
+        return new Sending(order.getGatewayOrderId(), refund.getRefundReference(), refund.getAmount(), note);
+    }
+
+    private Refund refund(UUID refundId) {
+        return refunds.findById(refundId).orElseThrow(() -> new ResourceNotFoundException("Refund", refundId));
+    }
+
+    private static void requireNoTransaction() {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("Cashfree is never asked inside a transaction.");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -233,16 +306,41 @@ public class BillingRefunds {
         return refunds.saveAndFlush(refund);
     }
 
-    private void send(Refund refund, GatewayOrder order, String note) {
-        update(refund, cashfree.refund(order.getGatewayOrderId(), refund.getRefundReference(), refund.getAmount(), note));
+    /**
+     * Applies what Cashfree said, under the refund's lock, so a webhook and a check at the same moment apply it once.
+     * A payment no invoice could take is refunded only when its refund went through; when it failed it goes back to
+     * waiting for review.
+     */
+    private void record(String reference, CashfreeClient.GatewayRefund reported) {
+        Refund refund = refunds.findByProviderAndRefundReference(Refund.GATEWAY, reference).orElseThrow();
+        if (!refund.update(reported.status(), reported.gatewayRefundId(), reported.message(), today())) {
+            refunds.saveAndFlush(refund);
+            return;
+        }
+        boolean succeeded = refund.getStatus() == Refund.Status.SUCCEEDED;
+        audit.record(succeeded ? "REFUND_SUCCEEDED" : "REFUND_FAILED", "Refund", refund.getId(), null,
+                failed(refund, Map.of("amount", refund.getAmount().toPlainString())));
+        refunds.saveAndFlush(refund);
+        if (refund.getGatewayOrderId() != null) {
+            GatewayOrder order = orders.lockById(refund.getGatewayOrderId()).orElseThrow();
+            if (order.getStatus() == GatewayOrder.Status.REFUND_PENDING) {
+                order.setStatus(succeeded ? GatewayOrder.Status.REFUNDED : GatewayOrder.Status.NEEDS_REVIEW);
+                orders.saveAndFlush(order);
+                audit.record(succeeded ? "PAYMENT_REFUNDED" : "PAYMENT_REFUND_FAILED", "GatewayOrder", order.getId(),
+                        Map.of("status", GatewayOrder.Status.REFUND_PENDING.name()),
+                        failed(refund, Map.of("status", order.getStatus().name(),
+                                "order", order.getGatewayOrderId(), "amount", order.getAmount().toPlainString())));
+            }
+        }
     }
 
-    private void update(Refund refund, CashfreeClient.GatewayRefund reported) {
-        if (refund.update(reported.status(), reported.gatewayRefundId(), reported.message(), today())) {
-            audit.record(refund.getStatus() == Refund.Status.SUCCEEDED ? "REFUND_SUCCEEDED" : "REFUND_FAILED",
-                    "Refund", refund.getId(), null, Map.of("amount", refund.getAmount().toPlainString()));
+    private static Map<String, Object> failed(Refund refund, Map<String, Object> values) {
+        if (refund.getFailureReason() == null) {
+            return values;
         }
-        refunds.saveAndFlush(refund);
+        Map<String, Object> withReason = new java.util.LinkedHashMap<>(values);
+        withReason.put("reason", refund.getFailureReason());
+        return withReason;
     }
 
     private GatewayOrder orderOf(Refund refund) {

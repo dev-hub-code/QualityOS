@@ -1,0 +1,2 @@
+# Copy to backend.hcl (git-ignored) and use the state_bucket output of infra/terraform/shared.
+bucket = "qualityos-terraform-state-<account id>"

@@ -204,6 +204,9 @@ public class MaterialReceiptService implements AttachmentPolicy {
         if (used) {
             throw new BusinessRuleException("This receipt cannot be voided: its material has gone into production.");
         }
+        if (receipt.getItems().stream().anyMatch(item -> item.getTransferredQuantity().signum() > 0)) {
+            throw new BusinessRuleException("This receipt cannot be voided: some of it was sent to another plant.");
+        }
         if (receipt.getItems().stream().anyMatch(item -> item.getReservedQuantity().signum() > 0)) {
             throw new BusinessRuleException("This receipt cannot be voided: some of it is reserved for work orders.");
         }
@@ -237,6 +240,48 @@ public class MaterialReceiptService implements AttachmentPolicy {
                 item,
                 suppliers.reference(item.getReceipt().getSupplierId()),
                 materials.references(Set.of(item.getMaterialId())).get(item.getMaterialId()));
+    }
+
+    /** Sends part of a lot to another plant. Only released, unexpired stock not set aside can go. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public LotView transferOut(UUID itemId, BigDecimal quantity) {
+        MaterialReceiptItem item = lockUsable(itemId);
+        item.requireNotExpired(today());
+        item.transferOut(quantity);
+        items.flush();
+        return lots(List.of(item)).getFirst();
+    }
+
+    /** A transfer cancelled in transit: the stock goes back to its lot. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void returnTransferred(UUID itemId, BigDecimal quantity) {
+        lockItem(itemId).returnTransferred(quantity);
+        items.flush();
+    }
+
+    /**
+     * Receives what was sent from a lot as a lot of its own at {@code facilityId}, numbered after it: the first part
+     * of LOT-7 received elsewhere is LOT-7-T1.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public LotView receiveTransferred(UUID sourceId, BigDecimal quantity, UUID facilityId) {
+        MaterialReceiptItem source = lockItem(sourceId);
+        String number = source.getInternalBatch() + "-T" + (items.countByTransferredFromId(sourceId) + 1);
+        MaterialReceiptItem lot = items.saveAndFlush(
+                MaterialReceiptItem.receivedFrom(source, number, quantity, facilityId));
+        return lots(List.of(lot)).getFirst();
+    }
+
+    /** Every lot received elsewhere from these lots, and from those in turn. */
+    @Transactional(readOnly = true)
+    public Set<UUID> transferredOn(Collection<UUID> lotIds) {
+        Set<UUID> found = new HashSet<>();
+        Collection<UUID> next = lotIds;
+        while (!next.isEmpty()) {
+            next = items.findByTransferredFromIdIn(next).stream().map(MaterialReceiptItem::getId)
+                    .filter(found::add).toList();
+        }
+        return found;
     }
 
     /** Takes stock from a lot for production, in the lot's unit. The lot is locked while it does. */
@@ -332,7 +377,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
 
     private MaterialReceiptItem lockUsable(UUID itemId) {
         MaterialReceiptItem item = lockItem(itemId);
-        scope.requireAllowed(item.getReceipt().getFacilityId(), "Batch", itemId.toString());
+        scope.requireAllowed(item.currentFacilityId(), "Batch", itemId.toString());
         if (item.getReceipt().getStatus() == MaterialReceipt.Status.VOIDED) {
             throw new BusinessRuleException("This receipt was voided.");
         }
@@ -352,6 +397,9 @@ public class MaterialReceiptService implements AttachmentPolicy {
     @Transactional
     public AppliedLotCorrection correct(UUID itemId, LotCorrection correction) {
         MaterialReceiptItem item = lockItem(itemId);
+        if (item.getTransferredFromId() != null) {
+            throw new BusinessRuleException("This lot was received from another plant. Correct the lot it came from.");
+        }
         MaterialReceipt receipt = item.getReceipt();
         if (receipt.getStatus() == MaterialReceipt.Status.VOIDED) {
             throw new BusinessRuleException("This receipt was voided.");
@@ -384,7 +432,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
         LocalDate today = today();
         return lots(firstExpiringFirst(items.findLots(materialId).stream()
                 .filter(item -> item.isReleased() && item.freeQuantity().signum() > 0 && !item.isExpiredOn(today))
-                .filter(item -> scope.allows(item.getReceipt().getFacilityId()))
+                .filter(item -> scope.allows(item.currentFacilityId()))
                 .toList()));
     }
 
@@ -460,7 +508,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
                     item.getDisposition(),
                     item.isReleased(),
                     item.getReservedQuantity(),
-                    receipt.getFacilityId(),
+                    item.currentFacilityId(),
                     item.getExpiryDate());
         }).toList();
     }
@@ -520,7 +568,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
     private MaterialReceiptItem loadItem(UUID id) {
         MaterialReceiptItem item =
                 items.findWithReceipt(id).orElseThrow(() -> new ResourceNotFoundException("Received batch", id));
-        scope.requireAllowed(item.getReceipt().getFacilityId(), "Received batch", id.toString());
+        scope.requireAllowed(item.currentFacilityId(), "Received batch", id.toString());
         return item;
     }
 
@@ -534,7 +582,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
                 receipt.getReceivedOn(),
                 supplier.id(),
                 supplier.name(),
-                receipt.getFacilityId(),
+                item.currentFacilityId(),
                 material.id(),
                 material.code(),
                 material.name(),
@@ -565,7 +613,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
                 receipt.getNotes(),
                 receipt.getStatus().name(),
                 receipt.getVoidReason(),
-                receipt.getItems().stream().map(item -> {
+                receipt.getItems().stream().filter(item -> item.getTransferredFromId() == null).map(item -> {
                     MaterialReference material = referenced.get(item.getMaterialId());
                     return new ReceiptItemResponse(
                             item.getId(),

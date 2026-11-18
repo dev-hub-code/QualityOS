@@ -192,7 +192,7 @@ public class TraceabilityService {
         }
         LotView lot = receipts.lotByNumber(batchNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Batch", batchNumber));
-        return build(Set.of(lot.itemId()), Set.of(), Set.of(), downstream("parent_lot_id", lot.itemId()),
+        return build(Set.of(lot.itemId()), Set.of(), Set.of(), downstreamOfLot(lot.itemId()),
                 null, lot.itemId(), permissions);
     }
 
@@ -391,7 +391,7 @@ public class TraceabilityService {
     /** How far a lot has gone: the batches it reached, and the customers who still hold what was made from it. */
     @Transactional(readOnly = true)
     public CorrectionImpact lotImpact(UUID lotId, boolean inspected) {
-        Set<UUID> reached = downstream("parent_lot_id", lotId);
+        Set<UUID> reached = downstreamOfLot(lotId);
         return impact(inspected, reached, reached);
     }
 
@@ -414,6 +414,13 @@ public class TraceabilityService {
                         .distinct()
                         .sorted()
                         .toList());
+    }
+
+    /** What a lot reached, including what the parts of it sent to other plants reached there. */
+    private Set<UUID> downstreamOfLot(UUID lotId) {
+        Set<UUID> reached = new HashSet<>(downstream("parent_lot_id", lotId));
+        receipts.transferredOn(Set.of(lotId)).forEach(part -> reached.addAll(downstream("parent_lot_id", part)));
+        return reached;
     }
 
     private Set<UUID> downstream(String parentColumn, UUID id) {

@@ -29,4 +29,6 @@ public interface ProductionBatchRepository
 
     List<ProductionBatch> findByProductIdInAndFacilityIdAndStatusOrderByCompletedAt(
             Collection<UUID> productIds, UUID facilityId, ProductionBatch.Status status);
+
+    long countByTransferredFromId(UUID sourceId);
 }

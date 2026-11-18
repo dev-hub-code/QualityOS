@@ -652,6 +652,8 @@ export interface ReleasedLot {
   /** Set aside for work orders, out of what remains. */
   reservedQuantity: string;
   uomId: string;
+  /** The plant it is at: its goods receipt's, or the one it was transferred to. */
+  facilityId: string;
 }
 
 export interface ProductionBatch {
@@ -661,6 +663,7 @@ export interface ProductionBatch {
   productCode: string;
   productName: string;
   uomId: string;
+  facilityId: string;
   status: string;
   plannedQuantity: string;
   producedQuantity: string | null;
@@ -2827,4 +2830,33 @@ export interface ProductionAnalytics {
   downtimeByCategory: DowntimeSummaryRow[];
   /** Absent for those who may not see production cost. */
   cost?: CostSummary | null;
+}
+
+/** Part of a lot or batch on a stock transfer, and what it became at the other plant once received. */
+export interface TransferLine {
+  kind: "LOT" | "BATCH";
+  sourceId: string;
+  sourceNumber: string;
+  itemCode: string;
+  itemName: string;
+  quantity: string;
+  uomId: string;
+  receivedId: string | null;
+  receivedNumber: string | null;
+}
+
+export interface StockTransfer {
+  id: string;
+  transferNumber: string;
+  fromFacilityId: string;
+  fromFacilityName: string;
+  toFacilityId: string;
+  toFacilityName: string;
+  status: "IN_TRANSIT" | "RECEIVED" | "CANCELLED";
+  sentOn: string;
+  receivedOn: string | null;
+  note: string | null;
+  cancelReason: string | null;
+  createdAt: string;
+  items: TransferLine[];
 }

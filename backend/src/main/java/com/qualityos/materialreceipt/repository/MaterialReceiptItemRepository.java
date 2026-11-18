@@ -37,6 +37,11 @@ public interface MaterialReceiptItemRepository extends JpaRepository<MaterialRec
     @EntityGraph(attributePaths = "receipt")
     List<MaterialReceiptItem> findByIdIn(Collection<UUID> ids);
 
+    long countByTransferredFromId(UUID sourceId);
+
+    /** Lots received elsewhere from these lots. */
+    List<MaterialReceiptItem> findByTransferredFromIdIn(Collection<UUID> sourceIds);
+
     @Query("""
             select i from MaterialReceiptItem i join fetch i.receipt r
             where r.status <> com.qualityos.materialreceipt.entity.MaterialReceipt.Status.VOIDED
@@ -48,7 +53,7 @@ public interface MaterialReceiptItemRepository extends JpaRepository<MaterialRec
     @Query("""
             select i from MaterialReceiptItem i join fetch i.receipt r
             where r.status <> com.qualityos.materialreceipt.entity.MaterialReceipt.Status.VOIDED
-              and i.materialId in :materialIds and r.facilityId = :facilityId
+              and i.materialId in :materialIds and coalesce(i.facilityId, r.facilityId) = :facilityId
             order by r.receivedOn, i.internalBatch
             """)
     List<MaterialReceiptItem> findLotsOf(Collection<UUID> materialIds, UUID facilityId);

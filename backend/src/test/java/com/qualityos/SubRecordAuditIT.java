@@ -63,4 +63,59 @@ class SubRecordAuditIT extends TraceabilityFixture {
         assertThat(entries("UNIT_ADDED")).singleElement()
                 .satisfies(row -> assertThat((String) row.get("after")).contains("BOX", "COUNT"));
     }
+
+    private void put(String path, Map<String, Object> body) throws Exception {
+        as(owner, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/v1" + path)
+                        .contentType("application/json").content(json.writeValueAsString(body)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void anEditKeepsOnlyWhatChangedBeforeAndAfter() throws Exception {
+        String supplier = draftSupplier(owner);
+        String code = com.jayway.jsonpath.JsonPath.read(body(as(owner,
+                org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/suppliers/" + supplier))),
+                "$.data.supplier.code");
+        put("/suppliers/" + supplier, Map.of("code", code, "name", "Bharat Forgings", "version", 0));
+        assertThat(entries("SUPPLIER_UPDATED")).singleElement().satisfies(row -> {
+            assertThat((String) row.get("before")).contains("\"name\": \"Bharat Steels\"").doesNotContain(code);
+            assertThat((String) row.get("after")).contains("\"name\": \"Bharat Forgings\"").doesNotContain(code);
+        });
+
+        // A child line changed shows the lines before and after.
+        String material = material(owner);
+        String approved = approvedSupplier(owner);
+        String order = idOf(draftOrder(owner, approved, material, "100"));
+        put("/purchase-orders/" + order, orderRequest(approved, facility(owner), material, "250", 0));
+        assertThat(entries("PURCHASE_ORDER_UPDATED")).singleElement().satisfies(row -> {
+            assertThat((String) row.get("before")).contains("items", "100").doesNotContain("supplierName");
+            assertThat((String) row.get("after")).contains("items", "250");
+        });
+
+        // Saving with nothing changed is recorded, with nothing to show.
+        put("/suppliers/" + supplier, Map.of("code", code, "name", "Bharat Forgings", "version", 1));
+        assertThat(entries("SUPPLIER_UPDATED")).hasSize(2)
+                .anySatisfy(row -> assertThat(row.get("before")).isNull());
+    }
+
+    @Test
+    void specificationsAndCategoriesKeepWhatTheyWere() throws Exception {
+        String material = material(owner);
+        String spec = add("/materials/" + material + "/specifications", Map.of(
+                "name", "Diameter", "minValue", "19.9", "maxValue", "20.1", "uomId", unitId(owner, "MM")));
+        as(owner, delete("/api/v1/materials/" + material + "/specifications/" + spec)).andExpect(status().isNoContent());
+        assertThat(entries("MATERIAL_SPECIFICATION_ADDED")).singleElement()
+                .satisfies(row -> assertThat((String) row.get("after")).contains("Diameter", "19.9"));
+        assertThat(entries("MATERIAL_SPECIFICATION_REMOVED")).singleElement()
+                .satisfies(row -> assertThat((String) row.get("before")).contains("Diameter", "20.1"));
+
+        String category = add("/product-categories", Map.of("name", "Fasteners"));
+        put("/product-categories/" + category, Map.of("name", "Bolts and nuts"));
+        assertThat(entries("PRODUCT_CATEGORY_RENAMED")).singleElement().satisfies(row -> {
+            assertThat((String) row.get("before")).contains("Fasteners");
+            assertThat((String) row.get("after")).contains("Bolts and nuts");
+        });
+        assertThat(entries("MATERIAL_CREATED")).isNotEmpty()
+                .allSatisfy(row -> assertThat((String) row.get("after")).contains("EN8 Bar"));
+    }
 }

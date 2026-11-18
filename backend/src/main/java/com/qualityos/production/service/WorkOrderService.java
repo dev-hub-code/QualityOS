@@ -218,10 +218,12 @@ public class WorkOrderService {
         if (order.getPlanLineId() != null) {
             orderableLine(request);
         }
+        var before = audit.state(detail(order));
         apply(order, request);
         workOrders.saveAndFlush(order);
-        audit.record("WORK_ORDER_UPDATED", ENTITY, id);
-        return detail(order);
+        WorkOrderDetail after = detail(order);
+        audit.recordChange("WORK_ORDER_UPDATED", ENTITY, id, before, audit.state(after));
+        return after;
     }
 
     @Transactional

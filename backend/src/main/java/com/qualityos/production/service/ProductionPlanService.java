@@ -120,11 +120,13 @@ public class ProductionPlanService {
         if (!plan.getFacilityId().equals(request.facilityId())) {
             throw new BusinessRuleException("A plan cannot move to another facility. Cancel it and plan there.");
         }
+        var before = audit.state(detail(plan).plan());
         apply(plan, request);
         lines.findByPlanIdOrderByDueDateAscIdAsc(id).forEach(line -> requireInPeriod(plan, line.getDueDate()));
         plans.saveAndFlush(plan);
-        audit.record("PRODUCTION_PLAN_UPDATED", ENTITY, id);
-        return detail(plan);
+        PlanDetail after = detail(plan);
+        audit.recordChange("PRODUCTION_PLAN_UPDATED", ENTITY, id, before, audit.state(after.plan()));
+        return after;
     }
 
     @Transactional
@@ -139,15 +141,21 @@ public class ProductionPlanService {
         return detail(plan);
     }
 
+    /** One line as the screen shows it, for the audit trail. */
+    private Map<String, Object> lineState(ProductionPlan plan, UUID lineId) {
+        return detail(plan).lines().stream().filter(found -> found.id().equals(lineId)).findFirst()
+                .map(audit::state).orElseGet(Map::of);
+    }
+
     @Transactional
     public PlanDetail updateLine(UUID id, UUID lineId, SavePlanLineRequest request) {
         ProductionPlan plan = load(id);
         plan.requireDraft();
         ProductionPlanLine line = loadLine(id, lineId);
-        ProductReference product = applyLine(plan, line, request);
+        var before = lineState(plan, lineId);
+        applyLine(plan, line, request);
         lines.saveAndFlush(line);
-        audit.record("PRODUCTION_PLAN_LINE_CHANGED", ENTITY, id, null,
-                Map.of("product", product.code(), "quantity", request.quantity().toPlainString()));
+        audit.recordChange("PRODUCTION_PLAN_LINE_CHANGED", ENTITY, id, before, lineState(plan, lineId));
         return detail(plan);
     }
 
@@ -156,9 +164,10 @@ public class ProductionPlanService {
         ProductionPlan plan = load(id);
         plan.requireDraft();
         ProductionPlanLine line = loadLine(id, lineId);
+        var before = lineState(plan, lineId);
         lines.delete(line);
         lines.flush();
-        audit.record("PRODUCTION_PLAN_LINE_REMOVED", ENTITY, id, null, Map.of("line", lineId.toString()));
+        audit.record("PRODUCTION_PLAN_LINE_REMOVED", ENTITY, id, before, null);
         return detail(plan);
     }
 

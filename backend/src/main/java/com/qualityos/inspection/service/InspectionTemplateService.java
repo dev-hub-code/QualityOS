@@ -211,6 +211,7 @@ public class InspectionTemplateService {
                 .orElseThrow(() -> new ResourceNotFoundException("Template version", versionId));
         draft.requireDraft();
         validate(request);
+        var before = audit.state(toResponse(draft));
         draft.setChangeNote(request.changeNote());
         draft.setSamplingType(request.samplingType());
         draft.setSampleSize(request.samplingType() == SamplingType.FIXED ? request.sampleSize() : null);
@@ -228,7 +229,7 @@ public class InspectionTemplateService {
             draft.getParameters().add(toEntity(parameter, draft, order++));
         }
         versions.saveAndFlush(draft);
-        audit.record("TEMPLATE_DRAFT_SAVED", "InspectionTemplate", id);
+        audit.recordChange("TEMPLATE_DRAFT_SAVED", "InspectionTemplate", id, before, audit.state(toResponse(draft)));
         return get(id);
     }
 

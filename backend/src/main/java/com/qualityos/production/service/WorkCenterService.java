@@ -158,6 +158,7 @@ public class WorkCenterService {
     @Transactional
     public WorkCenterResponse update(UUID id, SaveWorkCenterRequest request) {
         WorkCenter centre = loadActive(id);
+        var before = audit.state(toResponse(centre, facilityCodes(List.of(centre))));
         String code = request.code().trim();
         if (workCenters.existsByCodeAndIdNot(code, id)) {
             throw new ConflictException("Work centre %s already exists.".formatted(code));
@@ -167,8 +168,9 @@ public class WorkCenterService {
         }
         centre.setCode(code);
         apply(centre, request);
-        audit.record("WORK_CENTER_UPDATED", "WorkCenter", id);
-        return toResponse(centre, facilityCodes(List.of(centre)));
+        WorkCenterResponse after = toResponse(centre, facilityCodes(List.of(centre)));
+        audit.recordChange("WORK_CENTER_UPDATED", "WorkCenter", id, before, audit.state(after));
+        return after;
     }
 
     /** A work centre with machines still in use stays, so that nothing points at a place that has gone. */
@@ -296,6 +298,7 @@ public class WorkCenterService {
     @Transactional
     public MachineResponse updateMachine(UUID id, SaveMachineRequest request) {
         Machine machine = loadMachine(id);
+        var before = audit.state(toResponse(machine, workCenters.findById(machine.getWorkCenterId()).orElseThrow()));
         String code = request.code().trim();
         if (machines.existsByCodeAndIdNot(code, id)) {
             throw new ConflictException("Machine %s already exists.".formatted(code));
@@ -304,8 +307,9 @@ public class WorkCenterService {
         machine.setCode(code);
         machine.setWorkCenterId(centre.getId());
         applyMachine(machine, request);
-        audit.record("MACHINE_UPDATED", MACHINE, id);
-        return toResponse(machine, centre);
+        MachineResponse after = toResponse(machine, centre);
+        audit.recordChange("MACHINE_UPDATED", MACHINE, id, before, audit.state(after));
+        return after;
     }
 
     /** Only the changes in {@link Machine#TRANSITIONS}; each one is kept in the machine's history. */

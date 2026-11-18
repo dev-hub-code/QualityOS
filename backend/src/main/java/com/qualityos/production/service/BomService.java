@@ -160,12 +160,14 @@ public class BomService {
     public BomDetail update(Bom.Kind kind, UUID id, UpdateRevisionRequest request) {
         Bom bom = load(kind, id);
         bom.requireDraft();
+        var before = audit.state(detail(bom).revision());
         bom.setChangeNote(request.changeNote());
         if (request.baseQuantity() != null) {
             bom.setBaseQuantity(request.baseQuantity());
         }
-        audit.record(action(kind, "UPDATED"), entity(kind), id);
-        return detail(bom);
+        BomDetail after = detail(bom);
+        audit.recordChange(action(kind, "UPDATED"), entity(kind), id, before, audit.state(after.revision()));
+        return after;
     }
 
     @Transactional
@@ -177,8 +179,14 @@ public class BomService {
         BomLine line = new BomLine(id, next);
         apply(bom, line, request);
         lines.saveAndFlush(line);
-        audit.record(action(kind, "LINE_ADDED"), entity(kind), id, null, Map.of("line", next));
+        audit.record(action(kind, "LINE_ADDED"), entity(kind), id, null, lineState(bom, line.getId()));
         return detail(bom);
+    }
+
+    /** One line as the screen shows it, for the audit trail. */
+    private Map<String, Object> lineState(Bom bom, UUID lineId) {
+        return detail(bom).lines().stream().filter(found -> found.id().equals(lineId)).findFirst()
+                .map(audit::state).orElseGet(Map::of);
     }
 
     @Transactional
@@ -186,8 +194,10 @@ public class BomService {
         Bom bom = load(kind, id);
         bom.requireDraft();
         BomLine line = loadLine(id, lineId);
+        var before = lineState(bom, lineId);
         apply(bom, line, request);
-        audit.record(action(kind, "LINE_CHANGED"), entity(kind), id, null, Map.of("line", line.getLineNumber()));
+        lines.flush();
+        audit.recordChange(action(kind, "LINE_CHANGED"), entity(kind), id, before, lineState(bom, lineId));
         return detail(bom);
     }
 
@@ -196,9 +206,10 @@ public class BomService {
         Bom bom = load(kind, id);
         bom.requireDraft();
         BomLine line = loadLine(id, lineId);
+        var before = lineState(bom, lineId);
         lines.delete(line);
         lines.flush();
-        audit.record(action(kind, "LINE_REMOVED"), entity(kind), id, null, Map.of("line", line.getLineNumber()));
+        audit.record(action(kind, "LINE_REMOVED"), entity(kind), id, before, null);
         return detail(bom);
     }
 

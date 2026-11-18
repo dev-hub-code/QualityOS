@@ -85,17 +85,19 @@ public class SupplierService implements AttachmentPolicy {
         Supplier supplier = new Supplier(code);
         apply(supplier, request);
         suppliers.saveAndFlush(supplier);
-        audit.record("SUPPLIER_CREATED", "Supplier", supplier.getId());
-        return mapper.toResponse(supplier);
+        var created = mapper.toResponse(supplier);
+        audit.record("SUPPLIER_CREATED", "Supplier", supplier.getId(), null, audit.state(created));
+        return created;
     }
 
     @Transactional
     public SupplierResponse update(UUID id, SaveSupplierRequest request) {
         Supplier supplier = load(id);
+        var before = audit.state(mapper.toResponse(supplier));
         supplier.requireVersion(request.version());
         apply(supplier, request);
         suppliers.saveAndFlush(supplier);
-        audit.record("SUPPLIER_UPDATED", "Supplier", id);
+        audit.recordChange("SUPPLIER_UPDATED", "Supplier", id, before, audit.state(mapper.toResponse(supplier)));
         return mapper.toResponse(supplier);
     }
 
@@ -159,8 +161,9 @@ public class SupplierService implements AttachmentPolicy {
             throw new ConflictException("This category already exists.");
         }
         SupplierCategory category = categories.save(new SupplierCategory(trimmed));
-        audit.record("SUPPLIER_CATEGORY_CREATED", "SupplierCategory", category.getId());
-        return mapper.toResponse(category);
+        var created = mapper.toResponse(category);
+        audit.record("SUPPLIER_CATEGORY_CREATED", "SupplierCategory", category.getId(), null, audit.state(created));
+        return created;
     }
 
     @Transactional
@@ -170,21 +173,24 @@ public class SupplierService implements AttachmentPolicy {
         if (!trimmed.equals(category.getName()) && categories.existsByName(trimmed)) {
             throw new ConflictException("This category already exists.");
         }
+        String previous = category.getName();
         category.setName(trimmed);
-        audit.record("SUPPLIER_CATEGORY_RENAMED", "SupplierCategory", id);
+        audit.record("SUPPLIER_CATEGORY_RENAMED", "SupplierCategory", id, Map.of("name", previous), Map.of("name", trimmed));
         return mapper.toResponse(category);
     }
 
     /** The database refuses while a supplier holds the category, including an archived one. */
     @Transactional
     public void deleteCategory(UUID id) {
-        categories.delete(requireCategory(id));
+        var category = requireCategory(id);
+        String name = category.getName();
+        categories.delete(category);
         try {
             categories.flush();
         } catch (DataIntegrityViolationException e) {
             throw new ConflictException("This category is in use, so it cannot be deleted.");
         }
-        audit.record("SUPPLIER_CATEGORY_DELETED", "SupplierCategory", id);
+        audit.record("SUPPLIER_CATEGORY_DELETED", "SupplierCategory", id, Map.of("name", name), null);
     }
 
     private SupplierCategory requireCategory(UUID id) {

@@ -95,17 +95,19 @@ public class MaterialService implements AttachmentPolicy {
         Material material = new Material(code);
         apply(material, request);
         materials.saveAndFlush(material);
-        audit.record("MATERIAL_CREATED", "Material", material.getId());
-        return mapper.toResponse(material);
+        var created = mapper.toResponse(material);
+        audit.record("MATERIAL_CREATED", "Material", material.getId(), null, audit.state(created));
+        return created;
     }
 
     @Transactional
     public MaterialResponse update(UUID id, SaveMaterialRequest request) {
         Material material = load(id);
+        var before = audit.state(mapper.toResponse(material));
         material.requireVersion(request.version());
         apply(material, request);
         materials.saveAndFlush(material);
-        audit.record("MATERIAL_UPDATED", "Material", id);
+        audit.recordChange("MATERIAL_UPDATED", "Material", id, before, audit.state(mapper.toResponse(material)));
         return mapper.toResponse(material);
     }
 
@@ -136,7 +138,7 @@ public class MaterialService implements AttachmentPolicy {
         MaterialSpecification specification = specifications.save(new MaterialSpecification(
                 materialId, request.name().trim(), request.nominalValue(), request.minValue(), request.maxValue(),
                 request.textValue(), request.uomId(), request.notes(), nextOrder));
-        audit.record("MATERIAL_SPECIFICATION_ADDED", "Material", materialId);
+        audit.record("MATERIAL_SPECIFICATION_ADDED", "Material", materialId, null, audit.state(mapper.toResponse(specification)));
         return mapper.toResponse(specification);
     }
 
@@ -145,8 +147,9 @@ public class MaterialService implements AttachmentPolicy {
         MaterialSpecification specification = specifications.findById(specificationId)
                 .filter(found -> found.getMaterialId().equals(materialId))
                 .orElseThrow(() -> new ResourceNotFoundException("Specification", specificationId));
+        var before = audit.state(mapper.toResponse(specification));
         specifications.delete(specification);
-        audit.record("MATERIAL_SPECIFICATION_REMOVED", "Material", materialId);
+        audit.record("MATERIAL_SPECIFICATION_REMOVED", "Material", materialId, before, null);
     }
 
     /** Validates a specification; also used for product specifications. */
@@ -225,8 +228,9 @@ public class MaterialService implements AttachmentPolicy {
             throw new ConflictException("This category already exists.");
         }
         ProductCategory category = categories.save(new ProductCategory(trimmed));
-        audit.record("PRODUCT_CATEGORY_CREATED", "ProductCategory", category.getId());
-        return mapper.toResponse(category);
+        var created = mapper.toResponse(category);
+        audit.record("PRODUCT_CATEGORY_CREATED", "ProductCategory", category.getId(), null, audit.state(created));
+        return created;
     }
 
     @Transactional
@@ -236,21 +240,24 @@ public class MaterialService implements AttachmentPolicy {
         if (!trimmed.equals(category.getName()) && categories.existsByName(trimmed)) {
             throw new ConflictException("This category already exists.");
         }
+        String previous = category.getName();
         category.setName(trimmed);
-        audit.record("PRODUCT_CATEGORY_RENAMED", "ProductCategory", id);
+        audit.record("PRODUCT_CATEGORY_RENAMED", "ProductCategory", id, Map.of("name", previous), Map.of("name", trimmed));
         return mapper.toResponse(category);
     }
 
     /** The database refuses while a material or product holds the category, including an archived one. */
     @Transactional
     public void deleteCategory(UUID id) {
-        categories.delete(findCategory(id));
+        var category = findCategory(id);
+        String name = category.getName();
+        categories.delete(category);
         try {
             categories.flush();
         } catch (DataIntegrityViolationException e) {
             throw new ConflictException("This category is in use, so it cannot be deleted.");
         }
-        audit.record("PRODUCT_CATEGORY_DELETED", "ProductCategory", id);
+        audit.record("PRODUCT_CATEGORY_DELETED", "ProductCategory", id, Map.of("name", name), null);
     }
 
     private ProductCategory findCategory(UUID id) {

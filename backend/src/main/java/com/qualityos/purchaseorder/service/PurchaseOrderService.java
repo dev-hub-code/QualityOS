@@ -108,8 +108,9 @@ public class PurchaseOrderService {
         PurchaseOrder order = new PurchaseOrder(numbers.next(NUMBER_PREFIX));
         apply(order, request);
         orders.saveAndFlush(order);
-        audit.record("PURCHASE_ORDER_CREATED", "PurchaseOrder", order.getId());
-        return toDetail(order);
+        var created = toDetail(order);
+        audit.record("PURCHASE_ORDER_CREATED", "PurchaseOrder", order.getId(), null, audit.state(created));
+        return created;
     }
 
     @Transactional
@@ -117,14 +118,16 @@ public class PurchaseOrderService {
         PurchaseOrder order = loadWithItems(id);
         order.requireDraft();
         order.requireVersion(request.version());
+        var before = audit.state(toDetail(order));
         // Item changes do not touch the order row, so without this two edits could overwrite each other.
         entityManager.lock(order, LockModeType.PESSIMISTIC_FORCE_INCREMENT);
         order.getItems().clear();
         orders.flush();
         apply(order, request);
         orders.saveAndFlush(order);
-        audit.record("PURCHASE_ORDER_UPDATED", "PurchaseOrder", id);
-        return toDetail(order);
+        PurchaseOrderDetail after = toDetail(order);
+        audit.recordChange("PURCHASE_ORDER_UPDATED", "PurchaseOrder", id, before, audit.state(after));
+        return after;
     }
 
     @Transactional

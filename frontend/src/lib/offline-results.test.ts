@@ -162,4 +162,97 @@ describe("offline results", () => {
       true,
     );
   });
+
+  describe("edge cases from the November review", () => {
+    it("keeps results measured while an earlier send was on its way", async () => {
+      queueResults(owner, [entry(1, "20", "2026-11-18T10:00:00Z")]);
+      // Another tab, or the same screen, keeps a new measurement while the request is out.
+      const post = vi.fn(async () => {
+        queueResults(owner, [
+          entry(2, "20.02", "2026-11-18T10:05:00Z"),
+          entry(1, "19.99", "2026-11-18T10:06:00Z"),
+        ]);
+      });
+
+      expect(await sendQueued(me, post)).toEqual(["i-1"]);
+
+      const left = queuedFor(me, "i-1");
+      expect(
+        left?.entries.map((item) => [item.sampleNumber, item.valueNumeric]),
+      ).toEqual([
+        [1, "19.99"],
+        [2, "20.02"],
+      ]);
+    });
+
+    it("two tabs sending at once both finish, leaving nothing behind", async () => {
+      queueResults(owner, [entry(1, "20", "2026-11-18T10:00:00Z")]);
+      queueResults({ ...owner, inspectionId: "i-2" }, [
+        entry(1, "20", "2026-11-18T10:00:00Z"),
+      ]);
+      // The server keeps one result per sample, so a result sent by both tabs is stored once.
+      const post = vi.fn(
+        () => new Promise<void>((resolve) => setTimeout(resolve, 5)),
+      );
+
+      const [first, second] = await Promise.all([
+        sendQueued(me, post),
+        sendQueued(me, post),
+      ]);
+
+      expect(new Set([...first, ...second])).toEqual(new Set(["i-1", "i-2"]));
+      expect(queuedBy(me)).toEqual([]);
+    });
+
+    it("sends nothing kept in one organisation while signed in to another, and sends it on return", async () => {
+      queueResults(owner, [entry(1, "20", "2026-11-18T10:00:00Z")]);
+      const post = vi.fn(async () => undefined);
+
+      expect(await sendQueued({ ...me, tenantId: "t-2" }, post)).toEqual([]);
+      expect(post).not.toHaveBeenCalled();
+      expect(queuedFor(me, "i-1")).toBeDefined();
+
+      expect(await sendQueued(me, post)).toEqual(["i-1"]);
+      expect(post).toHaveBeenCalledWith(
+        "/inspections/i-1/execute",
+        expect.anything(),
+      );
+    });
+
+    it("sends refused results again only when asked, and clears them once taken", async () => {
+      queueResults(owner, [entry(1, "20", "2026-11-18T10:00:00Z")]);
+      const closed = vi.fn(async () => {
+        throw new ApiError(
+          422,
+          "RULE",
+          "Results cannot be changed after submission.",
+        );
+      });
+      await sendQueued(me, closed);
+      expect(queuedFor(me, "i-1")?.error).toBe(
+        "Results cannot be changed after submission.",
+      );
+
+      // Reopened by the manager, then sent again from the banner.
+      const taken = vi.fn(async () => undefined);
+      expect(await sendQueued(me, taken)).toEqual([]);
+      expect(await sendQueued(me, taken, true)).toEqual(["i-1"]);
+      expect(queuedFor(me, "i-1")).toBeUndefined();
+    });
+
+    it("starts afresh, without failing, when what the device kept is unreadable or was cleared", async () => {
+      window.localStorage.setItem("qualityos.offline-results", "{not json");
+      expect(queued()).toEqual([]);
+      expect(
+        queueResults(owner, [entry(1, "20", "2026-11-18T10:00:00Z")]),
+      ).toBe(true);
+      expect(queuedFor(me, "i-1")).toBeDefined();
+
+      // Cleared by the browser or another tab: nothing to send, and nothing breaks.
+      window.localStorage.clear();
+      const post = vi.fn(async () => undefined);
+      expect(await sendQueued(me, post)).toEqual([]);
+      expect(post).not.toHaveBeenCalled();
+    });
+  });
 });

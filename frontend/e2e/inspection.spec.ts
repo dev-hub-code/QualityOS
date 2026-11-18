@@ -439,10 +439,8 @@ test("under double sampling an inconclusive first sample asks for a second, coun
   ).toBeVisible();
 });
 
-test("results saved without a connection are kept on the device and sent when it is back", async ({
-  page,
-  context,
-}) => {
+/** Signs up, publishes a one-parameter template and starts an inspection with it, leaving its page open. */
+async function startFloorInspection(page: Page) {
   await signUp(page);
   await receiveMaterial(page);
   await page.goto("/inspection-templates");
@@ -470,6 +468,13 @@ test("results saved without a connection are kept on the device and sent when it
     .selectOption({ label: "BAR-OFF – Bar on the floor" });
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page).toHaveURL(/inspections\//);
+}
+
+test("results saved without a connection are kept on the device and sent when it is back", async ({
+  page,
+  context,
+}) => {
+  await startFloorInspection(page);
 
   await context.setOffline(true);
   await page.getByLabel("DIA sample 1", { exact: true }).fill("20.02");
@@ -490,5 +495,54 @@ test("results saved without a connection are kept on the device and sent when it
   await page.reload();
   await expect(page.getByLabel("DIA sample 1", { exact: true })).toHaveValue(
     "20.02",
+  );
+});
+
+test("values kept offline for an inspection submitted meanwhile are refused with the reason, and discarding them asks first", async ({
+  page,
+  context,
+  browser,
+}) => {
+  await startFloorInspection(page);
+  const inspectionUrl = page.url();
+
+  await context.setOffline(true);
+  await page.getByLabel("DIA sample 1", { exact: true }).fill("19.95");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("On this device, not sent yet")).toBeVisible();
+
+  // Meanwhile, from the bench, the same person finishes and submits the inspection.
+  const bench = await browser.newContext({
+    storageState: await context.storageState(),
+  });
+  const benchPage = await bench.newPage();
+  await benchPage.goto(inspectionUrl);
+  const samples = benchPage.getByLabel(/^DIA sample \d+$/);
+  for (let index = 0; index < (await samples.count()); index++) {
+    await samples.nth(index).fill("20.0");
+  }
+  await benchPage.getByRole("button", { name: "Submit for approval" }).click();
+  await confirmAction(benchPage);
+  await expect(
+    benchPage.getByText("submitted", { exact: true }).first(),
+  ).toBeVisible();
+  await bench.close();
+
+  // Back online, the tablet's value is refused and kept with the reason, not lost and not sent again on its own.
+  await context.setOffline(false);
+  await expect(
+    page.getByText("not accepted: Results cannot be changed after submission."),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Discard" }).click();
+  const question = page.getByRole("alertdialog");
+  await expect(question).toContainText("exist only on this device");
+  await question.getByRole("button", { name: "Cancel" }).click();
+  await expect(page.getByText("not accepted:", { exact: false })).toBeVisible();
+
+  await page.getByRole("button", { name: "Discard" }).click();
+  await confirmAction(page);
+  await expect(page.getByText("not accepted:", { exact: false })).toHaveCount(
+    0,
   );
 });

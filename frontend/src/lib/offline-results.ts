@@ -141,6 +141,30 @@ export function discard(owner: Owner, inspectionId: string) {
   write(queue);
 }
 
+/**
+ * Removes what was sent, and only that. A measurement kept while the request was out, from this screen or another
+ * tab, stays to be sent next time.
+ */
+function removeSent(owner: Owner, inspectionId: string, sent: QueuedEntry[]) {
+  const queue = read();
+  const key = slot(owner, inspectionId);
+  const item = queue[key];
+  if (!item) return;
+  const sentAt = new Map(
+    sent.map((entry) => [
+      sampleKey(entry.parameterCode, entry.sampleNumber),
+      entry.measuredAt,
+    ]),
+  );
+  const left = item.entries.filter((entry) => {
+    const at = sentAt.get(sampleKey(entry.parameterCode, entry.sampleNumber));
+    return at === undefined || entry.measuredAt > at;
+  });
+  if (left.length === 0) delete queue[key];
+  else queue[key] = { ...item, entries: left, error: undefined };
+  write(queue);
+}
+
 function markRefused(owner: Owner, inspectionId: string, error: string) {
   const queue = read();
   const key = slot(owner, inspectionId);
@@ -168,7 +192,7 @@ export async function sendQueued(
       await post(`/inspections/${item.inspectionId}/execute`, {
         results: item.entries,
       });
-      discard(me, item.inspectionId);
+      removeSent(me, item.inspectionId, item.entries);
       sent.push(item.inspectionId);
     } catch (error) {
       if (isConnectionLost(error)) break;

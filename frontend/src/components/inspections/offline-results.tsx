@@ -14,6 +14,7 @@ import {
   sendQueued,
   type QueuedInspection,
 } from "@/lib/offline-results";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const RETRY_MS = 30_000;
 
@@ -22,6 +23,7 @@ const RETRY_MS = 30_000;
  * and every half minute while any wait.
  */
 export function OfflineResults() {
+  const confirm = useConfirm();
   const { data: me } = useMe();
   const queryClient = useQueryClient();
   const [online, setOnline] = useState(true);
@@ -115,7 +117,17 @@ export function OfflineResults() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => discard(item, item.inspectionId)}
+                  onClick={() =>
+                    confirm({
+                      title: `Discard the values kept for ${item.inspectionNumber}?`,
+                      description:
+                        "They exist only on this device and were not accepted. Once discarded they are gone, so note them down first if you still need them.",
+                      confirmLabel: "Discard values",
+                      danger: true,
+                    }).then((ok) => {
+                      if (ok) discard(item, item.inspectionId);
+                    })
+                  }
                 >
                   Discard
                 </Button>

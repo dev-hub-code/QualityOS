@@ -20,7 +20,7 @@ test("a BOM is drafted, approved and exploded, and machines keep their status hi
   // A discrete organisation sees BOMs, not recipes.
   await page.goto("/manufacturing/work-centers");
   const menu = page.getByRole("navigation", { name: "Main" });
-  await expect(menu.getByText("Manufacturing", { exact: true })).toBeVisible();
+  await expect(menu.getByRole("button", { name: "Manufacturing setup" })).toBeVisible();
   await expect(menu.getByRole("link", { name: "BOMs" })).toBeVisible();
   await expect(menu.getByRole("link", { name: "Recipes" })).toHaveCount(0);
 

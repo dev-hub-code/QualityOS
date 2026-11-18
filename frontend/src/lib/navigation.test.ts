@@ -4,7 +4,9 @@ import {
   forManufacturingModel,
   landingPage,
   leavesWorkspace,
+  NAV_GROUPS,
   NAV_ITEMS,
+  navSections,
   visibleNavItems,
   workspaceNavItems,
 } from "./navigation";
@@ -115,8 +117,8 @@ describe("visibleNavItems", () => {
   it("shows the audit log to those allowed to read it", () => {
     expect(labels(["AUDIT_LOG_VIEW"])).toEqual([
       "Dashboard",
-      "Audit log",
       "Settings",
+      "Audit log",
       "My account",
       "Support",
       "Documentation",
@@ -156,8 +158,8 @@ describe("activeNavHref", () => {
 });
 
 describe("forManufacturingModel", () => {
-  const manufacturing = visibleNavItems(["MANUFACTURING_VIEW"]).filter(
-    (item) => item.group === "Manufacturing",
+  const manufacturing = visibleNavItems(["MANUFACTURING_VIEW"]).filter((item) =>
+    item.href.startsWith("/manufacturing/"),
   );
   const shown = (model?: "DISCRETE" | "PROCESS" | "HYBRID") =>
     forManufacturingModel(manufacturing, model).map((item) => item.label);
@@ -171,22 +173,18 @@ describe("forManufacturingModel", () => {
       "Recipes",
       "Routings",
       "Quality checkpoints",
-      "Downtime",
       "Configuration",
+      "Downtime",
     ]);
     expect(shown("HYBRID")).toEqual(
       expect.arrayContaining(["BOMs", "Recipes"]),
     );
   });
 
-  it("keeps the group together and hidden from people without the permission", () => {
-    const indexes = NAV_ITEMS.flatMap((item, index) =>
-      item.group === "Manufacturing" ? [index] : [],
-    );
-    expect(indexes.at(-1)! - indexes[0]).toBe(indexes.length - 1);
+  it("is hidden from people without the permission", () => {
     expect(
-      visibleNavItems(["NCR_VIEW"]).some(
-        (item) => item.group === "Manufacturing",
+      visibleNavItems(["NCR_VIEW"]).some((item) =>
+        item.href.startsWith("/manufacturing/"),
       ),
     ).toBe(false);
   });
@@ -200,5 +198,50 @@ describe("forManufacturingModel", () => {
       expect.arrayContaining(["Production plans", "Work orders"]),
     );
     expect(labels).not.toContain("Machines");
+  });
+});
+
+describe("menu order", () => {
+  it("starts with the dashboard, then puts every other item in a group", () => {
+    expect(NAV_ITEMS[0]).toMatchObject({ label: "Dashboard" });
+    expect(NAV_ITEMS[0].group).toBeUndefined();
+    expect(NAV_ITEMS.slice(1).filter((item) => !item.group)).toEqual([]);
+  });
+
+  it("keeps each group together, in the order work flows", () => {
+    const sections = navSections(NAV_ITEMS);
+    expect(sections.map((section) => section.group)).toEqual([
+      undefined,
+      ...NAV_GROUPS,
+    ]);
+    expect(sections.flatMap((section) => section.items)).toEqual(NAV_ITEMS);
+  });
+
+  it("follows the workflow within a group", () => {
+    const group = (name: string) =>
+      NAV_ITEMS.filter((item) => item.group === name).map((item) => item.label);
+    expect(group("Incoming material")).toEqual([
+      "Purchase orders",
+      "Receipts",
+      "Inspections",
+    ]);
+    expect(group("Quality")).toEqual(["NCRs", "CAPAs"]);
+    expect(group("Traceability")).toEqual([
+      "Traceability",
+      "Serial search",
+      "Recalls",
+      "Corrections",
+    ]);
+  });
+
+  it("leaves out a group with nothing visible", () => {
+    const sections = navSections(visibleNavItems(["NCR_VIEW", "CAPA_VIEW"]));
+    expect(sections.map((section) => section.group)).toEqual([
+      undefined,
+      "Set up",
+      "Quality",
+      "Administration",
+      "Account and help",
+    ]);
   });
 });

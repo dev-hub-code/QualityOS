@@ -162,13 +162,15 @@ public class InstrumentService implements AttachmentPolicy {
     public InstrumentResponse update(UUID id, SaveInstrumentRequest request) {
         Instrument instrument = load(id);
         instrument.requireNotRetired();
+        var before = audit.state(toResponse(instrument));
         apply(instrument, request);
         instrument.setInstrumentCode(request.instrumentCode().trim());
         instrument.setNextDueOn(instrument.getLastCalibratedOn() == null
                 ? request.nextDueOn()
                 : instrument.getLastCalibratedOn().plusDays(request.frequencyDays()));
-        audit.record("INSTRUMENT_UPDATED", ENTITY, id);
-        return toResponse(instrument);
+        InstrumentResponse after = toResponse(instrument);
+        audit.recordChange("INSTRUMENT_UPDATED", ENTITY, id, before, audit.state(after));
+        return after;
     }
 
     @Transactional

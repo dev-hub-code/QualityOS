@@ -158,17 +158,19 @@ public class FacilityService {
         Facility facility = new Facility(code);
         apply(facility, request);
         facilities.saveAndFlush(facility);
-        audit.record("FACILITY_CREATED", "Facility", facility.getId());
-        return mapper.toResponse(facility);
+        var created = mapper.toResponse(facility);
+        audit.record("FACILITY_CREATED", "Facility", facility.getId(), null, audit.state(created));
+        return created;
     }
 
     @Transactional
     public FacilityResponse update(UUID id, SaveFacilityRequest request) {
         Facility facility = load(id);
+        var before = audit.state(mapper.toResponse(facility));
         facility.requireVersion(request.version());
         apply(facility, request);
         facilities.saveAndFlush(facility);
-        audit.record("FACILITY_UPDATED", "Facility", id);
+        audit.recordChange("FACILITY_UPDATED", "Facility", id, before, audit.state(mapper.toResponse(facility)));
         return mapper.toResponse(facility);
     }
 

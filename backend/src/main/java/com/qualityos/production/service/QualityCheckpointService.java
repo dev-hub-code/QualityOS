@@ -79,10 +79,12 @@ public class QualityCheckpointService {
         if (checkpoint.getStage() != request.stage()) {
             throw new BusinessRuleException("A checkpoint keeps its stage. Archive it and add another.");
         }
+        var before = audit.state(responses(List.of(checkpoint)).getFirst());
         apply(checkpoint, request);
         checkpoints.saveAndFlush(checkpoint);
-        audit.record("QUALITY_CHECKPOINT_UPDATED", ENTITY, id);
-        return responses(List.of(checkpoint)).getFirst();
+        CheckpointResponse after = responses(List.of(checkpoint)).getFirst();
+        audit.recordChange("QUALITY_CHECKPOINT_UPDATED", ENTITY, id, before, audit.state(after));
+        return after;
     }
 
     /** Orders already released keep it; new ones no longer take it. */

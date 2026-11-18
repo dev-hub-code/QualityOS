@@ -1,5 +1,12 @@
 package com.qualityos.common.audit;
 
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
 import com.qualityos.common.config.CorrelationIdFilter;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.common.util.UuidV7;
@@ -23,6 +30,9 @@ public class AuditService {
                                     correlation_id, previous_state, new_state, support_grant_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?)
             """;
+
+    private static final Set<String> BOOKKEEPING =
+            Set.of("id", "version", "createdAt", "updatedAt", "createdBy", "updatedBy");
 
     private final JdbcTemplate jdbc;
     private final JsonMapper json;
@@ -55,6 +65,61 @@ public class AuditService {
                 toJson(newState),
                 supportGrant());
         TenantContext.findCurrentTenantId().map(TenantDataChanged::new).ifPresent(events::publishEvent);
+    }
+
+    /**
+     * Records an edit as what it changed: each field, or each list of child lines, whose value differs, before and
+     * after. Saving with nothing changed is still recorded, with no values.
+     *
+     * @param before the record as it was, from the same {@code snapshot} as {@code after}
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordChange(
+            String action, String entityType, Object entityId, Map<String, ?> before, Map<String, ?> after) {
+        Map<String, Object> was = new LinkedHashMap<>();
+        Map<String, Object> now = new LinkedHashMap<>();
+        Set<String> keys = new LinkedHashSet<>(before.keySet());
+        keys.addAll(after.keySet());
+        for (String key : keys) {
+            Object old = before.get(key);
+            Object current = after.get(key);
+            if (!same(old, current)) {
+                was.put(key, old);
+                now.put(key, current);
+            }
+        }
+        record(action, entityType, entityId, was.isEmpty() ? null : was, now.isEmpty() ? null : now);
+    }
+
+    /**
+     * A record as the screen sees it, for {@link #recordChange}: the response it is shown with, less the bookkeeping
+     * every record has. Child lines in the response come along, so a change to one shows as the list before and after.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> state(Object response) {
+        Map<String, Object> state = new LinkedHashMap<>(json.convertValue(response, Map.class));
+        BOOKKEEPING.forEach(state::remove);
+        return state;
+    }
+
+    /** Numbers compare by value, also inside child lines, so that 5 and 5.00 are the same. */
+    private static boolean same(Object a, Object b) {
+        return Objects.equals(normal(a), normal(b));
+    }
+
+    private static Object normal(Object value) {
+        if (value instanceof BigDecimal number) {
+            return number.signum() == 0 ? BigDecimal.ZERO : number.stripTrailingZeros();
+        }
+        if (value instanceof Map<?, ?> map) {
+            Map<Object, Object> copy = new LinkedHashMap<>();
+            map.forEach((key, item) -> copy.put(key, normal(item)));
+            return copy;
+        }
+        if (value instanceof java.util.Collection<?> items) {
+            return items.stream().map(AuditService::normal).toList();
+        }
+        return value;
     }
 
     private String toJson(Object state) {

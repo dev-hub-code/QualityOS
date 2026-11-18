@@ -63,19 +63,23 @@ public class AuditChecklistService {
         }
         AuditChecklist checklist = checklists.saveAndFlush(new AuditChecklist(code, request.name().trim()));
         saveItems(checklist.getId(), request.items());
-        audit.record("AUDIT_CHECKLIST_CREATED", ENTITY, checklist.getId());
-        return toDetail(checklist);
+        var created = toDetail(checklist);
+        audit.record("AUDIT_CHECKLIST_CREATED", ENTITY, checklist.getId(), null, audit.state(created));
+        return created;
     }
 
     @Transactional
     public ChecklistDetail update(UUID id, SaveChecklistRequest request) {
         AuditChecklist checklist = load(id);
+        var before = audit.state(toDetail(checklist));
         checklist.setName(request.name().trim());
         items.deleteByChecklistId(id);
         items.flush();
         saveItems(id, request.items());
-        audit.record("AUDIT_CHECKLIST_UPDATED", ENTITY, id);
-        return toDetail(checklist);
+        items.flush();
+        ChecklistDetail after = toDetail(checklist);
+        audit.recordChange("AUDIT_CHECKLIST_UPDATED", ENTITY, id, before, audit.state(after));
+        return after;
     }
 
     @Transactional

@@ -40,6 +40,12 @@ Sub-records are audited against their parent: departments, production lines and 
 (`DEPARTMENT_ADDED`, `PRODUCTION_LINE_ARCHIVED`, `SHIFT_ADDED`, and so on), contacts against the supplier
 (`SUPPLIER_CONTACT_ADDED`, `SUPPLIER_CONTACT_REMOVED`), material mappings against the product (`PRODUCT_MATERIAL_ADDED`,
 `PRODUCT_MATERIAL_REMOVED`), each with what was added or removed. A new unit is audited as `UNIT_ADDED` on itself.
+Edits keep before and after values in `audit_logs.previous_state` and `new_state`, holding only the fields that changed
+(numbers compared by value, so 5 and 5.00 are the same). Where a save replaces child lines, such as purchase order
+items, checklist items or template parameters, the list is kept as it was and as it is. A line edited on its own (BOM
+line, routing step, plan line) is kept as that line before and after; one removed keeps what it was. Specifications
+added or removed and categories renamed or deleted keep their values too, and creating a master record keeps what it
+was created with.
 
 ### Phase 4: inspection
 `inspection_templates`, `inspection_template_versions` (status, effective dates, sampling plan, immutable once

@@ -106,17 +106,19 @@ public class ProductService implements AttachmentPolicy {
         apply(product, request);
         products.saveAndFlush(product);
         revisions.save(new ProductRevision(product.getId(), INITIAL_REVISION, "Initial revision", LocalDate.now()));
-        audit.record("PRODUCT_CREATED", "Product", product.getId());
-        return mapper.toResponse(product);
+        var created = mapper.toResponse(product);
+        audit.record("PRODUCT_CREATED", "Product", product.getId(), null, audit.state(created));
+        return created;
     }
 
     @Transactional
     public ProductResponse update(UUID id, SaveProductRequest request) {
         Product product = load(id);
+        var before = audit.state(mapper.toResponse(product));
         product.requireVersion(request.version());
         apply(product, request);
         products.saveAndFlush(product);
-        audit.record("PRODUCT_UPDATED", "Product", id);
+        audit.recordChange("PRODUCT_UPDATED", "Product", id, before, audit.state(mapper.toResponse(product)));
         return mapper.toResponse(product);
     }
 
@@ -162,7 +164,7 @@ public class ProductService implements AttachmentPolicy {
         ProductSpecification specification = specifications.save(new ProductSpecification(
                 id, request.name().trim(), request.nominalValue(), request.minValue(), request.maxValue(),
                 request.textValue(), request.uomId(), request.notes(), nextOrder));
-        audit.record("PRODUCT_SPECIFICATION_ADDED", "Product", id);
+        audit.record("PRODUCT_SPECIFICATION_ADDED", "Product", id, null, audit.state(mapper.toResponse(specification)));
         return mapper.toResponse(specification);
     }
 
@@ -171,8 +173,9 @@ public class ProductService implements AttachmentPolicy {
         ProductSpecification specification = specifications.findById(specificationId)
                 .filter(found -> found.getProductId().equals(id))
                 .orElseThrow(() -> new ResourceNotFoundException("Specification", specificationId));
+        var before = audit.state(mapper.toResponse(specification));
         specifications.delete(specification);
-        audit.record("PRODUCT_SPECIFICATION_REMOVED", "Product", id);
+        audit.record("PRODUCT_SPECIFICATION_REMOVED", "Product", id, before, null);
     }
 
     @Transactional

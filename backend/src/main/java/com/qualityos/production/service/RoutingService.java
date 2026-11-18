@@ -128,9 +128,11 @@ public class RoutingService {
     public RoutingDetail update(UUID id, UpdateRevisionRequest request) {
         Routing routing = load(id);
         routing.requireDraft();
+        var before = audit.state(detail(routing).revision());
         routing.setChangeNote(request.changeNote());
-        audit.record("ROUTING_UPDATED", ENTITY, id);
-        return detail(routing);
+        RoutingDetail after = detail(routing);
+        audit.recordChange("ROUTING_UPDATED", ENTITY, id, before, audit.state(after.revision()));
+        return after;
     }
 
     @Transactional
@@ -143,8 +145,14 @@ public class RoutingService {
         RoutingOperation operation = new RoutingOperation(id);
         apply(operation, request);
         operations.saveAndFlush(operation);
-        audit.record("ROUTING_OPERATION_ADDED", ENTITY, id, null, Map.of("sequence", request.sequence()));
+        audit.record("ROUTING_OPERATION_ADDED", ENTITY, id, null, operationState(routing, operation.getId()));
         return detail(routing);
+    }
+
+    /** One step as the screen shows it, with its parameters, for the audit trail. */
+    private Map<String, Object> operationState(Routing routing, UUID operationId) {
+        return detail(routing).operations().stream().filter(found -> found.id().equals(operationId)).findFirst()
+                .map(audit::state).orElseGet(Map::of);
     }
 
     @Transactional
@@ -156,8 +164,10 @@ public class RoutingService {
                 && operations.existsByRoutingIdAndSequence(id, request.sequence())) {
             throw new ConflictException("Step %d is already used.".formatted(request.sequence()));
         }
+        var before = operationState(routing, operationId);
         apply(operation, request);
-        audit.record("ROUTING_OPERATION_CHANGED", ENTITY, id, null, Map.of("sequence", request.sequence()));
+        operations.flush();
+        audit.recordChange("ROUTING_OPERATION_CHANGED", ENTITY, id, before, operationState(routing, operationId));
         return detail(routing);
     }
 
@@ -166,11 +176,12 @@ public class RoutingService {
         Routing routing = load(id);
         routing.requireDraft();
         RoutingOperation operation = loadOperation(id, operationId);
+        var before = operationState(routing, operationId);
         parameters.deleteAll(parameters.findByOperationIdInOrderByCode(List.of(operationId)));
         parameters.flush();
         operations.delete(operation);
         operations.flush();
-        audit.record("ROUTING_OPERATION_REMOVED", ENTITY, id, null, Map.of("sequence", operation.getSequence()));
+        audit.record("ROUTING_OPERATION_REMOVED", ENTITY, id, before, null);
         return detail(routing);
     }
 

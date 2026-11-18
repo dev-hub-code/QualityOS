@@ -142,8 +142,9 @@ public class DispatchService {
         }
         Customer customer = customers.save(new Customer(code, request.name().trim(), request.gstin(),
                 request.contactPerson(), request.email(), request.phone(), request.address()));
-        audit.record("CUSTOMER_CREATED", "Customer", customer.getId());
-        return toResponse(customer);
+        var created = toResponse(customer);
+        audit.record("CUSTOMER_CREATED", "Customer", customer.getId(), null, audit.state(created));
+        return created;
     }
 
     @Transactional

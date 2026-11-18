@@ -1,5 +1,14 @@
 package com.qualityos.reporting.controller;
 
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.http.HttpStatus;
+import org.springframework.core.io.InputStreamResource;
+import java.util.List;
+import com.qualityos.reporting.dto.ReportingDtos.ReportExportView;
+import com.qualityos.reporting.dto.ReportingDtos.ExportRequest;
+import com.qualityos.reporting.service.ReportExports;
 import com.qualityos.common.response.ApiResponse;
 import com.qualityos.common.security.Permissions.Require;
 import com.qualityos.reporting.dto.ReportingDtos.Overview;
@@ -35,8 +44,11 @@ public class ReportingController {
     private final AnalyticsService analytics;
     private final ReportService reports;
     private final ReportExporter exporter;
+    private final ReportExports exports;
 
-    ReportingController(AnalyticsService analytics, ReportService reports, ReportExporter exporter) {
+    ReportingController(AnalyticsService analytics, ReportService reports, ReportExporter exporter,
+            ReportExports exports) {
+        this.exports = exports;
         this.analytics = analytics;
         this.reports = reports;
         this.exporter = exporter;
@@ -81,6 +93,30 @@ public class ReportingController {
             Authentication caller) {
         ReportType type = allowed(slug, caller);
         return file(slug, "xlsx", EXCEL, exporter.excel(reports.export(type, "EXCEL", from, to, facilityId)));
+    }
+
+    /** Exports the whole report to Excel in the background. The person is told when it is ready. */
+    @PostMapping("/reports/{slug:[a-z-]+}/exports")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public ApiResponse<ReportExportView> exportInBackground(
+            @PathVariable String slug, @RequestBody ExportRequest request, Authentication caller) {
+        return ApiResponse.ok(exports.request(allowed(slug, caller), request.from(), request.to(), request.facilityId()));
+    }
+
+    @GetMapping("/reports/exports")
+    public ApiResponse<List<ReportExportView>> myExports() {
+        return ApiResponse.ok(exports.mine());
+    }
+
+    @GetMapping("/reports/exports/{id}/file")
+    public ResponseEntity<InputStreamResource> exportFile(@PathVariable UUID id) {
+        ReportExports.Download download = exports.download(id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(EXCEL))
+                .contentLength(download.size())
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(download.fileName()).build().toString())
+                .body(new InputStreamResource(download.content()));
     }
 
     private static ReportType allowed(String slug, Authentication caller) {

@@ -69,7 +69,8 @@ Phase 11 is on hold until you ask for it.
 - [x] Notifications pushed to the bell as they happen (#106), an email template for each (#90), and the organisation's
   logo in the app, its emails and PDFs (#105, #110)
 - [x] Pickers list every record (#82), and archived records can be restored (#81)
-- [ ] Background report exports beyond 5,000 rows, and separate permissions for totals and detail
+- [x] Background report exports beyond 5,000 rows: streamed to Excel, up to 1,000,000 rows, kept 7 days
+- [ ] Separate permissions for report totals and detail
 - [ ] Audit every change to child records, with before and after values. Done for facility units, supplier contacts,
   material mappings and units (#84)
 - [ ] Offline inspection on the shop floor

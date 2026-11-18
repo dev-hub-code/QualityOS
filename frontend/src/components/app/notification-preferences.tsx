@@ -25,7 +25,8 @@ const LABELS: Record<string, string> = {
   CAPA_DUE_SOON: "My CAPA is due soon",
   CAPA_OVERDUE: "My CAPA is overdue",
   CAPA_ACTION_OVERDUE: "An action I own, or on my CAPA, is overdue",
-  CAPA_ESCALATED: "A CAPA or one of its actions is long overdue (for CAPA approvers)",
+  CAPA_ESCALATED:
+    "A CAPA or one of its actions is long overdue (for CAPA approvers)",
   CAPA_CLOSED: "My CAPA is closed",
   RECALL_UNANSWERED: "Customers on a recall have not acknowledged it in time",
   DISPATCH_SHIPMENT_UNCONFIRMED:
@@ -51,6 +52,7 @@ const LABELS: Record<string, string> = {
   SUPPORT_TICKET_UPDATED: "Support replies to my request or changes its status",
   SUPPORT_CHANGES_STARTED:
     "Support starts a session that can make changes in our organisation",
+  REPORT_EXPORT_READY: "A report I exported is ready, or could not be made",
 };
 const PATH = "/notifications/preferences";
 

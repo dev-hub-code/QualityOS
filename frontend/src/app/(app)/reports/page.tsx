@@ -2,10 +2,23 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { NO_PERIOD, PeriodFilter, periodQuery } from "@/components/analytics/period-filter";
+import {
+  NO_PERIOD,
+  PeriodFilter,
+  periodQuery,
+} from "@/components/analytics/period-filter";
+import Link from "next/link";
 import { PageHeader, QueryState } from "@/components/records/parts";
+import { ExportInBackground } from "@/components/reports/report-exports";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useMe } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import type { ReportTable } from "@/lib/types";
@@ -29,7 +42,9 @@ const PREVIEW_ROWS = 100;
 
 export default function ReportsPage() {
   const { data: me } = useMe();
-  const allowed = REPORTS.filter(([, , permission]) => me?.permissions.includes(permission));
+  const allowed = REPORTS.filter(([, , permission]) =>
+    me?.permissions.includes(permission),
+  );
   const [chosen, setChosen] = useState("");
   const [period, setPeriod] = useState(NO_PERIOD);
   const slug = chosen || allowed[0]?.[0];
@@ -44,7 +59,11 @@ export default function ReportsPage() {
   });
   return (
     <div className="space-y-6">
-      <PageHeader title="Reports" />
+      <PageHeader title="Reports">
+        <Link className="text-sm underline" href="/reports/exports">
+          Your exports
+        </Link>
+      </PageHeader>
       <div className="space-y-1.5">
         <Label htmlFor="report-type">Report</Label>
         <select
@@ -69,28 +88,47 @@ export default function ReportsPage() {
             <span className="text-muted-foreground">
               {data.rows.length} rows. {data.periodLabel}.
             </span>
-            <a className="underline" href={`/api/v1/reports/${slug}.pdf?${query}`}>
+            <a
+              className="underline"
+              href={`/api/v1/reports/${slug}.pdf?${query}`}
+            >
               Download PDF
             </a>
-            <a className="underline" href={`/api/v1/reports/${slug}.xlsx?${query}`}>
+            <a
+              className="underline"
+              href={`/api/v1/reports/${slug}.xlsx?${query}`}
+            >
               Download Excel
             </a>
           </div>
           <p className="text-sm text-muted-foreground">{data.note}</p>
-          {data.truncated && (
-            <p className="text-sm text-destructive">
-              This view stops at {data.rows.length} rows. Download Excel for the rest, or choose fewer dates.
-            </p>
+          {data.truncated && slug && (
+            <>
+              <p className="text-sm text-destructive">
+                This view and the PDF stop at {data.rows.length} rows. Export
+                every row to Excel, or choose fewer dates.
+              </p>
+              <ExportInBackground
+                key={path}
+                slug={slug}
+                period={{ ...period }}
+              />
+            </>
           )}
           {data.rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nothing to report for this period.</p>
+            <p className="text-sm text-muted-foreground">
+              Nothing to report for this period.
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     {data.columns.map((column) => (
-                      <TableHead key={column.label} className={column.numeric ? "text-right" : ""}>
+                      <TableHead
+                        key={column.label}
+                        className={column.numeric ? "text-right" : ""}
+                      >
                         {column.label}
                       </TableHead>
                     ))}
@@ -100,7 +138,12 @@ export default function ReportsPage() {
                   {data.rows.slice(0, PREVIEW_ROWS).map((row, index) => (
                     <TableRow key={index}>
                       {row.map((value, column) => (
-                        <TableCell key={column} className={data.columns[column].numeric ? "text-right" : ""}>
+                        <TableCell
+                          key={column}
+                          className={
+                            data.columns[column].numeric ? "text-right" : ""
+                          }
+                        >
                           {value?.replaceAll("_", " ")}
                         </TableCell>
                       ))}
@@ -111,7 +154,9 @@ export default function ReportsPage() {
             </div>
           )}
           {data.rows.length > PREVIEW_ROWS && (
-            <p className="text-sm text-muted-foreground">Showing the first {PREVIEW_ROWS}. The downloads hold every row.</p>
+            <p className="text-sm text-muted-foreground">
+              Showing the first {PREVIEW_ROWS}. The downloads hold every row.
+            </p>
           )}
         </>
       )}

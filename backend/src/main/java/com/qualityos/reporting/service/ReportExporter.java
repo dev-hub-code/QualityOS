@@ -6,6 +6,7 @@ import com.qualityos.reporting.dto.ReportingDtos.ReportTable;
 import com.samskivert.mustache.Template;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -54,43 +55,87 @@ public class ReportExporter {
 
     /** Text goes in as text, so that a value beginning with an equals sign is never run as a formula. */
     public byte[] excel(ReportTable report) {
-        try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            Workbook workbook = new Workbook(out, "ProductionOS", "1.0");
-            Worksheet sheet = workbook.newWorksheet("Report");
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ExcelSink sink = excel(out);
+        sink.start(report);
+        report.rows().forEach(sink::row);
+        sink.finish(report.truncated());
+        return out.toByteArray();
+    }
+
+    /** Writes rows out as they come, so that a long report never sits whole in memory. */
+    public ExcelSink excel(OutputStream out) {
+        return new ExcelSink(out);
+    }
+
+    public static final class ExcelSink implements ReportSink {
+
+        private static final int FLUSH_EVERY = 1_000;
+
+        private final Workbook workbook;
+        private Worksheet sheet;
+        private List<Column> columns;
+        private int row;
+        private int rows;
+
+        private ExcelSink(OutputStream out) {
+            workbook = new Workbook(out, "ProductionOS", "1.0");
+        }
+
+        @Override
+        public void start(ReportTable report) {
+            sheet = workbook.newWorksheet("Report");
             sheet.value(0, 0, report.title());
             sheet.style(0, 0).bold().fontSize(14).set();
             sheet.value(1, 0, report.organizationName() + ", " + report.facilityLabel());
             sheet.value(2, 0, report.periodLabel() + ". Generated " + report.generatedLabel());
-            List<Column> columns = report.columns();
+            columns = report.columns();
             for (int index = 0; index < columns.size(); index++) {
                 sheet.value(HEADER_ROW, index, columns.get(index).label());
                 sheet.style(HEADER_ROW, index).bold().fillColor("E8E8E8").set();
                 sheet.width(index, columns.get(index).weight() * WIDTH_PER_WEIGHT);
             }
             sheet.freezePane(0, HEADER_ROW + 1);
-            int row = HEADER_ROW + 1;
-            for (List<String> values : report.rows()) {
-                for (int index = 0; index < values.size(); index++) {
-                    String value = values.get(index);
-                    if (value == null) {
-                        continue;
-                    }
-                    if (columns.get(index).numeric()) {
-                        sheet.value(row, index, new BigDecimal(value));
-                    } else {
-                        sheet.value(row, index, value);
-                    }
+            row = HEADER_ROW + 1;
+        }
+
+        @Override
+        public void row(List<String> values) {
+            for (int index = 0; index < values.size(); index++) {
+                String value = values.get(index);
+                if (value == null) {
+                    continue;
                 }
-                row++;
+                if (columns.get(index).numeric()) {
+                    sheet.value(row, index, new BigDecimal(value));
+                } else {
+                    sheet.value(row, index, value);
+                }
             }
-            if (report.truncated()) {
-                sheet.value(row + 1, 0, "This report stops at " + report.rows().size()
-                        + " rows. Choose fewer dates to see the rest.");
+            row++;
+            rows++;
+            if (rows % FLUSH_EVERY == 0) {
+                try {
+                    sheet.flush();
+                } catch (IOException ex) {
+                    throw new UncheckedIOException(ex);
+                }
             }
-            workbook.finish();
-            return out.toByteArray();
-        } catch (IOException ex) {
-            throw new UncheckedIOException(ex);
+        }
+
+        public int rows() {
+            return rows;
+        }
+
+        public void finish(boolean truncated) {
+            if (truncated) {
+                sheet.value(row + 1, 0, "This report stops at " + rows + " rows. Choose fewer dates to see the rest.");
+            }
+            try {
+                workbook.finish();
+            } catch (IOException ex) {
+                throw new UncheckedIOException(ex);
+            }
         }
     }
 }

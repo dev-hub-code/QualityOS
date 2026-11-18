@@ -81,6 +81,8 @@ qualityos:
     screen-rows: 5000
     # Rows in an Excel download, which can hold a long period in one file.
     excel-rows: 100000
+    # An export made in the background streams to its file; Excel itself stops at 1,048,576 rows.
+    background-rows: 1000000
   mail:
     from: ${MAIL_FROM:ProductionOS <no-reply@qualityos.local>}
     retry-delay: ${MAIL_RETRY_DELAY:5s}
@@ -120,6 +122,9 @@ qualityos:
     production-reminders:
       initial-delay: PT5M
       interval: PT1H
+    report-exports:
+      initial-delay: PT3M
+      interval: PT15M
     monitor:
       interval: PT15M
   storage:

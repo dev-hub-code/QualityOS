@@ -9,4 +9,7 @@ public interface FileStorage {
     void store(String key, InputStream content) throws IOException;
 
     InputStream open(String key) throws IOException;
+
+    /** Nothing happens if there is nothing under the key. */
+    void delete(String key) throws IOException;
 }

@@ -104,4 +104,23 @@ public final class ReportingDtos {
             List<List<String>> rows,
             boolean truncated) {
     }
+
+    public record ExportRequest(java.time.LocalDate from, java.time.LocalDate to, java.util.UUID facilityId) {
+    }
+
+    /** A background export. {@code rowCount} and {@code expiresAt} are set once it is ready. */
+    public record ReportExportView(
+            java.util.UUID id,
+            String report,
+            String title,
+            java.time.LocalDate from,
+            java.time.LocalDate to,
+            String status,
+            Integer rowCount,
+            boolean truncated,
+            Long sizeBytes,
+            String failure,
+            java.time.Instant requestedAt,
+            java.time.Instant expiresAt) {
+    }
 }

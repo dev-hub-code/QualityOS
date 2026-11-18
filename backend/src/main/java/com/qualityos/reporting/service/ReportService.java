@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +37,8 @@ public class ReportService {
     }
 
     private final NamedParameterJdbcTemplate jdbc;
+    /** The same connections, read through a cursor a few thousand rows at a time. */
+    private final NamedParameterJdbcTemplate streaming;
     private final ReportScope scopes;
     private final OrganizationService organizations;
     private final FacilityService facilities;
@@ -56,6 +60,9 @@ public class ReportService {
         this.excelRows = excelRows;
         computedReports.forEach(report -> computed.put(report.type(), report));
         this.jdbc = jdbc;
+        JdbcTemplate cursor = new JdbcTemplate(jdbc.getJdbcTemplate().getDataSource());
+        cursor.setFetchSize(2_000);
+        this.streaming = new NamedParameterJdbcTemplate(cursor);
         this.scopes = scopes;
         this.organizations = organizations;
         this.facilities = facilities;
@@ -81,34 +88,68 @@ public class ReportService {
         return table;
     }
 
+    /**
+     * Reads a report row by row into {@code sink}, as the person in the current context: their facilities, today's
+     * dates. Nothing is held but the row being read, so it suits an export of any length.
+     *
+     * @return whether rows were left out at {@code limit}
+     */
+    @Transactional(readOnly = true)
+    public boolean stream(ReportType type, LocalDate from, LocalDate to, UUID facilityId, int limit, ReportSink sink) {
+        return read(type, scopes.resolve(from, to, facilityId), limit, sink);
+    }
+
     private ReportTable build(ReportType type, Resolved scope, int limit) {
+        List<List<String>> rows = new ArrayList<>();
+        ReportTable[] heading = new ReportTable[1];
+        boolean truncated = read(type, scope, limit, new ReportSink() {
+            @Override
+            public void start(ReportTable table) {
+                heading[0] = table;
+            }
+
+            @Override
+            public void row(List<String> values) {
+                rows.add(values);
+            }
+        });
+        ReportTable head = heading[0];
+        return new ReportTable(head.title(), head.organizationName(), head.facilityLabel(), head.periodLabel(),
+                head.generatedLabel(), head.note(), head.columns(), rows, truncated);
+    }
+
+    private boolean read(ReportType type, Resolved scope, int limit, ReportSink sink) {
+        int[] count = {0};
+        boolean[] more = {false};
+        java.util.function.Consumer<List<String>> capped = values -> {
+            if (count[0] < limit) {
+                sink.row(values);
+                count[0]++;
+            } else {
+                more[0] = true;
+            }
+        };
         ComputedReport source = computed.get(type);
-        List<Column> columns;
-        List<List<String>> rows;
-        String note;
         if (source != null) {
             ComputedReport.Table table = source.rows(scope.from(), scope.to(), scope.facilityId());
-            columns = table.columns();
-            rows = new ArrayList<>(table.rows().subList(0, Math.min(table.rows().size(), limit + 1)));
-            note = table.note();
+            sink.start(heading(type, scope, table.columns(), table.note()));
+            table.rows().forEach(capped);
         } else {
             Definition definition = definition(type, scope);
             int width = definition.columns().size();
-            columns = definition.columns();
-            note = definition.note();
-            rows = new ArrayList<>(jdbc.query(
-                    definition.sql() + " LIMIT " + (limit + 1), scope.params(), (row, n) -> {
-                        List<String> values = new ArrayList<>(width);
-                        for (int column = 1; column <= width; column++) {
-                            values.add(row.getString(column));
-                        }
-                        return values;
-                    }));
+            sink.start(heading(type, scope, definition.columns(), definition.note()));
+            streaming.query(definition.sql() + " LIMIT " + (limit + 1L), scope.params(), (RowCallbackHandler) row -> {
+                List<String> values = new ArrayList<>(width);
+                for (int column = 1; column <= width; column++) {
+                    values.add(row.getString(column));
+                }
+                capped.accept(values);
+            });
         }
-        boolean truncated = rows.size() > limit;
-        if (truncated) {
-            rows.removeLast();
-        }
+        return more[0];
+    }
+
+    private ReportTable heading(ReportType type, Resolved scope, List<Column> columns, String note) {
         return new ReportTable(
                 type.title(),
                 organizations.getCurrent().name(),
@@ -118,8 +159,8 @@ public class ReportService {
                 DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm z").withZone(scope.zone()).format(Instant.now()),
                 note,
                 columns,
-                rows,
-                truncated);
+                List.of(),
+                false);
     }
 
     private static String date(String column) {

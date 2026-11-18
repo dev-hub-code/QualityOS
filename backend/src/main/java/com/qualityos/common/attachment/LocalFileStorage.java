@@ -28,6 +28,11 @@ class LocalFileStorage implements FileStorage {
         return Files.newInputStream(resolve(key));
     }
 
+    @Override
+    public void delete(String key) throws IOException {
+        Files.deleteIfExists(resolve(key));
+    }
+
     private Path resolve(String key) {
         Path path = root.resolve(key).normalize();
         if (!path.startsWith(root)) {

@@ -313,6 +313,9 @@ may span two years at most. `facilityId` narrows the result; a facility the call
 |---|---|---|
 | GET | `/api/v1/analytics/overview` | Key figures, chart series, pending approvals, recent activity, and `production`: open and late work orders, work orders completed and on time, shop-floor loss and unplanned downtime |
 | GET | `/api/v1/reports/{slug}` | Report as JSON: columns, up to 5,000 rows, `truncated`. The PDF stops there too; the `.xlsx` holds up to 100,000 rows and says where it stops. Both limits are set under `qualityos.reports` |
+| POST | `/api/v1/reports/{slug}/exports` | Takes `from`, `to`, `facilityId`. Exports the whole report to Excel in the background, up to `qualityos.reports.background-rows` (1,000,000), as the person asking: their facilities and permissions, checked again when it runs and at download. `202` with the export; `422` for a bad period, `409` with 3 exports already being made. The person is notified (`REPORT_EXPORT_READY`) when it is ready or fails |
+| GET | `/api/v1/reports/exports` | The person's own exports, newest first |
+| GET | `/api/v1/reports/exports/{id}/file` | Downloads a ready export. Only its requester; kept 7 days, then `409` |
 | GET | `/api/v1/reports/{slug}.pdf` | The same report as a PDF, audited as `REPORT_EXPORTED` |
 | GET | `/api/v1/reports/{slug}.xlsx` | The same report as a workbook, audited as `REPORT_EXPORTED` |
 

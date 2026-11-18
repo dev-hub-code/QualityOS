@@ -133,6 +133,9 @@ date.
 records the announcement as sent and creates a notice for every active member, in one transaction. The notification
 delivery job then sends the emails, so members who turned announcements off are not emailed.
 
+`report-exports` runs every 15 minutes as a safety net. Exports start the moment they are requested; the job makes any
+that a restart left waiting, fails any cut off mid-run, and deletes files past their 7 days.
+
 ## Production module
 
 `com.qualityos.production` holds manufacturing: definitions, plans, work orders, the shop floor, quality gates,
@@ -184,8 +187,16 @@ nobody.
 ## Reporting
 
 `reporting` reads across modules with plain SQL, like the traceability search, and writes nothing except an audit row
-for each export. Row-level security limits every statement to the tenant. `ReportScope` adds the member's facilities,
-and anything with no facility fails that clause, so a limited member never sees what cannot be placed.
+for each export, and its background exports. Row-level security limits every statement to the tenant. `ReportScope`
+adds the member's facilities, and anything with no facility fails that clause, so a limited member never sees what
+cannot be placed.
+
+A report longer than the screen's 5,000 rows can be exported in the background. The request is checked and saved, and
+after it commits `ReportExportStarter` runs it on another thread as the person who asked, so it holds only what they may
+see. Their permissions are checked again then, and at download. Rows are read through a database cursor and written
+straight into the Excel file, which is flushed every thousand rows, so neither the rows nor the workbook are held in
+memory. The file goes to the same `FileStorage` as attachments, under `report-exports/`, and only its requester can
+download it. Each person has at most three exports being made at once.
 
 ## Subscription
 

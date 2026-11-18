@@ -2903,3 +2903,19 @@ export interface UnappliedPayment {
   amount: number;
   since: string;
 }
+
+/** A report exported to Excel in the background, for the person who asked. */
+export interface ReportExport {
+  id: string;
+  report: string;
+  title: string;
+  from: string;
+  to: string;
+  status: "QUEUED" | "RUNNING" | "READY" | "FAILED" | "EXPIRED";
+  rowCount: number | null;
+  truncated: boolean;
+  sizeBytes: number | null;
+  failure: string | null;
+  requestedAt: string;
+  expiresAt: string | null;
+}

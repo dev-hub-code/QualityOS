@@ -1,7 +1,10 @@
 # UAT: user acceptance testing, run as production is (the prod profile comes with it), with real email through
-# SendGrid. It does not start without SENDGRID_API_KEY, a verified MAIL_FROM sender, real JWT keys and
-# SECOND_FACTOR_KEY.
+# SendGrid and files in S3. It does not start without SENDGRID_API_KEY, a verified MAIL_FROM sender,
+# STORAGE_S3_BUCKET, real JWT keys and SECOND_FACTOR_KEY.
 qualityos:
   environment: UAT
   mail:
     provider: ${MAIL_PROVIDER:sendgrid}
+  storage:
+    # Several instances run, so files must be shared: S3, in the bucket Terraform creates.
+    provider: ${STORAGE_PROVIDER:s3}

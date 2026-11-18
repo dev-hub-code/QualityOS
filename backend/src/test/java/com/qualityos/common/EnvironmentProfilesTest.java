@@ -18,7 +18,7 @@ class EnvironmentProfilesTest {
     }
 
     private record Resolved(List<String> profiles, String mail, String environment, String smtpHost,
-            String allowEphemeralKeys) {
+            String allowEphemeralKeys, String storage) {
     }
 
     private static Resolved resolve(String profile) {
@@ -29,7 +29,8 @@ class EnvironmentProfilesTest {
             Environment env = context.getEnvironment();
             return new Resolved(List.of(env.getActiveProfiles()), env.getProperty("qualityos.mail.provider"),
                     env.getProperty("qualityos.environment"), env.getProperty("spring.mail.host"),
-                    env.getProperty("qualityos.security.jwt.allow-ephemeral-keys", "false"));
+                    env.getProperty("qualityos.security.jwt.allow-ephemeral-keys", "false"),
+                    env.getProperty("qualityos.storage.provider"));
         }
     }
 
@@ -40,6 +41,7 @@ class EnvironmentProfilesTest {
             assertThat(resolved.profiles()).contains(profile, "local").doesNotContain("prod");
             assertThat(resolved.mail()).isEqualTo("smtp");
             assertThat(resolved.smtpHost()).isEqualTo("mailpit");
+            assertThat(resolved.storage()).isEqualTo("local");
             assertThat(resolved.environment()).isEqualTo(profile.toUpperCase());
         }
     }
@@ -50,6 +52,8 @@ class EnvironmentProfilesTest {
 
         assertThat(resolved.profiles()).contains("uat", "prod").doesNotContain("local");
         assertThat(resolved.mail()).isEqualTo("sendgrid");
+        // Several instances share files, so they live in S3.
+        assertThat(resolved.storage()).isEqualTo("s3");
         assertThat(resolved.environment()).isEqualTo("UAT");
         // As in production, it needs real signing keys rather than throwaway ones.
         assertThat(resolved.allowEphemeralKeys()).isEqualTo("false");

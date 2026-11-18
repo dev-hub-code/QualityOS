@@ -147,7 +147,16 @@ qualityos:
     monitor:
       interval: PT15M
   storage:
+    # local (one machine: local, dev, SIT) or s3 (AWS: UAT and production). Each environment's profile sets it.
+    provider: ${STORAGE_PROVIDER:local}
     local-root: ${STORAGE_LOCAL_ROOT}
+    s3:
+      bucket: ${STORAGE_S3_BUCKET:}
+      prefix: ${STORAGE_S3_PREFIX:}
+      # Empty uses the region the task runs in (AWS_REGION).
+      region: ${STORAGE_S3_REGION:}
+      # Only for an S3-compatible server in tests.
+      endpoint: ${STORAGE_S3_ENDPOINT:}
   security:
     auth-rate-limit-per-minute: ${AUTH_RATE_LIMIT_PER_MINUTE:30}
     # Seals operators' authenticator secrets in the database: 32 random bytes, base64. Losing it ends every enrolment.

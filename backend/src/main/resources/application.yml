@@ -148,6 +148,7 @@ qualityos:
       key-id: ${JWT_KEY_ID:}
       # The key signed with before the last rotation, verified until the date given, then refused.
       previous-public-key: ${JWT_PREVIOUS_PUBLIC_KEY:}
+      previous-key-id: ${JWT_PREVIOUS_KEY_ID:}
       previous-key-trusted-until: ${JWT_PREVIOUS_KEY_TRUSTED_UNTIL:}
 
 management:

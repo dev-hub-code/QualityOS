@@ -31,7 +31,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | Gap | Planned |
 |---|---|
 | The client address is only as reliable as the proxy in front of the web app, which must append `X-Forwarded-For`. The backend must not be reachable directly | With production work |
-| Someone can still deliberately lock out a known email (10 failures, 15 minutes), though the IP limit slows it down. A reset link unlocks the account | Review after real use |
+| Lockout is per address (10 failures, 15 minutes), with an account-wide limit of 50 that spares addresses the owner signed in from, so a stranger cannot lock the owner out. A CAPTCHA or growing delay is still open | Before public launch |
 | The IP rate limit is held per backend instance, so several instances multiply it. Shared limits need Redis or the load balancer | With production work |
 | An expired sign-up is emptied after 30 days, not deleted, because its audit rows cannot be removed. Its suspended organisation row stays. With unverified login allowed, nothing is expired | By design |
 | The bell updates live over server-sent events, with a 5-minute poll behind it. Connections are held per instance, so running several instances needs a shared channel (such as PostgreSQL `LISTEN`/`NOTIFY`) before every page hears every change. Only email and in-app channels exist | When a user needs it |

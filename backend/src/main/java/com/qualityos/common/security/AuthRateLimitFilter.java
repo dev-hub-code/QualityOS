@@ -11,6 +11,8 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -19,7 +21,9 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * Limits how fast one address can try credentials or trigger emails. Counts are per minute, kept by an
  * {@link AttemptCounter}: in production the database, so every instance shares one limit and a restart does not reset
- * it. A known account is protected separately: ten wrong passwords lock it for 15 minutes, from any address.
+ * it. Once an address is over the limit, this instance refuses it for the rest of the minute without asking the
+ * counter again, so a flood costs the database at most one limit's worth of writes per address and instance. A known
+ * account is protected separately, by a lockout counted per address (see AuthService).
  */
 public class AuthRateLimitFilter extends OncePerRequestFilter {
 
@@ -37,6 +41,9 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     private final JsonMapper json;
     private final Clock clock;
     private final AttemptCounter counter;
+    /** Addresses already over the limit, with the window they are refused in. Pruned as windows pass. */
+    private final Map<String, Instant> refused = new ConcurrentHashMap<>();
+    private volatile Instant prunedFor = Instant.EPOCH;
 
     public AuthRateLimitFilter(int limit, JsonMapper json, Clock clock, AttemptCounter counter) {
         this.limit = limit;
@@ -55,7 +62,17 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         Instant window = Instant.ofEpochMilli(clock.millis() / WINDOW_MILLIS * WINDOW_MILLIS);
-        if (counter.increment("address:" + request.getRemoteAddr(), window) > limit) {
+        if (!window.equals(prunedFor)) {
+            prunedFor = window;
+            refused.values().removeIf(refusedIn -> !refusedIn.equals(window));
+        }
+        String address = request.getRemoteAddr();
+        boolean over = window.equals(refused.get(address));
+        if (!over && counter.increment("address:" + address, window) > limit) {
+            refused.put(address, window);
+            over = true;
+        }
+        if (over) {
             response.setStatus(ErrorCode.TOO_MANY_REQUESTS.status().value());
             response.setHeader(HttpHeaders.RETRY_AFTER, String.valueOf(RETRY_AFTER_SECONDS));
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);

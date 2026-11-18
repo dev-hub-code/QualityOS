@@ -53,9 +53,15 @@ class JwtKeyRotationTest {
     }
 
     private JwtProperties properties(KeyPair signing, String keyId, KeyPair previous, Instant trustedUntil) {
+        return properties(signing, keyId, previous, null, trustedUntil);
+    }
+
+    private JwtProperties properties(KeyPair signing, String keyId, KeyPair previous, String previousKeyId,
+            Instant trustedUntil) {
         return new JwtProperties("qualityos", "qualityos-api", Duration.ofMinutes(15), Duration.ofDays(14),
                 pem("PRIVATE KEY", signing.getPrivate().getEncoded()), pem("PUBLIC KEY", signing.getPublic().getEncoded()),
-                keyId, previous == null ? null : pem("PUBLIC KEY", previous.getPublic().getEncoded()), trustedUntil, false);
+                keyId, previous == null ? null : pem("PUBLIC KEY", previous.getPublic().getEncoded()), previousKeyId, trustedUntil,
+                false);
     }
 
     private static String token(KeyPair key, String keyId, Instant issuedAt) {
@@ -114,6 +120,20 @@ class JwtKeyRotationTest {
     }
 
     @Test
+    void anOldKeyWithItsOwnIdKeepsWorkingWhenThatIdIsGiven() throws Exception {
+        // Before the rotation the key was named "2026-10"; its tokens carry that name, not its thumbprint.
+        String fromOldKey = token(oldKey, "2026-10", ROTATED.minusSeconds(60));
+
+        JwtDecoder withId = decoderAt(properties(newKey, "2026-11", oldKey, "2026-10", TRUSTED_UNTIL), ROTATED);
+        assertThat(withId.decode(fromOldKey).getSubject()).isEqualTo("someone");
+        assertThat(withId.decode(token(newKey, "2026-11", ROTATED)).getSubject()).isEqualTo("someone");
+
+        // Without it, the old tokens are refused: which is why the runbook asks for JWT_PREVIOUS_KEY_ID.
+        JwtDecoder withoutId = decoderAt(properties(newKey, "2026-11", oldKey, null, TRUSTED_UNTIL), ROTATED);
+        assertThatThrownBy(() -> withoutId.decode(fromOldKey)).isInstanceOf(JwtException.class);
+    }
+
+    @Test
     void withoutARotationOnlyTheSigningKeyIsTrusted() throws Exception {
         JwtDecoder decoder = decoderAt(properties(newKey, null, null, null), ROTATED);
 
@@ -139,5 +159,8 @@ class JwtKeyRotationTest {
         assertThatThrownBy(() -> config.jwtKeys(properties(newKey, null, newKey, TRUSTED_UNTIL)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("same as the signing key");
+        assertThatThrownBy(() -> config.jwtKeys(properties(newKey, "same", oldKey, "same", TRUSTED_UNTIL)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("JWT_PREVIOUS_KEY_ID");
     }
 }

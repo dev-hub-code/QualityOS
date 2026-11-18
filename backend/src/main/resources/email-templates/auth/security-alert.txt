@@ -3,7 +3,7 @@ Subject: Security alert for your ProductionOS account
 Your account was locked
 
 Hello {{recipientName}},
-After repeated failed sign-in attempts, your ProductionOS account is locked for {{lockMinutes}} minutes.
+After repeated failed sign-in attempts, signing in to your ProductionOS account from where they came from is blocked for {{lockMinutes}} minutes. Other places where you have signed in before are not affected.
 If this was not you, reset your password.
 
 Reset password: {{actionUrl}}

@@ -754,7 +754,7 @@ export const DOC_FLOWS: Record<string, Flow[]> = {
     {
       title: "What happens on each request",
       steps: [
-        { label: "You sign in", note: "Ten failed tries lock the account for 15 minutes." },
+        { label: "You sign in", note: "Ten failed tries from one place block sign-in from there for 15 minutes." },
         { label: "Your organisation comes from your session" },
         {
           label: "Does your role allow this?",

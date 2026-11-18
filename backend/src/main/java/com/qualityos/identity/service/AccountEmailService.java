@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -49,8 +50,10 @@ public class AccountEmailService {
     private final TransactionTemplate tx;
     private final RegistrationProperties registration;
     private final String appUrl;
+    private final JdbcTemplate jdbc;
 
     AccountEmailService(
+            JdbcTemplate jdbc,
             UserRepository users,
             AccountTokenRepository tokens,
             RefreshTokenRepository refreshTokens,
@@ -69,6 +72,7 @@ public class AccountEmailService {
         this.tx = new TransactionTemplate(transactionManager);
         this.registration = registration;
         this.appUrl = appUrl;
+        this.jdbc = jdbc;
     }
 
     /** Behaves the same whether or not the address has an account, so it cannot be used to discover accounts. */
@@ -98,6 +102,7 @@ public class AccountEmailService {
             user.setPasswordHash(newHash);
             user.setFailedLoginCount(0);
             user.setLockedUntil(null);
+            jdbc.update("DELETE FROM login_failures WHERE user_id = ?", user.getId());
             // The link reached this mailbox, which is the same proof that verification asks for.
             user.markEmailVerified(now);
             refreshTokens.revokeAllForUser(user.getId(), now);

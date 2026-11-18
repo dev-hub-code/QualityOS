@@ -11,6 +11,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *     which every instance with the same key works out alike
  * @param previousPublicKey X.509 PEM of the key signed with before the last rotation, trusted only to verify tokens
  *     it already signed. Blank when no rotation is under way
+ * @param previousKeyId the {@code kid} the previous key's tokens carry: what {@code keyId} was before the rotation.
+ *     Blank when it had none, so its tokens carry its thumbprint
  * @param previousKeyTrustedUntil when tokens signed with the previous key stop being accepted. Required with a
  *     previous key: at least the longest token lifetime after the new key went live
  * @param allowEphemeralKeys generate keys at startup when none are configured; local development only
@@ -25,6 +27,7 @@ public record JwtProperties(
         String publicKey,
         String keyId,
         String previousPublicKey,
+        String previousKeyId,
         Instant previousKeyTrustedUntil,
         boolean allowEphemeralKeys) {
 }

@@ -70,8 +70,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | The material rejection rate converts quantities to the base unit of their kind. Kinds that cannot be added together, such as kilograms and pieces, each get a rate, and the figure weighs those rates by their lots. The material rejection report shows each material in its own unit | Review after real use |
 | NCRs raised before unit conversion keep their rejected quantity without a unit | By design |
 | Cashfree checkout is built but has not been run against Cashfree's sandbox. Its calls were tested against a local stand-in | Before enabling live keys |
-| No refund flow exists. A refund is made in the Cashfree dashboard and is not recorded here | When a user needs it |
-| A payment that cannot be applied, such as one for a replaced invoice, shows only in the audit log as `PAYMENT_NEEDS_REVIEW`. A person must refund it or apply it by hand | Before customer launch |
+| A credit note takes back money; it does not change the invoice it is against, which stays `PAID`. A refund that fails at Cashfree is shown as failed and is then made by hand outside ProductionOS | When a user needs it |
 | A renewal is paid by hand each period. There are no saved cards or automatic debits | When a user needs it |
 | CGST, SGST, IGST, place of supply and SAC are worked out from GSTINs, but no accountant has reviewed this. It does not cover exemptions, SEZ supplies, exports or an unregistered buyer. The seller's GSTIN and SAC must be set before an invoice goes to a customer | Before the first paid customer |
 | A plan change has no proration. A different plan starts on payment and the unused time on the old one is lost | Review after real use |

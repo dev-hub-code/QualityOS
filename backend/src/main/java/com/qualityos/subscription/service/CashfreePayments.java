@@ -85,6 +85,7 @@ public class CashfreePayments {
     private final JsonMapper json;
     private final TransactionTemplate tx;
     private final String appUrl;
+    private final BillingRefunds refunds;
 
     CashfreePayments(
             CashfreeProperties properties,
@@ -96,7 +97,9 @@ public class CashfreePayments {
             JdbcTemplate jdbc,
             JsonMapper json,
             PlatformTransactionManager transactionManager,
-            @Value("${qualityos.app-url}") String appUrl) {
+            @Value("${qualityos.app-url}") String appUrl,
+            BillingRefunds refunds) {
+        this.refunds = refunds;
         this.properties = properties;
         this.cashfree = cashfree;
         this.orders = orders;
@@ -224,6 +227,15 @@ public class CashfreePayments {
         if (!cashfree.signatureMatches(body, timestamp, signature)) {
             throw new QualityOsException(ErrorCode.UNAUTHENTICATED, "The webhook signature is not valid.");
         }
+        Optional<String[]> refund = refundIn(body);
+        if (refund.isPresent()) {
+            UUID owner = TenantContext.callAs(null, null, () -> tx.execute(status -> jdbc.queryForObject(
+                    "SELECT gateway_order_tenant(?, ?)", UUID.class, PROVIDER, refund.get()[0])));
+            if (owner != null) {
+                TenantContext.runAs(owner, null, () -> refunds.refreshByReference(refund.get()[0], refund.get()[1]));
+            }
+            return;
+        }
         Optional<String> reference = orderIn(body);
         if (reference.isEmpty()) {
             return;
@@ -233,6 +245,19 @@ public class CashfreePayments {
         // Otherwise another order on the same Cashfree account, or the dashboard's test event.
         if (tenant != null) {
             TenantContext.runAs(tenant, null, () -> reconcile(reference.get()));
+        }
+    }
+
+    /** The order and our refund id, when this is news of a refund. Its status is then asked of Cashfree. */
+    private Optional<String[]> refundIn(byte[] body) {
+        try {
+            JsonNode refund = json.readTree(body).path("data").path("refund");
+            JsonNode order = refund.path("order_id");
+            JsonNode id = refund.path("refund_id");
+            return order.isString() && id.isString()
+                    ? Optional.of(new String[] {order.asString(), id.asString()}) : Optional.empty();
+        } catch (JacksonException e) {
+            throw new BusinessRuleException("The webhook body is not valid.");
         }
     }
 

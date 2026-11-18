@@ -54,6 +54,13 @@ public class Subscription extends TenantOwnedEntity {
     }
 
     /** The grace period starts now, as if the trial had run out by itself. */
+    /** A refund of the period being paid for ends it now. */
+    public void endPaidPeriod(Instant at) {
+        currentPeriodEndsAt = at;
+        cancelledAt = at;
+        lastNoticeDays = null;
+    }
+
     public void endTrial(Instant at) {
         currentPeriodEndsAt = at;
         lastNoticeDays = null;

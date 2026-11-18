@@ -2,10 +2,21 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { PageHeader, QueryState, StatusBadge } from "@/components/records/parts";
+import {
+  PageHeader,
+  QueryState,
+  StatusBadge,
+} from "@/components/records/parts";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { api } from "@/lib/api";
 import type { PlatformNoticeList } from "@/lib/types";
 
@@ -15,6 +26,7 @@ const TYPES: Record<string, string> = {
   INVOICE_OVERDUE: "Invoice overdue",
   PAYMENT_RECEIVED: "Payment recorded",
   PLAN_CHANGED: "Plan changed",
+  REFUND_ISSUED: "Refund issued",
 };
 
 export default function PlatformNotificationsPage() {
@@ -38,10 +50,17 @@ export default function PlatformNotificationsPage() {
           id="notice-type"
           className="h-9 rounded-xl border bg-white/70 px-2 text-sm"
           value={type}
-          onChange={(event) => { setType(event.target.value); setPage(0); }}
+          onChange={(event) => {
+            setType(event.target.value);
+            setPage(0);
+          }}
         >
           <option value="">Any</option>
-          {Object.entries(TYPES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          {Object.entries(TYPES).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
         </select>
       </div>
       {!data ? (
@@ -65,12 +84,17 @@ export default function PlatformNotificationsPage() {
                 {data.items.map((notice) => (
                   <TableRow key={notice.id}>
                     <TableCell className="whitespace-nowrap">
-                      {new Date(notice.sentAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                      {new Date(notice.sentAt).toLocaleString("en-IN", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
                     </TableCell>
                     <TableCell>{TYPES[notice.type] ?? notice.type}</TableCell>
                     <TableCell>{notice.organisation}</TableCell>
                     <TableCell>{notice.recipient}</TableCell>
-                    <TableCell><StatusBadge status={notice.emailStatus} /></TableCell>
+                    <TableCell>
+                      <StatusBadge status={notice.emailStatus} />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -79,8 +103,22 @@ export default function PlatformNotificationsPage() {
           <div className="flex items-center justify-between text-sm">
             <span>{data.total} notices</span>
             <span className="space-x-2">
-              <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</Button>
-              <Button size="sm" variant="outline" disabled={(page + 1) * PAGE_SIZE >= data.total} onClick={() => setPage(page + 1)}>Next</Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={page === 0}
+                onClick={() => setPage(page - 1)}
+              >
+                Previous
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={(page + 1) * PAGE_SIZE >= data.total}
+                onClick={() => setPage(page + 1)}
+              >
+                Next
+              </Button>
             </span>
           </div>
         </>

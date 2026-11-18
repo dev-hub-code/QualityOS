@@ -55,7 +55,7 @@ Phase 11 is on hold until you ask for it.
 - [x] Two checkouts of one invoice at the same moment share one Cashfree order, a checkout stopped halfway is carried
   on rather than repeated, and a payment without an amount or in another currency is kept for a person (#128)
 - [ ] Cashfree sandbox run: success, failure, duplicate webhook, bad signature, amount mismatch
-- [ ] Refunds, credit notes and reconciliation
+- [x] Refunds, credit notes and reconciliation
 - [ ] GST invoice reviewed by an accountant
 - [ ] Proration and auto-debit renewals
 - [x] Every plan feature on sale is enforced: `NCR_CAPA`, `REPORTS`, `ADVANCED` and `MANUFACTURING`. A feature added

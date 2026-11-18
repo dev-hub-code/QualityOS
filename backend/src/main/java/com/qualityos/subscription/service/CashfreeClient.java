@@ -134,6 +134,32 @@ public class CashfreeClient {
         return payments;
     }
 
+    /** @param status PENDING, SUCCESS, CANCELLED or ONHOLD, as Cashfree reports it */
+    public record GatewayRefund(String refundId, String gatewayRefundId, String status, String message) {
+    }
+
+    /** Asks Cashfree to return {@code amount} of what the order took. {@code refundId} is ours, and makes a retry safe. */
+    public GatewayRefund refund(String orderId, String refundId, BigDecimal amount, String note) {
+        Map<String, Object> body = Map.of(
+                "refund_amount", amount,
+                "refund_id", refundId,
+                "refund_note", note.length() > 100 ? note.substring(0, 100) : note);
+        return parseRefund(call(() -> rest.post().uri("/orders/{id}/refunds", orderId)
+                .contentType(MediaType.APPLICATION_JSON).body(json.writeValueAsString(body)).retrieve()
+                .body(String.class)));
+    }
+
+    public GatewayRefund findRefund(String orderId, String refundId) {
+        return parseRefund(call(() -> rest.get().uri("/orders/{id}/refunds/{refund}", orderId, refundId).retrieve()
+                .body(String.class)));
+    }
+
+    private GatewayRefund parseRefund(String response) {
+        JsonNode refund = json.readTree(response);
+        return new GatewayRefund(text(refund, "refund_id"), text(refund, "cf_refund_id"), text(refund, "refund_status"),
+                text(refund, "status_description"));
+    }
+
     /**
      * Cashfree signs the timestamp followed directly by the raw body, so the body must be the bytes that arrived.
      * Parsing it first can rewrite an amount such as 170.00 and break the match.

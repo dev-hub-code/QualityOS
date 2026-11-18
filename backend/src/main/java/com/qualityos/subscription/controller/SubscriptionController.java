@@ -1,5 +1,7 @@
 package com.qualityos.subscription.controller;
 
+import com.qualityos.subscription.dto.SubscriptionDtos.CreditNoteResponse;
+import com.qualityos.subscription.service.BillingRefunds;
 import com.qualityos.common.response.ApiResponse;
 import com.qualityos.common.security.Permissions.Require;
 import com.qualityos.subscription.dto.SubscriptionDtos.ChangePlanRequest;
@@ -42,8 +44,11 @@ public class SubscriptionController {
     private final SubscriptionService subscriptions;
     private final InvoicePdfRenderer invoices;
     private final CashfreePayments gateway;
+    private final BillingRefunds refunds;
 
-    SubscriptionController(SubscriptionService subscriptions, InvoicePdfRenderer invoices, CashfreePayments gateway) {
+    SubscriptionController(SubscriptionService subscriptions, InvoicePdfRenderer invoices, CashfreePayments gateway,
+            BillingRefunds refunds) {
+        this.refunds = refunds;
         this.subscriptions = subscriptions;
         this.invoices = invoices;
         this.gateway = gateway;
@@ -101,6 +106,21 @@ public class SubscriptionController {
     @PostMapping("/gateway-orders/{orderId}/confirm")
     public ApiResponse<OrderConfirmation> confirm(@PathVariable String orderId) {
         return ApiResponse.ok(new OrderConfirmation(gateway.confirm(orderId).name()));
+    }
+
+    @GetMapping("/credit-notes")
+    public ApiResponse<List<CreditNoteResponse>> creditNotes() {
+        return ApiResponse.ok(refunds.list());
+    }
+
+    @GetMapping("/credit-notes/{id}/pdf")
+    public ResponseEntity<byte[]> creditNotePdf(@PathVariable UUID id) {
+        BillingRefunds.Pdf pdf = refunds.pdf(id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(pdf.fileName()).build().toString())
+                .body(pdf.content());
     }
 
     @GetMapping("/invoices/{id}/pdf")

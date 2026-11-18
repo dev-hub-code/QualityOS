@@ -85,7 +85,14 @@ fields are allow-listed per endpoint. `data` is a `PageResponse`:
 | `GET /subscription/payment-gateway` | Whether online payment is available, and in which mode |
 | `POST /subscription/invoices/{id}/checkout` | Takes `phone`. Opens or continues a Cashfree order for the invoice's own total. The order is reserved under the invoice's row lock first, so a second checkout at the same moment gets the same order, or `409` "A payment for this invoice is being started. Try again in a moment." while Cashfree is creating it. A reservation Cashfree turns out to hold is carried on; one it never created is set aside (`ABANDONED`) once the create call has plainly failed, or after two minutes |
 | `POST /subscription/gateway-orders/{orderId}/confirm` | Asks Cashfree what happened and applies it. Returns `CREATING`, `ACTIVE`, `PAID`, `NEEDS_REVIEW` or `ABANDONED`. A successful payment without an amount, or not in INR, is `NEEDS_REVIEW`; money reaching an abandoned order is still applied |
-| `POST /public/webhooks/cashfree` | Cashfree only, checked by signature. Reach it through the web app at `/api/webhooks/cashfree` |
+| `POST /public/webhooks/cashfree` | Cashfree only, checked by signature. Reach it through the web app at `/api/webhooks/cashfree`. A refund webhook makes ProductionOS ask Cashfree where that refund stands |
+| `GET /subscription/credit-notes` | The organisation's credit notes, newest first, each with its refund |
+| `GET /subscription/credit-notes/{id}/pdf` | The credit note as a PDF |
+| `POST /platform/organisations/{tenantId}/invoices/{invoiceId}/credit-notes` | Billing operators, with step-up. Takes `amount` (before GST), `reason`, `refundBy` (`GATEWAY` or `BANK`), `reference` and `refundedOn` for a bank refund, and `endAccess`. `422` for an unpaid invoice, more than is left, a gateway refund of an invoice not paid through Cashfree, or ending a period that is not the current one; `409` for a bank reference already used |
+| `GET /platform/organisations/{tenantId}/credit-notes`, `GET .../credit-notes/{id}/pdf` | The same, for an organisation |
+| `POST /platform/organisations/{tenantId}/refunds/{refundId}/refresh` | Asks Cashfree where a pending refund stands |
+| `GET /platform/unapplied-payments` | Gateway orders in `NEEDS_REVIEW`, across organisations |
+| `POST /platform/organisations/{tenantId}/gateway-orders/{orderId}/refund` | Takes `reason`. Refunds a `NEEDS_REVIEW` order whole through Cashfree and marks it `REFUNDED`; `409` otherwise |
 | `GET /auth/me` | User, current organisation, whether it has a subscription, permissions and memberships. An addition to the brief |
 
 Access token: RS256, 15 minutes, with claims `sub` and `tid` (tenant). Membership and permissions are

@@ -1,5 +1,10 @@
 package com.qualityos.subscription.controller;
 
+import com.qualityos.subscription.dto.SubscriptionDtos.UnappliedPayment;
+import com.qualityos.subscription.dto.SubscriptionDtos.RefundView;
+import com.qualityos.subscription.dto.SubscriptionDtos.CreditNoteRequest;
+import com.qualityos.subscription.dto.SubscriptionDtos.CreditNoteResponse;
+import com.qualityos.subscription.service.BillingRefunds;
 import com.qualityos.common.response.ApiResponse;
 import com.qualityos.common.security.Permissions.Require;
 import com.qualityos.subscription.dto.SubscriptionDtos.CreatePlanRequest;
@@ -330,6 +335,46 @@ public class PlatformController {
     public ApiResponse<PaymentResponse> recordPayment(
             @PathVariable UUID tenantId, @PathVariable UUID invoiceId, @Valid @RequestBody RecordPaymentRequest request) {
         return ApiResponse.ok(platform.recordPayment(tenantId, invoiceId, request));
+    }
+
+    @PreAuthorize(Require.PLATFORM_BILLING_MANAGE)
+    @PostMapping("/organisations/{tenantId}/invoices/{invoiceId}/credit-notes")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<CreditNoteResponse> issueCreditNote(
+            @PathVariable UUID tenantId, @PathVariable UUID invoiceId, @Valid @RequestBody CreditNoteRequest request) {
+        return ApiResponse.ok(platform.issueCreditNote(tenantId, invoiceId, request));
+    }
+
+    @GetMapping("/organisations/{tenantId}/credit-notes")
+    public ApiResponse<List<CreditNoteResponse>> creditNotes(@PathVariable UUID tenantId) {
+        return ApiResponse.ok(platform.creditNotes(tenantId));
+    }
+
+    @GetMapping("/organisations/{tenantId}/credit-notes/{id}/pdf")
+    public ResponseEntity<byte[]> creditNotePdf(@PathVariable UUID tenantId, @PathVariable UUID id) {
+        BillingRefunds.Pdf pdf = platform.creditNotePdf(tenantId, id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + pdf.fileName() + "\"")
+                .body(pdf.content());
+    }
+
+    @PreAuthorize(Require.PLATFORM_BILLING_MANAGE)
+    @PostMapping("/organisations/{tenantId}/refunds/{refundId}/refresh")
+    public ApiResponse<RefundView> refreshRefund(@PathVariable UUID tenantId, @PathVariable UUID refundId) {
+        return ApiResponse.ok(platform.refreshRefund(tenantId, refundId));
+    }
+
+    @GetMapping("/unapplied-payments")
+    public ApiResponse<List<UnappliedPayment>> unappliedPayments() {
+        return ApiResponse.ok(platform.unappliedPayments());
+    }
+
+    @PreAuthorize(Require.PLATFORM_BILLING_MANAGE)
+    @PostMapping("/organisations/{tenantId}/gateway-orders/{orderId}/refund")
+    public ApiResponse<RefundView> refundUnapplied(
+            @PathVariable UUID tenantId, @PathVariable UUID orderId, @Valid @RequestBody ReasonRequest request) {
+        return ApiResponse.ok(platform.refundUnapplied(tenantId, orderId, request.reason()));
     }
 
     @PreAuthorize(Require.PLATFORM_ACCOUNT_MANAGE)

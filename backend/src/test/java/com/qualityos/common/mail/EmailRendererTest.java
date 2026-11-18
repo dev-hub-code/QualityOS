@@ -27,7 +27,7 @@ class EmailRendererTest {
                 "where", "reason", "receiptNumber", "lots", "supplierName", "actionDescription", "disposition",
                 "correctionNumber", "outcome", "count", "impact", "auditTitle", "planName", "invoiceNumber", "headline",
                 "usage", "advice", "message", "subject", "update", "recallNumber", "daysLate", "lateItem",
-                "ownerName")) {
+                "creditNoteNumber", "ownerName")) {
             values.put(name, "value-" + name);
         }
         values.put("actionUrl", "https://app.example/path");

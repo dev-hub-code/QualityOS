@@ -1,0 +1,8 @@
+Subject: Refund of {{amount}} for {{organizationName}}
+
+Refund issued
+
+Hello {{recipientName}},
+We issued credit note {{creditNoteNumber}} for {{amount}} against invoice {{invoiceNumber}}, and are refunding it to you. A refund through the payment gateway usually reaches your account within 5 to 7 working days.
+
+View billing: {{actionUrl}}

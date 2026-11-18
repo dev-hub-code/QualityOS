@@ -1,5 +1,9 @@
 package com.qualityos.subscription.service;
 
+import com.qualityos.subscription.dto.SubscriptionDtos.UnappliedPayment;
+import com.qualityos.subscription.dto.SubscriptionDtos.RefundView;
+import com.qualityos.subscription.dto.SubscriptionDtos.CreditNoteRequest;
+import com.qualityos.subscription.dto.SubscriptionDtos.CreditNoteResponse;
 import com.qualityos.common.audit.AuditService;
 import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ConflictException;
@@ -48,6 +52,7 @@ public class PlatformService {
     private final FeatureDefinitionRepository featureDefinitions;
     private final PlatformStepUp stepUp;
     private final TransactionTemplate tx;
+    private final BillingRefunds refunds;
 
     PlatformService(
             SubscriptionPlanRepository plans,
@@ -58,7 +63,9 @@ public class PlatformService {
             JdbcTemplate jdbc,
             FeatureDefinitionRepository featureDefinitions,
             PlatformStepUp stepUp,
-            PlatformTransactionManager transactionManager) {
+            PlatformTransactionManager transactionManager,
+            BillingRefunds refunds) {
+        this.refunds = refunds;
         this.plans = plans;
         this.catalogue = catalogue;
         this.subscriptions = subscriptions;
@@ -155,6 +162,37 @@ public class PlatformService {
             throw new ConflictException("This reference is already used on another invoice.");
         }
         return inside(tenant, () -> subscriptions.settle(invoice, PROVIDER_MANUAL, request));
+    }
+
+    public CreditNoteResponse issueCreditNote(UUID tenant, UUID invoice, CreditNoteRequest request) {
+        stepUp.require();
+        return inside(tenant, "CREDIT_NOTE", request.reason(), () -> refunds.issue(invoice, request));
+    }
+
+    public List<CreditNoteResponse> creditNotes(UUID tenant) {
+        return inside(tenant, refunds::list);
+    }
+
+    public BillingRefunds.Pdf creditNotePdf(UUID tenant, UUID id) {
+        return inside(tenant, () -> refunds.pdf(id));
+    }
+
+    public RefundView refreshRefund(UUID tenant, UUID refund) {
+        return inside(tenant, () -> refunds.refresh(refund));
+    }
+
+    /** Payments the gateway took that no invoice could take, across organisations. */
+    public List<UnappliedPayment> unappliedPayments() {
+        return tx.execute(status -> jdbc.query("SELECT * FROM platform_unapplied_payments()", (row, n) ->
+                new UnappliedPayment(row.getObject("tenant_id", UUID.class), row.getString("organisation"),
+                        row.getObject("order_id", UUID.class), row.getString("gateway_order_id"),
+                        row.getString("invoice_number"), row.getBigDecimal("amount"),
+                        row.getTimestamp("since").toInstant())));
+    }
+
+    public RefundView refundUnapplied(UUID tenant, UUID order, String reason) {
+        stepUp.require();
+        return inside(tenant, "REFUND_PAYMENT", reason, () -> refunds.refundUnapplied(order, reason));
     }
 
     public SubscriptionResponse extend(UUID tenant, int days, String reason) {

@@ -63,7 +63,7 @@ public class AnalyticsService {
     @Transactional(readOnly = true)
     public Overview overview(LocalDate from, LocalDate to, UUID facilityId) {
         Resolved scope = scopes.resolve(from, to, facilityId);
-        return cache.get(scope, () -> compute(scope));
+        return OverviewMask.visibleTo(cache.get(scope, () -> compute(scope)), CurrentPermissions.held());
     }
 
     private Overview compute(Resolved scope) {
@@ -306,6 +306,7 @@ public class AnalyticsService {
         return new Pending(inspections, ncrs, audits);
     }
 
+    /** The latest eight of each kind, so that someone who may view only one kind still sees eight. */
     private List<RecentActivity> recent(Resolved scope, MapSqlParameterSource params) {
         return jdbc.query("""
                 (SELECT 'Inspection' AS kind, i.inspection_number AS reference, '/inspections/' || i.id AS link,
@@ -314,7 +315,7 @@ public class AnalyticsService {
                 UNION ALL
                 (SELECT 'NCR', n.ncr_number, '/ncrs/' || n.id, n.status, n.created_at
                  FROM %s WHERE TRUE%s ORDER BY n.created_at DESC LIMIT 8)
-                ORDER BY at DESC LIMIT 8
+                ORDER BY at DESC
                 """.formatted(scope.facility("i.facility_id"), NCRS, scope.facility(NCR_FACILITY)), params,
                 (row, n) -> new RecentActivity(row.getString("kind"), row.getString("reference"), row.getString("link"),
                         row.getString("status"), row.getObject("at", java.time.OffsetDateTime.class)

@@ -1,4 +1,5 @@
 import type { Kpis, ProductionFigures } from "@/lib/types";
+import type { FigureAccess } from "@/lib/analytics-access";
 
 export const rate = (value: number | null) => (value === null ? "No data" : `${value}%`);
 
@@ -7,23 +8,26 @@ function hours(value: number | null) {
   return value < 48 ? `${value} h` : `${(value / 24).toFixed(1)} days`;
 }
 
-const KEY = (kpis: Kpis): [string, string | number][] => [
-  ["Inspections decided", kpis.totalInspections],
-  ["Pass rate", rate(kpis.inspectionPassRate)],
-  ["Open NCRs", kpis.openNcrs],
-  ["Overdue CAPAs", kpis.overdueCapas],
+type Area = keyof FigureAccess;
+type Figure = [label: string, value: string | number | null, area: Area];
+
+const KEY = (kpis: Kpis): Figure[] => [
+  ["Inspections decided", kpis.totalInspections, "inspections"],
+  ["Pass rate", rate(kpis.inspectionPassRate), "inspections"],
+  ["Open NCRs", kpis.openNcrs, "ncrs"],
+  ["Overdue CAPAs", kpis.overdueCapas, "capas"],
 ];
 
-const REST = (kpis: Kpis): [string, string | number][] => [
-  ["Passed", kpis.passedInspections],
-  ["Failed", kpis.failedInspections],
-  ["NCRs closed", kpis.closedNcrs],
-  ["Open CAPAs", kpis.openCapas],
-  ["Supplier lot rejection", rate(kpis.supplierRejectionRate)],
-  ["Material rejection", rate(kpis.materialRejectionRate)],
-  ["Defect rate", rate(kpis.defectRate)],
-  ["First pass yield", rate(kpis.firstPassYield)],
-  ["Inspection turnaround", hours(kpis.turnaroundHours)],
+const REST = (kpis: Kpis): Figure[] => [
+  ["Passed", kpis.passedInspections, "inspections"],
+  ["Failed", kpis.failedInspections, "inspections"],
+  ["NCRs closed", kpis.closedNcrs, "ncrs"],
+  ["Open CAPAs", kpis.openCapas, "capas"],
+  ["Supplier lot rejection", rate(kpis.supplierRejectionRate), "suppliers"],
+  ["Material rejection", rate(kpis.materialRejectionRate), "inspections"],
+  ["Defect rate", rate(kpis.defectRate), "inspections"],
+  ["First pass yield", rate(kpis.firstPassYield), "inspections"],
+  ["Inspection turnaround", hours(kpis.turnaroundHours), "inspections"],
 ];
 
 /** Minutes as hours once there are enough of them. */
@@ -31,27 +35,44 @@ export function downtime(minutes: number) {
   return minutes < 120 ? `${minutes} min` : `${(minutes / 60).toFixed(1)} h`;
 }
 
-const PRODUCTION = (figures: ProductionFigures): [string, string | number][] => [
-  ["Open work orders", figures.openWorkOrders],
-  ["Late work orders", figures.lateWorkOrders],
-  ["Work orders completed", figures.completedWorkOrders],
-  ["Completed on time", rate(figures.onTimeRate)],
-  ["Shop-floor loss", rate(figures.lossRate)],
-  ["Unplanned downtime", downtime(figures.unplannedDowntimeMinutes)],
+const PRODUCTION = (figures: ProductionFigures): Figure[] => [
+  ["Open work orders", figures.openWorkOrders, "production"],
+  ["Late work orders", figures.lateWorkOrders, "production"],
+  ["Work orders completed", figures.completedWorkOrders, "production"],
+  ["Completed on time", rate(figures.onTimeRate), "production"],
+  ["Shop-floor loss", rate(figures.lossRate), "production"],
+  [
+    "Unplanned downtime",
+    figures.unplannedDowntimeMinutes === null ? null : downtime(figures.unplannedDowntimeMinutes),
+    "downtime",
+  ],
 ];
 
-export function ProductionTiles({ figures }: { figures: ProductionFigures }) {
-  return <Tiles tiles={PRODUCTION(figures)} />;
+const EVERYTHING: FigureAccess = {
+  inspections: true,
+  ncrs: true,
+  capas: true,
+  suppliers: true,
+  audits: true,
+  production: true,
+  downtime: true,
+};
+
+export function ProductionTiles({ figures, access = EVERYTHING }: { figures: ProductionFigures; access?: FigureAccess }) {
+  return <Tiles tiles={PRODUCTION(figures)} access={access} />;
 }
 
-export function KpiTiles({ kpis, all = false }: { kpis: Kpis; all?: boolean }) {
-  return <Tiles tiles={all ? [...KEY(kpis), ...REST(kpis)] : KEY(kpis)} />;
+export function KpiTiles({ kpis, all = false, access = EVERYTHING }: { kpis: Kpis; all?: boolean; access?: FigureAccess }) {
+  return <Tiles tiles={all ? [...KEY(kpis), ...REST(kpis)] : KEY(kpis)} access={access} />;
 }
 
-function Tiles({ tiles }: { tiles: [string, string | number][] }) {
+/** Leaves out figures this person may not see. */
+function Tiles({ tiles, access }: { tiles: Figure[]; access: FigureAccess }) {
+  const shown = tiles.filter(([, value, area]) => access[area] && value !== null);
+  if (shown.length === 0) return null;
   return (
     <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-      {tiles.map(([label, value]) => (
+      {shown.map(([label, value]) => (
         <div key={label} className="glass rounded-2xl p-3">
           <dt className="text-xs text-muted-foreground">{label}</dt>
           <dd className="text-xl font-semibold">{value}</dd>

@@ -66,7 +66,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A recorded audit finding cannot be edited. A wrong one is handled by cancelling its NCR, and it stays on the report | Review after real use |
 | `tenant_settings` holds the review rule, the two NCR and CAPA rules and the action evidence rule so far | Grows as rules are added |
 | Dashboard figures are kept for 60 seconds per organisation, period and facility scope. Anything written to the audit log clears them at once on the same instance. Other changes, and changes on another instance, show within 60 seconds | With production work: use a shared cache if the figures must agree across instances |
-| Key figures and charts show to anyone with `REPORT_VIEW`, as totals, even without the view permission for each kind of record. Lists and reports need that permission too | Review after real use |
+| Key figures and charts need `REPORT_VIEW` and the view permission of their records, like reports. The figures are worked out once per organisation and kept; what a person may not view is taken out on each request | By design |
 | The material rejection rate converts quantities to the base unit of their kind. Kinds that cannot be added together, such as kilograms and pieces, each get a rate, and the figure weighs those rates by their lots. The material rejection report shows each material in its own unit | Review after real use |
 | NCRs raised before unit conversion keep their rejected quantity without a unit | By design |
 | Cashfree checkout is built but has not been run against Cashfree's sandbox. Its calls were tested against a local stand-in | Before enabling live keys |

@@ -21,7 +21,8 @@ import {
   Wrench,
 } from "lucide-react";
 import { downtime, rate } from "@/components/analytics/kpi-tiles";
-import { usePermission } from "@/hooks/use-me";
+import { useMe } from "@/hooks/use-me";
+import { figureAccess } from "@/lib/analytics-access";
 import { MonthBars, RankBars } from "@/components/analytics/charts";
 import { QueryState, RecordLink, StatusBadge } from "@/components/records/parts";
 import { DashboardFrame, FloatCard, HeroCard, HeroHeading, Panel, Pending, Tile, type QuickAction } from "@/components/app/showcase";
@@ -65,15 +66,19 @@ function PassRateCard({ data }: { data: Overview }) {
       actions={ACTIONS}
       floats={
         <>
-          <FloatCard icon={FileWarning} label="Open NCRs" value={kpis.openNcrs} note={`${kpis.closedNcrs} closed`} href="/ncrs" />
-          <FloatCard
-            icon={TimerReset}
-            label="Overdue CAPAs"
-            value={kpis.overdueCapas}
-            note={`${kpis.openCapas} open`}
-            href="/capas"
-            alert={kpis.overdueCapas > 0}
-          />
+          {kpis.openNcrs !== null && (
+            <FloatCard icon={FileWarning} label="Open NCRs" value={kpis.openNcrs} note={`${kpis.closedNcrs} closed`} href="/ncrs" />
+          )}
+          {kpis.overdueCapas !== null && (
+            <FloatCard
+              icon={TimerReset}
+              label="Overdue CAPAs"
+              value={kpis.overdueCapas}
+              note={`${kpis.openCapas} open`}
+              href="/capas"
+              alert={kpis.overdueCapas > 0}
+            />
+          )}
         </>
       }
     />
@@ -83,7 +88,8 @@ function PassRateCard({ data }: { data: Overview }) {
 /** Opening page: the last 90 days at a glance, what is waiting, and what just happened. */
 export function QualityDashboard({ name }: { name?: string }) {
   const path = "/analytics/overview";
-  const seesProduction = usePermission("WORK_ORDER_VIEW");
+  const { data: me } = useMe();
+  const access = figureAccess(me?.permissions);
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<Overview>(path) });
   if (!data) {
     return (
@@ -118,33 +124,47 @@ export function QualityDashboard({ name }: { name?: string }) {
             </Link>
           </div>
           <div className="grid gap-3 pt-2 sm:grid-cols-3">
-            <Pending icon={ClipboardCheck} label="Inspections to approve" value={pending.inspectionsAwaitingApproval} href="/inspections" />
-            <Pending icon={ListChecks} label="NCRs ready to close" value={pending.ncrsAwaitingClosure} href="/ncrs" />
-            <Pending icon={ScanSearch} label="Audits ready to close" value={pending.auditsAwaitingClosure} href="/audits" />
+            {pending.inspectionsAwaitingApproval !== null && (
+              <Pending icon={ClipboardCheck} label="Inspections to approve" value={pending.inspectionsAwaitingApproval} href="/inspections" />
+            )}
+            {pending.ncrsAwaitingClosure !== null && (
+              <Pending icon={ListChecks} label="NCRs ready to close" value={pending.ncrsAwaitingClosure} href="/ncrs" />
+            )}
+            {pending.auditsAwaitingClosure !== null && (
+              <Pending icon={ScanSearch} label="Audits ready to close" value={pending.auditsAwaitingClosure} href="/audits" />
+            )}
           </div>
         </Welcome>
-        <PassRateCard data={data} />
+        {kpis.totalInspections !== null && <PassRateCard data={data} />}
       </div>
 
       <dl className="mt-10 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile icon={ClipboardCheck} label="Inspections decided" value={kpis.totalInspections} />
-        <Tile icon={ShieldCheck} label="First pass yield" value={rate(kpis.firstPassYield)} />
-        <Tile icon={FileWarning} label="Open NCRs" value={kpis.openNcrs} />
-        <Tile icon={ShieldAlert} label="Overdue CAPAs" value={kpis.overdueCapas} />
+        {kpis.totalInspections !== null && (
+          <>
+            <Tile icon={ClipboardCheck} label="Inspections decided" value={kpis.totalInspections} />
+            <Tile icon={ShieldCheck} label="First pass yield" value={rate(kpis.firstPassYield)} />
+          </>
+        )}
+        {kpis.openNcrs !== null && <Tile icon={FileWarning} label="Open NCRs" value={kpis.openNcrs} />}
+        {kpis.overdueCapas !== null && <Tile icon={ShieldAlert} label="Overdue CAPAs" value={kpis.overdueCapas} />}
       </dl>
-      {seesProduction && (
+      {data.production && access.production && (
         <dl className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Production">
           <Tile icon={Factory} label="Open work orders" value={data.production.openWorkOrders} />
           <Tile icon={CalendarClock} label="Late work orders" value={data.production.lateWorkOrders} />
           <Tile icon={PackageX} label="Shop-floor loss" value={rate(data.production.lossRate)} />
-          <Tile icon={TimerOff} label="Unplanned downtime" value={downtime(data.production.unplannedDowntimeMinutes)} />
+          {data.production.unplannedDowntimeMinutes !== null && (
+            <Tile icon={TimerOff} label="Unplanned downtime" value={downtime(data.production.unplannedDowntimeMinutes)} />
+          )}
         </dl>
       )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <Panel title="Inspection trend">
-          <MonthBars data={data.inspectionTrend} series={INSPECTIONS} />
-        </Panel>
+        {data.inspectionTrend && (
+          <Panel title="Inspection trend">
+            <MonthBars data={data.inspectionTrend} series={INSPECTIONS} />
+          </Panel>
+        )}
         <Panel title="Recent activity">
           {data.recent.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing yet.</p>
@@ -162,24 +182,28 @@ export function QualityDashboard({ name }: { name?: string }) {
             </ul>
           )}
         </Panel>
-        <Panel title="Supplier lot rejection">
-          <RankBars
-            max={100}
-            headings={["Supplier", "Lots rejected"]}
-            rows={data.suppliers.map((supplier) => ({
-              label: supplier.name,
-              value: supplier.rejectionRate ?? 0,
-              display: `${supplier.rejectionRate ?? 0}%`,
-              note: `${supplier.rejectedLots} of ${supplier.lots} lots`,
-            }))}
-          />
-        </Panel>
-        <Panel title="Defect categories">
-          <RankBars
-            headings={["Category", "NCRs"]}
-            rows={data.defects.map((defect) => ({ label: defect.category, value: defect.ncrs, display: String(defect.ncrs) }))}
-          />
-        </Panel>
+        {data.suppliers && (
+          <Panel title="Supplier lot rejection">
+            <RankBars
+              max={100}
+              headings={["Supplier", "Lots rejected"]}
+              rows={data.suppliers.map((supplier) => ({
+                label: supplier.name,
+                value: supplier.rejectionRate ?? 0,
+                display: `${supplier.rejectionRate ?? 0}%`,
+                note: `${supplier.rejectedLots} of ${supplier.lots} lots`,
+              }))}
+            />
+          </Panel>
+        )}
+        {data.defects && (
+          <Panel title="Defect categories">
+            <RankBars
+              headings={["Category", "NCRs"]}
+              rows={data.defects.map((defect) => ({ label: defect.category, value: defect.ncrs, display: String(defect.ncrs) }))}
+            />
+          </Panel>
+        )}
       </div>
     </DashboardFrame>
   );

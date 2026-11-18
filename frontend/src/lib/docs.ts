@@ -1570,7 +1570,7 @@ export const DOC_PAGES: DocPage[] = [
           '"No data" means there was nothing to measure. It is not the same as 0%.',
           "Each chart has a table view under it.",
           "A facility you cannot see returns nothing, and a manual NCR has no facility, so it is left out when a facility is chosen.",
-          "Anyone with report view sees these totals, even without view permission for each kind of record.",
+          "Each figure and chart shows only to someone who can also view its kind of record: inspection figures need inspection view, NCR figures NCR view, CAPA figures CAPA view, supplier figures supplier view, audits waiting audit view, and production figures work order view, with downtime also needing manufacturing view.",
         ],
       },
     ],

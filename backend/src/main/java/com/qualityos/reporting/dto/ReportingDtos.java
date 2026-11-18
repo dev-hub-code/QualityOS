@@ -8,16 +8,19 @@ public final class ReportingDtos {
     private ReportingDtos() {
     }
 
-    /** A rate is null when there was nothing to measure, which is different from zero. */
+    /**
+     * A rate is null when there was nothing to measure, which is different from zero. Any figure is also null for
+     * someone who may not view that kind of record.
+     */
     public record Kpis(
-            long totalInspections,
-            long passedInspections,
-            long failedInspections,
+            Long totalInspections,
+            Long passedInspections,
+            Long failedInspections,
             Double inspectionPassRate,
-            long openNcrs,
-            long closedNcrs,
-            long openCapas,
-            long overdueCapas,
+            Long openNcrs,
+            Long closedNcrs,
+            Long openCapas,
+            Long overdueCapas,
             Double supplierRejectionRate,
             Double materialRejectionRate,
             Double defectRate,
@@ -43,12 +46,16 @@ public final class ReportingDtos {
     public record AgeBucket(String label, long ncrs) {
     }
 
-    public record Pending(long inspectionsAwaitingApproval, long ncrsAwaitingClosure, long auditsAwaitingClosure) {
+    public record Pending(Long inspectionsAwaitingApproval, Long ncrsAwaitingClosure, Long auditsAwaitingClosure) {
     }
 
     public record RecentActivity(String kind, String reference, String link, String status, String on) {
     }
 
+    /**
+     * Figures and charts about a kind of record are null for someone without the permission to view that kind, and
+     * recent activity lists only the kinds they may view.
+     */
     public record Overview(
             LocalDate from,
             LocalDate to,
@@ -78,7 +85,7 @@ public final class ReportingDtos {
             long completedWorkOrders,
             Double onTimeRate,
             Double lossRate,
-            long unplannedDowntimeMinutes) {
+            Long unplannedDowntimeMinutes) {
     }
 
     public record Column(String label, int weight, boolean numeric) {

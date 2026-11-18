@@ -69,7 +69,7 @@ export function CreditNotes({
             )}
             {canRefresh &&
               note.refund?.status === "PENDING" &&
-              note.refund.provider === "CASHFREE" && (
+              note.refund.provider === "RAZORPAY" && (
                 <Button
                   size="sm"
                   variant="outline"

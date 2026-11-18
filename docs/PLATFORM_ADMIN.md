@@ -34,23 +34,34 @@ prorated: enter the amount agreed.
 
 ## Online payment
 
-Cashfree checkout appears on a customer's billing page once `CASHFREE_APP_ID` and `CASHFREE_SECRET_KEY` are set. Without
-them customers see no pay button, and invoices are recorded by hand as before. Set `CASHFREE_ENVIRONMENT=production` only
-with live keys, and point the Cashfree webhook at `<APP_URL>/api/webhooks/cashfree`.
+Razorpay checkout appears on a customer's billing page once `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` are set. Without
+them customers see no pay button, and invoices are recorded by hand as before. A `rzp_test_` key is test mode, where no
+real money moves; a `rzp_live_` key takes real payments. Checkout opens over the billing page and offers UPI, cards,
+netbanking and wallets; card and UPI details go to Razorpay only.
 
-The amount comes from the invoice, and a payment counts only after ProductionOS has asked Cashfree about it. Neither the
-customer's return nor a webhook's contents settle anything alone. Payments appear under Payments with provider `CASHFREE`.
+In Razorpay's dashboard:
+
+- Turn on automatic capture (Payment Capture settings). ProductionOS also captures a payment left authorised, but only
+  for the order's own amount in rupees.
+- Add a webhook to `<APP_URL>/api/webhooks/razorpay` for `payment.captured`, `payment.failed`, `order.paid`,
+  `refund.processed` and `refund.failed`, and set its secret as `RAZORPAY_WEBHOOK_SECRET`. Without the secret every
+  webhook is refused; payments are then confirmed when the customer closes checkout, and refunds by the refunds job.
+
+The amount comes from the invoice, and a payment counts only after ProductionOS has asked Razorpay about it. Neither the
+browser's callback nor a webhook's contents settle anything alone. Our order reference is the Razorpay order's receipt.
+Payments appear under Payments with provider `RAZORPAY`. Cashfree, used before, is gone; payments recorded through it
+stay in the history with provider `CASHFREE`.
 
 A payment that was taken but could not be applied, usually because the invoice was replaced or already paid, is listed
-under Payments as waiting for review. Refund sends the whole amount back through Cashfree. It stays listed, as
-waiting for Cashfree to confirm, until Cashfree says the refund went through; then the order is `REFUNDED`. A refund
-Cashfree refuses or fails puts it back to review, with the reason, to refund again. It is never revenue, so it gets no
+under Payments as waiting for review. Refund sends the whole amount back through Razorpay. It stays listed, as
+waiting for Razorpay to confirm, until Razorpay says the refund went through; then the order is `REFUNDED`. A refund
+Razorpay refuses or fails puts it back to review, with the reason, to refund again. It is never revenue, so it gets no
 credit note.
 
-Every gateway refund is saved, with its own reference, before Cashfree is asked, and Cashfree is never asked inside a
-database transaction. If Cashfree's answer is lost, the `refunds` job (every 15 minutes) looks the refund up: if
-Cashfree has it, its answer is applied; if Cashfree never received it, it is sent again under the same reference,
-which Cashfree accepts only once. A payment webhook replayed for an order being or already refunded changes nothing.
+Every gateway refund is saved, with its own reference, before Razorpay is asked, and Razorpay is never asked inside a
+database transaction. The reference goes to Razorpay as the refund's receipt and its `X-Refund-Idempotency` key. If
+Razorpay's answer is lost, the `refunds` job (every 15 minutes) looks the refund up: if Razorpay has it, its answer is
+applied; if Razorpay never received it, it is sent again under the same reference, which Razorpay accepts only once. A payment webhook replayed for an order being or already refunded changes nothing.
 
 ## Credit notes and refunds
 
@@ -58,7 +69,7 @@ On an organisation, a paid invoice has a Credit note action (billing operators, 
 amount before GST, up to what is left of the invoice; its GST is worked out at the invoice's rate and split as the
 invoice was, and crediting all that is left takes exactly the GST left. Each credit note carries one refund:
 
-- Back to the card or UPI, when the invoice was paid through Cashfree. The refund stays in progress until Cashfree
+- Back to the card or UPI, when the invoice was paid through Razorpay. The refund stays in progress until Razorpay
   reports it through its webhook, or an operator presses Check refund.
 - By bank transfer, made outside ProductionOS and recorded with its reference and date. A bank reference is used once.
 
@@ -243,11 +254,11 @@ Every action writes an audit row in that organisation's trail, with its reason.
 
 ### Payments
 
-Payments are recorded by hand or arrive through Cashfree (see Online payment). Each pays one invoice, and the amount must equal the invoice total, because partial payments are not part of the financial model. Failed attempts are kept and listed under the Failed filter. These are what needs following up.
+Payments are recorded by hand or arrive through Razorpay (see Online payment). Each pays one invoice, and the amount must equal the invoice total, because partial payments are not part of the financial model. Failed attempts are kept and listed under the Failed filter. These are what needs following up.
 
 A reference pays one invoice across the whole platform, ignoring case and provider. Repeating it on the same invoice returns the first payment, so a gateway callback can safely arrive twice. A unique index in the database enforces this, so two payments with the same reference arriving at the same moment for different organisations cannot both be saved: the second is refused as already used.
 
-Every payment, by hand or through Cashfree, goes through `SubscriptionService.settle`.
+Every payment, by hand or through Razorpay, goes through `SubscriptionService.settle`.
 
 ### GST on invoices
 

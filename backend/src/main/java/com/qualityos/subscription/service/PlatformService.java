@@ -167,7 +167,7 @@ public class PlatformService {
     public CreditNoteResponse issueCreditNote(UUID tenant, UUID invoice, CreditNoteRequest request) {
         stepUp.require();
         CreditNoteResponse note = inside(tenant, "CREDIT_NOTE", request.reason(), () -> refunds.issue(invoice, request));
-        // Committed first, so the credit note and its refund exist whatever Cashfree answers, or if it never does.
+        // Committed first, so the credit note and its refund exist whatever Razorpay answers, or if it never does.
         if (note.refund() != null && "PENDING".equals(note.refund().status())) {
             outside(tenant, () -> refunds.send(note.refund().id()));
             return inside(tenant, refunds::list).stream().filter(found -> found.id().equals(note.id()))
@@ -250,7 +250,7 @@ public class PlatformService {
         });
     }
 
-    /** Under the organisation, with no transaction open, for work that asks Cashfree and records the answer itself. */
+    /** Under the organisation, with no transaction open, for work that asks Razorpay and records the answer itself. */
     private <T> T outside(UUID tenant, Supplier<T> work) {
         return TenantContext.callAs(tenant, TenantContext.getCurrentUserId(), work);
     }

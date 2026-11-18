@@ -61,7 +61,7 @@ public class BillingRefunds {
     private final GatewayOrderRepository orders;
     private final SubscriptionRepository subscriptions;
     private final SubscriptionService billing;
-    private final CashfreeClient cashfree;
+    private final RazorpayClient razorpay;
     private final DocumentNumberService numbers;
     private final OrganizationService organizations;
     private final NotificationService notifications;
@@ -84,7 +84,7 @@ public class BillingRefunds {
             GatewayOrderRepository orders,
             SubscriptionRepository subscriptions,
             SubscriptionService billing,
-            CashfreeClient cashfree,
+            RazorpayClient razorpay,
             DocumentNumberService numbers,
             OrganizationService organizations,
             NotificationService notifications,
@@ -99,7 +99,7 @@ public class BillingRefunds {
         this.orders = orders;
         this.subscriptions = subscriptions;
         this.billing = billing;
-        this.cashfree = cashfree;
+        this.razorpay = razorpay;
         this.numbers = numbers;
         this.organizations = organizations;
         this.notifications = notifications;
@@ -178,7 +178,7 @@ public class BillingRefunds {
 
     /**
      * Reserves the refund, whole, of a payment that no invoice could take: the order waits in {@code REFUND_PENDING}
-     * and leaves the queue for review only once Cashfree says the refund went through. Locked, so two requests cannot
+     * and leaves the queue for review only once Razorpay says the refund went through. Locked, so two requests cannot
      * both refund it. The refund itself is sent once this commits, with {@link #send}.
      *
      * @return the refund to send
@@ -199,7 +199,7 @@ public class BillingRefunds {
     }
 
     /**
-     * Sends a gateway refund that is waiting, with no transaction open while Cashfree is asked. Its reference was
+     * Sends a gateway refund that is waiting, with no transaction open while Razorpay is asked. Its reference was
      * fixed when it was reserved, so sending again never refunds twice. With no answer, it stays waiting, and
      * {@link #reconcile} finishes it.
      */
@@ -208,7 +208,7 @@ public class BillingRefunds {
         Sending sending = tx.execute(status -> sending(refundId));
         if (sending != null) {
             try {
-                CashfreeClient.GatewayRefund reported = cashfree.refund(
+                RazorpayClient.GatewayRefund reported = razorpay.refund(
                         sending.gatewayOrderId(), sending.reference(), sending.amount(), sending.note());
                 tx.executeWithoutResult(status -> record(sending.reference(), reported));
             } catch (QualityOsException e) {
@@ -219,7 +219,7 @@ public class BillingRefunds {
     }
 
     /**
-     * Finds out where a waiting gateway refund stands. Cashfree may have taken it even though the answer never came
+     * Finds out where a waiting gateway refund stands. Razorpay may have taken it even though the answer never came
      * back; if it never received it, it is sent again under the same reference. Changes nothing once it went through
      * or failed.
      */
@@ -227,8 +227,8 @@ public class BillingRefunds {
         requireNoTransaction();
         Sending sending = tx.execute(status -> sending(refundId));
         if (sending != null) {
-            Optional<CashfreeClient.GatewayRefund> found =
-                    cashfree.lookupRefund(sending.gatewayOrderId(), sending.reference());
+            Optional<RazorpayClient.GatewayRefund> found =
+                    razorpay.lookupRefund(sending.gatewayOrderId(), sending.reference());
             if (found.isEmpty()) {
                 return send(refundId);
             }
@@ -244,7 +244,7 @@ public class BillingRefunds {
         id.ifPresent(this::reconcile);
     }
 
-    /** Gateway refunds in this organisation still waiting for Cashfree's answer a while after they were asked for. */
+    /** Gateway refunds in this organisation still waiting for Razorpay's answer a while after they were asked for. */
     public List<UUID> waiting(Instant askedBefore) {
         return tx.execute(status -> refunds.findIdsWaiting(Refund.GATEWAY, Refund.Status.PENDING, askedBefore));
     }
@@ -268,7 +268,7 @@ public class BillingRefunds {
 
     private static void requireNoTransaction() {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            throw new IllegalStateException("Cashfree is never asked inside a transaction.");
+            throw new IllegalStateException("Razorpay is never asked inside a transaction.");
         }
     }
 
@@ -307,11 +307,11 @@ public class BillingRefunds {
     }
 
     /**
-     * Applies what Cashfree said, under the refund's lock, so a webhook and a check at the same moment apply it once.
+     * Applies what Razorpay said, under the refund's lock, so a webhook and a check at the same moment apply it once.
      * A payment no invoice could take is refunded only when its refund went through; when it failed it goes back to
      * waiting for review.
      */
-    private void record(String reference, CashfreeClient.GatewayRefund reported) {
+    private void record(String reference, RazorpayClient.GatewayRefund reported) {
         Refund refund = refunds.findByProviderAndRefundReference(Refund.GATEWAY, reference).orElseThrow();
         if (!refund.update(reported.status(), reported.gatewayRefundId(), reported.message(), today())) {
             refunds.saveAndFlush(refund);

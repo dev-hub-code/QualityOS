@@ -20,10 +20,10 @@ import lombok.Setter;
 public class GatewayOrder extends TenantOwnedEntity {
 
     /**
-     * CREATING: reserved for the invoice, while Cashfree is asked to create it. NEEDS_REVIEW: money was taken but could
-     * not be applied, so a person must decide what happens to it. ABANDONED: Cashfree has no such order, or it expired
-     * there unpaid; a payment that still reaches it is applied all the same. REFUND_PENDING: a person chose to refund
-     * a NEEDS_REVIEW payment, and Cashfree has not yet said it went through; it becomes REFUNDED when it does, and
+     * CREATING: reserved for the invoice, while Razorpay is asked to create it. NEEDS_REVIEW: money was taken but could
+     * not be applied, so a person must decide what happens to it. ABANDONED: Razorpay has no such order, or checkout
+     * moved on to a newer one; a payment that still reaches it is applied all the same. REFUND_PENDING: a person chose to refund
+     * a NEEDS_REVIEW payment, and Razorpay has not yet said it went through; it becomes REFUNDED when it does, and
      * goes back to NEEDS_REVIEW when it fails.
      */
     public enum Status { CREATING, ACTIVE, PAID, NEEDS_REVIEW, ABANDONED, REFUND_PENDING, REFUNDED }

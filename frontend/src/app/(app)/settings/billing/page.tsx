@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { CreditNotes, InvoiceNote } from "@/components/billing/credit-notes";
 import { PayOnline } from "@/components/billing/pay-online";
 import {
@@ -129,19 +129,28 @@ export default function BillingPage() {
   const queryClient = useQueryClient();
   const [returned, setReturned] = useState("");
 
-  // Back from Cashfree. The address only says which order to ask about; the backend finds out what happened.
-  useEffect(() => {
-    const orderId = new URLSearchParams(window.location.search).get("order_id");
-    if (!orderId) return;
-    window.history.replaceState(null, "", window.location.pathname);
-    api
-      .post<OrderConfirmation>(
-        `/subscription/gateway-orders/${encodeURIComponent(orderId)}/confirm`,
-      )
-      .then(({ status }) => setReturned(RETURNED[status]))
-      .catch((error: Error) => setReturned(error.message))
-      .finally(() => queryClient.invalidateQueries());
-  }, [queryClient]);
+  // After Razorpay's checkout closes. Only the order is taken from it; the backend asks Razorpay what happened.
+  const confirmOrder = useCallback(
+    (orderId: string, outcome: "paid" | "closed") => {
+      api
+        .post<OrderConfirmation>(
+          `/subscription/gateway-orders/${encodeURIComponent(orderId)}/confirm`,
+        )
+        .then(({ status }) =>
+          // Closed without paying: nothing to say, unless money arrived all the same.
+          setReturned(
+            outcome === "closed" &&
+              status !== "PAID" &&
+              status !== "NEEDS_REVIEW"
+              ? ""
+              : RETURNED[status],
+          ),
+        )
+        .catch((error: Error) => setReturned(error.message))
+        .finally(() => queryClient.invalidateQueries());
+    },
+    [queryClient],
+  );
 
   const current = subscription.data;
   if (!current) return <QueryState error={subscription.error} />;
@@ -248,6 +257,7 @@ export default function BillingPage() {
             <PayOnline
               invoice={open}
               testMode={gateway.data.mode === "sandbox"}
+              onDone={confirmOrder}
             />
           )}
         </div>

@@ -17,7 +17,7 @@ const PATH = "/platform/unapplied-payments";
 
 /**
  * Payments the gateway took that no invoice could take: the wrong amount or currency, or an invoice already paid.
- * They are never revenue, so they go back whole, through the gateway. One stays listed until Cashfree confirms its
+ * They are never revenue, so they go back whole, through the gateway. One stays listed until Razorpay confirms its
  * refund went through; a failed refund leaves it to refund again.
  */
 export function UnappliedPayments() {
@@ -43,7 +43,7 @@ export function UnappliedPayments() {
             </span>
             {payment.status === "REFUND_PENDING" && (
               <span className="text-muted-foreground">
-                Refund sent, waiting for Cashfree to confirm it
+                Refund sent, waiting for Razorpay to confirm it
               </span>
             )}
             {payment.status === "NEEDS_REVIEW" &&

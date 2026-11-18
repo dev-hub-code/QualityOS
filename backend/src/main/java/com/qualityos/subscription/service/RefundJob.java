@@ -15,7 +15,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Finishes gateway refunds left waiting: one whose answer never came back, or whose webhook never arrived. Each is
- * looked up at Cashfree, and sent again under its own reference only if Cashfree never received it.
+ * looked up at Razorpay, and sent again under its own reference only if Razorpay never received it.
  */
 @lombok.extern.slf4j.Slf4j
 @Component
@@ -54,7 +54,7 @@ class RefundJob {
                     jdbc.queryForList("SELECT tenants_with_pending_refunds()", UUID.class));
             jobs.forEachTenant(context, tenants, tenant -> {
                 for (UUID refund : refunds.waiting(Instant.now().minus(SETTLE))) {
-                    // One Cashfree cannot answer for now is tried again next time; the others go on.
+                    // One Razorpay cannot answer for now is tried again next time; the others go on.
                     try {
                         refunds.reconcile(refund);
                         context.processed(1);

@@ -1237,20 +1237,20 @@ export const DOC_EXAMPLES: Record<string, WorkedExample[]> = {
         {
           who: "A billing administrator",
           action: "Opens the paid invoice and raises a credit note for the amount, with the reason, to be refunded through the gateway.",
-          result: "The credit note is saved, and the refund is sent to Cashfree after that.",
+          result: "The credit note is saved, and the refund is sent to Razorpay after that.",
           why: "Saving first means that a refund already asked for is never asked for twice, even if something fails halfway.",
         },
         {
-          who: "Cashfree",
+          who: "Razorpay",
           action: "Takes a while to confirm.",
           result: "The refund shows Pending.",
-          why: "A refund is not counted as made until Cashfree confirms it, by webhook, by Check refund, or by the refunds job every 15 minutes.",
+          why: "A refund is not counted as made until Razorpay confirms it, by webhook, by Check refund, or by the refunds job every 15 minutes.",
         },
         {
           who: "ProductionOS",
-          action: "Hears from Cashfree that the refund succeeded.",
+          action: "Hears from Razorpay that the refund succeeded.",
           result: "The credit note shows Refunded, and Acme sees it and its PDF under Billing.",
-          why: "If Cashfree reports a failure, the credit note shows it, and the money can be returned by bank instead.",
+          why: "If Razorpay reports a failure, the credit note shows it, and the money can be returned by bank instead.",
         },
       ],
       takeaways: [

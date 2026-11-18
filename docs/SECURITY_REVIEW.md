@@ -35,10 +35,9 @@ does not claim any certification.
 
 | Item | Why it matters |
 |---|---|
-| The web app must sit behind a proxy that appends `X-Forwarded-For`, and the backend must not be reachable directly | Without that, a client can still choose the address seen by the backend. Handle with production work |
+| The web app must sit behind a proxy that appends `X-Forwarded-For`, and the backend must not be reachable directly | Without that, a client can still choose the address seen by the backend. The UAT Terraform does both (see [DEPLOYMENT.md](DEPLOYMENT.md)); it holds once deployed |
 | Facility limits are enforced in services, not RLS | A mistake in a new module could reopen a gap, so new modules need access tests |
 | A CAPTCHA, or a growing delay, before sign-in from an address with several failures | The per-address lockout stops one address, but a large botnet trying one password per address is only limited by the account-wide lock. Worth adding before a public launch |
-| The repository is public with no licence | The owner should decide how the code may be used |
 
 ## Rotating the signing key
 

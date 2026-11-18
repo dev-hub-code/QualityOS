@@ -155,6 +155,19 @@ variable "deletion_protection" {
 # Operations
 
 variable "log_retention_days" {
-  type    = number
-  default = 30
+  description = "Application, firewall, flow and access logs. A year, so an incident found late can still be traced."
+  type        = number
+  default     = 365
+}
+
+variable "waf_requests_per_5_minutes" {
+  description = "Requests one address may make in 5 minutes before the firewall blocks it. A factory may share one address."
+  type        = number
+  default     = 3000
+}
+
+variable "enable_exec_command" {
+  description = "ECS Exec: a shell inside running containers for anyone with the IAM permission. For UAT diagnosis; keep off in production."
+  type        = bool
+  default     = false
 }

@@ -6,9 +6,15 @@
 # --no-wait skips waiting for the services to become healthy: for the first deployment, before the secrets and
 # database roles exist.
 #
+# Gates, until GitHub Actions can run them (docs/CI.md):
+# - The commit must already be on the environment's branch on GitHub (origin/uat for uat), so what runs was reviewed
+#   and merged.
+# - The backend suite (unit and integration tests) and the frontend type check, lint and unit tests must pass on that
+#   exact commit, and each image must pass the Trivy scan CI uses, before anything is pushed.
+#
 # The images come from `git archive HEAD`, so uncommitted changes never reach an environment, and a tag always names
-# exactly one commit. A tag already in the registry is not built again. Terraform shows its plan and asks before
-# changing anything.
+# exactly one commit. Images are pushed only after the gates pass, so a tag already in the registry has passed them and
+# is not built or tested again. Terraform shows its plan and asks before changing anything.
 set -euo pipefail
 
 env="${1:?usage: deploy.sh <environment> [--no-wait]}"
@@ -25,22 +31,41 @@ if ! git -C "$repo" diff --quiet HEAD; then
   echo "Note: uncommitted changes are not deployed. Deploying commit $tag." >&2
 fi
 
+git -C "$repo" fetch --quiet origin "$env"
+if ! git -C "$repo" merge-base --is-ancestor HEAD "origin/$env"; then
+  echo "Commit $tag is not on origin/$env. Merge it into $env first, then deploy from there." >&2
+  exit 1
+fi
+
 source_dir="$(mktemp -d)"
 trap 'rm -rf "$source_dir"' EXIT
 git -C "$repo" archive HEAD backend frontend | tar -x -C "$source_dir"
 
 aws ecr get-login-password --region "$region" | docker login --username AWS --password-stdin "$registry" >/dev/null
 
-for image in backend frontend; do
-  name="$registry/qualityos-$image:$tag"
-  if aws ecr describe-images --region "$region" --repository-name "qualityos-$image" \
-    --image-ids imageTag="$tag" >/dev/null 2>&1; then
-    echo "qualityos-$image:$tag is already in the registry"
-    continue
-  fi
-  docker build --platform linux/amd64 --pull -t "$name" "$source_dir/$image"
-  docker push "$name"
-done
+in_registry() {
+  aws ecr describe-images --region "$region" --repository-name "qualityos-$1" --image-ids imageTag="$tag" \
+    >/dev/null 2>&1
+}
+
+if in_registry backend && in_registry frontend; then
+  echo "Both images for $tag are already in the registry, so they have passed the tests."
+else
+  echo "Testing $tag..."
+  (cd "$source_dir/backend" && ./mvnw -B -q verify)
+  (cd "$source_dir/frontend" && npm ci --no-audit --no-fund && npm run typecheck && npm run lint && npm test)
+  echo "Tests passed for $tag."
+
+  for image in backend frontend; do
+    name="$registry/qualityos-$image:$tag"
+    if in_registry "$image"; then
+      continue
+    fi
+    docker build --platform linux/amd64 --pull -t "$name" "$source_dir/$image"
+    (cd "$repo" && .github/scripts/trivy.sh image "$name")
+    docker push "$name"
+  done
+fi
 
 terraform -chdir="$root" apply -var "image_tag=$tag"
 

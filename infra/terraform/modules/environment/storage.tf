@@ -1,6 +1,9 @@
 # Attachments and report exports. Private: the application streams every download itself, after its permission checks.
 
 resource "aws_s3_bucket" "files" {
+  #checkov:skip=CKV_AWS_144:Versioning protects against deletion; copying to a second region is a production decision
+  #checkov:skip=CKV2_AWS_62:Nothing reacts to new files
+  #checkov:skip=CKV_AWS_145:Encrypted with S3-managed keys; a customer-managed key is a production decision
   bucket = "${local.prefix}-files-${data.aws_caller_identity.current.account_id}"
 
   lifecycle {

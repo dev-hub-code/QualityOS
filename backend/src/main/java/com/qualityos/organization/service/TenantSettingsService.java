@@ -18,6 +18,7 @@ public class TenantSettingsService {
             SeverityThreshold capaRequiredFrom,
             SeverityThreshold effectivenessRequiredFrom,
             boolean actionEvidenceRequired,
+            int capaEscalationDays,
             Long version) {
 
         static final Settings DEFAULTS = view(new TenantSettings());
@@ -49,6 +50,7 @@ public class TenantSettingsService {
         row.setCapaRequiredFrom(desired.capaRequiredFrom());
         row.setEffectivenessRequiredFrom(desired.effectivenessRequiredFrom());
         row.setActionEvidenceRequired(desired.actionEvidenceRequired());
+        row.setCapaEscalationDays(desired.capaEscalationDays());
         Settings saved = view(settings.saveAndFlush(row));
         audit.record("TENANT_SETTINGS_UPDATED", "Organization", TenantContext.getCurrentTenantId(),
                 previous, snapshot(saved));
@@ -57,7 +59,7 @@ public class TenantSettingsService {
 
     private static Settings view(TenantSettings row) {
         return new Settings(row.isSinglePersonReview(), row.getCapaRequiredFrom(), row.getEffectivenessRequiredFrom(),
-                row.isActionEvidenceRequired(), row.getVersion());
+                row.isActionEvidenceRequired(), row.getCapaEscalationDays(), row.getVersion());
     }
 
     private static Map<String, Object> snapshot(Settings settings) {
@@ -65,6 +67,7 @@ public class TenantSettingsService {
                 "singlePersonReview", settings.singlePersonReview(),
                 "capaRequiredFrom", settings.capaRequiredFrom(),
                 "effectivenessRequiredFrom", settings.effectivenessRequiredFrom(),
-                "actionEvidenceRequired", settings.actionEvidenceRequired());
+                "actionEvidenceRequired", settings.actionEvidenceRequired(),
+                "capaEscalationDays", settings.capaEscalationDays());
     }
 }

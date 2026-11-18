@@ -58,6 +58,8 @@ export interface OrganizationSettings {
   effectivenessRequiredFrom: SeverityThreshold;
   /** A CAPA action needs a file attached before it can be completed. */
   actionEvidenceRequired: boolean;
+  /** Days late before a CAPA or action is escalated to CAPA approvers; 0 never. */
+  capaEscalationDays: number;
   version: number | null;
 }
 
@@ -571,6 +573,7 @@ export interface CapaAction {
   id: string;
   actionType: "CORRECTIVE" | "PREVENTIVE";
   description: string;
+  ownerId: string;
   ownerName: string | null;
   targetDate: string;
   completedAt: string | null;

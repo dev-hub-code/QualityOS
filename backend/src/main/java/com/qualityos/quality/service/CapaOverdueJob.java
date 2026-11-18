@@ -45,7 +45,8 @@ class CapaOverdueJob {
         jobs.run("capa-reminders", LEASE, interval, context -> {
             List<UUID> tenants = tx.execute(status -> jdbc.queryForList("SELECT tenants_with_capas_due()", UUID.class));
             jobs.forEachTenant(context, tenants, tenant -> {
-                int sent = capas.remindOverdue() + capas.remindDueSoon() + capas.remindOverdueActions();
+                int sent = capas.remindOverdue() + capas.remindDueSoon() + capas.remindOverdueActions()
+                        + capas.escalateLate();
                 context.processed(sent);
                 context.notified(sent);
             });

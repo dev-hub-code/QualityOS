@@ -213,20 +213,25 @@ public abstract class AbstractIntegrationTest {
 
     /** Saves the organisation's settings with {@code changes}, keeping every other rule as it is. */
     protected void updateSettings(Session admin, Map<String, Object> changes) throws Exception {
+        updateSettings(admin, changes, status().isOk());
+    }
+
+    protected void updateSettings(Session admin, Map<String, Object> changes,
+            org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
         String path = "/api/v1/organizations/current/settings";
         Map<String, Object> current = JsonPath.read(as(admin, org.springframework.test.web.servlet.request
                         .MockMvcRequestBuilders.get(path)).andReturn().getResponse().getContentAsString(), "$.data");
         Map<String, Object> body = new java.util.HashMap<>();
         for (String key : java.util.List.of(
                 "singlePersonReview", "capaRequiredFrom", "effectivenessRequiredFrom", "actionEvidenceRequired",
-                "version")) {
+                "capaEscalationDays", "version")) {
             body.put(key, current.get(key));
         }
         body.putAll(changes);
         as(admin, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path)
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(body)))
-                .andExpect(status().isOk());
+                .andExpect(expected);
     }
 
     protected int selfReviews(UUID tenantId, String step) {

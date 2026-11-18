@@ -36,9 +36,9 @@ Phase 11 is on hold until you ask for it.
 
 - [x] **Inspection sampling and routing**: AQL (ISO 2859-1) sampling with special levels, switching rules and double
   sampling (#103, #114, #117), and the template chosen by material, product or operation
-- [ ] **CAPA execution**, remaining: an action owner without `CAPA_MANAGE` cannot complete their own action, and
-  there is no escalation. Done: evidence before an action completes (#101), a reminder for each late action (#80),
-  and a new action needed after an ineffective verification
+- [x] **CAPA execution**: evidence before an action completes (#101), a reminder for each late action (#80), a new
+  action needed after an ineffective verification, an action's owner completing it without `CAPA_MANAGE`, and
+  escalation to CAPA approvers once a CAPA or action is a chosen number of days late (#129)
 - [ ] **More NCR sources**, remaining: supplier issues and process incidents as sources of their own (today they are
   raised by hand). Done: customer complaints and quality returns (#104, #113), and production rejects
 - [ ] **Recall**, remaining: a regulatory report pack, and escalation when customers do not respond. Done: one recall

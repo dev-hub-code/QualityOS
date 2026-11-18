@@ -34,6 +34,15 @@ public interface CorrectiveActionRepository
             """)
     List<CorrectiveAction> findOverdue(LocalDate today, Instant remindedBefore);
 
+    /** Open CAPAs due on or before the given date, not yet escalated. */
+    @Query("""
+            select c from CorrectiveAction c
+            where c.targetDate <= :dueBy and c.escalatedAt is null
+              and c.status not in (com.qualityos.quality.entity.CorrectiveAction.Status.CLOSED,
+                                   com.qualityos.quality.entity.CorrectiveAction.Status.CANCELLED)
+            """)
+    List<CorrectiveAction> findToEscalate(LocalDate dueBy);
+
     @Query("""
             select c from CorrectiveAction c
             where c.targetDate between :today and :until

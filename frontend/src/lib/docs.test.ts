@@ -16,8 +16,16 @@ describe("documentation", () => {
 
   it("gives every topic a flow chart, and no chart without a topic", () => {
     expect(Object.keys(DOC_FLOWS).sort()).toEqual(DOC_PAGES.map((page) => page.slug).sort());
-    for (const flow of Object.values(DOC_FLOWS)) {
-      expect(flow.steps.length).toBeGreaterThan(1);
+    for (const [slug, flows] of Object.entries(DOC_FLOWS)) {
+      expect(flows.length, slug).toBeGreaterThan(0);
+      expect(new Set(flows.map((flow) => flow.title)).size, slug).toBe(flows.length);
+      for (const flow of flows) {
+        expect(flow.steps.length, flow.title).toBeGreaterThan(1);
+        expect(new Set(flow.steps.map((step) => step.label)).size, flow.title).toBe(flow.steps.length);
+        for (const step of flow.steps) {
+          if (step.next) expect(step.branches?.length, `${flow.title}: ${step.label}`).toBeGreaterThan(0);
+        }
+      }
     }
   });
 

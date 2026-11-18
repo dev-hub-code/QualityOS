@@ -2,7 +2,12 @@ import Link from "next/link";
 import { DOC_GROUPS, DOC_PAGES } from "@/lib/docs";
 
 function Topics() {
-  return DOC_GROUPS.map((group) => (
+  return (
+    <>
+      <Link href="/docs/workflows" className="mb-4 block text-sm font-medium text-primary hover:underline">
+        Every workflow, as flowcharts
+      </Link>
+      {DOC_GROUPS.map((group) => (
     <div key={group}>
       <h2 className="text-xs font-semibold text-muted-foreground">{group}</h2>
       <ul className="mt-1 mb-4">
@@ -15,7 +20,9 @@ function Topics() {
         ))}
       </ul>
     </div>
-  ));
+      ))}
+    </>
+  );
 }
 
 export function DocsNav() {

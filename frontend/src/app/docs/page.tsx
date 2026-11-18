@@ -12,7 +12,10 @@ export default function DocsHome() {
         examples are made up.
       </p>
       <div className="mt-6 max-w-3xl">
-        <FlowChart flow={OVERVIEW_FLOW} />
+        <FlowChart flow={OVERVIEW_FLOW} fileName="overview" />
+        <Link href="/docs/workflows" className="mt-3 inline-block text-sm font-medium text-primary hover:underline">
+          See every workflow as a flowchart
+        </Link>
       </div>
       {DOC_GROUPS.map((group) => (
         <section key={group} className="mt-8">

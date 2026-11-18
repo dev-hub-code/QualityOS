@@ -73,9 +73,16 @@ export default async function DocsTopic({ params }: Props) {
         </div>
       </dl>
 
-      <div className="mt-8">
-        <FlowChart flow={DOC_FLOWS[page.slug]} />
-      </div>
+      <section className="mt-8" aria-labelledby="workflows">
+        <h2 id="workflows" className="text-xl font-semibold">
+          {DOC_FLOWS[page.slug].length > 1 ? "Workflows" : "Workflow"}
+        </h2>
+        <div className="mt-3 space-y-4">
+          {DOC_FLOWS[page.slug].map((flow, index) => (
+            <FlowChart key={flow.title} flow={flow} fileName={`${page.slug}-${index + 1}`} />
+          ))}
+        </div>
+      </section>
 
       {page.sections.map((section) => (
         <Section key={section.title} section={section} />

@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import type { FacilityDetail, Machine, WorkCenter } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface WorkCenterDetail {
   workCenter: WorkCenter;
@@ -36,6 +37,7 @@ interface WorkCenterDetail {
 const rate = (value: string | null) => (value === null || value === undefined ? "Not set" : String(Number(value)));
 
 export default function WorkCenterPage() {
+  const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const path = `/manufacturing/work-centers/${id}`;
   const canManage = usePermission("MANUFACTURING_MANAGE");
@@ -72,11 +74,15 @@ export default function WorkCenterPage() {
               variant="outline"
               disabled={pending}
               onClick={() =>
-                run(async () => {
-                  await api.delete(path);
-                  router.push("/manufacturing/work-centers");
-                })
-              }
+                  confirm({
+                    title: "Archive this work centre?",
+                    description: "It can no longer be used on new routings. Its history is kept.",
+                    confirmLabel: "Archive work centre",
+                    danger: true,
+                  }).then((ok) => {
+                    if (ok) void run(async () => { await api.delete(path); router.push("/manufacturing/work-centers"); });
+                  })
+                }
             >
               Archive
             </Button>

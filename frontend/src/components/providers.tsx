@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
+import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 import { ApiError } from "@/lib/api";
 
 const MAX_RETRIES = 2;
@@ -20,5 +21,9 @@ export function Providers({ children }: { children: ReactNode }) {
       }),
   );
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ConfirmProvider>{children}</ConfirmProvider>
+    </QueryClientProvider>
+  );
 }

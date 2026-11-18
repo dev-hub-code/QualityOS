@@ -11,6 +11,7 @@ import { api } from "@/lib/api";
 import { DEFINITIONS, revisionActions, type DefinitionKind } from "@/lib/manufacturing";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { Revision } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const when = (value: string | null) => (value ? new Date(value).toLocaleString() : "–");
 
@@ -26,6 +27,7 @@ export function RevisionHeader({
   unit: string;
   details?: [string, ReactNode][];
 }) {
+  const confirm = useConfirm();
   const definition = DEFINITIONS[kind];
   const path = `${definition.path}/${revision.id}`;
   const canManage = usePermission(definition.manage);
@@ -60,7 +62,15 @@ export function RevisionHeader({
           </Button>
         )}
         {actions.includes("submit") && (
-          <Button disabled={pending} onClick={() => run(() => api.post(`${path}/submit`))}>
+          <Button disabled={pending} onClick={() =>
+              confirm({
+                title: "Submit this revision for approval?",
+                description: "Approvers are notified, and it can no longer be edited unless it is sent back.",
+                confirmLabel: "Submit",
+              }).then((ok) => {
+                if (ok) void run(() => api.post(`${path}/submit`));
+              })
+            }>
             Submit for approval
           </Button>
         )}
@@ -69,11 +79,15 @@ export function RevisionHeader({
             variant="outline"
             disabled={pending}
             onClick={() =>
-              run(async () => {
-                await api.delete(path);
-                router.push(definition.path);
-              })
-            }
+                confirm({
+                  title: "Discard this draft?",
+                  description: "The draft and everything on it is deleted. This cannot be undone.",
+                  confirmLabel: "Discard draft",
+                  danger: true,
+                }).then((ok) => {
+                  if (ok) void run(async () => { await api.delete(path); router.push(definition.path); });
+                })
+              }
           >
             Discard draft
           </Button>

@@ -22,10 +22,12 @@ import { api } from "@/lib/api";
 import { humanize } from "@/lib/capa";
 import type { FieldDef } from "@/lib/record-form";
 import type { CorrectionDetail } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const noteField: FieldDef = { name: "note", label: "Note", type: "textarea", required: true };
 
 export default function MaterialCorrectionPage() {
+  const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const path = `/material-corrections/${id}`;
   const refresh = useRefresh();
@@ -59,7 +61,15 @@ export default function MaterialCorrectionPage() {
         }
       >
         {mine && status === "DRAFT" && (
-          <Button disabled={pending} onClick={() => run(() => api.post(`${path}/submit`))}>
+          <Button disabled={pending} onClick={() =>
+              confirm({
+                title: "Submit this correction for approval?",
+                description: "It can no longer be edited, and someone else must approve it before the record changes.",
+                confirmLabel: "Submit",
+              }).then((ok) => {
+                if (ok) void run(() => api.post(`${path}/submit`));
+              })
+            }>
             Submit for approval
           </Button>
         )}

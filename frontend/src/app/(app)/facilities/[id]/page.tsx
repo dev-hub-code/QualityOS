@@ -13,6 +13,7 @@ import { daysToMask, describeDays, WEEKDAYS } from "@/lib/manufacturing";
 import { FACILITY_FIELDS } from "@/lib/record-fields";
 import type { FieldDef } from "@/lib/record-form";
 import type { FacilityDetail } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const UNIT_FIELDS: FieldDef[] = [
   { name: "code", label: "Code", required: true },
@@ -66,6 +67,7 @@ function UnitList({
 }
 
 export default function FacilityPage() {
+  const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const path = `/facilities/${id}`;
@@ -96,7 +98,16 @@ export default function FacilityPage() {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => run(() => api.delete(path).then(() => router.push("/facilities")))}
+              onClick={() =>
+                  confirm({
+                    title: "Archive this facility?",
+                    description: "It can no longer be chosen on new records. Its existing records are kept.",
+                    confirmLabel: "Archive facility",
+                    danger: true,
+                  }).then((ok) => {
+                    if (ok) void run(() => api.delete(path).then(() => router.push("/facilities")));
+                  })
+                }
             >
               Archive
             </Button>

@@ -13,6 +13,7 @@ import { reinspectionState, reworkActions } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
 import type { ReworkDetail } from "@/lib/types";
 import { lookupAll } from "@/components/records/parts";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const when = (value: string | null) => (value ? new Date(value).toLocaleString() : "–");
 const words = (value: string | null) => (value ? value.replaceAll("_", " ").toLowerCase() : "–");
@@ -38,6 +39,7 @@ function useBatchTemplates(enabled: boolean) {
 }
 
 export default function ReworkOrderPage() {
+  const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const path = `/manufacturing/rework-orders/${id}`;
   const can = {
@@ -79,7 +81,15 @@ export default function ReworkOrderPage() {
         {actions.includes("complete") && <Button onClick={() => setDialog("complete")}>Complete</Button>}
         {actions.includes("reinspect") && <Button onClick={() => setDialog("reinspect")}>Reinspect</Button>}
         {actions.includes("close") && (
-          <Button disabled={pending} onClick={() => run(() => api.post(`${path}/close`))}>
+          <Button disabled={pending} onClick={() =>
+              confirm({
+                title: "Close this rework order?",
+                description: "The reinspection's decision is applied to the reworked goods, and the order closes.",
+                confirmLabel: "Close rework order",
+              }).then((ok) => {
+                if (ok) void run(() => api.post(`${path}/close`));
+              })
+            }>
             Close on the reinspection
           </Button>
         )}

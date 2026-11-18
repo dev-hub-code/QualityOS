@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { apiCaller, signUp } from "./helpers";
+import { apiCaller, signUp, confirmAction } from "./helpers";
 
 test("an administrator sets the organisation's review and NCR rules", async ({
   page,
@@ -84,6 +84,7 @@ test("an administrator uploads the organisation's logo, which the menu shows", a
     page.getByRole("button", { name: "Replace logo" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Remove logo" }).click();
+  await confirmAction(page);
   await expect(page.getByText("No logo yet.")).toBeVisible();
   await expect(
     page.locator("aside").getByRole("img", { name: / logo$/ }),

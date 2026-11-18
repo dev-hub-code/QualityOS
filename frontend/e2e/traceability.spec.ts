@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { apiCaller, PASSWORD, signUp, unique } from "./helpers";
+import { apiCaller, PASSWORD, signUp, unique, confirmAction } from "./helpers";
 import { acceptInvitation, inviteUser } from "./mail";
 import { dispatchedBatch, prepare, publishTemplate, step } from "./trace-setup";
 
@@ -41,6 +41,7 @@ test("raw material is traced through production and inspection to the customer",
   await expect(page).toHaveURL(/inspections\//);
   await page.getByLabel("DIA sample 1").fill("20.0");
   await page.getByRole("button", { name: "Submit for approval" }).click();
+  await confirmAction(page);
   await expect(page.getByText("submitted", { exact: true }).first()).toBeVisible();
 
   await manager.goto(page.url());
@@ -63,6 +64,7 @@ test("raw material is traced through production and inspection to the customer",
   await expect(page).toHaveURL(/inspections\//);
   await page.getByLabel("DIA sample 1").fill("20.0");
   await page.getByRole("button", { name: "Submit for approval" }).click();
+  await confirmAction(page);
   await manager.goto(page.url());
   await manager.getByRole("button", { name: "Approve" }).click();
   await manager.getByRole("dialog").getByRole("button", { name: "Save" }).click();
@@ -152,6 +154,7 @@ test("a wrong lot on a completed batch is corrected with approval", async ({ pag
   await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
   await expect(page).toHaveURL(/material-corrections\/.+/);
   await page.getByRole("button", { name: "Submit for approval" }).click();
+  await confirmAction(page);
   await expect(page.getByText("Someone other than you must approve this.")).toBeVisible();
   await expect(page.getByText("6 PCS (entered as 0.5 DOZ)")).toBeVisible();
 
@@ -202,6 +205,7 @@ test("returned goods stay out of stock until an inspection accepts them", async 
   const returnInspection = page.url();
   await page.getByLabel("DIA sample 1").fill("20.0");
   await page.getByRole("button", { name: "Submit for approval" }).click();
+  await confirmAction(page);
   await expect(page.getByText("submitted", { exact: true }).first()).toBeVisible();
 
   await manager.goto(returnInspection);

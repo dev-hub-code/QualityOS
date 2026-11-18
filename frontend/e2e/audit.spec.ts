@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
-import { apiCaller, PASSWORD, signUp, unique } from "./helpers";
+import { apiCaller, PASSWORD, signUp, unique, confirmAction } from "./helpers";
 import { acceptInvitation, inviteUser } from "./mail";
 import { step } from "./trace-setup";
 
@@ -40,6 +40,7 @@ test("an audit runs from checklist to a finding's NCR, a report, and closure by 
   await expect(page.getByText("Every year")).toBeVisible();
 
   await page.getByRole("button", { name: "Start audit" }).click();
+  await confirmAction(page);
   await page.getByLabel("Answer to question 1").selectOption("NONCONFORMING");
   await expect(page.getByText("Checklist (1 of 2 answered)")).toBeVisible();
   await page.getByLabel("Answer to question 2").selectOption("CONFORMING");
@@ -96,6 +97,7 @@ test("an audit runs from checklist to a finding's NCR, a report, and closure by 
 
   await manager.goto(auditUrl);
   await manager.getByRole("button", { name: "Approve closure" }).click();
+  await confirmAction(manager);
   await expect(manager.getByText("closed", { exact: true }).first()).toBeVisible();
   await expect(manager.getByRole("button", { name: "Approve closure" })).toHaveCount(0);
   await manager.getByRole("link", { name: /^AUD-/ }).click();

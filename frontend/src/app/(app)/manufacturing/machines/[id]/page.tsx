@@ -12,6 +12,7 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import type { Instrument, InstrumentOption, Machine, MachineStatusEvent } from "@/lib/types";
 import { lookupAll } from "@/components/records/parts";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface MachineDetail {
   machine: Machine;
@@ -21,6 +22,7 @@ interface MachineDetail {
 const label = (status: string) => status.charAt(0) + status.slice(1).toLowerCase();
 
 export default function MachinePage() {
+  const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const path = `/manufacturing/machines/${id}`;
   const canManage = usePermission("MANUFACTURING_MANAGE");
@@ -106,7 +108,16 @@ export default function MachinePage() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => api.delete(`${path}/instruments/${instrument.id}`).then(refresh)}
+                      onClick={() =>
+                          confirm({
+                            title: `Remove ${instrument.name} from this machine?`,
+                            description: "The instrument is no longer listed on this machine. The instrument itself is not changed.",
+                            confirmLabel: "Remove",
+                            danger: true,
+                          }).then((ok) => {
+                            if (ok) void api.delete(`${path}/instruments/${instrument.id}`).then(refresh);
+                          })
+                        }
                     >
                       Remove
                     </Button>

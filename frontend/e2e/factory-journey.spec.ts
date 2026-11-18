@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { apiCaller, PASSWORD, signUp, unique } from "./helpers";
+import { apiCaller, PASSWORD, signUp, unique, confirmAction } from "./helpers";
 import { acceptInvitation, inviteUser } from "./mail";
 import { step } from "./trace-setup";
 
@@ -101,6 +101,7 @@ async function inspectHere(page: Page, templateLabel: string, measurement: strin
   await expect(page).toHaveURL(/inspections\//);
   await page.getByLabel(measurement).fill(value);
   await page.getByRole("button", { name: "Submit for approval" }).click();
+  await confirmAction(page);
   await expect(page.getByText("submitted", { exact: true }).first()).toBeVisible();
   return page.url();
 }
@@ -141,6 +142,7 @@ test("a lot keeps its history from the order through a conditional release, prod
   await expect(page).toHaveURL(/inspections\//);
   await page.getByLabel("DIA sample 1").fill("20.0");
   await page.getByRole("button", { name: "Submit for approval" }).click();
+  await confirmAction(page);
   await expect(page.getByText("submitted", { exact: true }).first()).toBeVisible();
   await decide(manager, page.url(), "ACCEPT");
 
@@ -152,6 +154,7 @@ test("a lot keeps its history from the order through a conditional release, prod
   await expect(page).toHaveURL(/inspections\//);
   await page.getByLabel("DIA sample 1").fill("20.3");
   await page.getByRole("button", { name: "Submit for approval" }).click();
+  await confirmAction(page);
   await expect(page.getByText("submitted", { exact: true }).first()).toBeVisible();
   const lotBInspection = page.url();
 

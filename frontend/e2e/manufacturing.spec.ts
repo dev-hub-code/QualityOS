@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
-import { apiCaller, signUp } from "./helpers";
+import { apiCaller, signUp, confirmAction } from "./helpers";
 import { step } from "./trace-setup";
 
 /**
@@ -64,6 +64,7 @@ test("a BOM is drafted, approved and exploded, and machines keep their status hi
   await expect(page.getByText("1. EN8 – EN8 Bar")).toBeVisible();
   await expect(page.getByText("substitutes: EN9")).toBeVisible();
   await page.getByRole("button", { name: "Submit for approval" }).click();
+  await confirmAction(page);
   await step(page, "Approve", async () => {});
   await expect(page.locator("[data-slot='badge']", { hasText: "in effect" })).toBeVisible();
 

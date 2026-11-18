@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { signUp } from "./helpers";
+import { signUp, confirmAction } from "./helpers";
 
 
 test("a category can be added from the form when the list is empty", async ({ page }) => {
@@ -56,6 +56,7 @@ test("categories are managed in one place, and one in use cannot be deleted", as
 
   await page.getByRole("link", { name: "Categories" }).click();
   await suppliers.getByRole("button", { name: "Delete" }).click();
+  await confirmAction(page);
   await expect(page.getByText("This category is in use, so it cannot be deleted.")).toBeVisible();
   await expect(suppliers.getByText("Castings")).toBeVisible();
 });
@@ -86,7 +87,9 @@ test("a supplier is approved, ordered from, and delivers in two batches", async 
   await page.getByRole("button", { name: "Save" }).click();
   await page.getByRole("link", { name: "SUP-1" }).click();
   await page.getByRole("button", { name: "Submit for approval" }).click();
+  await confirmAction(page);
   await page.getByRole("button", { name: "Approve" }).click();
+  await confirmAction(page);
   await expect(page.getByRole("button", { name: "Block" })).toBeVisible();
 
   await page.getByLabel("Upload a document").setInputFiles({
@@ -106,6 +109,7 @@ test("a supplier is approved, ordered from, and delivers in two batches", async 
   await page.getByLabel("Quantity", { exact: true }).fill("100");
   await page.getByRole("button", { name: "Save draft" }).click();
   await page.getByRole("button", { name: "Issue" }).click();
+  await confirmAction(page);
 
   await page.getByRole("link", { name: "Receive material" }).click();
   await page.getByRole("button", { name: "Add batch" }).click();

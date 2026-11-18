@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 import type { AuditFinding } from "@/lib/types";
 import { AuditFindings } from "./audit-findings";
 
@@ -13,7 +14,9 @@ function show(findings: AuditFinding[], canRaise = true) {
   vi.stubGlobal("fetch", vi.fn(async () => Response.json({ success: true, data: {} })));
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <AuditFindings auditId="a" findings={findings} canRaise={canRaise} canAttach={false} />
+      <ConfirmProvider>
+        <AuditFindings auditId="a" findings={findings} canRaise={canRaise} canAttach={false} />
+      </ConfirmProvider>
     </QueryClientProvider>,
   );
 }
@@ -27,7 +30,21 @@ describe("AuditFindings", () => {
   it("lets an observation raise an NCR", async () => {
     show([FINDING]);
     fireEvent.click(screen.getByRole("button", { name: "Raise NCR" }));
+    // Nothing is sent until the question is answered.
+    const question = await screen.findByRole("alertdialog");
+    expect(question).toHaveTextContent("Raise an NCR for this finding?");
+    expect(fetch).not.toHaveBeenCalled();
+    fireEvent.click(within(question).getByRole("button", { name: "Raise NCR" }));
     await waitFor(() => expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/audits/a/findings/f/ncr"), expect.anything()));
+  });
+
+  it("raises nothing when the question is cancelled", async () => {
+    show([FINDING]);
+    fireEvent.click(screen.getByRole("button", { name: "Raise NCR" }));
+    const question = await screen.findByRole("alertdialog");
+    fireEvent.click(within(question).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("shows the NCR and CAPA of a finding that has one, instead of offering another", () => {

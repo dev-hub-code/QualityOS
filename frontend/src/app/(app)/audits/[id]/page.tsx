@@ -15,6 +15,7 @@ import { useSelfReviewInEffect } from "@/hooks/use-organization-settings";
 import { api } from "@/lib/api";
 import type { FieldDef } from "@/lib/record-form";
 import type { Audit } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 function repeats(months: number | null): string {
   if (!months) return "No";
@@ -38,6 +39,7 @@ interface Step {
 }
 
 export default function AuditPage() {
+  const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const path = `/audits/${id}`;
   const canManage = usePermission("AUDIT_MANAGE");
@@ -76,7 +78,15 @@ export default function AuditPage() {
       </PageHeader>
       <FormError message={message} />
       <div className="flex flex-wrap gap-2">
-        {canManage && status === "PLANNED" && <Button onClick={() => run(() => api.post(`${path}/start`))}>Start audit</Button>}
+        {canManage && status === "PLANNED" && <Button onClick={() =>
+            confirm({
+              title: "Start this audit?",
+              description: "The audit moves to In progress, ready for its checklist to be answered.",
+              confirmLabel: "Start audit",
+            }).then((ok) => {
+              if (ok) void run(() => api.post(`${path}/start`));
+            })
+          }>Start audit</Button>}
         {canManage && inProgress && (
           <>
             <Button variant="outline" onClick={() => setStep(findingStep)}>
@@ -116,7 +126,15 @@ export default function AuditPage() {
                 Approve closure
               </Button>
             ) : (
-              <Button onClick={() => run(() => api.post(`${path}/close`))}>Approve closure</Button>
+              <Button onClick={() =>
+                  confirm({
+                    title: "Approve closing this audit?",
+                    description: "The audit is closed, and its findings and report become final.",
+                    confirmLabel: "Approve closure",
+                  }).then((ok) => {
+                    if (ok) void run(() => api.post(`${path}/close`));
+                  })
+                }>Approve closure</Button>
             )}
             <Button variant="outline" onClick={() => setStep({ title: "Send back", action: "send-back", fields: note("What still needs doing") })}>
               Send back

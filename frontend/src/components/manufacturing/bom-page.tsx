@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import { DEFINITIONS, SUBSTITUTE_FIELDS, describeLimits, toLineRequest } from "@/lib/manufacturing";
 import { DECIMAL_PATTERN, formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { BomDetail, BomLine, Explosion, ScaledRecipe } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const PARAMETER_FIELDS: FieldDef[] = [
   { name: "code", label: "Code", required: true },
@@ -135,6 +136,7 @@ function Scale({ path, unit }: { path: string; unit: string }) {
 }
 
 export function BomPage({ kind, id }: { kind: "BOM" | "RECIPE"; id: string }) {
+  const confirm = useConfirm();
   const definition = DEFINITIONS[kind];
   const path = `${definition.path}/${id}`;
   const canManage = usePermission(definition.manage);
@@ -220,7 +222,16 @@ export function BomPage({ kind, id }: { kind: "BOM" | "RECIPE"; id: string }) {
                     <Button variant="ghost" size="sm" onClick={() => setEditing(line)}>
                       Edit
                     </Button>
-                    <Button variant="ghost" size="sm" disabled={pending} onClick={() => run(() => api.delete(`${path}/lines/${line.id}`))}>
+                    <Button variant="ghost" size="sm" disabled={pending} onClick={() =>
+                        confirm({
+                          title: "Remove this line?",
+                          description: "It is removed from this draft.",
+                          confirmLabel: "Remove line",
+                          danger: true,
+                        }).then((ok) => {
+                          if (ok) void run(() => api.delete(`${path}/lines/${line.id}`));
+                        })
+                      }>
                       Remove
                     </Button>
                   </>
@@ -251,7 +262,16 @@ export function BomPage({ kind, id }: { kind: "BOM" | "RECIPE"; id: string }) {
                 <span className="flex items-center gap-2">
                   {describeLimits(parameter)}
                   {draft && (
-                    <Button variant="ghost" size="sm" disabled={pending} onClick={() => run(() => api.delete(`${path}/parameters/${parameter.id}`))}>
+                    <Button variant="ghost" size="sm" disabled={pending} onClick={() =>
+                        confirm({
+                          title: "Remove this parameter?",
+                          description: "It is removed from this draft.",
+                          confirmLabel: "Remove",
+                          danger: true,
+                        }).then((ok) => {
+                          if (ok) void run(() => api.delete(`${path}/parameters/${parameter.id}`));
+                        })
+                      }>
                       Remove
                     </Button>
                   )}

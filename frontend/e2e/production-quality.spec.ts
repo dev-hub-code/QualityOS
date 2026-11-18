@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { apiCaller, PASSWORD, signUp, unique } from "./helpers";
+import { apiCaller, PASSWORD, signUp, unique, confirmAction } from "./helpers";
 import { acceptInvitation, inviteUser } from "./mail";
 import { step } from "./trace-setup";
 
@@ -126,6 +126,7 @@ test("quality gates, rework and a quality hold on a work order", async ({ page, 
   await decide(detail.reinspection.id, "20.0", "ACCEPT");
   await page.reload();
   await page.getByRole("button", { name: "Close on the reinspection" }).click();
+  await confirmAction(page);
   await expect(badge(page, "closed")).toBeVisible();
   await expect(page.getByText("Reworked 2 PCS, scrapped 0 PCS")).toBeVisible();
 

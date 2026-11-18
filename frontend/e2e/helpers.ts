@@ -49,3 +49,10 @@ export function apiCaller(page: Page) {
       [method, path, data] as const,
     );
 }
+
+/** Answers yes to the confirmation an important action asks for: its confirm button is the last in the dialog. */
+export async function confirmAction(page: Page) {
+  const question = page.getByRole("alertdialog");
+  await question.getByRole("button").last().click();
+  await expect(question).toBeHidden();
+}

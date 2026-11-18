@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
-import { apiCaller, unique } from "./helpers";
+import { apiCaller, unique, confirmAction } from "./helpers";
 import { dispatchedBatch, step } from "./trace-setup";
 
 test("a recall runs from the report through contact, acknowledgement and approved closure", async ({
@@ -126,6 +126,7 @@ test("a recall runs from the report through contact, acknowledgement and approve
 
   await manager.goto(recallUrl);
   await manager.getByRole("button", { name: "Approve closure" }).click();
+  await confirmAction(manager);
   await expect(
     manager.getByRole("button", { name: "Approve closure" }),
   ).toHaveCount(0);

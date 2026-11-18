@@ -12,6 +12,7 @@ import { STAGE_LABELS } from "@/lib/manufacturing";
 import type { FieldDef } from "@/lib/record-form";
 import type { CheckpointStage, QualityCheckpoint } from "@/lib/types";
 import { lookupAll } from "@/components/records/parts";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const PATH = "/manufacturing/quality-checkpoints";
 
@@ -37,6 +38,7 @@ const STAGES = (Object.keys(STAGE_LABELS) as CheckpointStage[]).map((value) => (
 
 /** Where production needs an inspection. Each work order takes the checkpoints in use when it is released. */
 export default function QualityCheckpointsPage() {
+  const confirm = useConfirm();
   const canManage = usePermission("QUALITY_CHECKPOINT_MANAGE");
   const products = useProducts();
   const workCenters = useWorkCenters();
@@ -104,7 +106,16 @@ export default function QualityCheckpointsPage() {
                         <Button size="sm" variant="outline" onClick={() => setDialog(checkpoint)}>
                           Edit
                         </Button>
-                        <Button size="sm" variant="outline" disabled={pending} onClick={() => run(() => api.delete(`${PATH}/${checkpoint.id}`))}>
+                        <Button size="sm" variant="outline" disabled={pending} onClick={() =>
+                            confirm({
+                              title: "Archive this checkpoint?",
+                              description: "It no longer becomes a gate on work orders released from now on. Orders already released keep their gates.",
+                              confirmLabel: "Archive",
+                              danger: true,
+                            }).then((ok) => {
+                              if (ok) void run(() => api.delete(`${PATH}/${checkpoint.id}`));
+                            })
+                          }>
                           Archive
                         </Button>
                       </>

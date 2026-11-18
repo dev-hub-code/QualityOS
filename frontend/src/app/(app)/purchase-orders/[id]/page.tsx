@@ -22,6 +22,7 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { formatQuantity } from "@/lib/record-form";
 import type { PurchaseOrder, ReceiptSummary } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const column = createColumnHelper<ReceiptSummary>();
 const receiptColumns = [
@@ -34,6 +35,7 @@ const receiptColumns = [
 ];
 
 export default function PurchaseOrderPage() {
+  const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const path = `/purchase-orders/${id}`;
   const canManage = usePermission("PURCHASE_MANAGE");
@@ -52,7 +54,15 @@ export default function PurchaseOrderPage() {
       <PageHeader title={order.poNumber} subtitle={<StatusBadge status={status} />}>
         {canManage && status === "DRAFT" && (
           <>
-            <Button disabled={pending} onClick={() => act("issue")}>
+            <Button disabled={pending} onClick={() =>
+                confirm({
+                  title: "Issue this purchase order?",
+                  description: "It can then be received against, and can no longer be edited.",
+                  confirmLabel: "Issue order",
+                }).then((ok) => {
+                  if (ok) void act("issue");
+                })
+              }>
               Issue
             </Button>
             <Button variant="outline" render={<Link href={`/purchase-orders/${id}/edit`} />}>
@@ -62,12 +72,30 @@ export default function PurchaseOrderPage() {
         )}
         {canReceive && open && <Button render={<Link href={`/purchase-orders/${id}/receive`} />}>Receive material</Button>}
         {canManage && (open || status === "RECEIVED") && (
-          <Button variant="outline" disabled={pending} onClick={() => act("close")}>
+          <Button variant="outline" disabled={pending} onClick={() =>
+              confirm({
+                title: "Close this purchase order?",
+                description: "Nothing more can be received against it, even if some quantity is still due.",
+                confirmLabel: "Close order",
+                danger: true,
+              }).then((ok) => {
+                if (ok) void act("close");
+              })
+            }>
             Close
           </Button>
         )}
         {canManage && (status === "DRAFT" || status === "ISSUED") && (
-          <Button variant="destructive" disabled={pending} onClick={() => act("cancel")}>
+          <Button variant="destructive" disabled={pending} onClick={() =>
+              confirm({
+                title: "Cancel this purchase order?",
+                description: "The order is called off and cannot be used again.",
+                confirmLabel: "Cancel order",
+                danger: true,
+              }).then((ok) => {
+                if (ok) void act("cancel");
+              })
+            }>
             Cancel order
           </Button>
         )}

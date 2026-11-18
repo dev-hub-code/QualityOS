@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import type { Attachment } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 /** A record's files, with an upload control for those who may add them. */
 export function AttachmentPanel(props: { entityType: string; entityId: string; canManage: boolean }) {
@@ -37,6 +38,7 @@ export function AttachmentList({
   uploadLabel?: string;
   emptyMessage?: string;
 }) {
+  const confirm = useConfirm();
   const path = `/attachments?entityType=${entityType}&entityId=${entityId}`;
   const input = useRef<HTMLInputElement>(null);
   const { data = [] } = useQuery({ queryKey: [path], queryFn: () => api.get<Attachment[]>(path) });
@@ -68,7 +70,16 @@ export function AttachmentList({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => run(() => api.delete(`/attachments/${attachment.id}`))}
+                onClick={() =>
+                    confirm({
+                      title: `Remove ${attachment.fileName}?`,
+                      description: "The file is removed from this record.",
+                      confirmLabel: "Remove file",
+                      danger: true,
+                    }).then((ok) => {
+                      if (ok) void run(() => api.delete(`/attachments/${attachment.id}`));
+                    })
+                  }
               >
                 Remove
               </Button>

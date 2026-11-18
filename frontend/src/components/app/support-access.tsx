@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePermission } from "@/hooks/use-me";
 import { api, ApiError } from "@/lib/api";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface Grant {
   id: string;
@@ -44,6 +45,7 @@ const CHANGES_MAX_HOURS = 24;
  * most, and see what it read and changed.
  */
 export function SupportAccessSettings() {
+  const confirm = useConfirm();
   const canManage = usePermission("TENANT_MANAGE");
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: [PATH], queryFn: () => api.get<Overview>(PATH), enabled: canManage });
@@ -85,7 +87,16 @@ export function SupportAccessSettings() {
             {current.grantedByName && `, as ${current.grantedByName} allowed`}
             {current.note && ` (${current.note})`}.
           </span>
-          <Button variant="outline" disabled={pending} onClick={() => run(() => api.post<Overview>(`${PATH}/revoke`))}>
+          <Button variant="outline" disabled={pending} onClick={() =>
+              confirm({
+                title: "Withdraw support access now?",
+                description: "Support's access ends at once, including any session open now.",
+                confirmLabel: "Withdraw access",
+                danger: true,
+              }).then((ok) => {
+                if (ok) void run(() => api.post<Overview>(`${PATH}/revoke`));
+              })
+            }>
             Withdraw access
           </Button>
         </div>
@@ -130,7 +141,16 @@ export function SupportAccessSettings() {
         </div>
         <Button
           disabled={pending}
-          onClick={() => run(() => api.post<Overview>(PATH, { durationHours: hours, note: note || null, allowChanges }))}
+          onClick={() =>
+              confirm({
+                title: "Allow support access?",
+                description: `Support can ${allowChanges ? "read and change" : "read"} your organisation's records for ${hours} hours. Every page they open is listed here, and you can withdraw access at any time.`,
+                confirmLabel: "Allow access",
+                danger: allowChanges,
+              }).then((ok) => {
+                if (ok) void run(() => api.post<Overview>(PATH, { durationHours: hours, note: note || null, allowChanges }));
+              })
+            }
         >
           Allow support access
         </Button>

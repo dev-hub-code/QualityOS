@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import { describeLimits } from "@/lib/manufacturing";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { RoutingDetail, RoutingOperation } from "@/lib/types";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const PARAMETER_FIELDS: FieldDef[] = [
   { name: "code", label: "Code", required: true },
@@ -24,6 +25,7 @@ const PARAMETER_FIELDS: FieldDef[] = [
 ];
 
 export default function RoutingPage() {
+  const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const path = `/manufacturing/routings/${id}`;
   const canManage = usePermission("ROUTING_MANAGE");
@@ -83,7 +85,16 @@ export default function RoutingPage() {
                     <Button variant="ghost" size="sm" onClick={() => setEditing(operation)}>
                       Edit
                     </Button>
-                    <Button variant="ghost" size="sm" disabled={pending} onClick={() => run(() => api.delete(`${path}/operations/${operation.id}`))}>
+                    <Button variant="ghost" size="sm" disabled={pending} onClick={() =>
+                        confirm({
+                          title: "Remove this operation?",
+                          description: "The operation and its parameters are removed from this draft.",
+                          confirmLabel: "Remove operation",
+                          danger: true,
+                        }).then((ok) => {
+                          if (ok) void run(() => api.delete(`${path}/operations/${operation.id}`));
+                        })
+                      }>
                       Remove
                     </Button>
                   </span>
@@ -105,7 +116,16 @@ export default function RoutingPage() {
                           variant="ghost"
                           size="sm"
                           disabled={pending}
-                          onClick={() => run(() => api.delete(`${path}/operations/${operation.id}/parameters/${parameter.id}`))}
+                          onClick={() =>
+                              confirm({
+                                title: "Remove this parameter?",
+                                description: "It is removed from the operation in this draft.",
+                                confirmLabel: "Remove",
+                                danger: true,
+                              }).then((ok) => {
+                                if (ok) void run(() => api.delete(`${path}/operations/${operation.id}/parameters/${parameter.id}`));
+                              })
+                            }
                         >
                           Remove
                         </Button>

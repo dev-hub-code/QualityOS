@@ -74,7 +74,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A renewal invoice is raised on its own, but the customer pays it. There are no saved cards or automatic debits (Cashfree mandates) | When a user needs it |
 | CGST, SGST, IGST, place of supply and SAC are worked out from GSTINs, but no accountant has reviewed this. It does not cover exemptions, SEZ supplies, exports or an unregistered buyer. The seller's GSTIN and SAC must be set before an invoice goes to a customer | Before the first paid customer |
 | A plan change has no proration. A different plan starts on payment and the unused time on the old one is lost | Review after real use |
-| The starting user and facility limits, grace period and annual prices are placeholders, editable under Plans. The trial length is under Settings | Owner to confirm before launch |
+| The starting user and facility limits, grace period and annual prices are placeholders, editable under Plans. The trial length is under Platform settings | Owner to confirm before launch |
 | Which features each plan includes is an interpretation of the brief's table. Starter has no dashboards or reports | Owner to confirm before launch |
 | Account emails, such as reset links, cannot be retried, because a resent link would have expired. Failed ones show in the email log | By design |
 | An emailed announcement goes once, to members active when it starts. Someone who joins later sees only the banner | Review after real use |

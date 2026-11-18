@@ -9,11 +9,14 @@ import {
   workspaceNavItems,
 } from "./navigation";
 
-const labels = (permissions: string[]) => visibleNavItems(permissions).map((item) => item.label);
+const labels = (permissions: string[]) =>
+  visibleNavItems(permissions).map((item) => item.label);
 
 describe("landingPage", () => {
   it("sends platform operators to the Control Center", () => {
-    expect(landingPage(["PLATFORM_ADMIN", "TENANT_MANAGE"])).toBe("/platform/dashboard");
+    expect(landingPage(["PLATFORM_ADMIN", "TENANT_MANAGE"])).toBe(
+      "/platform/dashboard",
+    );
   });
 
   it("sends everyone else to their organisation", () => {
@@ -23,18 +26,22 @@ describe("landingPage", () => {
 });
 
 describe("workspaceNavItems", () => {
-  const permissions = ["PLATFORM_ADMIN", "SUBSCRIPTION_MANAGE", "PURCHASE_VIEW"];
+  const permissions = [
+    "PLATFORM_ADMIN",
+    "SUBSCRIPTION_MANAGE",
+    "PURCHASE_VIEW",
+  ];
 
   it("keeps the whole workspace for a subscribed organisation", () => {
-    expect(workspaceNavItems(permissions, true)).toEqual(visibleNavItems(permissions));
+    expect(workspaceNavItems(permissions, true)).toEqual(
+      visibleNavItems(permissions),
+    );
   });
 
   it("leaves a platform organisation only its account pages", () => {
-    expect(workspaceNavItems(permissions, false).map((item) => item.label)).toEqual([
-      "Settings",
-      "Documentation",
-      "Control Center",
-    ]);
+    expect(
+      workspaceNavItems(permissions, false).map((item) => item.label),
+    ).toEqual(["My account", "Documentation", "Control Center"]);
   });
 });
 
@@ -42,7 +49,12 @@ describe("leavesWorkspace", () => {
   it("moves an operator of a platform organisation off workspace pages", () => {
     expect(leavesWorkspace("/dashboard", ["PLATFORM_ADMIN"], false)).toBe(true);
     expect(leavesWorkspace("/ncrs/1", ["PLATFORM_ADMIN"], false)).toBe(true);
-    expect(leavesWorkspace("/settings/billing", ["PLATFORM_ADMIN"], false)).toBe(true);
+    expect(
+      leavesWorkspace("/settings/billing", ["PLATFORM_ADMIN"], false),
+    ).toBe(true);
+    expect(
+      leavesWorkspace("/settings/organisation", ["PLATFORM_ADMIN"], false),
+    ).toBe(true);
   });
 
   it("leaves their account pages and the Control Center alone", () => {
@@ -59,35 +71,82 @@ describe("leavesWorkspace", () => {
 
 describe("visibleNavItems", () => {
   it("hides administration from users without permissions", () => {
-    expect(labels([])).toEqual(["Dashboard", "Settings", "Support", "Documentation"]);
+    expect(labels([])).toEqual([
+      "Dashboard",
+      "Settings",
+      "My account",
+      "Support",
+      "Documentation",
+    ]);
   });
 
   it("shows master data by module permission", () => {
-    expect(labels(["PURCHASE_VIEW"])).toEqual(["Dashboard", "Purchase orders", "Receipts", "Settings", "Support", "Documentation"]);
+    expect(labels(["PURCHASE_VIEW"])).toEqual([
+      "Dashboard",
+      "Purchase orders",
+      "Receipts",
+      "Settings",
+      "My account",
+      "Support",
+      "Documentation",
+    ]);
   });
 
   it("shows items for any matching permission", () => {
-    expect(labels(["USER_MANAGE"])).toEqual(["Dashboard", "Users", "Roles", "Settings", "Support", "Documentation"]);
-    expect(labels(["ROLE_MANAGE"])).toEqual(["Dashboard", "Roles", "Settings", "Support", "Documentation"]);
+    expect(labels(["USER_MANAGE"])).toEqual([
+      "Dashboard",
+      "Users",
+      "Roles",
+      "Settings",
+      "My account",
+      "Support",
+      "Documentation",
+    ]);
+    expect(labels(["ROLE_MANAGE"])).toEqual([
+      "Dashboard",
+      "Roles",
+      "Settings",
+      "My account",
+      "Support",
+      "Documentation",
+    ]);
   });
 
   it("shows the audit log to those allowed to read it", () => {
-    expect(labels(["AUDIT_LOG_VIEW"])).toEqual(["Dashboard", "Audit log", "Settings", "Support", "Documentation"]);
+    expect(labels(["AUDIT_LOG_VIEW"])).toEqual([
+      "Dashboard",
+      "Audit log",
+      "Settings",
+      "My account",
+      "Support",
+      "Documentation",
+    ]);
   });
 });
 
 describe("activeNavHref", () => {
   it("highlights serial search, not traceability, on a serial page", () => {
-    expect(activeNavHref("/traceability/serials", NAV_ITEMS)).toBe("/traceability/serials");
-    expect(activeNavHref("/traceability/serials/SN-1", NAV_ITEMS)).toBe("/traceability/serials");
+    expect(activeNavHref("/traceability/serials", NAV_ITEMS)).toBe(
+      "/traceability/serials",
+    );
+    expect(activeNavHref("/traceability/serials/SN-1", NAV_ITEMS)).toBe(
+      "/traceability/serials",
+    );
   });
 
   it("keeps traceability for a batch trace", () => {
-    expect(activeNavHref("/traceability/PB-2026-00001", NAV_ITEMS)).toBe("/traceability");
+    expect(activeNavHref("/traceability/PB-2026-00001", NAV_ITEMS)).toBe(
+      "/traceability",
+    );
   });
 
-  it("highlights billing, not settings, on the billing page", () => {
-    expect(activeNavHref("/settings/billing", NAV_ITEMS)).toBe("/settings/billing");
+  it("highlights billing or organisation settings, not my account, on the pages beneath it", () => {
+    expect(activeNavHref("/settings/billing", NAV_ITEMS)).toBe(
+      "/settings/billing",
+    );
+    expect(activeNavHref("/settings/organisation", NAV_ITEMS)).toBe(
+      "/settings/organisation",
+    );
     expect(activeNavHref("/settings", NAV_ITEMS)).toBe("/settings");
   });
 
@@ -97,26 +156,49 @@ describe("activeNavHref", () => {
 });
 
 describe("forManufacturingModel", () => {
-  const manufacturing = visibleNavItems(["MANUFACTURING_VIEW"]).filter((item) => item.group === "Manufacturing");
+  const manufacturing = visibleNavItems(["MANUFACTURING_VIEW"]).filter(
+    (item) => item.group === "Manufacturing",
+  );
   const shown = (model?: "DISCRETE" | "PROCESS" | "HYBRID") =>
     forManufacturingModel(manufacturing, model).map((item) => item.label);
 
   it("shows BOMs to discrete, recipes to process, and both to hybrid organisations", () => {
     expect(shown("DISCRETE")).toContain("BOMs");
     expect(shown("DISCRETE")).not.toContain("Recipes");
-    expect(shown("PROCESS")).toEqual(["Work centres", "Machines", "Recipes", "Routings", "Quality checkpoints", "Downtime", "Configuration"]);
-    expect(shown("HYBRID")).toEqual(expect.arrayContaining(["BOMs", "Recipes"]));
+    expect(shown("PROCESS")).toEqual([
+      "Work centres",
+      "Machines",
+      "Recipes",
+      "Routings",
+      "Quality checkpoints",
+      "Downtime",
+      "Configuration",
+    ]);
+    expect(shown("HYBRID")).toEqual(
+      expect.arrayContaining(["BOMs", "Recipes"]),
+    );
   });
 
   it("keeps the group together and hidden from people without the permission", () => {
-    const indexes = NAV_ITEMS.flatMap((item, index) => (item.group === "Manufacturing" ? [index] : []));
+    const indexes = NAV_ITEMS.flatMap((item, index) =>
+      item.group === "Manufacturing" ? [index] : [],
+    );
     expect(indexes.at(-1)! - indexes[0]).toBe(indexes.length - 1);
-    expect(visibleNavItems(["NCR_VIEW"]).some((item) => item.group === "Manufacturing")).toBe(false);
+    expect(
+      visibleNavItems(["NCR_VIEW"]).some(
+        (item) => item.group === "Manufacturing",
+      ),
+    ).toBe(false);
   });
 
   it("shows plans and work orders to whoever can see work orders, in every model", () => {
-    const labels = forManufacturingModel(visibleNavItems(["WORK_ORDER_VIEW"]), "PROCESS").map((item) => item.label);
-    expect(labels).toEqual(expect.arrayContaining(["Production plans", "Work orders"]));
+    const labels = forManufacturingModel(
+      visibleNavItems(["WORK_ORDER_VIEW"]),
+      "PROCESS",
+    ).map((item) => item.label);
+    expect(labels).toEqual(
+      expect.arrayContaining(["Production plans", "Work orders"]),
+    );
     expect(labels).not.toContain("Machines");
   });
 });

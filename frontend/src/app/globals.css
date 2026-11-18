@@ -170,6 +170,39 @@
   }
 }
 
+/*
+ * Every table heading stands apart from its rows: a blue band, white bold labels and a firmer rule beneath, whether the
+ * table is the shared component or plain HTML.
+ */
+:root {
+  /* The same blue as the menu item you are on. */
+  --table-head-bg: linear-gradient(to bottom, #2f4590, #1c2a62);
+  --table-head-fg: #ffffff;
+  --table-head-rule: #1c2a62;
+}
+
+.dark {
+  --table-head-bg: linear-gradient(to bottom, #2f4590, #1c2a62);
+  --table-head-fg: #ffffff;
+  --table-head-rule: #1c2a62;
+}
+
+@layer base {
+  thead {
+    background-image: var(--table-head-bg);
+  }
+  thead th {
+    color: var(--table-head-fg);
+    font-weight: 600;
+    border-bottom: 2px solid var(--table-head-rule);
+  }
+  /* Plain tables get room inside the band, and their cells line up with it. */
+  table:not([data-slot]) th,
+  table:not([data-slot]) td {
+    padding-inline: 0.5rem;
+  }
+}
+
 /* Native selects across the app follow the inputs. */
 @layer base {
   select {
@@ -181,6 +214,10 @@
 @media print {
   body {
     background-image: none;
+  }
+  thead {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   .glass,
   [data-slot="table-container"] {

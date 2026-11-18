@@ -69,9 +69,15 @@ test("an administrator uploads the organisation's logo, which the menu shows", a
   await expect(
     page.getByRole("img", { name: "Organisation logo" }),
   ).toBeVisible();
-  await expect(
-    page.locator("aside").getByRole("img", { name: / logo$/ }),
-  ).toBeVisible();
+  const logo = page.locator("aside").getByRole("img", { name: / logo$/ });
+  await expect(logo).toBeVisible();
+  // The name sits beside the logo, on the same row.
+  const name = (await logo.getAttribute("alt"))!.replace(/ logo$/, "");
+  const label = page.locator("aside").getByText(name, { exact: true });
+  await expect(label).toBeVisible();
+  const [logoBox, labelBox] = [await logo.boundingBox(), await label.boundingBox()];
+  expect(labelBox!.x).toBeGreaterThan(logoBox!.x + logoBox!.width - 1);
+  expect(Math.abs(labelBox!.y + labelBox!.height / 2 - (logoBox!.y + logoBox!.height / 2))).toBeLessThan(8);
 
   await page.reload();
   await expect(

@@ -64,307 +64,374 @@ import {
   HeartPulse,
 } from "lucide-react";
 
+export const NAV_GROUPS = [
+  "Set up",
+  "Incoming material",
+  "Quality",
+  "Manufacturing setup",
+  "Production",
+  "Dispatch",
+  "Traceability",
+  "Compliance",
+  "Insight",
+  "Administration",
+  "Account and help",
+] as const;
+
+export type NavGroup = (typeof NAV_GROUPS)[number];
+
 export interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
   /** Shown when the user holds any of these; omit for everyone. */
   anyPermission?: string[];
-  /** Items of a group sit together under its heading. */
-  group?: string;
+  /** Items of a group sit together under its heading. Only the dashboard has none. */
+  group?: NavGroup;
   /** Shown only when the organisation's manufacturing model uses this kind of definition. */
   definition?: "BOM" | "RECIPE";
 }
 
+/**
+ * The workspace menu, in the order work flows through ProductionOS: set up, receive and inspect, deal with problems,
+ * make, ship, trace, stay in control, then look back. Each group is a heading in the menu, and a group's items sit
+ * together. The groups match the documentation's.
+ */
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  {
+    label: "Facilities",
+    href: "/facilities",
+    icon: Factory,
+    anyPermission: ["FACILITY_VIEW"],
+    group: "Set up",
+  },
   {
     label: "Suppliers",
     href: "/suppliers",
     icon: Truck,
     anyPermission: ["SUPPLIER_VIEW"],
+    group: "Set up",
   },
   {
     label: "Materials",
     href: "/materials",
     icon: Boxes,
     anyPermission: ["PRODUCT_VIEW"],
+    group: "Set up",
   },
   {
     label: "Products",
     href: "/products",
     icon: Package,
     anyPermission: ["PRODUCT_VIEW"],
+    group: "Set up",
   },
   {
-    label: "Purchase orders",
-    href: "/purchase-orders",
-    icon: ClipboardList,
-    anyPermission: ["PURCHASE_VIEW"],
-  },
-  {
-    label: "Receipts",
-    href: "/material-receipts",
-    icon: PackageCheck,
-    anyPermission: ["PURCHASE_VIEW"],
-  },
-  {
-    label: "Inspections",
-    href: "/inspections",
-    icon: ClipboardCheck,
-    anyPermission: ["INSPECTION_VIEW"],
-  },
-  {
-    label: "Templates",
+    label: "Inspection templates",
     href: "/inspection-templates",
     icon: FileCog,
     anyPermission: ["TEMPLATE_VIEW"],
-  },
-  {
-    label: "NCRs",
-    href: "/ncrs",
-    icon: ClipboardX,
-    anyPermission: ["NCR_VIEW"],
-  },
-  {
-    label: "CAPAs",
-    href: "/capas",
-    icon: ListChecks,
-    anyPermission: ["CAPA_VIEW"],
-  },
-  {
-    label: "Production",
-    href: "/production-batches",
-    icon: Workflow,
-    anyPermission: ["TRACEABILITY_VIEW"],
-  },
-  {
-    label: "Dispatches",
-    href: "/dispatches",
-    icon: Send,
-    anyPermission: ["TRACEABILITY_VIEW"],
-  },
-  {
-    label: "Stock transfers",
-    href: "/stock-transfers",
-    icon: ArrowLeftRight,
-    anyPermission: ["TRACEABILITY_VIEW"],
-  },
-  {
-    label: "Returns",
-    href: "/dispatch-reversals",
-    icon: Undo2,
-    anyPermission: ["TRACEABILITY_VIEW"],
-  },
-  {
-    label: "Customers",
-    href: "/customers",
-    icon: Building2,
-    anyPermission: ["TRACEABILITY_VIEW"],
-  },
-  {
-    label: "Traceability",
-    href: "/traceability",
-    icon: GitBranch,
-    anyPermission: ["TRACEABILITY_VIEW"],
-  },
-  {
-    label: "Serial search",
-    href: "/traceability/serials",
-    icon: ScanSearch,
-    anyPermission: ["TRACEABILITY_VIEW"],
-  },
-  {
-    label: "Recalls",
-    href: "/recalls",
-    icon: Siren,
-    anyPermission: ["RECALL_VIEW"],
-  },
-  {
-    label: "Calibration",
-    href: "/calibration",
-    icon: Gauge,
-    anyPermission: ["CALIBRATION_VIEW"],
-  },
-  {
-    label: "Audits",
-    href: "/audits",
-    icon: SearchCheck,
-    anyPermission: ["AUDIT_VIEW"],
-  },
-  {
-    label: "Audit checklists",
-    href: "/audit-checklists",
-    icon: ListTodo,
-    anyPermission: ["AUDIT_VIEW"],
-  },
-  {
-    label: "Analytics",
-    href: "/analytics",
-    icon: ChartColumn,
-    anyPermission: ["REPORT_VIEW"],
-  },
-  {
-    label: "Reports",
-    href: "/reports",
-    icon: FileChartColumn,
-    anyPermission: ["REPORT_VIEW"],
-  },
-  {
-    label: "Corrections",
-    href: "/material-corrections",
-    icon: FilePen,
-    anyPermission: ["TRACEABILITY_VIEW"],
-  },
-  {
-    label: "Work centres",
-    href: "/manufacturing/work-centers",
-    icon: Factory,
-    anyPermission: ["MANUFACTURING_VIEW"],
-    group: "Manufacturing",
-  },
-  {
-    label: "Machines",
-    href: "/manufacturing/machines",
-    icon: Cog,
-    anyPermission: ["MANUFACTURING_VIEW"],
-    group: "Manufacturing",
-  },
-  {
-    label: "BOMs",
-    href: "/manufacturing/boms",
-    icon: Layers,
-    anyPermission: ["MANUFACTURING_VIEW"],
-    group: "Manufacturing",
-    definition: "BOM",
-  },
-  {
-    label: "Recipes",
-    href: "/manufacturing/recipes",
-    icon: FlaskConical,
-    anyPermission: ["MANUFACTURING_VIEW"],
-    group: "Manufacturing",
-    definition: "RECIPE",
-  },
-  {
-    label: "Routings",
-    href: "/manufacturing/routings",
-    icon: Route,
-    anyPermission: ["MANUFACTURING_VIEW"],
-    group: "Manufacturing",
-  },
-  {
-    label: "Production plans",
-    href: "/manufacturing/production-plans",
-    icon: CalendarRange,
-    anyPermission: ["WORK_ORDER_VIEW"],
-    group: "Manufacturing",
-  },
-  {
-    label: "Work orders",
-    href: "/manufacturing/work-orders",
-    icon: ClipboardPen,
-    anyPermission: ["WORK_ORDER_VIEW"],
-    group: "Manufacturing",
-  },
-  {
-    label: "Scheduling",
-    href: "/manufacturing/scheduling",
-    icon: CalendarClock,
-    anyPermission: ["WORK_ORDER_VIEW"],
-    group: "Manufacturing",
-  },
-  {
-    label: "Shop floor",
-    href: "/manufacturing/shop-floor",
-    icon: HardHat,
-    anyPermission: ["PRODUCTION_EXECUTE", "PRODUCTION_SUPERVISE"],
-    group: "Manufacturing",
-  },
-  {
-    label: "Quality checkpoints",
-    href: "/manufacturing/quality-checkpoints",
-    icon: SquareCheckBig,
-    anyPermission: ["MANUFACTURING_VIEW"],
-    group: "Manufacturing",
-  },
-  {
-    label: "Rework orders",
-    href: "/manufacturing/rework-orders",
-    icon: Hammer,
-    anyPermission: ["WORK_ORDER_VIEW"],
-    group: "Manufacturing",
-  },
-  {
-    label: "Downtime",
-    href: "/manufacturing/downtime",
-    icon: TimerOff,
-    anyPermission: ["MANUFACTURING_VIEW"],
-    group: "Manufacturing",
-  },
-  {
-    label: "Production analytics",
-    href: "/manufacturing/analytics",
-    icon: Activity,
-    anyPermission: ["PRODUCTION_ANALYTICS_VIEW"],
-    group: "Manufacturing",
-  },
-  {
-    label: "Configuration",
-    href: "/manufacturing/settings",
-    icon: SlidersHorizontal,
-    anyPermission: ["MANUFACTURING_VIEW"],
-    group: "Manufacturing",
+    group: "Set up",
   },
   {
     label: "Categories",
     href: "/categories",
     icon: Tags,
     anyPermission: ["SUPPLIER_VIEW", "PRODUCT_VIEW", "NCR_VIEW"],
+    group: "Set up",
   },
   {
-    label: "Facilities",
-    href: "/facilities",
+    label: "Purchase orders",
+    href: "/purchase-orders",
+    icon: ClipboardList,
+    anyPermission: ["PURCHASE_VIEW"],
+    group: "Incoming material",
+  },
+  {
+    label: "Receipts",
+    href: "/material-receipts",
+    icon: PackageCheck,
+    anyPermission: ["PURCHASE_VIEW"],
+    group: "Incoming material",
+  },
+  {
+    label: "Inspections",
+    href: "/inspections",
+    icon: ClipboardCheck,
+    anyPermission: ["INSPECTION_VIEW"],
+    group: "Incoming material",
+  },
+  {
+    label: "NCRs",
+    href: "/ncrs",
+    icon: ClipboardX,
+    anyPermission: ["NCR_VIEW"],
+    group: "Quality",
+  },
+  {
+    label: "CAPAs",
+    href: "/capas",
+    icon: ListChecks,
+    anyPermission: ["CAPA_VIEW"],
+    group: "Quality",
+  },
+  {
+    label: "Work centres",
+    href: "/manufacturing/work-centers",
     icon: Factory,
-    anyPermission: ["FACILITY_VIEW"],
+    anyPermission: ["MANUFACTURING_VIEW"],
+    group: "Manufacturing setup",
+  },
+  {
+    label: "Machines",
+    href: "/manufacturing/machines",
+    icon: Cog,
+    anyPermission: ["MANUFACTURING_VIEW"],
+    group: "Manufacturing setup",
+  },
+  {
+    label: "BOMs",
+    href: "/manufacturing/boms",
+    icon: Layers,
+    anyPermission: ["MANUFACTURING_VIEW"],
+    definition: "BOM",
+    group: "Manufacturing setup",
+  },
+  {
+    label: "Recipes",
+    href: "/manufacturing/recipes",
+    icon: FlaskConical,
+    anyPermission: ["MANUFACTURING_VIEW"],
+    definition: "RECIPE",
+    group: "Manufacturing setup",
+  },
+  {
+    label: "Routings",
+    href: "/manufacturing/routings",
+    icon: Route,
+    anyPermission: ["MANUFACTURING_VIEW"],
+    group: "Manufacturing setup",
+  },
+  {
+    label: "Quality checkpoints",
+    href: "/manufacturing/quality-checkpoints",
+    icon: SquareCheckBig,
+    anyPermission: ["MANUFACTURING_VIEW"],
+    group: "Manufacturing setup",
+  },
+  {
+    label: "Configuration",
+    href: "/manufacturing/settings",
+    icon: SlidersHorizontal,
+    anyPermission: ["MANUFACTURING_VIEW"],
+    group: "Manufacturing setup",
+  },
+  {
+    label: "Production plans",
+    href: "/manufacturing/production-plans",
+    icon: CalendarRange,
+    anyPermission: ["WORK_ORDER_VIEW"],
+    group: "Production",
+  },
+  {
+    label: "Work orders",
+    href: "/manufacturing/work-orders",
+    icon: ClipboardPen,
+    anyPermission: ["WORK_ORDER_VIEW"],
+    group: "Production",
+  },
+  {
+    label: "Scheduling",
+    href: "/manufacturing/scheduling",
+    icon: CalendarClock,
+    anyPermission: ["WORK_ORDER_VIEW"],
+    group: "Production",
+  },
+  {
+    label: "Shop floor",
+    href: "/manufacturing/shop-floor",
+    icon: HardHat,
+    anyPermission: ["PRODUCTION_EXECUTE", "PRODUCTION_SUPERVISE"],
+    group: "Production",
+  },
+  {
+    label: "Rework orders",
+    href: "/manufacturing/rework-orders",
+    icon: Hammer,
+    anyPermission: ["WORK_ORDER_VIEW"],
+    group: "Production",
+  },
+  {
+    label: "Downtime",
+    href: "/manufacturing/downtime",
+    icon: TimerOff,
+    anyPermission: ["MANUFACTURING_VIEW"],
+    group: "Production",
+  },
+  {
+    label: "Production batches",
+    href: "/production-batches",
+    icon: Workflow,
+    anyPermission: ["TRACEABILITY_VIEW"],
+    group: "Production",
+  },
+  {
+    label: "Stock transfers",
+    href: "/stock-transfers",
+    icon: ArrowLeftRight,
+    anyPermission: ["TRACEABILITY_VIEW"],
+    group: "Production",
+  },
+  {
+    label: "Customers",
+    href: "/customers",
+    icon: Building2,
+    anyPermission: ["TRACEABILITY_VIEW"],
+    group: "Dispatch",
+  },
+  {
+    label: "Dispatches",
+    href: "/dispatches",
+    icon: Send,
+    anyPermission: ["TRACEABILITY_VIEW"],
+    group: "Dispatch",
+  },
+  {
+    label: "Returns",
+    href: "/dispatch-reversals",
+    icon: Undo2,
+    anyPermission: ["TRACEABILITY_VIEW"],
+    group: "Dispatch",
+  },
+  {
+    label: "Traceability",
+    href: "/traceability",
+    icon: GitBranch,
+    anyPermission: ["TRACEABILITY_VIEW"],
+    group: "Traceability",
+  },
+  {
+    label: "Serial search",
+    href: "/traceability/serials",
+    icon: ScanSearch,
+    anyPermission: ["TRACEABILITY_VIEW"],
+    group: "Traceability",
+  },
+  {
+    label: "Recalls",
+    href: "/recalls",
+    icon: Siren,
+    anyPermission: ["RECALL_VIEW"],
+    group: "Traceability",
+  },
+  {
+    label: "Corrections",
+    href: "/material-corrections",
+    icon: FilePen,
+    anyPermission: ["TRACEABILITY_VIEW"],
+    group: "Traceability",
+  },
+  {
+    label: "Calibration",
+    href: "/calibration",
+    icon: Gauge,
+    anyPermission: ["CALIBRATION_VIEW"],
+    group: "Compliance",
+  },
+  {
+    label: "Audits",
+    href: "/audits",
+    icon: SearchCheck,
+    anyPermission: ["AUDIT_VIEW"],
+    group: "Compliance",
+  },
+  {
+    label: "Audit checklists",
+    href: "/audit-checklists",
+    icon: ListTodo,
+    anyPermission: ["AUDIT_VIEW"],
+    group: "Compliance",
+  },
+  {
+    label: "Analytics",
+    href: "/analytics",
+    icon: ChartColumn,
+    anyPermission: ["REPORT_VIEW"],
+    group: "Insight",
+  },
+  {
+    label: "Production analytics",
+    href: "/manufacturing/analytics",
+    icon: Activity,
+    anyPermission: ["PRODUCTION_ANALYTICS_VIEW"],
+    group: "Insight",
+  },
+  {
+    label: "Reports",
+    href: "/reports",
+    icon: FileChartColumn,
+    anyPermission: ["REPORT_VIEW"],
+    group: "Insight",
   },
   {
     label: "Users",
     href: "/users",
     icon: Users,
     anyPermission: ["USER_MANAGE"],
+    group: "Administration",
   },
   {
     label: "Roles",
     href: "/roles",
     icon: ShieldCheck,
     anyPermission: ["ROLE_MANAGE", "USER_MANAGE"],
+    group: "Administration",
   },
   {
-    label: "Audit log",
-    href: "/audit-log",
-    icon: ScrollText,
-    anyPermission: ["AUDIT_LOG_VIEW"],
+    label: "Settings",
+    href: "/settings/organisation",
+    icon: Building2,
+    group: "Administration",
   },
   {
     label: "Billing",
     href: "/settings/billing",
     icon: CreditCard,
     anyPermission: ["SUBSCRIPTION_MANAGE"],
+    group: "Administration",
   },
   {
-    label: "Settings",
-    href: "/settings/organisation",
-    icon: Building2,
+    label: "Audit log",
+    href: "/audit-log",
+    icon: ScrollText,
+    anyPermission: ["AUDIT_LOG_VIEW"],
+    group: "Administration",
   },
-  { label: "My account", href: "/settings", icon: UserRound },
-  { label: "Support", href: "/support", icon: LifeBuoy },
-  { label: "Documentation", href: "/docs", icon: BookOpen },
+  {
+    label: "My account",
+    href: "/settings",
+    icon: UserRound,
+    group: "Account and help",
+  },
+  {
+    label: "Support",
+    href: "/support",
+    icon: LifeBuoy,
+    group: "Account and help",
+  },
+  {
+    label: "Documentation",
+    href: "/docs",
+    icon: BookOpen,
+    group: "Account and help",
+  },
   {
     label: "Control Center",
     href: "/platform/dashboard",
     icon: ShieldEllipsis,
     anyPermission: ["PLATFORM_ADMIN"],
+    group: "Account and help",
   },
 ];
 
@@ -497,6 +564,25 @@ export function visibleNavItems(
       !item.anyPermission ||
       item.anyPermission.some((p) => permissions.includes(p)),
   );
+}
+
+/**
+ * The items in menu order, as runs that share a group: the dashboard on its own first, then one section per group
+ * that has anything visible.
+ */
+export function navSections(
+  items: readonly NavItem[],
+): { group?: NavGroup; items: NavItem[] }[] {
+  const sections: { group?: NavGroup; items: NavItem[] }[] = [];
+  for (const item of items) {
+    const last = sections.at(-1);
+    if (last && last.group === item.group) {
+      last.items.push(item);
+    } else {
+      sections.push({ group: item.group, items: [item] });
+    }
+  }
+  return sections;
 }
 
 /** Drops BOMs or recipes when the organisation's manufacturing model does not use them. */

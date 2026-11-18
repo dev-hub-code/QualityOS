@@ -25,13 +25,31 @@ function useLogo(tenantId: string | undefined) {
   return data ?? null;
 }
 
-/** Shown above the organisation's name in the menu. Nothing when it has no logo. */
+/** Shown beside the organisation's name in the menu: its logo, or its initials when it has none. */
 export function OrganizationLogo({ tenantId, name }: { tenantId: string; name: string }) {
   const logo = useLogo(tenantId);
-  if (!logo) return null;
+  if (!logo) {
+    return (
+      <span
+        aria-hidden
+        className="grid size-9 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-[#2a3f86] to-[#16224f] text-xs font-semibold text-white"
+      >
+        {initials(name)}
+      </span>
+    );
+  }
   // A local object URL: there is nothing for the image optimiser to fetch.
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={logo} alt={`${name} logo`} className="max-h-12 max-w-full self-start object-contain" />;
+  return <img src={logo} alt={`${name} logo`} className="h-9 w-auto max-w-20 shrink-0 rounded-md bg-white object-contain" />;
+}
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
 }
 
 /** Settings: upload, replace or remove the logo shown in the app and on the organisation's emails. */

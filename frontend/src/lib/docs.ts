@@ -209,7 +209,7 @@ export const DOC_PAGES: DocPage[] = [
     title: "Inspection templates",
     summary:
       "Define what gets checked, the limits, and how many samples to take.",
-    menu: "Templates",
+    menu: "Inspection templates",
     roles: "Quality Manager, Quality Engineer",
     plan: EVERY_PLAN,
     sections: [
@@ -484,7 +484,7 @@ export const DOC_PAGES: DocPage[] = [
     group: "Production and dispatch",
     title: "Production batches",
     summary: "Record what went into each batch, inspect it, and release it.",
-    menu: "Production",
+    menu: "Production batches",
     roles: "Quality Engineer, Quality Manager",
     plan: PROFESSIONAL,
     sections: [

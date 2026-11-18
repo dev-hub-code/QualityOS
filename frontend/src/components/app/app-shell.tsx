@@ -4,7 +4,7 @@ import { PlatformNotices } from "@/components/app/platform-notices";
 import { OfflineResults } from "@/components/inspections/offline-results";
 import { queuedBy } from "@/lib/offline-results";
 import { SubscriptionBanner } from "@/components/billing/subscription-banner";
-import { ArrowLeft, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Search, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronsLeft, LogOut, Menu, Search, ShieldCheck, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Fragment, useEffect, useState, type ReactNode } from "react";
@@ -23,6 +23,7 @@ import {
   CONTROL_CENTER_NAV,
   forManufacturingModel,
   leavesWorkspace,
+  navSections,
   visibleNavItems,
   workspaceNavItems,
 } from "@/lib/navigation";
@@ -36,6 +37,17 @@ const LINK = {
 };
 
 const COLLAPSED_KEY = "qualityos.menu-collapsed";
+const CLOSED_GROUPS_KEY = "qualityos.menu-closed-groups";
+
+/** The menu groups someone closed, remembered per browser like the collapsed menu. */
+function storedClosedGroups(): string[] {
+  try {
+    const stored = typeof window !== "undefined" ? JSON.parse(window.localStorage.getItem(CLOSED_GROUPS_KEY) ?? "[]") : [];
+    return Array.isArray(stored) ? stored.filter((group): group is string => typeof group === "string") : [];
+  } catch {
+    return [];
+  }
+}
 
 /** Remembered per browser. Storage can be missing or blocked, so every access is guarded. */
 function storedCollapsed() {
@@ -83,6 +95,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   // Collapsing applies from the md breakpoint up; on a phone the menu opens in full.
   const [collapsed, setCollapsed] = useState(storedCollapsed);
+  const [closedGroups, setClosedGroups] = useState(storedClosedGroups);
 
   const controlCenter = pathname === "/platform" || pathname.startsWith("/platform/");
   // Only a member of an organisation has an inbox.
@@ -105,6 +118,25 @@ export function AppShell({ children }: { children: ReactNode }) {
     setCollapsed(next);
     try {
       window.localStorage.setItem(COLLAPSED_KEY, next ? "1" : "0");
+    } catch {
+      // Not remembered, but the menu still works.
+    }
+  }
+
+  function toggleGroup(group: string) {
+    const next = closedGroups.includes(group) ? closedGroups.filter((closed) => closed !== group) : [...closedGroups, group];
+    setClosedGroups(next);
+    try {
+      window.localStorage.setItem(CLOSED_GROUPS_KEY, JSON.stringify(next));
+    } catch {
+      // Not remembered, but the menu still works.
+    }
+  }
+
+  function openAllGroups() {
+    setClosedGroups([]);
+    try {
+      window.localStorage.removeItem(CLOSED_GROUPS_KEY);
     } catch {
       // Not remembered, but the menu still works.
     }
@@ -147,6 +179,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     manufacturing?.manufacturingModel,
   );
   const activeWorkspaceHref = activeNavHref(pathname, workspaceItems);
+  const organizationName =
+    me.support?.organizationName ?? me.organizations.find((organization) => organization.id === me.tenantId)?.name ?? "Organisation";
+  const workspaceSections = navSections(workspaceItems);
+  const anyGroupClosed = workspaceSections.some(({ group }) => group && closedGroups.includes(group));
 
   return (
     <div className="flex min-h-svh flex-col md:flex-row md:gap-6 md:p-4 print:block print:p-0">
@@ -175,51 +211,54 @@ export function AppShell({ children }: { children: ReactNode }) {
         }`}
       >
         <div className={`hidden items-center justify-between gap-1 md:flex ${collapsed ? "md:flex-col md:gap-2" : ""}`}>
-          <Brand name={controlCenter ? "Control Center" : "ProductionOS"} light={controlCenter} compact={collapsed} />
+          {collapsed ? (
+            // In the narrow menu, the logo is also a way back to the full one.
+            <button type="button" aria-label="ProductionOS, expand menu" title="Expand menu" className="rounded-xl" onClick={() => toggleCollapsed(false)}>
+              <Brand name={controlCenter ? "Control Center" : "ProductionOS"} light={controlCenter} compact />
+            </button>
+          ) : (
+            <Brand name={controlCenter ? "Control Center" : "ProductionOS"} light={controlCenter} />
+          )}
           <span className={`flex items-center gap-1 ${collapsed ? "flex-col" : ""}`}>
             <NotificationBell />
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={collapsed ? "Expand menu" : "Collapse menu"}
-              aria-expanded={!collapsed}
-              title={collapsed ? "Expand menu" : "Collapse menu"}
-              className={controlCenter ? "text-slate-200 hover:bg-white/10 hover:text-white" : ""}
-              onClick={() => toggleCollapsed()}
-            >
-              {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
-            </Button>
           </span>
         </div>
 
-        {!controlCenter && me.tenantId && (
-          <div className={`flex ${hideWhenCollapsed}`}>
-            <OrganizationLogo
-              tenantId={me.tenantId}
-              name={me.support?.organizationName ?? me.organizations.find((organization) => organization.id === me.tenantId)?.name ?? "Organisation"}
-            />
-          </div>
-        )}
-        {me.support ? (
-          <p className={`truncate rounded-xl bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900 ring-1 ring-amber-200 ${hideWhenCollapsed}`}>
-            Support view: {me.support.organizationName}
-          </p>
-        ) : me.organizations.length > 1 ? (
-          <select
-            aria-label="Organisation"
-            className={`h-9 w-full rounded-xl border bg-white/70 px-2 text-sm ${hideWhenCollapsed}`}
-            value={me.tenantId}
-            onChange={(event) => switchOrganization(event.target.value)}
-          >
-            {me.organizations.map((organization) => (
-              <option key={organization.id} value={organization.id}>
-                {organization.name}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <p className={`truncate rounded-xl px-3 py-2 text-xs font-medium ${hideWhenCollapsed} ${controlCenter ? "bg-white/10 text-slate-300" : "bg-white/60 text-muted-foreground ring-1 ring-white/80"}`}>{me.organizations[0]?.name}</p>
-        )}
+        <div
+          className={`flex items-center gap-2.5 rounded-xl p-2 ${hideWhenCollapsed} ${
+            controlCenter ? "bg-white/10" : me.support ? "bg-amber-50 ring-1 ring-amber-200" : "bg-white/60 ring-1 ring-white/80"
+          }`}
+        >
+          {!controlCenter && me.tenantId && <OrganizationLogo tenantId={me.tenantId} name={organizationName} />}
+          {me.support ? (
+            <p className="min-w-0 flex-1 text-sm leading-tight font-semibold text-amber-900">
+              <span className="block text-[11px] font-medium tracking-wide uppercase">Support view</span>
+              <span className="block truncate" title={me.support.organizationName}>
+                {me.support.organizationName}
+              </span>
+            </p>
+          ) : me.organizations.length > 1 ? (
+            <select
+              aria-label="Organisation"
+              className="h-9 min-w-0 flex-1 rounded-lg border bg-white/70 px-2 text-sm font-medium"
+              value={me.tenantId}
+              onChange={(event) => switchOrganization(event.target.value)}
+            >
+              {me.organizations.map((organization) => (
+                <option key={organization.id} value={organization.id}>
+                  {organization.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p
+              className={`line-clamp-2 min-w-0 flex-1 text-sm leading-tight font-semibold break-words ${controlCenter ? "text-slate-200" : "text-[#1b2a55]"}`}
+              title={organizationName}
+            >
+              {organizationName}
+            </p>
+          )}
+        </div>
 
         {!controlCenter && me.permissions.includes("TRACEABILITY_VIEW") && (
           <>
@@ -268,29 +307,66 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
         ) : (
           <nav aria-label="Main" className="flex flex-1 flex-col gap-1">
-            {workspaceItems.map(({ href, label: text, icon: Icon, group }, index) => {
-              const active = href === activeWorkspaceHref;
-              const startsGroup = group && workspaceItems[index - 1]?.group !== group;
-              const endsGroup = group && workspaceItems[index + 1]?.group !== group;
-              return (
-                <Fragment key={href}>
-                {startsGroup && (
-                  <p className={`mt-2 px-3 pt-1 text-xs font-medium tracking-wide text-muted-foreground uppercase ${collapsed ? "md:sr-only" : ""}`}>
-                    {group}
-                  </p>
-                )}
+            {anyGroupClosed && !collapsed && (
+              <button
+                type="button"
+                onClick={openAllGroups}
+                className="self-end rounded-lg px-2 py-0.5 text-xs font-medium text-primary hover:bg-white/70 hover:underline"
+              >
+                Open all
+              </button>
+            )}
+            {workspaceSections.map(({ group, items }) => {
+              const navLink = ({ href, label: text, icon: Icon }: (typeof items)[number]) => (
                 <Link
+                  key={href}
                   href={href}
-                  aria-current={active ? "page" : undefined}
+                  aria-current={href === activeWorkspaceHref ? "page" : undefined}
                   title={collapsed ? text : undefined}
                   onClick={() => setMenuOpen(false)}
-                  className={link(href, active)}
+                  className={link(href, href === activeWorkspaceHref)}
                 >
                   <Icon aria-hidden className="size-4 shrink-0" />
                   {label(text)}
                 </Link>
-                {endsGroup && <hr aria-hidden className="mx-3 my-1 border-[#1b2a55]/10" />}
-                </Fragment>
+              );
+              if (!group) {
+                return <Fragment key="ungrouped">{items.map(navLink)}</Fragment>;
+              }
+              // The group of the page you are on stays open, so the highlighted item is never hidden.
+              const holdsActive = items.some(({ href }) => href === activeWorkspaceHref);
+              const open = collapsed || holdsActive || !closedGroups.includes(group);
+              const id = `menu-${group.toLowerCase().replaceAll(" ", "-")}`;
+              return (
+                <div key={group} className="mt-1">
+                  {collapsed && <hr aria-hidden className="mx-2 my-1 hidden border-[#1b2a55]/10 md:block" />}
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    title={holdsActive ? undefined : open ? `Hide ${group}` : `Show ${group}`}
+                    aria-controls={id}
+                    disabled={holdsActive}
+                    onClick={() => toggleGroup(group)}
+                    className={`flex w-full items-center justify-between rounded-lg px-3 pt-2 pb-1 text-left text-xs font-semibold tracking-wide text-muted-foreground uppercase hover:text-[#1b2a55] disabled:cursor-default disabled:hover:text-muted-foreground ${collapsed ? "md:sr-only" : ""}`}
+                  >
+                    <span>{group}</span>
+                    <span className="flex items-center gap-1.5">
+                      {!open && (
+                        <span
+                          title={`${items.length} hidden`}
+                          className="grid h-4 min-w-4 place-items-center rounded-full bg-[#1b2a55] px-1 text-[10px] font-semibold text-white"
+                        >
+                          {items.length}
+                          <span className="sr-only"> hidden</span>
+                        </span>
+                      )}
+                      <ChevronDown aria-hidden className={`size-3.5 transition-transform ${open ? "" : "-rotate-90"}`} />
+                    </span>
+                  </button>
+                  <div id={id} hidden={!open} className="space-y-0.5">
+                    {items.map(navLink)}
+                  </div>
+                </div>
               );
             })}
           </nav>
@@ -322,6 +398,30 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Button>
         </div>
       </aside>
+
+      {/* On the menu's edge: << collapses it to icons, >> brings the names back. */}
+      <div className="relative hidden w-0 md:-ml-6 md:block print:hidden">
+        <button
+          type="button"
+          aria-label={collapsed ? "Expand menu" : "Collapse menu"}
+          aria-expanded={!collapsed}
+          onClick={() => toggleCollapsed()}
+          className={`group/toggle sticky top-[calc(50svh-1rem)] z-20 grid size-8 -translate-x-1/2 place-items-center rounded-full border backdrop-blur-md transition-all duration-200 hover:scale-110 active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2f4590] ${
+            controlCenter
+              ? "border-white/25 bg-[#1c2a62]/80 text-white shadow-[0_6px_16px_-6px_rgba(0,0,0,0.6)] hover:bg-white hover:text-[#1b2a55]"
+              : "border-white bg-white/80 text-[#1b2a55] shadow-[0_6px_18px_-6px_rgba(27,42,85,0.45)] hover:border-transparent hover:bg-gradient-to-b hover:from-[#2f4590] hover:to-[#1c2a62] hover:text-white hover:shadow-[0_10px_22px_-8px_rgba(28,42,98,0.8)]"
+          }`}
+        >
+          {/* One icon that turns round: « while open, » once collapsed. */}
+          <ChevronsLeft aria-hidden className={`size-4 transition-transform duration-300 ease-out ${collapsed ? "rotate-180" : ""}`} />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute left-full ml-2 -translate-x-1 rounded-lg bg-[#1b2a55] px-2 py-1 text-xs font-medium whitespace-nowrap text-white opacity-0 shadow-lg transition-all duration-200 group-hover/toggle:translate-x-0 group-hover/toggle:opacity-100 group-focus-visible/toggle:translate-x-0 group-focus-visible/toggle:opacity-100"
+          >
+            {collapsed ? "Expand menu" : "Collapse menu"}
+          </span>
+        </button>
+      </div>
 
       <main className="min-w-0 flex-1 p-4 md:py-4 md:pr-4 md:pl-0">
         {me.support && <SupportSessionBanner organizationName={me.support.organizationName} expiresAt={me.support.expiresAt} allowChanges={me.support.allowChanges} />}

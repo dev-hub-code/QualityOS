@@ -15,6 +15,13 @@ export function findState(states: readonly PlaceState[], name: unknown): PlaceSt
   return wanted ? states.find((state) => state.name.toLowerCase() === wanted) : undefined;
 }
 
+/** The state a GSTIN is registered in, from its first two digits; undefined until they name one. */
+export function stateFromGstin(states: readonly PlaceState[], gstin: unknown): PlaceState | undefined {
+  if (typeof gstin !== "string") return undefined;
+  const code = /^\s*(\d{2})/.exec(gstin)?.[1];
+  return code ? states.find((state) => state.gstCode === code) : undefined;
+}
+
 // The lists change only with a release, so they are fetched once per visit.
 const ONCE = { staleTime: Infinity, gcTime: Infinity } as const;
 

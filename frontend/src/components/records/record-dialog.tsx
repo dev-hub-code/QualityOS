@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { useForm, type FieldValues } from "react-hook-form";
+import { useForm, useWatch, type FieldValues } from "react-hook-form";
 import { applyServerErrors } from "@/components/forms/apply-server-errors";
 import { Field, FormError } from "@/components/forms/field";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
-import { findState, useCities, useStates } from "@/lib/places";
+import { findState, stateFromGstin, useCities, useStates } from "@/lib/places";
 import { recordSchema, toFormValues, toPayload, type FieldDef } from "@/lib/record-form";
 
 interface RecordDialogProps {
@@ -104,7 +104,8 @@ export function RecordDialog({ title, fields, record, onSubmit, onClose, extra }
     handleSubmit,
     setError,
     setValue,
-    watch,
+    getValues,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<FieldValues>({
     resolver: zodResolver(schema as never),
@@ -114,9 +115,28 @@ export function RecordDialog({ title, fields, record, onSubmit, onClose, extra }
   // States and cities are only suggested: any text is still taken.
   const suggests = fields.some((field) => field.suggest);
   const states = useStates(suggests);
-  const chosenState = findState(states.data ?? [], suggests ? watch("state") : undefined);
+  const [typedState, typedGstin] = useWatch({ control, name: ["state", "gstin"] });
+  const chosenState = findState(states.data ?? [], suggests ? typedState : undefined);
   const cities = useCities(fields.some((field) => field.suggest === "city") ? chosenState?.gstCode : undefined);
   const suggestions = { state: (states.data ?? []).map((state) => state.name), city: cities.data ?? [] };
+
+  // A GSTIN starts with its state's code, so it fills in an empty state, or one it filled in itself. A state typed by
+  // hand is kept, with a note if the GSTIN says otherwise.
+  const fillsState = suggests && fields.some((field) => field.name === "gstin");
+  const registered = stateFromGstin(states.data ?? [], fillsState ? typedGstin : undefined);
+  const autoFilled = useRef<string | null>(null);
+  useEffect(() => {
+    if (!registered) return;
+    const current = String(getValues("state") ?? "");
+    if (current.trim() === "" || current === autoFilled.current) {
+      setValue("state", registered.name, { shouldDirty: true });
+      autoFilled.current = registered.name;
+    }
+  }, [registered, getValues, setValue]);
+  const stateMismatch =
+    registered && chosenState && registered.gstCode !== chosenState.gstCode
+      ? `The GSTIN is registered in ${registered.name}.`
+      : null;
 
   // A select cannot take a value until its option exists, which is after the refreshed list has rendered.
   useEffect(() => {
@@ -205,6 +225,9 @@ export function RecordDialog({ title, fields, record, onSubmit, onClose, extra }
                       <option key={name} value={name} />
                     ))}
                   </datalist>
+                  {field.suggest === "state" && stateMismatch && (
+                    <p className="mt-1 text-sm text-amber-700">{stateMismatch}</p>
+                  )}
                 </div>
               );
             }

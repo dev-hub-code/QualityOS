@@ -146,6 +146,8 @@ export interface FacilityDetail {
   shifts: Shift[];
   /** From the start of this year on. */
   holidays: Holiday[];
+  /** The days of the week it never works, as for a shift's days; 0 for none. */
+  weeklyOffDays: number;
 }
 
 /** A day the facility does not work, whatever its shifts say. */

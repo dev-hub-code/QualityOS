@@ -44,7 +44,13 @@ public final class FacilityDtos {
             List<UnitResponse> productionLines,
             List<ShiftResponse> shifts,
             /* From the start of this year on. */
-            List<HolidayResponse> holidays) {
+            List<HolidayResponse> holidays,
+            /* The days of the week it never works, as for a shift's days of the week; 0 for none. */
+            int weeklyOffDays) {
+    }
+
+    /** {@code daysOfWeek}: Monday 1, Tuesday 2, Wednesday 4 ... Sunday 64; 0 for no weekly off. */
+    public record SaveWeeklyOffRequest(@NotNull @Min(0) @Max(127) Integer daysOfWeek) {
     }
 
     public record SaveHolidayRequest(@NotNull java.time.LocalDate date, @NotBlank @Size(max = 200) String name) {

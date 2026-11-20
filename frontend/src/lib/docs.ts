@@ -133,6 +133,10 @@ export const DOC_PAGES: DocPage[] = [
             "Weekly off",
             "Days of the week the whole facility never works, such as Sunday. They count as holidays every week.",
           ],
+          [
+            "Alternate off",
+            "A day the whole facility does not work in some weeks of each month, such as the 2nd and 4th Saturday.",
+          ],
         ],
       },
       {

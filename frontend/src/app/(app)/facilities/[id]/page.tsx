@@ -9,7 +9,7 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
-import { daysToMask, describeDays, maskToDays, WEEKDAYS } from "@/lib/manufacturing";
+import { daysToMask, describeAlternateOff, describeDays, maskToDays, WEEK_ORDINALS, WEEKDAYS } from "@/lib/manufacturing";
 import { FACILITY_FIELDS } from "@/lib/record-fields";
 import type { FieldDef } from "@/lib/record-form";
 import type { FacilityDetail } from "@/lib/types";
@@ -37,11 +37,39 @@ const SHIFT_DEFAULTS = { breakMinutes: "0", ...Object.fromEntries(WEEKDAYS.map((
 
 type Dialog = "edit" | "department" | "line" | "shift" | "holiday" | "weeklyOff" | null;
 
-const WEEKLY_OFF_FIELDS: FieldDef[] = WEEKDAYS.map((day) => ({
-  name: `day${day}`,
-  label: `Off every ${day}`,
-  type: "checkbox" as const,
-}));
+const WEEKLY_OFF_FIELDS: FieldDef[] = [
+  ...WEEKDAYS.map((day) => ({ name: `day${day}`, label: `Off every ${day}`, type: "checkbox" as const })),
+  {
+    name: "alternateDay",
+    label: "Alternate day off (only in some weeks of the month)",
+    type: "select",
+    options: WEEKDAYS.map((day, index) => ({ value: String(index + 1), label: day })),
+  },
+  ...WEEK_ORDINALS.map((ordinal) => ({
+    name: `week${ordinal}`,
+    label: `Off on the ${ordinal} one in the month`,
+    type: "checkbox" as const,
+  })),
+];
+
+/** The dialog's values for a facility's days off. */
+function weeklyOffRecord(weeklyOffDays: number, alternateOffDay: number | null, alternateOffWeeks: number) {
+  return {
+    ...Object.fromEntries(maskToDays(weeklyOffDays).map((off, index) => [`day${WEEKDAYS[index]}`, off])),
+    alternateDay: alternateOffDay === null ? "" : String(alternateOffDay),
+    ...Object.fromEntries(WEEK_ORDINALS.map((ordinal, index) => [`week${ordinal}`, (alternateOffWeeks & (1 << index)) !== 0])),
+  };
+}
+
+/** The dialog's values as the API's days off. */
+function weeklyOffRequest(values: Record<string, unknown>) {
+  const alternateDay = values.alternateDay ? Number(values.alternateDay) : null;
+  return {
+    daysOfWeek: daysToMask(WEEKDAYS.map((day) => values[`day${day}`] === true)),
+    alternateDay,
+    alternateWeeks: alternateDay === null ? 0 : daysToMask(WEEK_ORDINALS.map((ordinal) => values[`week${ordinal}`] === true)),
+  };
+}
 
 const HOLIDAY_FIELDS: FieldDef[] = [
   { name: "date", label: "Date", type: "date", required: true },
@@ -84,7 +112,8 @@ export default function FacilityPage() {
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<FacilityDetail>(path) });
   if (!data) return <QueryState error={error} />;
 
-  const { facility, departments, productionLines, shifts, holidays, weeklyOffDays } = data;
+  const { facility, departments, productionLines, shifts, holidays, weeklyOffDays, alternateOffDay, alternateOffWeeks } =
+    data;
   const add = (button: string, target: Dialog) =>
     canManage && (
       <Button variant="outline" size="sm" onClick={() => setDialog(target)}>
@@ -171,10 +200,13 @@ export default function FacilityPage() {
         }
       >
         <p className="mb-2 text-sm text-muted-foreground">
-          No shift works on a holiday or a weekly off, so scheduling and machine availability give it no working time.
+          No shift works on a holiday, a weekly off or an alternate day off, so scheduling and machine availability give it no working time.
         </p>
         <p className="mb-2 text-sm">
           <span className="font-medium">Weekly off:</span> {weeklyOffDays === 0 ? "none" : describeDays(weeklyOffDays)}
+        </p>
+        <p className="mb-2 text-sm">
+          <span className="font-medium">Alternate off:</span> {describeAlternateOff(alternateOffDay, alternateOffWeeks)}
         </p>
         <UnitList
           items={holidays.map((holiday) => ({ id: holiday.id, label: `${holiday.date} – ${holiday.name}` }))}
@@ -214,13 +246,9 @@ export default function FacilityPage() {
         <RecordDialog
           title="Weekly off"
           fields={WEEKLY_OFF_FIELDS}
-          record={Object.fromEntries(maskToDays(weeklyOffDays).map((off, index) => [`day${WEEKDAYS[index]}`, off]))}
+          record={weeklyOffRecord(weeklyOffDays, alternateOffDay, alternateOffWeeks)}
           onClose={() => setDialog(null)}
-          onSubmit={(values) =>
-            api
-              .put(`${path}/weekly-off`, { daysOfWeek: daysToMask(WEEKDAYS.map((day) => values[`day${day}`] === true)) })
-              .then(refresh)
-          }
+          onSubmit={(values) => api.put(`${path}/weekly-off`, weeklyOffRequest(values)).then(refresh)}
         />
       )}
       {dialog === "shift" && (

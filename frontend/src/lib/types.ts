@@ -148,6 +148,10 @@ export interface FacilityDetail {
   holidays: Holiday[];
   /** The days of the week it never works, as for a shift's days; 0 for none. */
   weeklyOffDays: number;
+  /** A day (Monday 1 … Sunday 7) off only in some weeks of each month; null for none. */
+  alternateOffDay: number | null;
+  /** Which of that day's occurrences in a month are off: 1st 1, 2nd 2, 3rd 4, 4th 8, 5th 16. */
+  alternateOffWeeks: number;
 }
 
 /** A day the facility does not work, whatever its shifts say. */

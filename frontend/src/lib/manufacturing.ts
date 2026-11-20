@@ -315,6 +315,16 @@ export function describeDays(mask: number): string {
   return WEEKDAYS.filter((_, index) => (mask & (1 << index)) !== 0).join(", ");
 }
 
+export const WEEK_ORDINALS = ["1st", "2nd", "3rd", "4th", "5th"] as const;
+
+/** "2nd and 4th Sat" for an alternate day off; "none" when there is none. */
+export function describeAlternateOff(day: number | null, weeks: number): string {
+  if (day === null || weeks === 0) return "none";
+  const chosen = WEEK_ORDINALS.filter((_, index) => (weeks & (1 << index)) !== 0);
+  const list = chosen.length > 1 ? `${chosen.slice(0, -1).join(", ")} and ${chosen.at(-1)}` : chosen.join("");
+  return `${list} ${WEEKDAYS[day - 1]} of each month`;
+}
+
 /** A date and time typed in the browser's own time zone, as an instant for the API. Null if either is missing. */
 export function toInstant(date: unknown, time: unknown): string | null {
   if (typeof date !== "string" || typeof time !== "string" || !date || !time) return null;

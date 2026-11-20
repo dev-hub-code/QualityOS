@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   completionActions,
   daysToMask,
+  describeAlternateOff,
   describeDays,
   describeLimits,
   formatDuration,
@@ -329,5 +330,18 @@ describe("reschedulable", () => {
   it("covers approved orders until they close", () => {
     expect(["APPROVED", "RELEASED", "IN_PROGRESS", "ON_HOLD"].every((status) => reschedulable(status as never))).toBe(true);
     expect(["DRAFT", "SUBMITTED", "COMPLETED", "PARTIALLY_COMPLETED", "CANCELLED"].some((status) => reschedulable(status as never))).toBe(false);
+  });
+});
+
+describe("describeAlternateOff", () => {
+  it("names the weeks and the day", () => {
+    expect(describeAlternateOff(6, 2 | 8)).toBe("2nd and 4th Sat of each month");
+    expect(describeAlternateOff(6, 1 | 4 | 16)).toBe("1st, 3rd and 5th Sat of each month");
+    expect(describeAlternateOff(5, 1)).toBe("1st Fri of each month");
+  });
+
+  it("is none without a day or weeks", () => {
+    expect(describeAlternateOff(null, 0)).toBe("none");
+    expect(describeAlternateOff(6, 0)).toBe("none");
   });
 });

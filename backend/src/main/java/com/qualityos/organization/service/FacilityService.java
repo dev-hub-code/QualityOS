@@ -85,6 +85,7 @@ public class FacilityService {
     @Transactional(readOnly = true)
     public FacilityDetail get(UUID id) {
         Facility facility = load(id);
+        DaysOff offs = daysOff(id);
         return new FacilityDetail(
                 mapper.toResponse(facility),
                 departments.findByFacilityIdAndArchivedAtIsNullOrderByName(id).stream()
@@ -99,25 +100,67 @@ public class FacilityService {
                         """, (rows, row) -> new HolidayResponse(rows.getObject("id", UUID.class),
                         rows.getObject("holiday_on", java.time.LocalDate.class), rows.getString("name")),
                         id, java.time.LocalDate.now().withDayOfYear(1)),
-                weeklyOffDays(id));
+                offs.weeklyOffDays(), offs.alternateOffDay(), offs.alternateOffWeeks());
     }
 
-    private int weeklyOffDays(UUID facilityId) {
-        return jdbc.queryForObject("SELECT weekly_off_days FROM facilities WHERE id = ?", Integer.class, facilityId);
+    /** A facility's regular days off, as stored. */
+    private record DaysOff(int weeklyOffDays, Integer alternateOffDay, int alternateOffWeeks) {
+
+        Map<String, Object> state() {
+            Map<String, Object> state = new java.util.LinkedHashMap<>();
+            state.put("weeklyOffDays", weeklyOffDays);
+            state.put("alternateOffDay", alternateOffDay);
+            state.put("alternateOffWeeks", alternateOffWeeks);
+            return state;
+        }
     }
 
-    /** Sets the days of the week the facility never works, such as Sunday. */
+    private DaysOff daysOff(UUID facilityId) {
+        return jdbc.queryForObject(
+                "SELECT weekly_off_days, alternate_off_day, alternate_off_weeks FROM facilities WHERE id = ?",
+                (rows, row) -> new DaysOff(rows.getInt("weekly_off_days"),
+                        rows.getObject("alternate_off_day", Integer.class), rows.getInt("alternate_off_weeks")),
+                facilityId);
+    }
+
+    /**
+     * Sets the days of the week the facility never works, such as Sunday, and a day it does not work in some weeks
+     * of each month, such as the 2nd and 4th Saturday.
+     */
     @Transactional
     public void setWeeklyOff(UUID facilityId, SaveWeeklyOffRequest request) {
         load(facilityId);
-        int before = weeklyOffDays(facilityId);
-        int after = request.daysOfWeek();
-        if (before == after) {
+        Integer alternateDay = request.alternateDay();
+        int alternateWeeks = request.alternateWeeks() == null ? 0 : request.alternateWeeks();
+        if (alternateDay == null) {
+            alternateWeeks = 0;
+        } else if (alternateWeeks == 0) {
+            throw new BusinessRuleException("Choose which weeks of the month the alternate day is off.");
+        } else if (alternateWeeks == 31) {
+            throw new BusinessRuleException("Off in every week of the month: choose it as a weekly off instead.");
+        } else if ((request.daysOfWeek() & (1 << (alternateDay - 1))) != 0) {
+            throw new BusinessRuleException("The alternate day is already off every week.");
+        }
+        DaysOff before = daysOff(facilityId);
+        DaysOff after = new DaysOff(request.daysOfWeek(), alternateDay, alternateWeeks);
+        if (before.equals(after)) {
             return;
         }
-        jdbc.update("UPDATE facilities SET weekly_off_days = ? WHERE id = ?", after, facilityId);
-        audit.record("WEEKLY_OFF_CHANGED", "Facility", facilityId, Map.of("weeklyOffDays", before),
-                Map.of("weeklyOffDays", after));
+        jdbc.update("""
+                UPDATE facilities SET weekly_off_days = ?, alternate_off_day = ?, alternate_off_weeks = ? WHERE id = ?
+                """, after.weeklyOffDays(), after.alternateOffDay(), after.alternateOffWeeks(), facilityId);
+        audit.record("WEEKLY_OFF_CHANGED", "Facility", facilityId, before.state(), after.state());
+    }
+
+    /** Whether a day is a regular day off: a weekly off, or the alternate day in one of its weeks of the month. */
+    static boolean isDayOff(java.time.LocalDate day, int weeklyOffDays, Integer alternateOffDay,
+            int alternateOffWeeks) {
+        int weekday = day.getDayOfWeek().getValue();
+        if ((weeklyOffDays & (1 << (weekday - 1))) != 0) {
+            return true;
+        }
+        int occurrence = (day.getDayOfMonth() - 1) / 7;
+        return alternateOffDay != null && alternateOffDay == weekday && (alternateOffWeeks & (1 << occurrence)) != 0;
     }
 
     @Transactional
@@ -150,7 +193,7 @@ public class FacilityService {
         audit.record("HOLIDAY_REMOVED", "Facility", facilityId, Map.of("date", removed.getFirst().toString()), null);
     }
 
-    /** Each facility's holidays between the two days, both included, with every day of its weekly off. */
+    /** Each facility's holidays between the two days, both included, with its weekly and alternate days off. */
     @Transactional(readOnly = true)
     public Map<UUID, java.util.Set<java.time.LocalDate>> holidaysOf(Collection<UUID> facilityIds,
             java.time.LocalDate from, java.time.LocalDate to) {
@@ -158,12 +201,17 @@ public class FacilityService {
         if (facilityIds.isEmpty()) {
             return found;
         }
-        jdbc.query("SELECT id, weekly_off_days FROM facilities WHERE id = ANY (?) AND weekly_off_days <> 0", rows -> {
-            int mask = rows.getInt("weekly_off_days");
+        jdbc.query("""
+                SELECT id, weekly_off_days, alternate_off_day, alternate_off_weeks FROM facilities
+                WHERE id = ANY (?) AND (weekly_off_days <> 0 OR alternate_off_day IS NOT NULL)
+                """, rows -> {
+            int weekly = rows.getInt("weekly_off_days");
+            Integer alternateDay = rows.getObject("alternate_off_day", Integer.class);
+            int alternateWeeks = rows.getInt("alternate_off_weeks");
             java.util.Set<java.time.LocalDate> days = found.computeIfAbsent(rows.getObject("id", UUID.class),
                     ignored -> new java.util.HashSet<>());
             for (var day = from; !day.isAfter(to); day = day.plusDays(1)) {
-                if ((mask & (1 << (day.getDayOfWeek().getValue() - 1))) != 0) {
+                if (isDayOff(day, weekly, alternateDay, alternateWeeks)) {
                     days.add(day);
                 }
             }

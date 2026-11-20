@@ -78,9 +78,11 @@ const HOLIDAY_FIELDS: FieldDef[] = [
 
 function UnitList({
   items,
+  onEdit,
   onRemove,
 }: {
   items: { id: string; label: string }[];
+  onEdit?: (id: string) => void;
   onRemove?: (id: string) => void;
 }) {
   if (items.length === 0) return <p className="text-sm text-muted-foreground">None yet.</p>;
@@ -89,11 +91,18 @@ function UnitList({
       {items.map((item) => (
         <li key={item.id} className="flex items-center justify-between py-2">
           {item.label}
-          {onRemove && (
-            <Button variant="ghost" size="sm" onClick={() => onRemove(item.id)}>
-              Remove
-            </Button>
-          )}
+          <span className="flex gap-1">
+            {onEdit && (
+              <Button variant="ghost" size="sm" onClick={() => onEdit(item.id)}>
+                Edit
+              </Button>
+            )}
+            {onRemove && (
+              <Button variant="ghost" size="sm" onClick={() => onRemove(item.id)}>
+                Remove
+              </Button>
+            )}
+          </span>
         </li>
       ))}
     </ul>
@@ -107,6 +116,7 @@ export default function FacilityPage() {
   const path = `/facilities/${id}`;
   const canManage = usePermission("FACILITY_MANAGE");
   const [dialog, setDialog] = useState<Dialog>(null);
+  const [editingHoliday, setEditingHoliday] = useState<string | null>(null);
   const { run, message } = useAction();
   const refresh = useRefresh();
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<FacilityDetail>(path) });
@@ -210,6 +220,7 @@ export default function FacilityPage() {
         </p>
         <UnitList
           items={holidays.map((holiday) => ({ id: holiday.id, label: `${holiday.date} – ${holiday.name}` }))}
+          onEdit={canManage ? setEditingHoliday : undefined}
           onRemove={remover("holidays")}
         />
       </Section>
@@ -240,6 +251,15 @@ export default function FacilityPage() {
           fields={HOLIDAY_FIELDS}
           onClose={() => setDialog(null)}
           onSubmit={(values) => api.post(`${path}/holidays`, values).then(refresh)}
+        />
+      )}
+      {editingHoliday !== null && (
+        <RecordDialog
+          title="Edit holiday"
+          fields={HOLIDAY_FIELDS}
+          record={holidays.find((holiday) => holiday.id === editingHoliday)}
+          onClose={() => setEditingHoliday(null)}
+          onSubmit={(values) => api.put(`${path}/holidays/${editingHoliday}`, values).then(refresh)}
         />
       )}
       {dialog === "weeklyOff" && (

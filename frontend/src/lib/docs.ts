@@ -144,6 +144,7 @@ export const DOC_PAGES: DocPage[] = [
         list: [
           "Your plan sets how many facilities you can have.",
           "Open a facility from the list to add its departments, lines, shifts, holidays and weekly off.",
+          "Everyone can see upcoming holidays and regular days off under Holiday calendar in the menu, without access to facilities.",
         ],
       },
     ],

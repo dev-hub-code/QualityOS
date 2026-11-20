@@ -181,6 +181,37 @@ public class FacilityService {
         return new HolidayResponse(id, request.date(), name);
     }
 
+    /** Changes a holiday's date or name. */
+    @Transactional
+    public HolidayResponse updateHoliday(UUID facilityId, UUID holidayId, SaveHolidayRequest request) {
+        load(facilityId);
+        List<HolidayResponse> found = jdbc.query("""
+                SELECT id, holiday_on, name FROM facility_holidays WHERE id = ? AND facility_id = ? FOR UPDATE
+                """, (rows, row) -> new HolidayResponse(rows.getObject("id", UUID.class),
+                rows.getObject("holiday_on", java.time.LocalDate.class), rows.getString("name")),
+                holidayId, facilityId);
+        if (found.isEmpty()) {
+            throw new ResourceNotFoundException("Holiday", holidayId);
+        }
+        HolidayResponse before = found.getFirst();
+        HolidayResponse after = new HolidayResponse(holidayId, request.date(), request.name().trim());
+        if (before.equals(after)) {
+            return after;
+        }
+        Integer clashes = jdbc.queryForObject("""
+                SELECT count(*) FROM facility_holidays WHERE facility_id = ? AND holiday_on = ? AND id <> ?
+                """, Integer.class, facilityId, after.date(), holidayId);
+        if (clashes != null && clashes > 0) {
+            throw new ConflictException("%s is already a holiday here.".formatted(after.date()));
+        }
+        jdbc.update("UPDATE facility_holidays SET holiday_on = ?, name = ? WHERE id = ?", after.date(), after.name(),
+                holidayId);
+        audit.record("HOLIDAY_UPDATED", "Facility", facilityId,
+                Map.of("date", before.date().toString(), "name", before.name()),
+                Map.of("date", after.date().toString(), "name", after.name()));
+        return after;
+    }
+
     @Transactional
     public void removeHoliday(UUID facilityId, UUID holidayId) {
         load(facilityId);

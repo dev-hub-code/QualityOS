@@ -164,10 +164,11 @@ export interface CalendarFacility {
   alternateOffWeeks: number;
 }
 
-/** A named holiday at one facility. */
+/** A day one facility is closed: a named holiday, or a day of its weekly or alternate days off. */
 export interface CalendarHoliday {
   date: string;
   name: string;
+  kind: "HOLIDAY" | "WEEKLY_OFF" | "ALTERNATE_OFF";
   facilityId: string;
   facilityCode: string;
   facilityName: string;

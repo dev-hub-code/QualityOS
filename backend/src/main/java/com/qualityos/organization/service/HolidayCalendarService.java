@@ -5,9 +5,13 @@ import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.organization.dto.HolidayCalendarDtos.CalendarFacility;
 import com.qualityos.organization.dto.HolidayCalendarDtos.CalendarHoliday;
 import com.qualityos.organization.dto.HolidayCalendarDtos.HolidayCalendar;
+import com.qualityos.organization.dto.HolidayCalendarDtos.HolidayKind;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -15,7 +19,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Upcoming days off at the facilities a member can open; anyone in the organisation can read it. */
+/**
+ * Upcoming days off at the facilities a member can open, named holidays and each day of the weekly and alternate days
+ * off; anyone in the organisation can read it.
+ */
 @Service
 public class HolidayCalendarService {
 
@@ -53,15 +60,29 @@ public class HolidayCalendarService {
                 rows.getString("name"), rows.getInt("weekly_off_days"),
                 rows.getObject("alternate_off_day", Integer.class), rows.getInt("alternate_off_weeks")),
                 allowed, allowed);
-        List<CalendarHoliday> holidays = jdbc.query("""
+        List<CalendarHoliday> holidays = new ArrayList<>(jdbc.query("""
                 SELECT h.holiday_on, h.name, f.id, f.code, f.name AS facility_name
                 FROM facility_holidays h JOIN facilities f ON f.id = h.facility_id
                 WHERE f.archived_at IS NULL AND h.holiday_on BETWEEN ? AND ?
                   AND (?::uuid[] IS NULL OR f.id = ANY (?::uuid[]))
-                ORDER BY h.holiday_on, f.name
                 """, (rows, row) -> new CalendarHoliday(rows.getObject("holiday_on", LocalDate.class),
-                rows.getString("name"), rows.getObject("id", UUID.class), rows.getString("code"),
-                rows.getString("facility_name")), start, end, allowed, allowed);
+                rows.getString("name"), HolidayKind.HOLIDAY, rows.getObject("id", UUID.class), rows.getString("code"),
+                rows.getString("facility_name")), start, end, allowed, allowed));
+        Set<String> named = new HashSet<>();
+        holidays.forEach(holiday -> named.add(holiday.facilityId() + "/" + holiday.date()));
+        for (CalendarFacility facility : facilities) {
+            for (LocalDate day = start; !day.isAfter(end); day = day.plusDays(1)) {
+                if (named.contains(facility.id() + "/" + day) || !FacilityService.isDayOff(day,
+                        facility.weeklyOffDays(), facility.alternateOffDay(), facility.alternateOffWeeks())) {
+                    continue;
+                }
+                boolean weekly = FacilityService.isDayOff(day, facility.weeklyOffDays(), null, 0);
+                holidays.add(new CalendarHoliday(day, weekly ? "Weekly off" : "Alternate day off",
+                        weekly ? HolidayKind.WEEKLY_OFF : HolidayKind.ALTERNATE_OFF, facility.id(), facility.code(),
+                        facility.name()));
+            }
+        }
+        holidays.sort(Comparator.comparing(CalendarHoliday::date).thenComparing(CalendarHoliday::facilityName));
         return new HolidayCalendar(start, end, facilities, holidays);
     }
 }

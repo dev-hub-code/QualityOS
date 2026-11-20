@@ -44,6 +44,7 @@ function byMonth(holidays: CalendarHoliday[]): [string, CalendarHoliday[]][] {
 
 export default function HolidayCalendarPage() {
   const [days, setDays] = useState<number>(PERIODS[0].days);
+  const [showDaysOff, setShowDaysOff] = useState(true);
   const { data, error } = useQuery({
     queryKey: ["/holiday-calendar", days],
     queryFn: () => {
@@ -74,6 +75,7 @@ export default function HolidayCalendarPage() {
   }
 
   const severalFacilities = data.facilities.length > 1;
+  const listed = showDaysOff ? data.holidays : data.holidays.filter((holiday) => holiday.kind === "HOLIDAY");
   const regular = data.facilities.filter((facility) => facility.weeklyOffDays !== 0 || facility.alternateOffDay !== null);
 
   return (
@@ -81,12 +83,25 @@ export default function HolidayCalendarPage() {
       <PageHeader title="Holiday calendar" subtitle="Days your facilities are closed">
         {periodButtons}
       </PageHeader>
-      <Section title="Upcoming holidays">
-        {data.holidays.length === 0 ? (
+      <Section
+        title="Upcoming holidays"
+        action={
+          <label className="flex items-center gap-2 text-sm font-normal">
+            <input
+              type="checkbox"
+              className="size-4"
+              checked={showDaysOff}
+              onChange={(event) => setShowDaysOff(event.target.checked)}
+            />
+            Show weekly offs
+          </label>
+        }
+      >
+        {listed.length === 0 ? (
           <p className="text-sm text-muted-foreground">No holidays in this period.</p>
         ) : (
           <div className="space-y-5">
-            {byMonth(data.holidays).map(([month, holidays]) => (
+            {byMonth(listed).map(([month, holidays]) => (
               <div key={month}>
                 <h3 className="mb-1 text-sm font-semibold text-muted-foreground">{month}</h3>
                 <ul className="divide-y text-sm">
@@ -103,7 +118,7 @@ export default function HolidayCalendarPage() {
                             month: "short",
                           })}
                         </span>
-                        <span>
+                        <span className={holiday.kind === "HOLIDAY" ? undefined : "text-muted-foreground"}>
                           {holiday.name}
                           {severalFacilities && (
                             <span className="text-muted-foreground"> · {holiday.facilityName}</span>

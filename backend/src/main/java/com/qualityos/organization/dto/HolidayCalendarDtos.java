@@ -23,8 +23,16 @@ public final class HolidayCalendarDtos {
             int alternateOffWeeks) {
     }
 
-    /** A named holiday at one facility. */
-    public record CalendarHoliday(LocalDate date, String name, UUID facilityId, String facilityCode,
-            String facilityName) {
+    /** Why a facility is closed on a day. */
+    public enum HolidayKind {
+        HOLIDAY, WEEKLY_OFF, ALTERNATE_OFF
+    }
+
+    /**
+     * A day one facility is closed: a named holiday, or a day of its weekly or alternate days off. A named holiday on
+     * a regular day off is listed once, as the holiday.
+     */
+    public record CalendarHoliday(LocalDate date, String name, HolidayKind kind, UUID facilityId,
+            String facilityCode, String facilityName) {
     }
 }

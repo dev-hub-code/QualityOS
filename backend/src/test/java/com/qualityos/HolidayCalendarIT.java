@@ -32,8 +32,27 @@ class HolidayCalendarIT extends TraceabilityFixture {
         // Anyone in the organisation, whatever their role, without facility permissions.
         Session inspector = addMember(owner, "QUALITY_INSPECTOR");
         String calendar = body(as(inspector, get(CALENDAR)).andExpect(status().isOk()));
-        assertThat(JsonPath.<List<String>>read(calendar, "$.data.holidays[*].name"))
+        assertThat(JsonPath.<List<String>>read(calendar, "$.data.holidays[?(@.kind == 'HOLIDAY')].name"))
                 .containsExactly("Diwali", "Founders' day");
+
+        // Each Sunday and each 2nd and 4th Saturday at the first facility is listed with its date, except a day that
+        // is already a named holiday.
+        LocalDate today = LocalDate.now();
+        List<String> sundays = today.datesUntil(today.plusDays(90))
+                .filter(day -> day.getDayOfWeek() == java.time.DayOfWeek.SUNDAY && !day.equals(soon))
+                .map(LocalDate::toString).toList();
+        List<String> saturdays = today.datesUntil(today.plusDays(90))
+                .filter(day -> day.getDayOfWeek() == java.time.DayOfWeek.SATURDAY && !day.equals(soon))
+                .filter(day -> List.of(1, 3).contains((day.getDayOfMonth() - 1) / 7))
+                .map(LocalDate::toString).toList();
+        assertThat(JsonPath.<List<String>>read(calendar, "$.data.holidays[?(@.kind == 'WEEKLY_OFF')].date"))
+                .containsExactlyElementsOf(sundays);
+        assertThat(JsonPath.<List<String>>read(calendar, "$.data.holidays[?(@.kind == 'ALTERNATE_OFF')].date"))
+                .containsExactlyElementsOf(saturdays);
+        assertThat(JsonPath.<List<String>>read(calendar,
+                "$.data.holidays[?(@.kind == 'WEEKLY_OFF')].facilityId")).containsOnly(here);
+        List<String> dates = JsonPath.read(calendar, "$.data.holidays[*].date");
+        assertThat(dates).isSorted();
         assertThat(JsonPath.<List<Integer>>read(calendar, "$.data.facilities[?(@.id == '" + here + "')].weeklyOffDays"))
                 .containsExactly(64);
         assertThat(JsonPath.<List<Integer>>read(calendar,

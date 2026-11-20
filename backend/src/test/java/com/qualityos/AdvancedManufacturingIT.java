@@ -281,6 +281,29 @@ class AdvancedManufacturingIT extends TraceabilityFixture {
         assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[1].loadMinutes")).isEqualTo("120.0");
         assertThat(asDatabaseSuperuser().queryForObject("SELECT count(*) FROM audit_logs WHERE action IN ('HOLIDAY_ADDED', "
                 + "'HOLIDAY_REMOVED') AND entity_id = ?", Integer.class, facility)).isEqualTo(2);
+
+        // A weekly off on the second day's weekday: no working time that day, every week.
+        int offDay = 1 << (day.plusDays(1).getDayOfWeek().getValue() - 1);
+        String weeklyOff = "/api/v1/facilities/" + facility + "/weekly-off";
+        as(operator, put(weeklyOff).contentType("application/json")
+                .content(json.writeValueAsString(Map.of("daysOfWeek", offDay)))).andExpect(status().isForbidden());
+        as(owner, put(weeklyOff).contentType("application/json")
+                .content(json.writeValueAsString(Map.of("daysOfWeek", 128)))).andExpect(status().is4xxClientError());
+        as(owner, put(weeklyOff).contentType("application/json")
+                .content(json.writeValueAsString(Map.of("daysOfWeek", offDay)))).andExpect(status().isNoContent());
+        as(owner, get("/api/v1/facilities/" + facility)).andExpect(jsonPath("$.data.weeklyOffDays").value(offDay));
+        String weekly = API + "/scheduling?facilityId=" + facility + "&from=" + day + "&to=" + day.plusDays(8);
+        board = body(as(planner, get(weekly)));
+        assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[0].capacityMinutes")).isEqualTo("480.0");
+        assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[1].capacityMinutes")).isEqualTo("0.0");
+        assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[8].capacityMinutes")).isEqualTo("0.0");
+        assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[1].loadMinutes")).isEqualTo("0.0");
+        as(owner, put(weeklyOff).contentType("application/json")
+                .content(json.writeValueAsString(Map.of("daysOfWeek", 0)))).andExpect(status().isNoContent());
+        assertThat(JsonPath.<String>read(body(as(planner, get(query))), "$.data.workCenters[0].days[1].capacityMinutes"))
+                .isEqualTo("480.0");
+        assertThat(asDatabaseSuperuser().queryForObject("SELECT count(*) FROM audit_logs WHERE action = "
+                + "'WEEKLY_OFF_CHANGED' AND entity_id = ?", Integer.class, facility)).isEqualTo(2);
     }
 
     @Test

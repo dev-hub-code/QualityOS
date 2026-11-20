@@ -9,7 +9,7 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
-import { daysToMask, describeDays, WEEKDAYS } from "@/lib/manufacturing";
+import { daysToMask, describeDays, maskToDays, WEEKDAYS } from "@/lib/manufacturing";
 import { FACILITY_FIELDS } from "@/lib/record-fields";
 import type { FieldDef } from "@/lib/record-form";
 import type { FacilityDetail } from "@/lib/types";
@@ -35,7 +35,13 @@ function shiftRequest(values: Record<string, unknown>) {
 
 const SHIFT_DEFAULTS = { breakMinutes: "0", ...Object.fromEntries(WEEKDAYS.map((day) => [`day${day}`, true])) };
 
-type Dialog = "edit" | "department" | "line" | "shift" | "holiday" | null;
+type Dialog = "edit" | "department" | "line" | "shift" | "holiday" | "weeklyOff" | null;
+
+const WEEKLY_OFF_FIELDS: FieldDef[] = WEEKDAYS.map((day) => ({
+  name: `day${day}`,
+  label: `Off every ${day}`,
+  type: "checkbox" as const,
+}));
 
 const HOLIDAY_FIELDS: FieldDef[] = [
   { name: "date", label: "Date", type: "date", required: true },
@@ -78,7 +84,7 @@ export default function FacilityPage() {
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<FacilityDetail>(path) });
   if (!data) return <QueryState error={error} />;
 
-  const { facility, departments, productionLines, shifts, holidays } = data;
+  const { facility, departments, productionLines, shifts, holidays, weeklyOffDays } = data;
   const add = (button: string, target: Dialog) =>
     canManage && (
       <Button variant="outline" size="sm" onClick={() => setDialog(target)}>
@@ -149,9 +155,26 @@ export default function FacilityPage() {
           />
         </Section>
       </div>
-      <Section title="Holidays" action={add("Add holiday", "holiday")}>
+      <Section
+        title="Holidays"
+        action={
+          canManage && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setDialog("weeklyOff")}>
+                Weekly off
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setDialog("holiday")}>
+                Add holiday
+              </Button>
+            </div>
+          )
+        }
+      >
         <p className="mb-2 text-sm text-muted-foreground">
-          No shift works on a holiday, so scheduling and machine availability give it no working time.
+          No shift works on a holiday or a weekly off, so scheduling and machine availability give it no working time.
+        </p>
+        <p className="mb-2 text-sm">
+          <span className="font-medium">Weekly off:</span> {weeklyOffDays === 0 ? "none" : describeDays(weeklyOffDays)}
         </p>
         <UnitList
           items={holidays.map((holiday) => ({ id: holiday.id, label: `${holiday.date} – ${holiday.name}` }))}
@@ -185,6 +208,19 @@ export default function FacilityPage() {
           fields={HOLIDAY_FIELDS}
           onClose={() => setDialog(null)}
           onSubmit={(values) => api.post(`${path}/holidays`, values).then(refresh)}
+        />
+      )}
+      {dialog === "weeklyOff" && (
+        <RecordDialog
+          title="Weekly off"
+          fields={WEEKLY_OFF_FIELDS}
+          record={Object.fromEntries(maskToDays(weeklyOffDays).map((off, index) => [`day${WEEKDAYS[index]}`, off]))}
+          onClose={() => setDialog(null)}
+          onSubmit={(values) =>
+            api
+              .put(`${path}/weekly-off`, { daysOfWeek: daysToMask(WEEKDAYS.map((day) => values[`day${day}`] === true)) })
+              .then(refresh)
+          }
         />
       )}
       {dialog === "shift" && (

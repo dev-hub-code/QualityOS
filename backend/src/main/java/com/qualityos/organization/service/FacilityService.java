@@ -12,6 +12,7 @@ import com.qualityos.organization.dto.FacilityDtos.FacilityDetail;
 import com.qualityos.organization.dto.FacilityDtos.FacilityResponse;
 import com.qualityos.organization.dto.FacilityDtos.HolidayResponse;
 import com.qualityos.organization.dto.FacilityDtos.SaveHolidayRequest;
+import com.qualityos.organization.dto.FacilityDtos.SaveWeeklyOffRequest;
 import com.qualityos.organization.dto.FacilityDtos.SaveFacilityRequest;
 import com.qualityos.organization.dto.FacilityDtos.SaveShiftRequest;
 import com.qualityos.organization.dto.FacilityDtos.SaveUnitRequest;
@@ -97,7 +98,26 @@ public class FacilityService {
                         WHERE facility_id = ? AND holiday_on >= ? ORDER BY holiday_on
                         """, (rows, row) -> new HolidayResponse(rows.getObject("id", UUID.class),
                         rows.getObject("holiday_on", java.time.LocalDate.class), rows.getString("name")),
-                        id, java.time.LocalDate.now().withDayOfYear(1)));
+                        id, java.time.LocalDate.now().withDayOfYear(1)),
+                weeklyOffDays(id));
+    }
+
+    private int weeklyOffDays(UUID facilityId) {
+        return jdbc.queryForObject("SELECT weekly_off_days FROM facilities WHERE id = ?", Integer.class, facilityId);
+    }
+
+    /** Sets the days of the week the facility never works, such as Sunday. */
+    @Transactional
+    public void setWeeklyOff(UUID facilityId, SaveWeeklyOffRequest request) {
+        load(facilityId);
+        int before = weeklyOffDays(facilityId);
+        int after = request.daysOfWeek();
+        if (before == after) {
+            return;
+        }
+        jdbc.update("UPDATE facilities SET weekly_off_days = ? WHERE id = ?", after, facilityId);
+        audit.record("WEEKLY_OFF_CHANGED", "Facility", facilityId, Map.of("weeklyOffDays", before),
+                Map.of("weeklyOffDays", after));
     }
 
     @Transactional
@@ -130,7 +150,7 @@ public class FacilityService {
         audit.record("HOLIDAY_REMOVED", "Facility", facilityId, Map.of("date", removed.getFirst().toString()), null);
     }
 
-    /** Each facility's holidays between the two days, both included. */
+    /** Each facility's holidays between the two days, both included, with every day of its weekly off. */
     @Transactional(readOnly = true)
     public Map<UUID, java.util.Set<java.time.LocalDate>> holidaysOf(Collection<UUID> facilityIds,
             java.time.LocalDate from, java.time.LocalDate to) {
@@ -138,6 +158,16 @@ public class FacilityService {
         if (facilityIds.isEmpty()) {
             return found;
         }
+        jdbc.query("SELECT id, weekly_off_days FROM facilities WHERE id = ANY (?) AND weekly_off_days <> 0", rows -> {
+            int mask = rows.getInt("weekly_off_days");
+            java.util.Set<java.time.LocalDate> days = found.computeIfAbsent(rows.getObject("id", UUID.class),
+                    ignored -> new java.util.HashSet<>());
+            for (var day = from; !day.isAfter(to); day = day.plusDays(1)) {
+                if ((mask & (1 << (day.getDayOfWeek().getValue() - 1))) != 0) {
+                    days.add(day);
+                }
+            }
+        }, (Object) facilityIds.toArray(UUID[]::new));
         jdbc.query("""
                 SELECT facility_id, holiday_on FROM facility_holidays
                 WHERE facility_id = ANY (?) AND holiday_on BETWEEN ? AND ?

@@ -8,6 +8,9 @@ import { api } from "@/lib/api";
 import { describeAlternateOff, describeDays } from "@/lib/manufacturing";
 import type { CalendarHoliday, HolidayCalendar } from "@/lib/types";
 
+const SELECT_CLASS = "h-9 rounded-xl border border-input bg-white/70 px-2 text-sm";
+const ALL = "all";
+
 const PERIODS = [
   { days: 90, label: "Next 3 months" },
   { days: 183, label: "Next 6 months" },
@@ -45,6 +48,8 @@ function byMonth(holidays: CalendarHoliday[]): [string, CalendarHoliday[]][] {
 export default function HolidayCalendarPage() {
   const [days, setDays] = useState<number>(PERIODS[0].days);
   const [showDaysOff, setShowDaysOff] = useState(true);
+  /** Null until chosen: the first facility. */
+  const [facility, setFacility] = useState<string | null>(null);
   const { data, error } = useQuery({
     queryKey: ["/holiday-calendar", days],
     queryFn: () => {
@@ -74,15 +79,43 @@ export default function HolidayCalendarPage() {
     );
   }
 
-  const severalFacilities = data.facilities.length > 1;
-  const listed = showDaysOff ? data.holidays : data.holidays.filter((holiday) => holiday.kind === "HOLIDAY");
-  const regular = data.facilities.filter((facility) => facility.weeklyOffDays !== 0 || facility.alternateOffDay !== null);
+  // Each facility keeps its own calendar, so one is shown at a time unless all are asked for.
+  const chosen =
+    facility !== null && (facility === ALL || data.facilities.some(({ id }) => id === facility))
+      ? facility
+      : (data.facilities[0]?.id ?? ALL);
+  const inView = (facilityId: string) => chosen === ALL || facilityId === chosen;
+  const severalFacilities = chosen === ALL && data.facilities.length > 1;
+  const listed = data.holidays.filter(
+    (holiday) => inView(holiday.facilityId) && (showDaysOff || holiday.kind === "HOLIDAY"),
+  );
+  const regular = data.facilities.filter(
+    (place) => inView(place.id) && (place.weeklyOffDays !== 0 || place.alternateOffDay !== null),
+  );
 
   return (
     <div className="max-w-4xl space-y-6">
       <PageHeader title="Holiday calendar" subtitle="Days your facilities are closed">
+        {data.facilities.length > 1 && (
+          <select
+            aria-label="Facility"
+            className={SELECT_CLASS}
+            value={chosen}
+            onChange={(event) => setFacility(event.target.value)}
+          >
+            {data.facilities.map((place) => (
+              <option key={place.id} value={place.id}>
+                {place.name}
+              </option>
+            ))}
+            <option value={ALL}>All facilities</option>
+          </select>
+        )}
         {periodButtons}
       </PageHeader>
+      {data.facilities.length === 0 && (
+        <p className="text-sm text-muted-foreground">You have no facilities to show.</p>
+      )}
       <Section
         title="Upcoming holidays"
         action={
@@ -147,16 +180,16 @@ export default function HolidayCalendarPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {regular.map((facility) => (
-                <tr key={facility.id}>
-                  {severalFacilities && <td className="py-2 pr-4">{facility.name}</td>}
+              {regular.map((place) => (
+                <tr key={place.id}>
+                  {severalFacilities && <td className="py-2 pr-4">{place.name}</td>}
                   <td className="py-2 pr-4">
-                    {facility.weeklyOffDays === 0 ? "—" : describeDays(facility.weeklyOffDays)}
+                    {place.weeklyOffDays === 0 ? "—" : describeDays(place.weeklyOffDays)}
                   </td>
                   <td className="py-2">
-                    {facility.alternateOffDay === null
+                    {place.alternateOffDay === null
                       ? "—"
-                      : describeAlternateOff(facility.alternateOffDay, facility.alternateOffWeeks)}
+                      : describeAlternateOff(place.alternateOffDay, place.alternateOffWeeks)}
                   </td>
                 </tr>
               ))}

@@ -168,6 +168,11 @@ public class FacilityService {
         Facility facility = load(id);
         var before = audit.state(mapper.toResponse(facility));
         facility.requireVersion(request.version());
+        String code = request.code().trim();
+        if (facilities.existsByCodeAndIdNot(code, id)) {
+            throw new ConflictException("A facility with this code already exists.");
+        }
+        facility.setCode(code);
         apply(facility, request);
         facilities.saveAndFlush(facility);
         audit.recordChange("FACILITY_UPDATED", "Facility", id, before, audit.state(mapper.toResponse(facility)));

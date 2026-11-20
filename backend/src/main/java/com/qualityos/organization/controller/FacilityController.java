@@ -140,6 +140,13 @@ public class FacilityController {
         facilities.setWeeklyOff(id, request);
     }
 
+    @PutMapping("/{id}/holidays/{holidayId}")
+    @PreAuthorize(Require.FACILITY_MANAGE)
+    public ApiResponse<HolidayResponse> updateHoliday(@PathVariable UUID id, @PathVariable UUID holidayId,
+            @Valid @RequestBody SaveHolidayRequest request) {
+        return ApiResponse.ok(facilities.updateHoliday(id, holidayId, request));
+    }
+
     @DeleteMapping("/{id}/holidays/{holidayId}")
     @PreAuthorize(Require.FACILITY_MANAGE)
     @ResponseStatus(HttpStatus.NO_CONTENT)

@@ -269,6 +269,28 @@ class AdvancedManufacturingIT extends TraceabilityFixture {
                 Map.of("date", day.toString(), "name", "Mine"))).andExpect(status().isForbidden());
         as(owner, get("/api/v1/facilities/" + facility)).andExpect(jsonPath("$.data.holidays[0].name")
                 .value("Founders' day"));
+
+        // A holiday is updated in place: renamed, moved, and not onto another holiday's date.
+        String holidayPath = "/api/v1/facilities/" + facility + "/holidays/" + holiday;
+        String other = idOf(body(as(owner, postJson("/api/v1/facilities/" + facility + "/holidays",
+                Map.of("date", day.plusDays(30).toString(), "name", "Later"))).andExpect(status().isCreated())));
+        as(owner, put(holidayPath).contentType("application/json").content(json.writeValueAsString(
+                Map.of("date", day.plusDays(30).toString(), "name", "Clash")))).andExpect(status().isConflict());
+        as(operator, put(holidayPath).contentType("application/json").content(json.writeValueAsString(
+                Map.of("date", day.plusDays(2).toString(), "name", "Mine")))).andExpect(status().isForbidden());
+        as(owner, put(holidayPath).contentType("application/json").content(json.writeValueAsString(
+                Map.of("date", day.plusDays(2).toString(), "name", "Moved"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.name").value("Moved"));
+        as(owner, put(holidayPath).contentType("application/json").content(json.writeValueAsString(
+                Map.of("date", day.plusDays(1).toString(), "name", "Founders' day"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.date").value(day.plusDays(1).toString()));
+        as(owner, put("/api/v1/facilities/" + facility + "/holidays/" + java.util.UUID.randomUUID())
+                .contentType("application/json").content(json.writeValueAsString(
+                        Map.of("date", day.toString(), "name", "Nowhere")))).andExpect(status().isNotFound());
+        as(owner, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                "/api/v1/facilities/" + facility + "/holidays/" + other)).andExpect(status().isNoContent());
+        assertThat(asDatabaseSuperuser().queryForObject("SELECT count(*) FROM audit_logs WHERE action = "
+                + "'HOLIDAY_UPDATED' AND entity_id = ?", Integer.class, facility)).isEqualTo(2);
         approved("4", day, day.plusDays(1));
         String board = body(as(planner, get(query)));
         assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[1].capacityMinutes")).isEqualTo("0.0");
@@ -280,7 +302,7 @@ class AdvancedManufacturingIT extends TraceabilityFixture {
         assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[1].capacityMinutes")).isEqualTo("480.0");
         assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[1].loadMinutes")).isEqualTo("120.0");
         assertThat(asDatabaseSuperuser().queryForObject("SELECT count(*) FROM audit_logs WHERE action IN ('HOLIDAY_ADDED', "
-                + "'HOLIDAY_REMOVED') AND entity_id = ?", Integer.class, facility)).isEqualTo(2);
+                + "'HOLIDAY_REMOVED') AND entity_id = ?", Integer.class, facility)).isEqualTo(4);
 
         // A weekly off on the second day's weekday: no working time that day, every week.
         int offDay = 1 << (day.plusDays(1).getDayOfWeek().getValue() - 1);

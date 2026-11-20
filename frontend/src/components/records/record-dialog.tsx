@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
+import { findState, useCities, useStates } from "@/lib/places";
 import { recordSchema, toFormValues, toPayload, type FieldDef } from "@/lib/record-form";
 
 interface RecordDialogProps {
@@ -103,11 +104,19 @@ export function RecordDialog({ title, fields, record, onSubmit, onClose, extra }
     handleSubmit,
     setError,
     setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FieldValues>({
     resolver: zodResolver(schema as never),
     defaultValues: toFormValues(fields, record as Record<string, unknown> | undefined),
   });
+
+  // States and cities are only suggested: any text is still taken.
+  const suggests = fields.some((field) => field.suggest);
+  const states = useStates(suggests);
+  const chosenState = findState(states.data ?? [], suggests ? watch("state") : undefined);
+  const cities = useCities(fields.some((field) => field.suggest === "city") ? chosenState?.gstCode : undefined);
+  const suggestions = { state: (states.data ?? []).map((state) => state.name), city: cities.data ?? [] };
 
   // A select cannot take a value until its option exists, which is after the refreshed list has rendered.
   useEffect(() => {
@@ -177,6 +186,25 @@ export function RecordDialog({ title, fields, record, onSubmit, onClose, extra }
                   {errors[field.name] && (
                     <p className="text-sm text-destructive">{String(errors[field.name]?.message)}</p>
                   )}
+                </div>
+              );
+            }
+            if (field.suggest) {
+              return (
+                <div key={field.name}>
+                  <Field
+                    id={id}
+                    label={field.label}
+                    list={`${id}-suggestions`}
+                    autoComplete="off"
+                    error={error}
+                    {...register(field.name)}
+                  />
+                  <datalist id={`${id}-suggestions`}>
+                    {suggestions[field.suggest].map((name) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
                 </div>
               );
             }

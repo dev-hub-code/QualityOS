@@ -154,6 +154,33 @@ export interface FacilityDetail {
   alternateOffWeeks: number;
 }
 
+/** A facility's regular days off, as the holiday calendar shows them. */
+export interface CalendarFacility {
+  id: string;
+  code: string;
+  name: string;
+  weeklyOffDays: number;
+  alternateOffDay: number | null;
+  alternateOffWeeks: number;
+}
+
+/** A named holiday at one facility. */
+export interface CalendarHoliday {
+  date: string;
+  name: string;
+  facilityId: string;
+  facilityCode: string;
+  facilityName: string;
+}
+
+/** Upcoming days off at the facilities the member can open. Both days included. */
+export interface HolidayCalendar {
+  from: string;
+  to: string;
+  facilities: CalendarFacility[];
+  holidays: CalendarHoliday[];
+}
+
 /** A day the facility does not work, whatever its shifts say. */
 export interface Holiday {
   id: string;

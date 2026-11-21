@@ -16,11 +16,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Control charts and capability, read-only and worked out on request. */
+/** Control charts and capability, read-only and worked out on request. A report needs the view of its records too. */
 @RestController
 @RequestMapping("/api/v1/spc")
 @Tag(name = "Analytics and reports")
-@PreAuthorize(Require.REPORT_VIEW)
+@PreAuthorize(Require.REPORT_VIEW + " and " + Require.INSPECTION_VIEW)
 public class SpcController {
 
     private final SpcService spc;

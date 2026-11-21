@@ -19,7 +19,7 @@ import java.util.UUID;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
-/** Expected figures were worked out separately in Python, from the textbook formulas, to 6 significant figures. */
+/** Expected figures were worked out separately in Python, from the textbook formulas, to 9 significant figures. */
 class SpcMathTest {
 
     private static final Spec NO_SPEC = new Spec(null, null);
@@ -30,7 +30,7 @@ class SpcMathTest {
     }
 
     private static void near(double actual, double expected) {
-        assertThat(actual).isCloseTo(expected, within(Math.abs(expected) * 1e-9 + 1e-12));
+        assertThat(actual).isCloseTo(expected, within(Math.abs(expected) * 1e-12 + 1e-15));
     }
 
     @Test
@@ -40,14 +40,14 @@ class SpcMathTest {
                 subgroup(9.9, 10.1, 10.0, 10.2, 10.3), subgroup(10.2, 10.0, 9.7, 10.1, 10.0),
                 subgroup(10.1, 10.2, 10.3, 9.9, 10.0), subgroup(10.0, 9.8, 10.1, 10.2, 10.4)), NO_SPEC);
         assertThat(result.chartType()).isEqualTo(ChartType.XBAR_R);
-        near(result.centre(), 10.0833);
-        near(result.sigma(), 0.207796);
+        near(result.centre(), 10.0833333);
+        near(result.sigma(), 0.20779593);
         // X̿ ± A2·R̄, and D3·R̄ to D4·R̄ with D3 = 0 for n = 5.
         for (Point point : result.points()) {
-            near(point.ucl(), 10.3621);
-            near(point.lcl(), 9.80455);
-            near(point.rangeCentre(), 0.483333);
-            near(point.rangeUcl(), 1.02194);
+            near(point.ucl(), 10.3621208);
+            near(point.lcl(), 9.80454584);
+            near(point.rangeCentre(), 0.483333333);
+            near(point.rangeUcl(), 1.02194038);
             near(point.rangeLcl(), 0);
             assertThat(point.n()).isEqualTo(5);
         }
@@ -58,12 +58,12 @@ class SpcMathTest {
         Result result = SpcMath.xbarR(List.of(subgroup(5.0, 5.2, 4.9), subgroup(5.1, 5.0, 5.3, 4.8, 5.0),
                 subgroup(4.9, 5.1, 5.0, 5.2, 5.1, 4.8, 5.0, 5.3)), NO_SPEC);
         // σ̂ is the average of Rᵢ / d₂(nᵢ), and X̿ weights each mean by its n.
-        near(result.sigma(), 0.189262);
+        near(result.sigma(), 0.189261669);
         near(result.centre(), 5.04375);
         double[][] expected = {
-            {5.37156, 4.71594, 0.32042, 0.824613, 0},
-            {5.29767, 4.78983, 0.440223, 0.930789, 0},
-            {5.24449, 4.84301, 0.538828, 1.00441, 0.0732443},
+            {5.37156083, 4.71593917, 0.320420005, 0.824613091, 0},
+            {5.29767117, 4.78982883, 0.440222642, 0.930788887, 0},
+            {5.24449231, 4.84300769, 0.538827971, 1.00441168, 0.0732442658},
         };
         for (int i = 0; i < 3; i++) {
             Point point = result.points().get(i);
@@ -86,15 +86,15 @@ class SpcMathTest {
         assertThat(first.sampleNumber()).isEqualTo(1);
         assertThat(result.points().get(3).sampleNumber()).isEqualTo(1);
         near(result.points().get(1).range(), 0.3);
-        near(result.centre(), 2.21429);
-        near(result.sigma(), 0.251182);
-        near(first.ucl(), 2.96795);
-        near(first.lcl(), 1.46062);
-        near(first.rangeCentre(), 0.283333);
+        near(result.centre(), 2.21428571);
+        near(result.sigma(), 0.251182033);
+        near(first.ucl(), 2.96795238);
+        near(first.lcl(), 1.46061905);
+        near(first.rangeCentre(), 0.283333333);
         near(first.rangeUcl(), 0.92565);
         near(first.rangeLcl(), 0);
-        near(result.capability().cp(), 0.995294);
-        near(result.capability().cpk(), 0.947899);
+        near(result.capability().cp(), 0.995294118);
+        near(result.capability().cpk(), 0.94789916);
     }
 
     @Test
@@ -102,10 +102,10 @@ class SpcMathTest {
         List<Subgroup> readings = List.of(subgroup(2.0, 2.3, 2.1, 2.4, 2.2, 2.0, 2.5));
         Result upper = SpcMath.individuals(readings, new Spec(null, 3.0));
         assertThat(upper.capability().cp()).isNull();
-        near(upper.capability().cpk(), 1.04269);
+        near(upper.capability().cpk(), 1.04268908);
         Result lower = SpcMath.individuals(readings, new Spec(1.5, null));
         assertThat(lower.capability().cp()).isNull();
-        near(lower.capability().cpk(), 0.947899);
+        near(lower.capability().cpk(), 0.94789916);
 
         Result none = SpcMath.individuals(readings, NO_SPEC);
         assertThat(none.capability().cp()).isNull();
@@ -155,10 +155,14 @@ class SpcMathTest {
 
     @Test
     void autoFollowsTheReadingsAndExclusionsAreCounted() {
-        assertThat(SpcMath.auto(List.of(subgroup(1, 2), subgroup(1)))).isEqualTo(ChartType.XBAR_R);
-        assertThat(SpcMath.auto(List.of(subgroup(1, 2), subgroup(1), subgroup(2)))).isEqualTo(ChartType.I_MR);
-
+        // X̄-R needs at least half the subgroups, and at least two, with 2 to 25 readings.
         double[] large = IntStream.range(0, 26).mapToDouble(i -> i % 3).toArray();
+        assertThat(SpcMath.auto(List.of(subgroup(1, 2), subgroup(3, 4), subgroup(1), subgroup(2))))
+                .isEqualTo(ChartType.XBAR_R);
+        assertThat(SpcMath.auto(List.of(subgroup(1, 2), subgroup(1)))).isEqualTo(ChartType.I_MR);
+        assertThat(SpcMath.auto(List.of(subgroup(1, 2), subgroup(1), subgroup(2)))).isEqualTo(ChartType.I_MR);
+        assertThat(SpcMath.auto(List.of(subgroup(1, 2), subgroup(large), subgroup(large)))).isEqualTo(ChartType.I_MR);
+
         Result result = SpcMath.xbarR(List.of(subgroup(1, 2), subgroup(1), subgroup(2, 3, 4), subgroup(large)),
                 NO_SPEC);
         assertThat(result.points()).hasSize(2);
@@ -175,9 +179,11 @@ class SpcMathTest {
     }
 
     @Test
-    void roundsToSixSignificantFigures() {
-        assertThat(SpcMath.round(20.0066666)).isEqualTo(20.0067);
-        assertThat(SpcMath.round(0.000123456789)).isEqualTo(0.000123457);
+    void roundsToNineSignificantFigures() {
+        // Six stored decimals survive, and floating-point noise does not.
+        assertThat(SpcMath.round(20.123456)).isEqualTo(20.123456);
+        assertThat(SpcMath.round(0.1 + 0.2)).isEqualTo(0.3);
+        assertThat(SpcMath.round(20.00666666666)).isEqualTo(20.0066667);
         assertThat(SpcMath.round(0)).isZero();
     }
 }

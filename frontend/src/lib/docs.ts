@@ -1078,11 +1078,11 @@ export const DOC_PAGES: DocPage[] = [
         terms: [
           [
             "Where",
-            "Insight → Control charts. Pick a template's numeric parameter, a period of up to two years, and if you like a facility, a material or a product.",
+            "Insight → Control charts, for anyone who can view both reports and inspections. Pick a template's numeric parameter, a period of up to two years, and if you like a facility, a material or a product.",
           ],
           [
             "Which chart",
-            "Auto draws an X̄-R chart when at least half the inspections took two readings or more, and an individuals and moving range (I-MR) chart otherwise. You can choose either.",
+            "Auto draws an X̄-R chart when at least half the inspections, and at least two, took 2 to 25 readings. Otherwise it draws an individuals and moving range (I-MR) chart, so one-reading inspections and large AQL samples still chart. You can choose either.",
           ],
           [
             "X̄-R chart",

@@ -87,6 +87,8 @@ export interface NavItem {
   icon: LucideIcon;
   /** Shown when the user holds any of these; omit for everyone. */
   anyPermission?: string[];
+  /** Shown only when the user holds every one of these as well. */
+  allPermissions?: string[];
   /** Items of a group sit together under its heading. Only the dashboard has none. */
   group?: NavGroup;
   /** Shown only when the organisation's manufacturing model uses this kind of definition. */
@@ -372,7 +374,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Control charts",
     href: "/analytics/control-charts",
     icon: ChartNoAxesCombined,
-    anyPermission: ["REPORT_VIEW"],
+    allPermissions: ["REPORT_VIEW", "INSPECTION_VIEW"],
     group: "Insight",
   },
   {
@@ -582,8 +584,10 @@ export function visibleNavItems(
 ): NavItem[] {
   return items.filter(
     (item) =>
-      !item.anyPermission ||
-      item.anyPermission.some((p) => permissions.includes(p)),
+      (!item.anyPermission ||
+        item.anyPermission.some((p) => permissions.includes(p))) &&
+      (!item.allPermissions ||
+        item.allPermissions.every((p) => permissions.includes(p))),
   );
 }
 

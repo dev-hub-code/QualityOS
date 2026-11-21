@@ -83,6 +83,12 @@ describe("visibleNavItems", () => {
     ]);
   });
 
+  it("shows control charts only to those who may view both reports and inspections", () => {
+    expect(labels(["REPORT_VIEW"])).not.toContain("Control charts");
+    expect(labels(["INSPECTION_VIEW"])).not.toContain("Control charts");
+    expect(labels(["REPORT_VIEW", "INSPECTION_VIEW"])).toContain("Control charts");
+  });
+
   it("shows master data by module permission", () => {
     expect(labels(["PURCHASE_VIEW"])).toEqual([
       "Dashboard",

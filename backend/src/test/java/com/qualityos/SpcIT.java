@@ -196,16 +196,15 @@ class SpcIT extends TraceabilityFixture {
     }
 
     @Test
-    void needsReportViewAndAPlanWithReports() throws Exception {
+    void needsReportViewAndInspectionViewAndAPlanWithReports() throws Exception {
         String template = shaftTemplate();
-        String role = idOf(body(as(owner, postJson("/api/v1/roles", Map.of("name", "Inspections only " + code(),
-                "permissions", List.of("INSPECTION_VIEW")))).andExpect(status().isCreated())));
-        Session reader = addMember(owner, "VIEWER");
-        as(owner, put("/api/v1/users/" + membershipId(owner, reader.userId()) + "/roles")
-                .contentType("application/json").content(json.writeValueAsString(Map.of("roleIds", List.of(role)))))
-                .andExpect(status().isOk());
-        as(reader, get(SPC + "/parameters")).andExpect(status().isForbidden());
-        as(reader, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA")).andExpect(status().isForbidden());
+        // A Quality Inspector has no report view; a Production Planner has no inspection view.
+        for (String role : List.of("QUALITY_INSPECTOR", "PRODUCTION_PLANNER")) {
+            Session member = addMember(owner, role);
+            as(member, get(SPC + "/parameters")).andExpect(status().isForbidden());
+            as(member, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA"))
+                    .andExpect(status().isForbidden());
+        }
 
         asDatabaseSuperuser().update("UPDATE subscriptions SET plan_id = (SELECT id FROM subscription_plans "
                 + "WHERE code = 'STARTER') WHERE tenant_id = ?", owner.tenantId());

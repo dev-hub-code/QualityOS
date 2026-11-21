@@ -16,7 +16,8 @@ import java.util.UUID;
 /**
  * Phase I control charts and capability, worked out from the readings alone. Subgroup sizes may differ (AQL sampling
  * takes different sample sizes), so each point's limits come from its own n around one pooled estimate of σ: with
- * equal sizes these are the textbook A2, D3 and D4 limits. Statistics are returned to 6 significant figures.
+ * equal sizes these are the textbook A2, D3 and D4 limits. Statistics are returned to 9 significant figures, which
+ * keeps the six stored decimals without floating-point noise.
  */
 final class SpcMath {
 
@@ -64,10 +65,14 @@ final class SpcMath {
         return D3[n - 2];
     }
 
-    /** X̄-R when at least half the subgroups have two readings or more; otherwise I-MR. */
+    /**
+     * X̄-R when at least half the subgroups, and at least two, have 2 to 25 readings; otherwise I-MR, so one-reading
+     * inspections and large AQL samples still chart.
+     */
     static ChartType auto(List<Subgroup> subgroups) {
-        long several = subgroups.stream().filter(subgroup -> subgroup.n() >= 2).count();
-        return several * 2 >= subgroups.size() ? ChartType.XBAR_R : ChartType.I_MR;
+        long chartable = subgroups.stream().filter(subgroup -> subgroup.n() >= 2 && subgroup.n() <= MAX_SUBGROUP)
+                .count();
+        return chartable >= 2 && chartable * 2 >= subgroups.size() ? ChartType.XBAR_R : ChartType.I_MR;
     }
 
     static Result xbarR(List<Subgroup> subgroups, Spec spec) {
@@ -258,11 +263,11 @@ final class SpcMath {
         return List.copyOf(signals);
     }
 
-    /** To 6 significant figures. */
+    /** To 9 significant figures. */
     static double round(double value) {
         if (value == 0 || !Double.isFinite(value)) {
             return value;
         }
-        return new BigDecimal(value).round(new MathContext(6)).doubleValue();
+        return new BigDecimal(value).round(new MathContext(9)).doubleValue();
     }
 }

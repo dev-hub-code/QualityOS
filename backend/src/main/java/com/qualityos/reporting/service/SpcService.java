@@ -83,7 +83,7 @@ public class SpcService {
 
     /**
      * One parameter's chart over the period, at the member's facilities or the one chosen, and for one material or
-     * product if given. AUTO picks X̄-R when at least half the inspections took two readings or more.
+     * product if given. AUTO picks X̄-R when at least half the inspections, and at least two, took 2 to 25 readings.
      */
     @Transactional(readOnly = true)
     public SpcChart chart(UUID templateId, String parameterCode, ChartChoice choice, LocalDate from, LocalDate to,

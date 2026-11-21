@@ -7,7 +7,7 @@ const DIAMETERS = Array.from({ length: 25 }, (_, index) => {
   return [20 + drift, 20.01 + drift, 19.99 + drift].map((value) => value.toFixed(3));
 });
 
-test("SPC charts a parameter from submitted inspections, with its capability", async ({ page }) => {
+test("control charts plot a parameter from submitted inspections, with Cp and Cpk", async ({ page }) => {
   test.setTimeout(180_000);
   await signUp(page);
   const call = apiCaller(page);
@@ -61,21 +61,24 @@ test("SPC charts a parameter from submitted inspections, with its capability", a
     await call("POST", `/inspections/${inspection.id}/submit`);
   }
 
-  await page.goto("/spc");
-  await expect(page.getByRole("heading", { name: "SPC" })).toBeVisible();
-  await expect(page.getByText("X̄-R chart, 3 samples an inspection")).toBeVisible();
-  await expect(page.getByText("Subgroup means (X̄)")).toBeVisible();
-  await expect(page.getByText("1 point beyond the control limits")).toBeVisible();
-  await expect(page.getByText("Points beyond the control limits", { exact: true })).toBeVisible();
+  await page.goto("/analytics/control-charts");
+  await expect(page.getByRole("heading", { name: "Control charts" })).toBeVisible();
+  await expect(page.getByText("X̄-R chart, one subgroup per inspection")).toBeVisible();
+  await expect(page.getByText("X̄ chart · subgroup means")).toBeVisible();
+  await expect(page.getByText("R chart · subgroup ranges")).toBeVisible();
   await expect(page.getByText("Cpk", { exact: true })).toBeVisible();
+  await expect(page.getByText(/mean above the upper control limit/)).toBeVisible();
   if (process.env.SPC_SCREENSHOT) await page.screenshot({ path: process.env.SPC_SCREENSHOT, fullPage: true });
 
-  // The individuals chart takes every measurement.
-  await page.getByRole("button", { name: "Individuals" }).click();
-  await expect(page.getByText("Individual measurements (I)")).toBeVisible();
-  await expect(page.getByText("Moving ranges (MR)")).toBeVisible();
-  await expect(page.getByText("3 values and 1 range out of control")).toBeVisible();
+  // The individuals chart takes every reading.
+  await page.getByLabel("Chart", { exact: true }).selectOption("I_MR");
+  await expect(page.locator("figcaption").getByText("Individuals", { exact: true })).toBeVisible();
+  await expect(page.locator("figcaption").getByText("Moving range", { exact: true })).toBeVisible();
   if (process.env.SPC_SCREENSHOT) {
     await page.screenshot({ path: process.env.SPC_SCREENSHOT.replace(".png", "-imr.png"), fullPage: true });
   }
+
+  // A signal opens its inspection.
+  await page.getByRole("list", { name: "Signals" }).getByRole("link").first().click();
+  await expect(page).toHaveURL(/\/inspections\//);
 });

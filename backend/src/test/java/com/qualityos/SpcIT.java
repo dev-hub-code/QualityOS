@@ -9,30 +9,45 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.jayway.jsonpath.JsonPath;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 
 class SpcIT extends TraceabilityFixture {
 
     private static final String SPC = "/api/v1/spc";
 
-    /** A diameter between 19.9 and 20.1 on three samples, and a hardness without limits. */
+    private static Map<String, Object> diameter(String min, String max) {
+        return new HashMap<>(Map.of("code", "DIA", "name", "Diameter", "dataType", "NUMERIC", "criticality", "MAJOR",
+                "mandatory", true, "perSample", true, "evidenceRequired", false, "minValue", min, "maxValue", max));
+    }
+
+    private static Map<String, Object> finish() {
+        return new HashMap<>(Map.of("code", "FIN", "name", "Finish", "dataType", "TEXT", "criticality", "MINOR",
+                "mandatory", false, "perSample", false, "evidenceRequired", false));
+    }
+
+    /** Saves the template's draft with these parameters, five samples, and publishes it. */
+    private void publish(String template, Map<String, Object> diameter) throws Exception {
+        List<String> drafts = JsonPath.read(body(as(owner, get("/api/v1/inspection-templates/" + template))),
+                "$.data.versions[?(@.status == 'DRAFT')].id");
+        as(owner, put("/api/v1/inspection-templates/" + template + "/versions/" + drafts.getFirst())
+                .contentType("application/json").content(json.writeValueAsString(Map.of("samplingType", "FIXED",
+                        "sampleSize", 5, "acceptanceNumber", 0, "parameters", List.of(diameter, finish())))))
+                .andExpect(status().isOk());
+        as(owner, postJson("/api/v1/inspection-templates/" + template + "/publish",
+                Map.of("effectiveFrom", LocalDate.now().toString()))).andExpect(status().isOk());
+    }
+
     private String shaftTemplate() throws Exception {
         String template = JsonPath.read(body(as(owner, postJson("/api/v1/inspection-templates",
                 Map.of("code", code(), "name", "Shaft IQC", "inspectionType", "IQC")))
                 .andExpect(status().isCreated())), "$.data.template.id");
-        List<String> drafts = JsonPath.read(body(as(owner, get("/api/v1/inspection-templates/" + template))),
-                "$.data.versions[?(@.status == 'DRAFT')].id");
-        Map<String, Object> diameter = new java.util.HashMap<>(Map.of("code", "DIA", "name", "Diameter",
-                "dataType", "NUMERIC", "criticality", "MAJOR", "mandatory", true, "perSample", true,
-                "evidenceRequired", false, "minValue", "19.9", "maxValue", "20.1"));
-        as(owner, put("/api/v1/inspection-templates/" + template + "/versions/" + drafts.getFirst())
-                .contentType("application/json").content(json.writeValueAsString(Map.of("samplingType", "FIXED",
-                        "sampleSize", 3, "acceptanceNumber", 0, "parameters", List.of(diameter)))))
-                .andExpect(status().isOk());
-        as(owner, postJson("/api/v1/inspection-templates/" + template + "/publish",
-                Map.of("effectiveFrom", LocalDate.now().toString()))).andExpect(status().isOk());
+        publish(template, diameter("19.9", "20.1"));
         return template;
     }
 
@@ -40,74 +55,163 @@ class SpcIT extends TraceabilityFixture {
         return JsonPath.<Number>read(body, path).doubleValue();
     }
 
-    private void inspected(String template, String... diameters) throws Exception {
-        IssuedOrder order = issuedOrder(owner, "100");
+    /** An inspection of a new receipt with these diameters recorded, not yet submitted. */
+    /** One order, received a little at a time, so every inspection is at the same facility. */
+    private IssuedOrder order;
+
+    private String recorded(String template, String... diameters) throws Exception {
+        if (order == null) {
+            order = issuedOrder(owner, "10000");
+        }
         String item = JsonPath.read(body(receive(owner, order, "100").andExpect(status().isCreated())),
                 "$.data.items[0].id");
         String inspection = idOf(body(as(owner, postJson("/api/v1/inspections",
                 Map.of("receiptItemId", item, "templateId", template))).andExpect(status().isCreated())));
+        List<Map<String, Object>> results = new ArrayList<>();
         for (int sample = 1; sample <= diameters.length; sample++) {
-            as(owner, postJson("/api/v1/inspections/" + inspection + "/execute", Map.of("results", List.of(
-                    Map.of("parameterCode", "DIA", "sampleNumber", sample, "valueNumeric", diameters[sample - 1])))))
-                    .andExpect(status().isOk());
+            results.add(Map.of("parameterCode", "DIA", "sampleNumber", sample, "valueNumeric", diameters[sample - 1]));
         }
+        as(owner, postJson("/api/v1/inspections/" + inspection + "/execute", Map.of("results", results)))
+                .andExpect(status().isOk());
+        return inspection;
+    }
+
+    private String submitted(String template, String... diameters) throws Exception {
+        String inspection = recorded(template, diameters);
         as(owner, postJson("/api/v1/inspections/" + inspection + "/submit", Map.of())).andExpect(status().isOk());
+        return inspection;
+    }
+
+    private String chart(Session member, String template, String extra) throws Exception {
+        return body(as(member, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA" + extra))
+                .andExpect(status().isOk()));
     }
 
     @Test
-    void chartsAParameterFromTheInspectionsThatMeasuredIt() throws Exception {
+    void chartsSubmittedInspectionsInOrderAndJudgesTheirCapability() throws Exception {
         String template = shaftTemplate();
-        inspected(template, "20.00", "20.02", "19.98");
-        inspected(template, "20.01", "20.03", "20.02");
-        inspected(template, "19.99", "20.00", "19.97");
-        inspected(template, "20.02", "20.00", "20.04");
+        List<String> inspections = new ArrayList<>();
+        inspections.add(submitted(template, "20.00", "20.02", "19.98", "20.01", "19.99"));
+        inspections.add(submitted(template, "20.01", "20.03", "20.02", "20.00", "20.04"));
+        inspections.add(submitted(template, "19.99", "20.00", "19.97", "19.98", "20.01"));
+        inspections.add(submitted(template, "20.02", "20.00", "20.04", "20.01", "20.03"));
+        inspections.add(submitted(template, "20.00", "19.99", "20.01", "20.02", "19.98"));
+        // Neither a pending nor a cancelled inspection is charted.
+        recorded(template, "21.00", "21.00", "21.00", "21.00", "21.00");
+        String cancelled = recorded(template, "19.00", "19.00", "19.00", "19.00", "19.00");
+        // The app refuses to cancel one with results, so the status is set directly to prove the filter.
+        asDatabaseSuperuser().update("UPDATE inspections SET status = 'CANCELLED', submitted_at = now() WHERE id = ?",
+                UUID.fromString(cancelled));
 
-        Session inspector = addMember(owner, "QUALITY_INSPECTOR");
-        as(inspector, get(SPC + "/characteristics")).andExpect(status().isOk())
+        as(manager, get(SPC + "/parameters")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.templateId == '" + template + "')].parameterCode").value("DIA"))
                 .andExpect(jsonPath("$.data[?(@.templateId == '" + template + "')].parameterName").value("Diameter"))
-                .andExpect(jsonPath("$.data[?(@.templateId == '" + template + "')].measurements").value(12));
+                .andExpect(jsonPath("$.data[?(@.templateId == '" + template + "')].subgroups").value(5));
 
-        // Three samples an inspection suit an X̄-R chart, judged against 19.9 to 20.1.
-        String chart = body(as(inspector, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA"))
-                .andExpect(status().isOk()));
+        String chart = chart(manager, template, "");
         assertThat(JsonPath.<String>read(chart, "$.data.chartType")).isEqualTo("XBAR_R");
-        assertThat(JsonPath.<Integer>read(chart, "$.data.subgroupSize")).isEqualTo(3);
-        assertThat(JsonPath.<List<Object>>read(chart, "$.data.points")).hasSize(4);
-        assertThat(num(chart, "$.data.lowerSpec")).isCloseTo(19.9, within(1e-9));
-        assertThat(num(chart, "$.data.upperSpec")).isCloseTo(20.1, within(1e-9));
-        // Means 20.00, 20.02, 19.9867, 20.02; ranges 0.04, 0.02, 0.03, 0.04.
-        assertThat(num(chart, "$.data.valueLimits.centre")).isCloseTo(20.006667, within(1e-5));
-        assertThat(num(chart, "$.data.rangeLimits.centre")).isCloseTo(0.0325, within(1e-9));
-        double sigma = 0.0325 / 1.693;
-        assertThat(num(chart, "$.data.capability.cp")).isCloseTo(0.2 / (6 * sigma), within(1e-6));
-        assertThat(num(chart, "$.data.capability.cpk"))
-                .isCloseTo((20.1 - 20.006667) / (3 * sigma), within(1e-4));
-        assertThat(JsonPath.<Boolean>read(chart, "$.data.preliminary")).isTrue();
+        assertThat(JsonPath.<List<String>>read(chart, "$.data.points[*].inspectionId")).isEqualTo(inspections);
+        assertThat(JsonPath.<List<Integer>>read(chart, "$.data.points[*].n")).containsOnly(5);
+        assertThat(num(chart, "$.data.parameter.lsl")).isCloseTo(19.9, within(1e-9));
+        assertThat(num(chart, "$.data.parameter.usl")).isCloseTo(20.1, within(1e-9));
+        assertThat(JsonPath.<Boolean>read(chart, "$.data.parameter.specChanged")).isFalse();
+        // Means 20.00, 20.02, 19.99, 20.02, 20.00; ranges 0.04, 0.04, 0.04, 0.04, 0.04.
+        double sigma = 0.04 / 2.326;
+        assertThat(num(chart, "$.data.centre")).isCloseTo(20.006, within(1e-9));
+        assertThat(num(chart, "$.data.sigma")).isCloseTo(sigma, within(1e-6));
+        assertThat(num(chart, "$.data.points[0].ucl")).isCloseTo(20.006 + 3 * sigma / Math.sqrt(5), within(1e-4));
+        assertThat(num(chart, "$.data.capability.cp")).isCloseTo(0.2 / (6 * sigma), within(1e-4));
+        assertThat(num(chart, "$.data.capability.cpk")).isCloseTo((20.1 - 20.006) / (3 * sigma), within(1e-4));
+        assertThat(JsonPath.<List<String>>read(chart, "$.data.warnings"))
+                .anyMatch(warning -> warning.startsWith("Fewer than 25 subgroups"));
+        assertThat(JsonPath.<Boolean>read(chart, "$.data.truncated")).isFalse();
 
-        // The individuals chart takes all twelve, in the order measured.
-        String individuals = body(as(inspector, get(SPC + "/chart?templateId=" + template
-                + "&parameterCode=DIA&chartType=I_MR")));
-        assertThat(JsonPath.<List<Number>>read(individuals, "$.data.points[*].value")).hasSize(12)
-                .extracting(Number::doubleValue).startsWith(20.0, 20.02, 19.98);
+        // The individuals chart takes all 25 readings, in submission and sample order.
+        String individuals = chart(manager, template, "&chart=I_MR");
+        assertThat(JsonPath.<String>read(individuals, "$.data.chartType")).isEqualTo("I_MR");
+        assertThat(JsonPath.<List<Integer>>read(individuals, "$.data.points[*].sampleNumber")).hasSize(25)
+                .startsWith(1, 2, 3, 4, 5, 1);
         assertThat(JsonPath.<Object>read(individuals, "$.data.points[0].range")).isNull();
 
-        // Nothing outside the period, the parameter, the member's facilities or the organisation.
-        String old = LocalDate.now().minusYears(1).toString();
-        as(inspector, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA&from=" + old + "&to=" + old))
+        // Narrowed to the inspections' material every reading stays; to another, none is left.
+        String material = asDatabaseSuperuser().queryForObject("SELECT material_id::text FROM inspections WHERE id = ?",
+                String.class, UUID.fromString(inspections.getFirst()));
+        as(manager, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA&chart=I_MR&materialId=" + material))
+                .andExpect(jsonPath("$.data.points.length()").value(25));
+        as(manager, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA&materialId=" + UUID.randomUUID()))
+                .andExpect(status().isUnprocessableContent());
+    }
+
+    @Test
+    void aNewSpecificationIsFlaggedAndItsLimitsUsed() throws Exception {
+        String template = shaftTemplate();
+        submitted(template, "20.00", "20.02", "19.98", "20.01", "19.99");
+        submitted(template, "20.01", "20.03", "20.02", "20.00", "20.04");
+        as(owner, postJson("/api/v1/inspection-templates/" + template + "/versions", Map.of()))
+                .andExpect(status().isCreated());
+        publish(template, diameter("19.95", "20.05"));
+        submitted(template, "19.99", "20.00", "19.97", "19.98", "20.01");
+
+        String chart = chart(manager, template, "");
+        assertThat(JsonPath.<Boolean>read(chart, "$.data.parameter.specChanged")).isTrue();
+        assertThat(num(chart, "$.data.parameter.lsl")).isCloseTo(19.95, within(1e-9));
+        assertThat(num(chart, "$.data.parameter.usl")).isCloseTo(20.05, within(1e-9));
+        assertThat(JsonPath.<List<Object>>read(chart, "$.data.points")).hasSize(3);
+        assertThat(JsonPath.<List<String>>read(chart, "$.data.warnings"))
+                .anyMatch(warning -> warning.contains("specification changed"));
+    }
+
+    @Test
+    void refusesWhatCannotBeChartedAndHidesWhatTheMemberMayNotSee() throws Exception {
+        String template = shaftTemplate();
+        submitted(template, "20.00", "20.02", "19.98", "20.01", "19.99");
+
+        // One subgroup is too few for X̄-R; the message says the minimum.
+        as(manager, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA&chart=XBAR_R"))
                 .andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.error.message").value("No measurements of DIA in this period."));
-        as(inspector, get(SPC + "/chart?templateId=" + template + "&parameterCode=NONE"))
-                .andExpect(status().isUnprocessableContent());
-        as(inspector, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA&from="
+                .andExpect(jsonPath("$.error.message", Matchers.containsString("at least 2 inspections")));
+        as(manager, get(SPC + "/chart?templateId=" + template + "&parameterCode=FIN"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message", Matchers.containsString("only numeric parameters")));
+        as(manager, get(SPC + "/chart?templateId=" + template))
+                .andExpect(status().isBadRequest());
+        as(manager, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA&materialId=" + UUID.randomUUID()
+                + "&productId=" + UUID.randomUUID())).andExpect(status().isBadRequest());
+        as(manager, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA&from="
                 + LocalDate.now().minusYears(3) + "&to=" + LocalDate.now())).andExpect(status().isUnprocessableContent());
-        limit(manager, facility(owner));
-        as(manager, get(SPC + "/characteristics"))
+
+        // A member limited to another facility sees none of its points, and a facility beyond their scope is unknown.
+        String elsewhere = facility(owner);
+        limit(manager, elsewhere);
+        as(manager, get(SPC + "/parameters"))
                 .andExpect(jsonPath("$.data[?(@.templateId == '" + template + "')]").isEmpty());
-        as(manager, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA"))
+        as(manager, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA&chart=I_MR"))
                 .andExpect(status().isUnprocessableContent());
-        Session stranger = register();
-        as(stranger, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA"))
+        as(manager, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA&facilityId=" + facility(owner)))
                 .andExpect(status().isNotFound());
-        as(stranger, get(SPC + "/characteristics")).andExpect(jsonPath("$.data").isEmpty());
+
+        Session stranger = register();
+        as(stranger, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA")).andExpect(status().isNotFound());
+        as(stranger, get(SPC + "/parameters")).andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    void needsReportViewAndAPlanWithReports() throws Exception {
+        String template = shaftTemplate();
+        String role = idOf(body(as(owner, postJson("/api/v1/roles", Map.of("name", "Inspections only " + code(),
+                "permissions", List.of("INSPECTION_VIEW")))).andExpect(status().isCreated())));
+        Session reader = addMember(owner, "VIEWER");
+        as(owner, put("/api/v1/users/" + membershipId(owner, reader.userId()) + "/roles")
+                .contentType("application/json").content(json.writeValueAsString(Map.of("roleIds", List.of(role)))))
+                .andExpect(status().isOk());
+        as(reader, get(SPC + "/parameters")).andExpect(status().isForbidden());
+        as(reader, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA")).andExpect(status().isForbidden());
+
+        asDatabaseSuperuser().update("UPDATE subscriptions SET plan_id = (SELECT id FROM subscription_plans "
+                + "WHERE code = 'STARTER') WHERE tenant_id = ?", owner.tenantId());
+        as(owner, get("/api/v1/auth/me"))
+                .andExpect(jsonPath("$.data.permissions", Matchers.not(Matchers.hasItem("REPORT_VIEW"))));
+        as(owner, get(SPC + "/parameters")).andExpect(status().isForbidden());
+        as(owner, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA")).andExpect(status().isForbidden());
     }
 }

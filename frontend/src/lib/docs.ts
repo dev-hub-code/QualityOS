@@ -1074,35 +1074,39 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
       {
-        title: "SPC: control charts and capability",
+        title: "Control charts and Cp/Cpk",
         terms: [
           [
             "Where",
-            "Insight → SPC, for anyone with inspection view. Pick a template's numeric parameter, a period and, if you like, a facility.",
+            "Insight → Control charts. Pick a template's numeric parameter, a period of up to two years, and if you like a facility, a material or a product.",
+          ],
+          [
+            "Which chart",
+            "Auto draws an X̄-R chart when at least half the inspections took two readings or more, and an individuals and moving range (I-MR) chart otherwise. You can choose either.",
           ],
           [
             "X̄-R chart",
-            "One point per inspection: the mean of its samples, and below it their range. Suggested when inspections take 2 to 10 samples of the parameter. Inspections with another number of samples are left out, and the page says how many.",
+            "One point per inspection: the mean of its readings, and below it their range. Inspections with one reading, or more than 25, are left out and counted.",
+          ],
+          [
+            "Stepping limits",
+            "Under AQL sampling, inspections take different numbers of samples, so each point's limits come from its own sample size around one shared estimate of σ.",
           ],
           [
             "Individuals chart",
-            "One point per measurement in the order taken, and below it the moving range from the one before. Suggested when each inspection measures the parameter once.",
+            "One point per reading, in order of submission and sample number, with the moving range from the one before.",
           ],
           [
-            "Control limits",
-            "Worked out from the measurements by the usual Shewhart constants. A point beyond them is shown in red and listed with a link to its inspection. With fewer than 20 points the limits are marked preliminary.",
+            "Signals",
+            "A point beyond its control limits, or 8 or more in a row on one side of the centre line. Each is marked in red and listed with a link to its inspection.",
           ],
           [
             "Cp and Cpk",
-            "How the process fits the specification, from the variation within inspections (or between neighbouring measurements). Cpk of 1.33 or more reads as capable, from 1.00 marginal, below that not capable. Cp needs both limits.",
+            "How the process fits the specification, using the variation within inspections. Cp needs both limits; with one limit, Cpk is the one-sided figure. With fewer than 25 points the figures are shown with a warning that they are not yet reliable.",
           ],
           [
-            "Pp and Ppk",
-            "The same, from the overall spread of every measurement.",
-          ],
-          [
-            "Which measurements",
-            "Submitted, approved and completed inspections only, at facilities you can see. Each is judged against the specification it was carried out to; capability uses the latest one. The latest 200 inspections are charted.",
+            "Which readings",
+            "Submitted, approved and completed inspections, placed at their submission time, at facilities you can see. Capability uses the latest inspection's specification, and the page says if it changed during the period. Charts show up to 500 inspections or 1,000 readings.",
           ],
         ],
       },

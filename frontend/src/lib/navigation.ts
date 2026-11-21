@@ -369,10 +369,10 @@ export const NAV_ITEMS: NavItem[] = [
     group: "Insight",
   },
   {
-    label: "SPC",
-    href: "/spc",
+    label: "Control charts",
+    href: "/analytics/control-charts",
     icon: ChartNoAxesCombined,
-    anyPermission: ["INSPECTION_VIEW"],
+    anyPermission: ["REPORT_VIEW"],
     group: "Insight",
   },
   {

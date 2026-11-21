@@ -14,8 +14,8 @@ export interface FieldDef {
   /** Where a new option can be added from the form. The list must be cached under this same path. */
   addPath?: string;
   /**
-   * Suggests India's states, or the main cities of the state typed in the form's "state" field, while still taking
-   * any text.
+   * A dropdown of India's states, or of the cities of the state chosen in the form's "state" field, with Other for a
+   * city the list lacks.
    */
   suggest?: "state" | "city";
 }

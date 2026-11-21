@@ -9,6 +9,10 @@ locals {
 }
 
 resource "aws_s3_bucket" "state" {
+  #checkov:skip=CKV_AWS_18:Only Terraform touches it, and CloudTrail records who did
+  #checkov:skip=CKV_AWS_144:Versioned; copying state to a second region is not needed yet
+  #checkov:skip=CKV2_AWS_62:Nothing reacts to state changes
+  #checkov:skip=CKV_AWS_145:Encrypted with S3-managed keys and holds no secrets (see secrets.tf)
   bucket = local.state_bucket
 
   lifecycle {
@@ -57,6 +61,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "state" {
     noncurrent_version_expiration {
       noncurrent_days = 90
     }
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
   }
 }
 
@@ -85,6 +92,7 @@ resource "aws_s3_bucket_policy" "state" {
 }
 
 resource "aws_ecr_repository" "image" {
+  #checkov:skip=CKV_AWS_136:Encrypted with AES-256; images hold no secrets
   for_each = local.images
 
   name = "qualityos-${each.key}"

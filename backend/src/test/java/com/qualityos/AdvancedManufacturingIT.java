@@ -269,6 +269,28 @@ class AdvancedManufacturingIT extends TraceabilityFixture {
                 Map.of("date", day.toString(), "name", "Mine"))).andExpect(status().isForbidden());
         as(owner, get("/api/v1/facilities/" + facility)).andExpect(jsonPath("$.data.holidays[0].name")
                 .value("Founders' day"));
+
+        // A holiday is updated in place: renamed, moved, and not onto another holiday's date.
+        String holidayPath = "/api/v1/facilities/" + facility + "/holidays/" + holiday;
+        String other = idOf(body(as(owner, postJson("/api/v1/facilities/" + facility + "/holidays",
+                Map.of("date", day.plusDays(30).toString(), "name", "Later"))).andExpect(status().isCreated())));
+        as(owner, put(holidayPath).contentType("application/json").content(json.writeValueAsString(
+                Map.of("date", day.plusDays(30).toString(), "name", "Clash")))).andExpect(status().isConflict());
+        as(operator, put(holidayPath).contentType("application/json").content(json.writeValueAsString(
+                Map.of("date", day.plusDays(2).toString(), "name", "Mine")))).andExpect(status().isForbidden());
+        as(owner, put(holidayPath).contentType("application/json").content(json.writeValueAsString(
+                Map.of("date", day.plusDays(2).toString(), "name", "Moved"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.name").value("Moved"));
+        as(owner, put(holidayPath).contentType("application/json").content(json.writeValueAsString(
+                Map.of("date", day.plusDays(1).toString(), "name", "Founders' day"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.date").value(day.plusDays(1).toString()));
+        as(owner, put("/api/v1/facilities/" + facility + "/holidays/" + java.util.UUID.randomUUID())
+                .contentType("application/json").content(json.writeValueAsString(
+                        Map.of("date", day.toString(), "name", "Nowhere")))).andExpect(status().isNotFound());
+        as(owner, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                "/api/v1/facilities/" + facility + "/holidays/" + other)).andExpect(status().isNoContent());
+        assertThat(asDatabaseSuperuser().queryForObject("SELECT count(*) FROM audit_logs WHERE action = "
+                + "'HOLIDAY_UPDATED' AND entity_id = ?", Integer.class, facility)).isEqualTo(2);
         approved("4", day, day.plusDays(1));
         String board = body(as(planner, get(query)));
         assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[1].capacityMinutes")).isEqualTo("0.0");
@@ -280,7 +302,54 @@ class AdvancedManufacturingIT extends TraceabilityFixture {
         assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[1].capacityMinutes")).isEqualTo("480.0");
         assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[1].loadMinutes")).isEqualTo("120.0");
         assertThat(asDatabaseSuperuser().queryForObject("SELECT count(*) FROM audit_logs WHERE action IN ('HOLIDAY_ADDED', "
-                + "'HOLIDAY_REMOVED') AND entity_id = ?", Integer.class, facility)).isEqualTo(2);
+                + "'HOLIDAY_REMOVED') AND entity_id = ?", Integer.class, facility)).isEqualTo(4);
+
+        // A weekly off on the second day's weekday: no working time that day, every week.
+        int offDay = 1 << (day.plusDays(1).getDayOfWeek().getValue() - 1);
+        String weeklyOff = "/api/v1/facilities/" + facility + "/weekly-off";
+        as(operator, put(weeklyOff).contentType("application/json")
+                .content(json.writeValueAsString(Map.of("daysOfWeek", offDay)))).andExpect(status().isForbidden());
+        as(owner, put(weeklyOff).contentType("application/json")
+                .content(json.writeValueAsString(Map.of("daysOfWeek", 128)))).andExpect(status().is4xxClientError());
+        as(owner, put(weeklyOff).contentType("application/json")
+                .content(json.writeValueAsString(Map.of("daysOfWeek", offDay)))).andExpect(status().isNoContent());
+        as(owner, get("/api/v1/facilities/" + facility)).andExpect(jsonPath("$.data.weeklyOffDays").value(offDay));
+        String weekly = API + "/scheduling?facilityId=" + facility + "&from=" + day + "&to=" + day.plusDays(8);
+        board = body(as(planner, get(weekly)));
+        assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[0].capacityMinutes")).isEqualTo("480.0");
+        assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[1].capacityMinutes")).isEqualTo("0.0");
+        assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[8].capacityMinutes")).isEqualTo("0.0");
+        assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[1].loadMinutes")).isEqualTo("0.0");
+        as(owner, put(weeklyOff).contentType("application/json")
+                .content(json.writeValueAsString(Map.of("daysOfWeek", 0)))).andExpect(status().isNoContent());
+        assertThat(JsonPath.<String>read(body(as(planner, get(query))), "$.data.workCenters[0].days[1].capacityMinutes"))
+                .isEqualTo("480.0");
+        assertThat(asDatabaseSuperuser().queryForObject("SELECT count(*) FROM audit_logs WHERE action = "
+                + "'WEEKLY_OFF_CHANGED' AND entity_id = ?", Integer.class, facility)).isEqualTo(2);
+
+        // An alternate day off: the second day's weekday, off only on its occurrence in the month that week.
+        int weekday = day.plusDays(1).getDayOfWeek().getValue();
+        int occurrence = 1 << ((day.plusDays(1).getDayOfMonth() - 1) / 7);
+        Map<String, Object> alternate = new java.util.HashMap<>(Map.of("daysOfWeek", 0, "alternateDay", weekday,
+                "alternateWeeks", 0));
+        as(owner, put(weeklyOff).contentType("application/json").content(json.writeValueAsString(alternate)))
+                .andExpect(status().isUnprocessableContent());
+        alternate.putAll(Map.of("daysOfWeek", offDay, "alternateWeeks", occurrence));
+        as(owner, put(weeklyOff).contentType("application/json").content(json.writeValueAsString(alternate)))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value("The alternate day is already off every week."));
+        alternate.put("daysOfWeek", 0);
+        as(owner, put(weeklyOff).contentType("application/json").content(json.writeValueAsString(alternate)))
+                .andExpect(status().isNoContent());
+        as(owner, get("/api/v1/facilities/" + facility)).andExpect(jsonPath("$.data.alternateOffDay").value(weekday))
+                .andExpect(jsonPath("$.data.alternateOffWeeks").value(occurrence));
+        board = body(as(planner, get(weekly)));
+        assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[1].capacityMinutes")).isEqualTo("0.0");
+        // A week later the same weekday is a different occurrence in its month, so it is worked.
+        assertThat(JsonPath.<String>read(board, "$.data.workCenters[0].days[8].capacityMinutes")).isEqualTo("480.0");
+        as(owner, put(weeklyOff).contentType("application/json")
+                .content(json.writeValueAsString(Map.of("daysOfWeek", 0)))).andExpect(status().isNoContent());
+        as(owner, get("/api/v1/facilities/" + facility)).andExpect(jsonPath("$.data.alternateOffDay").isEmpty());
     }
 
     @Test

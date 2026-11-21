@@ -7,6 +7,7 @@ import {
   Building,
   Building2,
   CalendarClock,
+  CalendarDays,
   CalendarRange,
   Activity,
   TimerOff,
@@ -407,6 +408,12 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ScrollText,
     anyPermission: ["AUDIT_LOG_VIEW"],
     group: "Administration",
+  },
+  {
+    label: "Holiday calendar",
+    href: "/holiday-calendar",
+    icon: CalendarDays,
+    group: "Account and help",
   },
   {
     label: "My account",

@@ -2,7 +2,7 @@
 
 > **Status:** this workflow has not run yet. GitHub answers "Actions has been disabled for this user", so every result so far comes from local runs. Require these checks only after a real run has passed.
 
-`.github/workflows/ci.yml` runs on pull requests into `dev` and `main`, on pushes to them, and on demand.
+`.github/workflows/ci.yml` runs on pull requests into `dev`, `sit`, `uat` and `prod`, on pushes to them, and on demand.
 
 | Job | Checks |
 |---|---|
@@ -24,10 +24,12 @@ Production credentials must never be added to this workflow. The production pipe
 ## Blocking merges
 
 Passing checks only block a merge when GitHub is told to require them. Require `backend`, `migrations`, `frontend`, `e2e`
-and `security` on `dev` and `main`.
+and `security` on `dev`, `sit` and `uat`.
 
-Branch protection and rulesets are refused on a free private repository. Until the repository moves to GitHub Pro or
-Team, or becomes public, a failed check does not stop a merge.
+The repository is public, so branch protection is available. It is not switched on yet, because GitHub Actions is
+disabled on the account and a required check that never runs would block every merge. Once a real run passes, require
+the checks above on `dev`, `sit` and `uat`. Until then a failed check does not stop a merge, and `deploy.sh` runs the
+tests itself (see [DEPLOYMENT.md](DEPLOYMENT.md)).
 
 The backend job uploads the sample recall, audit and quality reports and an invoice as `report-samples`. Committed copies are in `docs/samples`. The browser job raises `AUTH_RATE_LIMIT_PER_MINUTE`, because the suite signs in far more often
 than a person, from one address. To run it locally, start the stack with the same setting.

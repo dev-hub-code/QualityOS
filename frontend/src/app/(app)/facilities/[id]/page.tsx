@@ -9,7 +9,7 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
-import { daysToMask, describeDays, WEEKDAYS } from "@/lib/manufacturing";
+import { daysToMask, describeAlternateOff, describeDays, maskToDays, WEEK_ORDINALS, WEEKDAYS } from "@/lib/manufacturing";
 import { FACILITY_FIELDS } from "@/lib/record-fields";
 import type { FieldDef } from "@/lib/record-form";
 import type { FacilityDetail } from "@/lib/types";
@@ -35,7 +35,41 @@ function shiftRequest(values: Record<string, unknown>) {
 
 const SHIFT_DEFAULTS = { breakMinutes: "0", ...Object.fromEntries(WEEKDAYS.map((day) => [`day${day}`, true])) };
 
-type Dialog = "edit" | "department" | "line" | "shift" | "holiday" | null;
+type Dialog = "edit" | "department" | "line" | "shift" | "holiday" | "weeklyOff" | null;
+
+const WEEKLY_OFF_FIELDS: FieldDef[] = [
+  ...WEEKDAYS.map((day) => ({ name: `day${day}`, label: `Off every ${day}`, type: "checkbox" as const })),
+  {
+    name: "alternateDay",
+    label: "Alternate day off (only in some weeks of the month)",
+    type: "select",
+    options: WEEKDAYS.map((day, index) => ({ value: String(index + 1), label: day })),
+  },
+  ...WEEK_ORDINALS.map((ordinal) => ({
+    name: `week${ordinal}`,
+    label: `Off on the ${ordinal} one in the month`,
+    type: "checkbox" as const,
+  })),
+];
+
+/** The dialog's values for a facility's days off. */
+function weeklyOffRecord(weeklyOffDays: number, alternateOffDay: number | null, alternateOffWeeks: number) {
+  return {
+    ...Object.fromEntries(maskToDays(weeklyOffDays).map((off, index) => [`day${WEEKDAYS[index]}`, off])),
+    alternateDay: alternateOffDay === null ? "" : String(alternateOffDay),
+    ...Object.fromEntries(WEEK_ORDINALS.map((ordinal, index) => [`week${ordinal}`, (alternateOffWeeks & (1 << index)) !== 0])),
+  };
+}
+
+/** The dialog's values as the API's days off. */
+function weeklyOffRequest(values: Record<string, unknown>) {
+  const alternateDay = values.alternateDay ? Number(values.alternateDay) : null;
+  return {
+    daysOfWeek: daysToMask(WEEKDAYS.map((day) => values[`day${day}`] === true)),
+    alternateDay,
+    alternateWeeks: alternateDay === null ? 0 : daysToMask(WEEK_ORDINALS.map((ordinal) => values[`week${ordinal}`] === true)),
+  };
+}
 
 const HOLIDAY_FIELDS: FieldDef[] = [
   { name: "date", label: "Date", type: "date", required: true },
@@ -44,9 +78,11 @@ const HOLIDAY_FIELDS: FieldDef[] = [
 
 function UnitList({
   items,
+  onEdit,
   onRemove,
 }: {
   items: { id: string; label: string }[];
+  onEdit?: (id: string) => void;
   onRemove?: (id: string) => void;
 }) {
   if (items.length === 0) return <p className="text-sm text-muted-foreground">None yet.</p>;
@@ -55,11 +91,18 @@ function UnitList({
       {items.map((item) => (
         <li key={item.id} className="flex items-center justify-between py-2">
           {item.label}
-          {onRemove && (
-            <Button variant="ghost" size="sm" onClick={() => onRemove(item.id)}>
-              Remove
-            </Button>
-          )}
+          <span className="flex gap-1">
+            {onEdit && (
+              <Button variant="ghost" size="sm" onClick={() => onEdit(item.id)}>
+                Edit
+              </Button>
+            )}
+            {onRemove && (
+              <Button variant="ghost" size="sm" onClick={() => onRemove(item.id)}>
+                Remove
+              </Button>
+            )}
+          </span>
         </li>
       ))}
     </ul>
@@ -73,12 +116,14 @@ export default function FacilityPage() {
   const path = `/facilities/${id}`;
   const canManage = usePermission("FACILITY_MANAGE");
   const [dialog, setDialog] = useState<Dialog>(null);
+  const [editingHoliday, setEditingHoliday] = useState<string | null>(null);
   const { run, message } = useAction();
   const refresh = useRefresh();
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<FacilityDetail>(path) });
   if (!data) return <QueryState error={error} />;
 
-  const { facility, departments, productionLines, shifts, holidays } = data;
+  const { facility, departments, productionLines, shifts, holidays, weeklyOffDays, alternateOffDay, alternateOffWeeks } =
+    data;
   const add = (button: string, target: Dialog) =>
     canManage && (
       <Button variant="outline" size="sm" onClick={() => setDialog(target)}>
@@ -149,12 +194,33 @@ export default function FacilityPage() {
           />
         </Section>
       </div>
-      <Section title="Holidays" action={add("Add holiday", "holiday")}>
+      <Section
+        title="Holidays"
+        action={
+          canManage && (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setDialog("weeklyOff")}>
+                Weekly off
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setDialog("holiday")}>
+                Add holiday
+              </Button>
+            </div>
+          )
+        }
+      >
         <p className="mb-2 text-sm text-muted-foreground">
-          No shift works on a holiday, so scheduling and machine availability give it no working time.
+          No shift works on a holiday, a weekly off or an alternate day off, so scheduling and machine availability give it no working time.
+        </p>
+        <p className="mb-2 text-sm">
+          <span className="font-medium">Weekly off:</span> {weeklyOffDays === 0 ? "none" : describeDays(weeklyOffDays)}
+        </p>
+        <p className="mb-2 text-sm">
+          <span className="font-medium">Alternate off:</span> {describeAlternateOff(alternateOffDay, alternateOffWeeks)}
         </p>
         <UnitList
           items={holidays.map((holiday) => ({ id: holiday.id, label: `${holiday.date} – ${holiday.name}` }))}
+          onEdit={canManage ? setEditingHoliday : undefined}
           onRemove={remover("holidays")}
         />
       </Section>
@@ -185,6 +251,24 @@ export default function FacilityPage() {
           fields={HOLIDAY_FIELDS}
           onClose={() => setDialog(null)}
           onSubmit={(values) => api.post(`${path}/holidays`, values).then(refresh)}
+        />
+      )}
+      {editingHoliday !== null && (
+        <RecordDialog
+          title="Edit holiday"
+          fields={HOLIDAY_FIELDS}
+          record={holidays.find((holiday) => holiday.id === editingHoliday)}
+          onClose={() => setEditingHoliday(null)}
+          onSubmit={(values) => api.put(`${path}/holidays/${editingHoliday}`, values).then(refresh)}
+        />
+      )}
+      {dialog === "weeklyOff" && (
+        <RecordDialog
+          title="Weekly off"
+          fields={WEEKLY_OFF_FIELDS}
+          record={weeklyOffRecord(weeklyOffDays, alternateOffDay, alternateOffWeeks)}
+          onClose={() => setDialog(null)}
+          onSubmit={(values) => api.put(`${path}/weekly-off`, weeklyOffRequest(values)).then(refresh)}
         />
       )}
       {dialog === "shift" && (

@@ -35,6 +35,25 @@ class MasterDataIT extends MasterDataFixture {
     }
 
     @Test
+    void facilityCodeCanBeChangedButNotToAnotherFacilitysCode() throws Exception {
+        Session owner = register();
+        String id = facility(owner);
+        String taken = JsonPath.read(body(as(owner, get("/api/v1/facilities/" + facility(owner)))),
+                "$.data.facility.code");
+        String newCode = code();
+
+        as(owner, put("/api/v1/facilities/" + id).contentType("application/json")
+                        .content(json.writeValueAsString(Map.of("code", newCode, "name", "Pune Plant", "version", 0))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.code").value(newCode));
+        as(owner, get("/api/v1/facilities/" + id)).andExpect(jsonPath("$.data.facility.code").value(newCode));
+
+        as(owner, put("/api/v1/facilities/" + id).contentType("application/json")
+                        .content(json.writeValueAsString(Map.of("code", taken, "name", "Pune Plant", "version", 1))))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
     void codesAreUniquePerTenantButReusableAcrossTenants() throws Exception {
         Session first = register();
         Session second = register();

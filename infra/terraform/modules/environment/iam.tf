@@ -66,7 +66,7 @@ resource "aws_iam_role_policy" "db_admin_secrets" {
 # What the running application may do: its own bucket, nothing else.
 
 data "aws_iam_policy_document" "exec_command" {
-  # ECS Exec, for a shell in a running task when diagnosing UAT.
+  # ECS Exec, for a shell in a running task when diagnosing. Only granted when enable_exec_command is on.
   statement {
     actions = [
       "ssmmessages:CreateControlChannel",
@@ -102,6 +102,7 @@ resource "aws_iam_role_policy" "backend_files" {
 }
 
 resource "aws_iam_role_policy" "backend_exec" {
+  count  = var.enable_exec_command ? 1 : 0
   name   = "exec-command"
   role   = aws_iam_role.backend.id
   policy = data.aws_iam_policy_document.exec_command.json
@@ -113,6 +114,7 @@ resource "aws_iam_role" "frontend" {
 }
 
 resource "aws_iam_role_policy" "frontend_exec" {
+  count  = var.enable_exec_command ? 1 : 0
   name   = "exec-command"
   role   = aws_iam_role.frontend.id
   policy = data.aws_iam_policy_document.exec_command.json

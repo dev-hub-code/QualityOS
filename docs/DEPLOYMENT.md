@@ -41,7 +41,13 @@ internet ──443──▶ ALB (public subnets) ──3000──▶ web app (pr
                                                                               └──▶ S3 (gateway endpoint), SendGrid, Razorpay (NAT)
 ```
 
-Each security group accepts only the tier in front of it. The backend has no route from the load balancer; the web
+A web application firewall (AWS WAF) sits on the load balancer. It blocks any address making more than 3,000 requests in
+5 minutes (`waf_requests_per_5_minutes`, set high because a whole factory can share one address), addresses on AWS's
+reputation list, and requests matching AWS's common and known-bad-input rules, Log4j among them. The common rules' 8 KB
+body limit only counts, because attachments are larger. Blocked and counted requests are logged, with cookies and the
+`Authorization` header removed, so false positives can be found in UAT before production.
+
+Each security group accepts only the tier in front of it, and the VPC's default group has no rules. The backend has no route from the load balancer; the web
 app reaches it at `backend.uat.qualityos.internal` (Cloud Map DNS). The Razorpay webhook enters through the web app.
 The ALB appends the client address to `X-Forwarded-For`, and the web app passes on that last entry, so audit and rate
 limits see the real address.
@@ -59,8 +65,8 @@ limits see the real address.
 
 ## Costs
 
-Roughly US$300 a month for UAT as configured, estimated from on-demand prices in Mumbai: the Multi-AZ database about
-$120, four Fargate instances about $115, NAT gateway about $45, load balancer about $20, the rest a few dollars. Data
+Roughly US$310 a month for UAT as configured, estimated from on-demand prices in Mumbai: the Multi-AZ database about
+$120, four Fargate instances about $115, NAT gateway about $45, load balancer about $20, the firewall about $10, the rest (logs, monitoring, secrets) a few dollars. Data
 transfer is extra. Setting `db_multi_az = false` saves about $55; keep it on if UAT is to prove failover.
 
 ## First deployment
@@ -91,9 +97,22 @@ domain. Every `terraform apply` shows its plan and asks before creating anything
 ## Deploying a change
 
 Merge into `uat`, then from that commit: `infra/scripts/deploy.sh uat`. Images are built from `git archive HEAD`, so
-uncommitted changes never reach an environment, and each image tag is the commit it was built from. New instances
+uncommitted changes never reach an environment, and each image tag is the commit it was built from.
+
+Until GitHub Actions runs (see [CI.md](CI.md)), the script is the test gate. It refuses a commit that is not on the
+environment's branch on GitHub, then runs the backend suite and the frontend type check, lint and unit tests on that
+exact commit, and scans each image with the Trivy check CI uses, before it pushes anything. Browser tests are not part
+of it, since they need a running stack. Expect 10 to 15 minutes for a new commit. An image tag already in the registry
+has passed all this, so deploying it again, or rolling back to it, skips straight to Terraform. New instances
 start beside the old ones, and the old ones stop only when the new ones are healthy. To roll back, deploy the earlier
 commit.
+
+## Accepted for UAT, to decide for production
+
+- Encryption uses AWS-managed keys. Customer-managed KMS keys add separate control and audit of who can decrypt.
+- Files and backups stay in Mumbai. Copying them to a second region protects against losing the region.
+- Secrets are rotated by hand (below), because each needs its own steps.
+- The database is reached with a password, not IAM tokens, which expire every 15 minutes.
 
 ## Secrets
 
@@ -119,8 +138,16 @@ then point `DB_URL` at it. A timed restore test is still to do (see Status).
 
 ## Diagnosing
 
-- Logs: CloudWatch groups `/qualityos/uat/backend`, `/frontend` and `/db-admin`, kept 30 days. The backend logs JSON.
+Everything below is kept for a year (`log_retention_days`).
+
+- Application logs: CloudWatch groups `/qualityos/uat/backend`, `/frontend` and `/db-admin`. The backend logs JSON.
+- Firewall: `aws-waf-logs-qualityos-uat`, blocked and counted requests only.
+- Network: `/qualityos/uat/vpc-flow`, every connection accepted or refused.
+- Load balancer and file bucket access logs: the `qualityos-uat-logs-<account>` bucket, under `alb/` and `s3/files/`.
+- Database: the PostgreSQL log, Performance Insights, and enhanced monitoring (operating system figures every minute).
 - Shell in a running instance: `aws ecs execute-command --cluster qualityos-uat --task <id> --container backend --interactive --command sh`.
+  This is ECS Exec. It is on in UAT only (`enable_exec_command`): anyone with that IAM permission gets a shell holding
+  the application's secrets, so it stays off in production.
 - Slow queries (over one second) are in the RDS PostgreSQL log, and in Performance Insights.
 
 ## Status
@@ -129,6 +156,7 @@ then point `DB_URL` at it. A timed restore test is still to do (see Status).
 |---|---|
 | Environment profiles (dev, SIT, UAT) | Done (#151) |
 | S3 file storage | Built and tested against an S3-compatible server (#153) |
+| Security scan | Checkov: 367 passed, 0 failed. 26 are skipped deliberately, each with its reason beside the resource: mostly customer-managed KMS keys and cross-region copies, which are production decisions |
 | Terraform for UAT, scripts, this runbook | Written; `terraform validate` passes; database setup script tested on PostgreSQL 18 as a non-superuser admin; secret seeding tested against a stand-in for AWS. **Not yet applied** |
 | First UAT deployment | Waiting for the owner's go-ahead, since it creates billable resources |
 | Deploy pipeline in GitHub Actions | To do. Actions is disabled on the account, so deploys run from `deploy.sh` until then |

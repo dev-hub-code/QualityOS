@@ -72,7 +72,7 @@ Deliberately left for a later phase. None of them weakens tenant isolation.
 | A credit note takes back money; it does not change the invoice it is against, which stays `PAID`. A credit note's refund that fails at Razorpay is shown as failed and is then made by hand outside ProductionOS; a refund of a payment no invoice could take goes back to review and can be sent again | When a user needs it |
 | A renewal invoice is raised on its own, but the customer pays it. There are no saved cards or automatic debits (Razorpay recurring payments) | When a user needs it |
 | CGST, SGST, IGST, place of supply and SAC are worked out from GSTINs, but no accountant has reviewed this. It does not cover exemptions, SEZ supplies, exports or an unregistered buyer. The seller's GSTIN and SAC must be set before an invoice goes to a customer | Before the first paid customer |
-| A plan change has no proration. A different plan starts on payment and the unused time on the old one is lost | Review after real use |
+| A plan change is prorated: the unused part of every paid period is credited against the new plan, before GST, and a credit larger than the new price becomes extra days at the new plan's rate. Renewing the same plan adds time and needs no credit | Review after real use |
 | The starting user and facility limits, grace period and annual prices are placeholders, editable under Plans. The trial length is under Platform settings | Owner to confirm before launch |
 | Which features each plan includes is an interpretation of the brief's table. Starter has no dashboards or reports | Owner to confirm before launch |
 | Account emails, such as reset links, cannot be retried, because a resent link would have expired. Failed ones show in the email log | By design |

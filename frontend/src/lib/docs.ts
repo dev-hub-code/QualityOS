@@ -1074,6 +1074,39 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
       {
+        title: "SPC: control charts and capability",
+        terms: [
+          [
+            "Where",
+            "Insight → SPC, for anyone with inspection view. Pick a template's numeric parameter, a period and, if you like, a facility.",
+          ],
+          [
+            "X̄-R chart",
+            "One point per inspection: the mean of its samples, and below it their range. Suggested when inspections take 2 to 10 samples of the parameter. Inspections with another number of samples are left out, and the page says how many.",
+          ],
+          [
+            "Individuals chart",
+            "One point per measurement in the order taken, and below it the moving range from the one before. Suggested when each inspection measures the parameter once.",
+          ],
+          [
+            "Control limits",
+            "Worked out from the measurements by the usual Shewhart constants. A point beyond them is shown in red and listed with a link to its inspection. With fewer than 20 points the limits are marked preliminary.",
+          ],
+          [
+            "Cp and Cpk",
+            "How the process fits the specification, from the variation within inspections (or between neighbouring measurements). Cpk of 1.33 or more reads as capable, from 1.00 marginal, below that not capable. Cp needs both limits.",
+          ],
+          [
+            "Pp and Ppk",
+            "The same, from the overall spread of every measurement.",
+          ],
+          [
+            "Which measurements",
+            "Submitted, approved and completed inspections only, at facilities you can see. Each is judged against the specification it was carried out to; capability uses the latest one. The latest 200 inspections are charted.",
+          ],
+        ],
+      },
+      {
         title: "Good to know",
         list: [
           "The default period is the last 90 days, and you can choose up to two years.",

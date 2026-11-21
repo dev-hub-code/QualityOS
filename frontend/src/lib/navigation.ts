@@ -369,6 +369,13 @@ export const NAV_ITEMS: NavItem[] = [
     group: "Insight",
   },
   {
+    label: "SPC",
+    href: "/spc",
+    icon: ChartNoAxesCombined,
+    anyPermission: ["INSPECTION_VIEW"],
+    group: "Insight",
+  },
+  {
     label: "Production analytics",
     href: "/manufacturing/analytics",
     icon: Activity,

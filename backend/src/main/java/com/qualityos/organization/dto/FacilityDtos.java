@@ -44,7 +44,26 @@ public final class FacilityDtos {
             List<UnitResponse> productionLines,
             List<ShiftResponse> shifts,
             /* From the start of this year on. */
-            List<HolidayResponse> holidays) {
+            List<HolidayResponse> holidays,
+            /* The days of the week it never works, as for a shift's days of the week; 0 for none. */
+            int weeklyOffDays,
+            /* A day of the week (Monday 1 ... Sunday 7) off only in some weeks of the month; null for none. */
+            Integer alternateOffDay,
+            /* Which of that day's occurrences in a month are off: 1st 1, 2nd 2, 3rd 4, 4th 8, 5th 16. */
+            int alternateOffWeeks,
+            /* Its state's holidays and All India's, from the start of this year to the end of the next. */
+            List<StateHolidayDtos.InheritedHoliday> stateHolidays) {
+    }
+
+    /**
+     * {@code daysOfWeek}: Monday 1, Tuesday 2, Wednesday 4 ... Sunday 64; 0 for no weekly off. {@code alternateDay}:
+     * Monday 1 ... Sunday 7, off only on the occurrences in each month that {@code alternateWeeks} names (1st 1, 2nd
+     * 2, 3rd 4, 4th 8, 5th 16), such as 10 for the 2nd and 4th; null for none.
+     */
+    public record SaveWeeklyOffRequest(
+            @NotNull @Min(0) @Max(127) Integer daysOfWeek,
+            @Min(1) @Max(7) Integer alternateDay,
+            @Min(0) @Max(31) Integer alternateWeeks) {
     }
 
     public record SaveHolidayRequest(@NotNull java.time.LocalDate date, @NotBlank @Size(max = 200) String name) {

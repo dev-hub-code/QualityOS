@@ -129,13 +129,26 @@ export const DOC_PAGES: DocPage[] = [
             "Holiday",
             "A day the whole facility does not work, whatever its shifts say.",
           ],
+          [
+            "Weekly off",
+            "Days of the week the whole facility never works, such as Sunday. They count as holidays every week.",
+          ],
+          [
+            "State holiday",
+            "A holiday kept once for a state, or for All India, under State holidays. Every facility whose address is in that state closes on it, unless it is set to work that day.",
+          ],
+          [
+            "Alternate off",
+            "A day the whole facility does not work in some weeks of each month, such as the 2nd and 4th Saturday.",
+          ],
         ],
       },
       {
         title: "Good to know",
         list: [
           "Your plan sets how many facilities you can have.",
-          "Open a facility from the list to add its departments, lines, shifts and holidays.",
+          "Open a facility from the list to add its departments, lines, shifts, holidays and weekly off.",
+          "Everyone can see upcoming holidays and regular days off under Holiday calendar in the menu, without access to facilities.",
         ],
       },
     ],

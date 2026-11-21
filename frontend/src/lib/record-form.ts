@@ -13,6 +13,11 @@ export interface FieldDef {
   options?: FieldOption[];
   /** Where a new option can be added from the form. The list must be cached under this same path. */
   addPath?: string;
+  /**
+   * A dropdown of India's states, or of the cities of the state chosen in the form's "state" field, with Other for a
+   * city the list lacks.
+   */
+  suggest?: "state" | "city";
 }
 
 /** Matches NUMERIC(18,6), so that the database never has to round a value. */

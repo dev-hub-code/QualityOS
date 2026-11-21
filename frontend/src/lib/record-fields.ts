@@ -4,8 +4,8 @@ export const FACILITY_FIELDS: FieldDef[] = [
   { name: "code", label: "Code", required: true },
   { name: "name", label: "Name", required: true },
   { name: "address", label: "Address" },
-  { name: "city", label: "City" },
-  { name: "state", label: "State" },
+  { name: "state", label: "State", suggest: "state" },
+  { name: "city", label: "City", suggest: "city" },
   { name: "postalCode", label: "Postal code" },
   { name: "gstin", label: "GSTIN" },
 ];
@@ -19,8 +19,8 @@ export const supplierFields = (categories: FieldOption[]): FieldDef[] => [
   { name: "email", label: "Email", type: "email" },
   { name: "phone", label: "Phone" },
   { name: "address", label: "Address" },
-  { name: "city", label: "City" },
-  { name: "state", label: "State" },
+  { name: "state", label: "State", suggest: "state" },
+  { name: "city", label: "City", suggest: "city" },
   { name: "postalCode", label: "Postal code" },
 ];
 

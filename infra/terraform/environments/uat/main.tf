@@ -23,4 +23,7 @@ module "environment" {
   nat_gateways      = 1
   db_instance_class = "db.t4g.medium"
   db_multi_az       = true
+
+  # A shell in running containers, for diagnosing UAT. Off in production.
+  enable_exec_command = true
 }

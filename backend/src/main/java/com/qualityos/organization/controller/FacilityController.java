@@ -11,6 +11,7 @@ import com.qualityos.organization.dto.FacilityDtos.SaveHolidayRequest;
 import com.qualityos.organization.dto.FacilityDtos.SaveFacilityRequest;
 import com.qualityos.organization.dto.FacilityDtos.SaveShiftRequest;
 import com.qualityos.organization.dto.FacilityDtos.SaveUnitRequest;
+import com.qualityos.organization.dto.FacilityDtos.SaveWeeklyOffRequest;
 import com.qualityos.organization.dto.FacilityDtos.ShiftResponse;
 import com.qualityos.organization.dto.FacilityDtos.UnitResponse;
 import com.qualityos.organization.service.FacilityService;
@@ -130,6 +131,29 @@ public class FacilityController {
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<HolidayResponse> addHoliday(@PathVariable UUID id, @Valid @RequestBody SaveHolidayRequest request) {
         return ApiResponse.ok(facilities.addHoliday(id, request));
+    }
+
+    @PutMapping("/{id}/weekly-off")
+    @PreAuthorize(Require.FACILITY_MANAGE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void setWeeklyOff(@PathVariable UUID id, @Valid @RequestBody SaveWeeklyOffRequest request) {
+        facilities.setWeeklyOff(id, request);
+    }
+
+    @PutMapping("/{id}/holidays/{holidayId}")
+    @PreAuthorize(Require.FACILITY_MANAGE)
+    public ApiResponse<HolidayResponse> updateHoliday(@PathVariable UUID id, @PathVariable UUID holidayId,
+            @Valid @RequestBody SaveHolidayRequest request) {
+        return ApiResponse.ok(facilities.updateHoliday(id, holidayId, request));
+    }
+
+    /** Whether the facility works on a holiday of its state, or of All India. */
+    @PutMapping("/{id}/state-holidays/{holidayId}")
+    @PreAuthorize(Require.FACILITY_MANAGE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void setStateHolidayWorking(@PathVariable UUID id, @PathVariable UUID holidayId,
+            @Valid @RequestBody com.qualityos.organization.dto.StateHolidayDtos.SetWorkingRequest request) {
+        facilities.setStateHolidayWorking(id, holidayId, request.working());
     }
 
     @DeleteMapping("/{id}/holidays/{holidayId}")

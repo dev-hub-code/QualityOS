@@ -19,7 +19,7 @@ and known gaps.
 | Traceability | Production batches, serial numbers, dispatch, returns, material corrections, forward and backward traces, recalls |
 | Calibration and audits | Instruments, calibration records, audit checklists, findings that raise NCRs |
 | Analytics | Dashboard, supplier scorecards, Pareto, PDF and Excel reports |
-| Subscription | Plans, limits, trials, invoices, and the Control Center at `/platform`, with operator roles, audit log, support console, settings and announcements. Payments are taken online through Cashfree once its keys are set, or recorded by hand, and invoices are not yet GST tax invoices |
+| Subscription | Plans, limits, trials, invoices, and the Control Center at `/platform`, with operator roles, audit log, support console, settings and announcements. Payments are taken online through Razorpay once its keys are set, or recorded by hand, and invoices are not yet GST tax invoices |
 
 ## Prerequisites
 
@@ -39,18 +39,49 @@ docker compose up --build -d --wait
 | Swagger UI | http://localhost:8080/swagger-ui.html |
 | OpenAPI JSON | http://localhost:8080/v3/api-docs |
 | Health | http://localhost:8080/actuator/health |
+| Mailpit (local email inbox) | http://localhost:8025 |
 
 Ports bind to 127.0.0.1 and can be changed in `.env` (see `.env.example`). Credentials default to
 local-only values. JWT keys are generated at each backend start, so a restart signs everyone out. Role passwords are set when the Postgres volume is first created, so after changing
 them run `docker compose down -v`, which **deletes the local database**.
 
+Stop it with `docker compose down` (keeps data) or `docker compose down -v` (deletes the database).
+Sign-up sends a verification email: open it in Mailpit at http://localhost:8025 to activate the account.
+
 ## Run the apps on the host
 
+Use three terminals, all starting from the repository root. The backend and frontend commands keep running in the
+foreground, so they cannot be chained in one terminal.
+
 ```bash
-docker compose up -d --wait postgres
-cd backend && ./mvnw spring-boot:run      # local profile; DB defaults in application-local.yml
-cd frontend && npm install && npm run dev # BACKEND_URL defaults to http://localhost:8080
+# Terminal 1: database and mail catcher only. Stop the Dockerised apps first if they are running,
+# or ports 8080 and 3000 are already taken.
+docker compose stop backend frontend
+docker compose up -d --wait postgres mailpit
+
+# Terminal 2: API on http://localhost:8080 (local profile; DB defaults in application-local.yml)
+cd backend
+./mvnw spring-boot:run
+
+# Terminal 3: web app on http://localhost:3000 (BACKEND_URL defaults to http://localhost:8080)
+cd frontend
+npm install
+npm run dev
 ```
+
+Wait for `Started QualityOSApplication` in terminal 2 before using the web app. Until then the frontend logs
+`ECONNREFUSED 127.0.0.1:8080`.
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `cd: frontend: No such file or directory` | You are still in `backend`. Run `cd ../frontend`, or start from the repository root |
+| `port is already allocated` / `Address already in use` | Another process holds 5432, 8080 or 3000. Run `docker compose stop backend frontend`, stop a local PostgreSQL, or change the ports in `.env` |
+| Backend fails with `password authentication failed` | The Postgres volume was created with different passwords. Run `docker compose down -v` (deletes local data) and start again |
+| Registered but cannot sign in | Verify the email first: the link is in Mailpit at http://localhost:8025 |
+| `./mvnw: Permission denied` | `chmod +x backend/mvnw` |
+| Signed out after restarting the backend | Expected locally: JWT keys are regenerated at each start |
 
 ## Tests
 

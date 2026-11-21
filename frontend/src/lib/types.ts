@@ -146,6 +146,57 @@ export interface FacilityDetail {
   shifts: Shift[];
   /** From the start of this year on. */
   holidays: Holiday[];
+  /** The days of the week it never works, as for a shift's days; 0 for none. */
+  weeklyOffDays: number;
+  /** A day (Monday 1 … Sunday 7) off only in some weeks of each month; null for none. */
+  alternateOffDay: number | null;
+  /** Which of that day's occurrences in a month are off: 1st 1, 2nd 2, 3rd 4, 4th 8, 5th 16. */
+  alternateOffWeeks: number;
+  /** Its state's holidays and All India's, from the start of this year to the end of the next. */
+  stateHolidays: InheritedHoliday[];
+}
+
+/** A holiday kept for a state, or for all of India. {@code region} is the state's GST code, or ALL. */
+export interface StateHoliday {
+  id: string;
+  region: string;
+  regionName: string;
+  date: string;
+  name: string;
+}
+
+/** A state or All India holiday as one facility takes it; {@code working} when it works all the same. */
+export interface InheritedHoliday extends StateHoliday {
+  working: boolean;
+}
+
+/** A facility's regular days off, as the holiday calendar shows them. */
+export interface CalendarFacility {
+  id: string;
+  code: string;
+  name: string;
+  weeklyOffDays: number;
+  alternateOffDay: number | null;
+  alternateOffWeeks: number;
+}
+
+/** A day one facility is closed: a named holiday, or a day of its weekly or alternate days off. */
+export interface CalendarHoliday {
+  date: string;
+  name: string;
+  /** HOLIDAY is the facility's own; STATE_HOLIDAY its state's or All India's. */
+  kind: "HOLIDAY" | "STATE_HOLIDAY" | "WEEKLY_OFF" | "ALTERNATE_OFF";
+  facilityId: string;
+  facilityCode: string;
+  facilityName: string;
+}
+
+/** Upcoming days off at the facilities the member can open. Both days included. */
+export interface HolidayCalendar {
+  from: string;
+  to: string;
+  facilities: CalendarFacility[];
+  holidays: CalendarHoliday[];
 }
 
 /** A day the facility does not work, whatever its shifts say. */

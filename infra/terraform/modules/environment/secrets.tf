@@ -2,6 +2,8 @@
 # reads it back, so no secret is ever in Terraform state or in git. infra/scripts/seed-secrets.sh fills it in.
 
 resource "aws_secretsmanager_secret" "app" {
+  #checkov:skip=CKV2_AWS_57:Each value needs its own rotation steps (docs/DEPLOYMENT.md); automatic rotation would sign everyone out or break the database connection
+  #checkov:skip=CKV_AWS_149:Encrypted with the AWS-managed key; a customer-managed key is a production decision
   name                    = "${local.prefix}/app"
   description             = "QualityOS ${var.name}: database passwords, signing keys and provider keys. Filled by infra/scripts/seed-secrets.sh."
   recovery_window_in_days = 30

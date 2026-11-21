@@ -6,6 +6,7 @@ import com.qualityos.organization.dto.HolidayCalendarDtos.CalendarFacility;
 import com.qualityos.organization.dto.HolidayCalendarDtos.CalendarHoliday;
 import com.qualityos.organization.dto.HolidayCalendarDtos.HolidayCalendar;
 import com.qualityos.organization.dto.HolidayCalendarDtos.HolidayKind;
+import com.qualityos.organization.dto.StateHolidayDtos.InheritedHoliday;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
@@ -13,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -32,11 +34,14 @@ public class HolidayCalendarService {
     private final JdbcTemplate jdbc;
     private final FacilityScope scope;
     private final OrganizationService organizations;
+    private final StateHolidayService stateHolidays;
 
-    HolidayCalendarService(JdbcTemplate jdbc, FacilityScope scope, OrganizationService organizations) {
+    HolidayCalendarService(JdbcTemplate jdbc, FacilityScope scope, OrganizationService organizations,
+            StateHolidayService stateHolidays) {
         this.jdbc = jdbc;
         this.scope = scope;
         this.organizations = organizations;
+        this.stateHolidays = stateHolidays;
     }
 
     /** From today in the organisation's time zone for 90 days, when no period is given. Both days included. */
@@ -70,6 +75,17 @@ public class HolidayCalendarService {
                 rows.getString("facility_name")), start, end, allowed, allowed));
         Set<String> named = new HashSet<>();
         holidays.forEach(holiday -> named.add(holiday.facilityId() + "/" + holiday.date()));
+        // Then its state's and All India's, unless it works on them or has its own holiday that day.
+        Map<UUID, List<InheritedHoliday>> inherited = stateHolidays.inherited(
+                facilities.stream().map(CalendarFacility::id).toList(), start, end);
+        for (CalendarFacility facility : facilities) {
+            for (InheritedHoliday holiday : inherited.getOrDefault(facility.id(), List.of())) {
+                if (!holiday.working() && named.add(facility.id() + "/" + holiday.date())) {
+                    holidays.add(new CalendarHoliday(holiday.date(), holiday.name(), HolidayKind.STATE_HOLIDAY,
+                            facility.id(), facility.code(), facility.name()));
+                }
+            }
+        }
         for (CalendarFacility facility : facilities) {
             for (LocalDate day = start; !day.isAfter(end); day = day.plusDays(1)) {
                 if (named.contains(facility.id() + "/" + day) || !FacilityService.isDayOff(day,

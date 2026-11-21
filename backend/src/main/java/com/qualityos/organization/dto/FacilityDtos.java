@@ -50,7 +50,9 @@ public final class FacilityDtos {
             /* A day of the week (Monday 1 ... Sunday 7) off only in some weeks of the month; null for none. */
             Integer alternateOffDay,
             /* Which of that day's occurrences in a month are off: 1st 1, 2nd 2, 3rd 4, 4th 8, 5th 16. */
-            int alternateOffWeeks) {
+            int alternateOffWeeks,
+            /* Its state's holidays and All India's, from the start of this year to the end of the next. */
+            List<StateHolidayDtos.InheritedHoliday> stateHolidays) {
     }
 
     /**

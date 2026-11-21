@@ -25,7 +25,12 @@ public final class HolidayCalendarDtos {
 
     /** Why a facility is closed on a day. */
     public enum HolidayKind {
-        HOLIDAY, WEEKLY_OFF, ALTERNATE_OFF
+        /** The facility's own. */
+        HOLIDAY,
+        /** Its state's, or All India's. */
+        STATE_HOLIDAY,
+        WEEKLY_OFF,
+        ALTERNATE_OFF
     }
 
     /**

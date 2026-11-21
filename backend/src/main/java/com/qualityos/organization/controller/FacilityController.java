@@ -147,6 +147,15 @@ public class FacilityController {
         return ApiResponse.ok(facilities.updateHoliday(id, holidayId, request));
     }
 
+    /** Whether the facility works on a holiday of its state, or of All India. */
+    @PutMapping("/{id}/state-holidays/{holidayId}")
+    @PreAuthorize(Require.FACILITY_MANAGE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void setStateHolidayWorking(@PathVariable UUID id, @PathVariable UUID holidayId,
+            @Valid @RequestBody com.qualityos.organization.dto.StateHolidayDtos.SetWorkingRequest request) {
+        facilities.setStateHolidayWorking(id, holidayId, request.working());
+    }
+
     @DeleteMapping("/{id}/holidays/{holidayId}")
     @PreAuthorize(Require.FACILITY_MANAGE)
     @ResponseStatus(HttpStatus.NO_CONTENT)

@@ -108,6 +108,13 @@ export const NAV_ITEMS: NavItem[] = [
     group: "Set up",
   },
   {
+    label: "State holidays",
+    href: "/state-holidays",
+    icon: CalendarDays,
+    anyPermission: ["FACILITY_VIEW"],
+    group: "Set up",
+  },
+  {
     label: "Suppliers",
     href: "/suppliers",
     icon: Truck,

@@ -105,6 +105,27 @@ class MigrationIT extends AbstractIntegrationTest {
             "work_orders.production_line_id",
             "work_orders.uom_id");
 
+    /** Shared rows of these have no tenant, so a link to them cannot include one. */
+    private static final java.util.Set<String> SHARED_ROWS = java.util.Set.of("units_of_measure", "roles");
+
+    @Test
+    void linksBetweenOrganisationsRecordsIncludeTheTenant() {
+        List<String> unscoped = asDatabaseSuperuser().queryForList("""
+                SELECT c.conrelid::regclass || '.' || c.conname || ' -> ' || c.confrelid::regclass
+                FROM pg_constraint c
+                WHERE c.contype = 'f' AND c.connamespace = 'public'::regnamespace
+                  AND c.confrelid::regclass::text <> ALL (?)
+                  AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.conrelid
+                      AND a.attname = 'tenant_id' AND NOT a.attisdropped)
+                  AND EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.confrelid
+                      AND a.attname = 'tenant_id' AND NOT a.attisdropped)
+                  AND NOT EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.conrelid
+                      AND a.attname = 'tenant_id' AND a.attnum = ANY (c.conkey))
+                ORDER BY 1
+                """, String.class, (Object) SHARED_ROWS.toArray(String[]::new));
+        assertThat(unscoped).as("foreign keys between tenant tables that leave out tenant_id").isEmpty();
+    }
+
     @Test
     void everyForeignKeyIsIndexedOrReviewed() {
         List<String> unindexed = asDatabaseSuperuser().queryForList("""

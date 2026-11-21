@@ -53,6 +53,7 @@ public class FacilityService {
     private final List<ArchiveGuard> archiveGuards;
     private final PlanLimits limits;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final StateHolidayService stateHolidays;
 
     FacilityService(
             FacilityRepository facilities,
@@ -63,8 +64,10 @@ public class FacilityService {
             PlanLimits limits,
             AuditService audit,
             List<ArchiveGuard> archiveGuards,
-            org.springframework.jdbc.core.JdbcTemplate jdbc) {
+            org.springframework.jdbc.core.JdbcTemplate jdbc,
+            StateHolidayService stateHolidays) {
         this.jdbc = jdbc;
+        this.stateHolidays = stateHolidays;
         this.limits = limits;
         this.facilities = facilities;
         this.departments = departments;
@@ -86,6 +89,7 @@ public class FacilityService {
     public FacilityDetail get(UUID id) {
         Facility facility = load(id);
         DaysOff offs = daysOff(id);
+        java.time.LocalDate thisYear = java.time.LocalDate.now().withDayOfYear(1);
         return new FacilityDetail(
                 mapper.toResponse(facility),
                 departments.findByFacilityIdAndArchivedAtIsNullOrderByName(id).stream()
@@ -99,8 +103,17 @@ public class FacilityService {
                         WHERE facility_id = ? AND holiday_on >= ? ORDER BY holiday_on
                         """, (rows, row) -> new HolidayResponse(rows.getObject("id", UUID.class),
                         rows.getObject("holiday_on", java.time.LocalDate.class), rows.getString("name")),
-                        id, java.time.LocalDate.now().withDayOfYear(1)),
-                offs.weeklyOffDays(), offs.alternateOffDay(), offs.alternateOffWeeks());
+                        id, thisYear),
+                offs.weeklyOffDays(), offs.alternateOffDay(), offs.alternateOffWeeks(),
+                stateHolidays.inherited(List.of(id), thisYear, thisYear.plusYears(2).minusDays(1))
+                        .getOrDefault(id, List.of()));
+    }
+
+    /** Marks a holiday of the facility's state, or of All India, as a day it works, or closes on again. */
+    @Transactional
+    public void setStateHolidayWorking(UUID facilityId, UUID holidayId, boolean working) {
+        Facility facility = load(facilityId);
+        stateHolidays.setWorking(facilityId, facility.getState(), holidayId, working);
     }
 
     /** A facility's regular days off, as stored. */
@@ -224,7 +237,10 @@ public class FacilityService {
         audit.record("HOLIDAY_REMOVED", "Facility", facilityId, Map.of("date", removed.getFirst().toString()), null);
     }
 
-    /** Each facility's holidays between the two days, both included, with its weekly and alternate days off. */
+    /**
+     * Each facility's holidays between the two days, both included: its own, its state's and All India's that it does
+     * not work on, and its weekly and alternate days off.
+     */
     @Transactional(readOnly = true)
     public Map<UUID, java.util.Set<java.time.LocalDate>> holidaysOf(Collection<UUID> facilityIds,
             java.time.LocalDate from, java.time.LocalDate to) {
@@ -254,6 +270,10 @@ public class FacilityService {
             found.computeIfAbsent(rows.getObject("facility_id", UUID.class), ignored -> new java.util.HashSet<>())
                     .add(rows.getObject("holiday_on", java.time.LocalDate.class));
         }, facilityIds.toArray(UUID[]::new), from, to);
+        stateHolidays.inherited(facilityIds, from, to).forEach((facility, holidays) -> holidays.stream()
+                .filter(holiday -> !holiday.working())
+                .forEach(holiday -> found.computeIfAbsent(facility, ignored -> new java.util.HashSet<>())
+                        .add(holiday.date())));
         return found;
     }
 

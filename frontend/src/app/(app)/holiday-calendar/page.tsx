@@ -35,6 +35,9 @@ function howSoon(date: string, today: string): string {
   return `In ${days} days`;
 }
 
+/** A named holiday, the facility's own or its state's, rather than a regular day off. */
+const isNamed = (holiday: CalendarHoliday) => holiday.kind === "HOLIDAY" || holiday.kind === "STATE_HOLIDAY";
+
 /** Holidays in date order, under the month they fall in. */
 function byMonth(holidays: CalendarHoliday[]): [string, CalendarHoliday[]][] {
   const months = new Map<string, CalendarHoliday[]>();
@@ -87,7 +90,7 @@ export default function HolidayCalendarPage() {
   const inView = (facilityId: string) => chosen === ALL || facilityId === chosen;
   const severalFacilities = chosen === ALL && data.facilities.length > 1;
   const listed = data.holidays.filter(
-    (holiday) => inView(holiday.facilityId) && (showDaysOff || holiday.kind === "HOLIDAY"),
+    (holiday) => inView(holiday.facilityId) && (showDaysOff || isNamed(holiday)),
   );
   const regular = data.facilities.filter(
     (place) => inView(place.id) && (place.weeklyOffDays !== 0 || place.alternateOffDay !== null),
@@ -151,7 +154,7 @@ export default function HolidayCalendarPage() {
                             month: "short",
                           })}
                         </span>
-                        <span className={holiday.kind === "HOLIDAY" ? undefined : "text-muted-foreground"}>
+                        <span className={isNamed(holiday) ? undefined : "text-muted-foreground"}>
                           {holiday.name}
                           {severalFacilities && (
                             <span className="text-muted-foreground"> · {holiday.facilityName}</span>

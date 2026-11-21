@@ -44,6 +44,21 @@ public class IndiaPlaces {
                 Function.identity()));
     }
 
+    /** The GST code of the state with this name, ignoring case and spaces at the ends. */
+    public java.util.Optional<String> codeOf(String name) {
+        if (name == null || name.isBlank()) {
+            return java.util.Optional.empty();
+        }
+        String wanted = name.trim();
+        return states.stream().filter(state -> state.name().equalsIgnoreCase(wanted)).map(StateWithCities::gstCode)
+                .findFirst();
+    }
+
+    /** The name of the state with this GST code. */
+    public java.util.Optional<String> nameOf(String gstCode) {
+        return java.util.Optional.ofNullable(byCode.get(gstCode)).map(StateWithCities::name);
+    }
+
     /** Every state and union territory, by name. */
     public List<StateResponse> states() {
         return states.stream().map(state -> new StateResponse(state.gstCode(), state.name(), state.kind())).toList();

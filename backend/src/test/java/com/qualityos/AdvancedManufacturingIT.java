@@ -304,6 +304,24 @@ class AdvancedManufacturingIT extends TraceabilityFixture {
         assertThat(asDatabaseSuperuser().queryForObject("SELECT count(*) FROM audit_logs WHERE action IN ('HOLIDAY_ADDED', "
                 + "'HOLIDAY_REMOVED') AND entity_id = ?", Integer.class, facility)).isEqualTo(4);
 
+        // A holiday of the facility's state closes it too, unless it works that day.
+        String facilityBody = body(as(owner, get("/api/v1/facilities/" + facility)));
+        Map<String, Object> located = new java.util.HashMap<>(Map.of("code",
+                JsonPath.read(facilityBody, "$.data.facility.code"), "name", "Pune Plant", "state", "Maharashtra",
+                "version", JsonPath.<Integer>read(facilityBody, "$.data.facility.version")));
+        as(owner, put("/api/v1/facilities/" + facility).contentType("application/json")
+                .content(json.writeValueAsString(located))).andExpect(status().isOk());
+        String stateHoliday = idOf(body(as(owner, postJson("/api/v1/state-holidays", Map.of("region", "27",
+                "date", day.plusDays(1).toString(), "name", "Gudi Padwa"))).andExpect(status().isCreated())));
+        assertThat(JsonPath.<String>read(body(as(planner, get(query))), "$.data.workCenters[0].days[1].capacityMinutes"))
+                .isEqualTo("0.0");
+        as(owner, put("/api/v1/facilities/" + facility + "/state-holidays/" + stateHoliday)
+                .contentType("application/json").content("{\"working\":true}")).andExpect(status().isNoContent());
+        assertThat(JsonPath.<String>read(body(as(planner, get(query))), "$.data.workCenters[0].days[1].capacityMinutes"))
+                .isEqualTo("480.0");
+        as(owner, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                "/api/v1/state-holidays/" + stateHoliday)).andExpect(status().isNoContent());
+
         // A weekly off on the second day's weekday: no working time that day, every week.
         int offDay = 1 << (day.plusDays(1).getDayOfWeek().getValue() - 1);
         String weeklyOff = "/api/v1/facilities/" + facility + "/weekly-off";

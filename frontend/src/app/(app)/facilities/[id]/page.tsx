@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
@@ -122,8 +123,19 @@ export default function FacilityPage() {
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<FacilityDetail>(path) });
   if (!data) return <QueryState error={error} />;
 
-  const { facility, departments, productionLines, shifts, holidays, weeklyOffDays, alternateOffDay, alternateOffWeeks } =
-    data;
+  const {
+    facility,
+    departments,
+    productionLines,
+    shifts,
+    holidays,
+    weeklyOffDays,
+    alternateOffDay,
+    alternateOffWeeks,
+    stateHolidays,
+  } = data;
+  const setWorking = (holidayId: string, working: boolean) =>
+    run(() => api.put(`${path}/state-holidays/${holidayId}`, { working }));
   const add = (button: string, target: Dialog) =>
     canManage && (
       <Button variant="outline" size="sm" onClick={() => setDialog(target)}>
@@ -210,7 +222,7 @@ export default function FacilityPage() {
         }
       >
         <p className="mb-2 text-sm text-muted-foreground">
-          No shift works on a holiday, a weekly off or an alternate day off, so scheduling and machine availability give it no working time.
+          No shift works on a holiday, its state&apos;s holidays, a weekly off or an alternate day off, so scheduling and machine availability give it no working time.
         </p>
         <p className="mb-2 text-sm">
           <span className="font-medium">Weekly off:</span> {weeklyOffDays === 0 ? "none" : describeDays(weeklyOffDays)}
@@ -218,11 +230,46 @@ export default function FacilityPage() {
         <p className="mb-2 text-sm">
           <span className="font-medium">Alternate off:</span> {describeAlternateOff(alternateOffDay, alternateOffWeeks)}
         </p>
+        <h3 className="mt-4 mb-1 text-sm font-semibold">This facility&apos;s own</h3>
         <UnitList
           items={holidays.map((holiday) => ({ id: holiday.id, label: `${holiday.date} – ${holiday.name}` }))}
           onEdit={canManage ? setEditingHoliday : undefined}
           onRemove={remover("holidays")}
         />
+        <h3 className="mt-4 mb-1 text-sm font-semibold">
+          From {facility.state ? `${facility.state} and ` : ""}All India
+        </h3>
+        <p className="mb-2 text-sm text-muted-foreground">
+          Kept under{" "}
+          <Link href="/state-holidays" className="underline underline-offset-4">
+            State holidays
+          </Link>
+          {facility.state
+            ? ". Mark one as a working day if this facility works on it."
+            : ". Set this facility's state to take its state's holidays too."}
+        </p>
+        {stateHolidays.length === 0 ? (
+          <p className="text-sm text-muted-foreground">None yet.</p>
+        ) : (
+          <ul className="divide-y text-sm">
+            {stateHolidays.map((holiday) => (
+              <li key={holiday.id} className="flex items-center justify-between gap-4 py-2">
+                <span className={holiday.working ? "text-muted-foreground line-through" : undefined}>
+                  {holiday.date} – {holiday.name}
+                  <span className="text-muted-foreground"> · {holiday.regionName}</span>
+                </span>
+                <span className="flex items-center gap-2">
+                  {holiday.working && <span className="text-xs text-muted-foreground">Working day</span>}
+                  {canManage && (
+                    <Button variant="ghost" size="sm" onClick={() => setWorking(holiday.id, !holiday.working)}>
+                      {holiday.working ? "Close this day" : "Work this day"}
+                    </Button>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </Section>
       {dialog === "edit" && (
         <RecordDialog

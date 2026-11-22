@@ -136,6 +136,36 @@ days through versioning.
 To restore, create a new instance from a point in time (`aws rds restore-db-instance-to-point-in-time`), check it,
 then point `DB_URL` at it. A timed restore test is still to do (see Status).
 
+### Restore drill
+
+`scripts/backup-restore-drill.sh` rehearses a full backup and restore on the local Docker stack:
+1. It backs up the database (`pg_dump -Fc`) and the attachments volume.
+2. It restores both into a fresh Postgres and a new volume. The roles are created the way a new environment creates them.
+3. It checks the copy against the source:
+   - every table's row count
+   - row-level security on the same tables
+   - that the migrator owns the tables, so the application role cannot bypass row-level security
+   - the Flyway version
+   - every attachment's checksum
+4. It starts a second backend on the copy, waits for readiness and, given `DRILL_EMAIL` and `DRILL_PASSWORD`, signs in.
+
+Run it while the stack is idle: rows written during the drill show up as differences. The backup stays in `./backups`
+(git-ignored). It holds real data, password hashes included.
+
+Last run, 22 November 2026, on the local stack:
+
+| Step | Result |
+|---|---|
+| Backup | 7.2 s: 10 MB database, 409 attachments |
+| Restore | 3.8 s |
+| Tables | 141 tables, 153,566 rows, all matching |
+| Row-level security | On for the same 124 tables; tables owned by the migrator |
+| Schema | Flyway version 74; the backend found nothing to migrate |
+| Application on the copy | Ready in 11.4 s; sign-in worked |
+
+On AWS the same checks apply after `restore-db-instance-to-point-in-time`. The time is dominated by RDS creating the
+instance, which is typically 10 to 30 minutes, and is still to be measured after the first deployment.
+
 ## Diagnosing
 
 Everything below is kept for a year (`log_retention_days`).
@@ -160,5 +190,5 @@ Everything below is kept for a year (`log_retention_days`).
 | Terraform for UAT, scripts, this runbook | Written; `terraform validate` passes; database setup script tested on PostgreSQL 18 as a non-superuser admin; secret seeding tested against a stand-in for AWS. **Not yet applied** |
 | First UAT deployment | Waiting for the owner's go-ahead, since it creates billable resources |
 | Deploy pipeline in GitHub Actions | To do. Actions is disabled on the account, so deploys run from `deploy.sh` until then |
-| Timed restore test | To do, after the first deployment |
+| Timed restore test | Local drill passing (`scripts/backup-restore-drill.sh`); the RDS restore is to be timed after the first deployment |
 | Production | After UAT passes: same module, one NAT gateway per zone, larger database |

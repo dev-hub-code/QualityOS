@@ -49,6 +49,8 @@ export interface SpcChart {
     usl: number | null;
     nominal: number | null;
     specChanged: boolean;
+    /** The template version whose specification capability is judged against. */
+    specVersion: number;
   };
   centre: number;
   sigma: number;
@@ -56,7 +58,26 @@ export interface SpcChart {
   points: SpcPoint[];
   excluded: { singleReading: number; tooLarge: number };
   truncated: boolean;
+  /** What the period holds; the points are the latest of it. */
+  subgroupsInPeriod: number;
+  readingsInPeriod: number;
+  /** Fewer than 25 points: the limits and capability are not yet reliable. */
+  preliminary: boolean;
   warnings: string[];
+}
+
+/** "Charting 500 of 812 inspections in the period (the latest)." and the like. */
+export function coverage(chart: SpcChart): string {
+  const subgroups = chart.chartType === "XBAR_R";
+  const total = subgroups ? chart.subgroupsInPeriod : chart.readingsInPeriod;
+  const noun = subgroups ? (total === 1 ? "inspection" : "inspections") : (total === 1 ? "reading" : "readings");
+  const charted = subgroups ? chart.points.length + chart.excluded.singleReading + chart.excluded.tooLarge : chart.points.length;
+  const shown = subgroups ? chart.points.length : charted;
+  const left = chart.excluded.singleReading + chart.excluded.tooLarge;
+  const what = chart.truncated
+    ? `Charting the latest ${charted.toLocaleString()} of ${total.toLocaleString()} ${noun} in the period`
+    : `Charting all ${total.toLocaleString()} ${noun} in the period`;
+  return left > 0 ? `${what}; ${shown.toLocaleString()} plotted, ${left.toLocaleString()} left out.` : `${what}.`;
 }
 
 /** One point as a chart panel draws it: its value and the limits that apply to it. */

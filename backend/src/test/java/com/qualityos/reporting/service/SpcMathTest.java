@@ -40,6 +40,7 @@ class SpcMathTest {
                 subgroup(9.9, 10.1, 10.0, 10.2, 10.3), subgroup(10.2, 10.0, 9.7, 10.1, 10.0),
                 subgroup(10.1, 10.2, 10.3, 9.9, 10.0), subgroup(10.0, 9.8, 10.1, 10.2, 10.4)), NO_SPEC);
         assertThat(result.chartType()).isEqualTo(ChartType.XBAR_R);
+        assertThat(result.warnings()).noneMatch(warning -> warning.contains("signal"));
         near(result.centre(), 10.0833333);
         near(result.sigma(), 0.20779593);
         // X̿ ± A2·R̄, and D3·R̄ to D4·R̄ with D3 = 0 for n = 5.
@@ -118,6 +119,7 @@ class SpcMathTest {
         assertThat(flat.warnings()).anyMatch(warning -> warning.contains("do not vary"));
         assertThat(flat.points()).allMatch(point -> point.signals().isEmpty());
         assertThat(flat.warnings()).anyMatch(warning -> warning.startsWith("Fewer than 25 subgroups"));
+        assertThat(flat.preliminary()).isTrue();
     }
 
     @Test
@@ -128,8 +130,13 @@ class SpcMathTest {
         }
         subgroups.set(6, subgroup(10.6, 10.7, 10.5));
         subgroups.set(9, subgroup(9.0, 11.0, 10.0));
-        List<Point> points = SpcMath.xbarR(subgroups, NO_SPEC).points();
+        Result result = SpcMath.xbarR(subgroups, new Spec(8.0, 12.0));
+        List<Point> points = result.points();
         assertThat(points.get(6).signals()).containsExactly(Signal.BEYOND_LIMITS);
+        // Capability is still worked out, with a warning that the process may not be stable.
+        assertThat(result.capability().cpk()).isNotNull();
+        assertThat(result.warnings()).contains("2 points have signals, so the process may not be stable: Cp and Cpk "
+                + "assume a stable process and should be read with care.");
         assertThat(points.get(9).signals()).containsExactly(Signal.RANGE_BEYOND_LIMITS);
         assertThat(points.get(0).signals()).isEmpty();
     }
@@ -162,6 +169,10 @@ class SpcMathTest {
         assertThat(SpcMath.auto(List.of(subgroup(1, 2), subgroup(1)))).isEqualTo(ChartType.I_MR);
         assertThat(SpcMath.auto(List.of(subgroup(1, 2), subgroup(1), subgroup(2)))).isEqualTo(ChartType.I_MR);
         assertThat(SpcMath.auto(List.of(subgroup(1, 2), subgroup(large), subgroup(large)))).isEqualTo(ChartType.I_MR);
+        // From counts, as the database gives them.
+        assertThat(SpcMath.auto(900, 450)).isEqualTo(ChartType.XBAR_R);
+        assertThat(SpcMath.auto(900, 449)).isEqualTo(ChartType.I_MR);
+        assertThat(SpcMath.auto(2, 1)).isEqualTo(ChartType.I_MR);
 
         Result result = SpcMath.xbarR(List.of(subgroup(1, 2), subgroup(1), subgroup(2, 3, 4), subgroup(large)),
                 NO_SPEC);

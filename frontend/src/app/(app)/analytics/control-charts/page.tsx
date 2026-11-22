@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PageHeader, QueryState, Section } from "@/components/records/parts";
 import { ControlChart } from "@/components/spc/control-chart";
-import { CapabilitySummary, SignalList } from "@/components/spc/spc-summary";
+import { CapabilitySummary, SignalList, SpcAssumptions } from "@/components/spc/spc-summary";
 import { usePermission } from "@/hooks/use-me";
 import { api, type PageResponse } from "@/lib/api";
 import type { ChartChoice, PanelPoint, SpcChart, SpcParameter } from "@/lib/spc";
@@ -213,6 +213,9 @@ function ChartResult({ chart }: { chart: SpcChart }) {
           · {chart.points.length} {chart.points.length === 1 ? "point" : "points"} · {chart.from} to {chart.to}
         </p>
         <CapabilitySummary chart={chart} />
+        <div className="mt-3">
+          <SpcAssumptions chart={chart} />
+        </div>
       </Section>
       <Section title="Charts">
         <div className="space-y-8">
@@ -221,7 +224,7 @@ function ChartResult({ chart }: { chart: SpcChart }) {
             valueName={subgroups ? "Mean" : "Reading"}
             unit={chart.parameter.unit}
             points={values}
-            spec={{ lower: chart.parameter.lsl, upper: chart.parameter.usl }}
+            spec={{ lower: chart.parameter.lsl, upper: chart.parameter.usl, version: chart.parameter.specVersion }}
             onOpen={open}
           />
           <ControlChart

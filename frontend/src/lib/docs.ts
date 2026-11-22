@@ -1105,8 +1105,12 @@ export const DOC_PAGES: DocPage[] = [
             "How the process fits the specification, using the variation within inspections. Cp needs both limits; with one limit, Cpk is the one-sided figure. With fewer than 25 points the figures are shown with a warning that they are not yet reliable.",
           ],
           [
+            "Reading the figures",
+            "Control limits show how the process behaves; specification limits show what the design requires. Cp and Cpk assume a stable process with roughly normal readings: with signals on the chart, or fewer than 25 points, read them with care. About these figures, under the tiles, says the same on the page.",
+          ],
+          [
             "Which readings",
-            "Submitted, approved and completed inspections, placed at their submission time, at facilities you can see. Capability uses the latest inspection's specification, and the page says if it changed during the period. Charts show up to 500 inspections or 1,000 readings.",
+            "Submitted, approved and completed inspections, placed at their submission time, at facilities you can see. Capability uses the latest inspection's specification, and the page says if it changed during the period. Charts show the latest 500 inspections or 1,000 readings, and say how many the period holds.",
           ],
         ],
       },

@@ -96,85 +96,100 @@ public class SpcService {
         requireNumeric(templateId, parameterCode);
 
         MapSqlParameterSource params = scope.params().addValue("template", templateId)
-                .addValue("code", parameterCode).addValue("material", materialId).addValue("product", productId);
+                .addValue("code", parameterCode).addValue("material", materialId).addValue("product", productId)
+                .addValue("subgroupCap", MAX_SUBGROUPS).addValue("readingCap", MAX_READINGS);
         String item = materialId != null ? " AND i.material_id = :material"
                 : productId != null ? """
                          AND EXISTS (SELECT 1 FROM production_batches b WHERE b.tenant_id = i.tenant_id
                                      AND b.id = i.production_batch_id AND b.product_id = :product)"""
                 : "";
-        List<Row> rows = jdbc.query(("""
-                SELECT i.id, i.inspection_number, i.batch_number, i.submitted_at, r.sample_number, r.value_numeric,
-                       p->>'name' AS name, p->>'uomId' AS uom_id, p->>'minValue' AS min_value,
-                       p->>'maxValue' AS max_value, p->>'nominalValue' AS nominal_value, p->>'tolerance' AS tolerance
-                """ + FROM + """
-                CROSS JOIN LATERAL %s AS p
+        // Every filter, tenant and facility included, applies before any limit.
+        String matching = FROM + """
                 WHERE v.template_id = :template AND r.parameter_code = :code AND r.value_numeric IS NOT NULL AND %s
                   AND i.submitted_at >= :start AND i.submitted_at < :end %s %s
-                ORDER BY i.submitted_at, i.id, r.sample_number
-                """).formatted(SPEC, SUBMITTED, scope.facility("i.facility_id"), item), params, SpcService::row);
-        if (rows.isEmpty()) {
+                """.formatted(SUBMITTED, scope.facility("i.facility_id"), item);
+
+        // What the period holds, counted in the database: it decides AUTO and whether the chart is cut.
+        Period period = jdbc.queryForObject("""
+                SELECT count(*) AS subgroups, count(*) FILTER (WHERE n BETWEEN 2 AND %d) AS chartable,
+                       coalesce(sum(n), 0) AS readings
+                FROM (SELECT count(*) AS n %s GROUP BY i.id) AS subgroup
+                """.formatted(SpcMath.MAX_SUBGROUP, matching), params, (rows, row) -> new Period(
+                rows.getLong("subgroups"), rows.getLong("chartable"), rows.getLong("readings")));
+        if (period.readings() == 0) {
             throw new BusinessRuleException("There are no readings of %s in this period.".formatted(parameterCode));
+        }
+        ChartType type = switch (choice == null ? ChartChoice.AUTO : choice) {
+            case AUTO -> SpcMath.auto(period.subgroups(), period.chartable());
+            case XBAR_R -> ChartType.XBAR_R;
+            case I_MR -> ChartType.I_MR;
+        };
+
+        // Only the rows charted leave the database: the latest subgroups whole, or the latest readings.
+        String columns = """
+                SELECT i.id, i.inspection_number, i.batch_number, i.submitted_at, r.sample_number, r.value_numeric,
+                       v.version_number, p->>'name' AS name, p->>'uomId' AS uom_id, p->>'minValue' AS min_value,
+                       p->>'maxValue' AS max_value, p->>'nominalValue' AS nominal_value, p->>'tolerance' AS tolerance
+                """;
+        String lateral = "CROSS JOIN LATERAL %s AS p\n".formatted(SPEC);
+        List<Row> rows;
+        boolean truncated;
+        if (type == ChartType.XBAR_R) {
+            rows = jdbc.query("""
+                    WITH latest AS (SELECT i.id %s GROUP BY i.id, i.submitted_at
+                                    ORDER BY i.submitted_at DESC, i.id DESC LIMIT :subgroupCap)
+                    %s %s %s AND i.id IN (SELECT id FROM latest)
+                    ORDER BY i.submitted_at, i.id, r.sample_number
+                    """.formatted(matching, columns, FROM + lateral, whereOf(matching)), params, SpcService::row);
+            truncated = period.subgroups() > MAX_SUBGROUPS;
+        } else {
+            rows = new ArrayList<>(jdbc.query("""
+                    %s %s %s
+                    ORDER BY i.submitted_at DESC, i.id DESC, r.sample_number DESC LIMIT :readingCap
+                    """.formatted(columns, FROM + lateral, whereOf(matching)), params, SpcService::row));
+            java.util.Collections.reverse(rows);
+            truncated = period.readings() > MAX_READINGS;
         }
 
         // One subgroup per inspection, in order of submission.
         Map<UUID, List<Row>> byInspection = new LinkedHashMap<>();
         rows.forEach(row -> byInspection.computeIfAbsent(row.inspectionId(), ignored -> new ArrayList<>()).add(row));
-        List<Subgroup> subgroups = new ArrayList<>();
+        List<Subgroup> charted = new ArrayList<>();
         Map<UUID, Row> firstRows = new LinkedHashMap<>();
         byInspection.forEach((id, theirs) -> {
             Row first = theirs.getFirst();
             firstRows.put(id, first);
-            subgroups.add(new Subgroup(id, first.inspectionNumber(), first.batchNumber(), first.submittedAt(),
+            charted.add(new Subgroup(id, first.inspectionNumber(), first.batchNumber(), first.submittedAt(),
                     theirs.stream().map(row -> new Reading(row.sample(), row.value())).toList()));
         });
 
-        ChartType type = switch (choice == null ? ChartChoice.AUTO : choice) {
-            case AUTO -> SpcMath.auto(subgroups);
-            case XBAR_R -> ChartType.XBAR_R;
-            case I_MR -> ChartType.I_MR;
-        };
-        List<Subgroup> charted = type == ChartType.XBAR_R ? latestSubgroups(subgroups) : latestReadings(subgroups);
-        boolean truncated = charted.stream().mapToInt(Subgroup::n).sum() < rows.size();
-
         // The latest inspection's specification; a change within the charted ones is flagged.
-        Limits latest = firstRows.get(charted.getLast().inspectionId()).limits();
+        Row named = firstRows.get(charted.getLast().inspectionId());
+        Limits latest = named.limits();
         boolean specChanged = charted.stream().map(subgroup -> firstRows.get(subgroup.inspectionId()).limits())
                 .distinct().count() > 1;
         Spec spec = new Spec(latest.lsl(), latest.usl());
         Result result = type == ChartType.XBAR_R ? SpcMath.xbarR(charted, spec) : SpcMath.individuals(charted, spec);
         List<String> warnings = new ArrayList<>(result.warnings());
         if (specChanged) {
-            warnings.add("The specification changed during this period: Cp and Cpk use the latest limits.");
+            warnings.add("The specification changed during this period: Cp and Cpk use the latest limits, from "
+                    + "template version %d.".formatted(named.version()));
         }
-        Row named = firstRows.get(charted.getLast().inspectionId());
         ParameterSpec parameter = new ParameterSpec(parameterCode, named.name(), unit(named.uomId()), latest.lsl(),
-                latest.usl(), latest.nominal(), specChanged);
+                latest.usl(), latest.nominal(), specChanged, named.version());
         return new SpcChart(templateId, template.code(), template.name(), scope.from(), scope.to(),
                 result.chartType(), parameter, result.centre(), result.sigma(), result.capability(), result.points(),
-                result.excluded(), truncated, List.copyOf(warnings));
+                result.excluded(), truncated, period.subgroups(), period.readings(), result.preliminary(),
+                List.copyOf(warnings));
     }
 
-    private static List<Subgroup> latestSubgroups(List<Subgroup> subgroups) {
-        return subgroups.size() <= MAX_SUBGROUPS ? subgroups
-                : subgroups.subList(subgroups.size() - MAX_SUBGROUPS, subgroups.size());
+    /** Subgroups and readings the period holds, and the subgroups an X̄-R chart can take. */
+    private record Period(long subgroups, long chartable, long readings) {
     }
 
-    /** The latest {@link #MAX_READINGS} readings, keeping the subgroups they belong to. */
-    private static List<Subgroup> latestReadings(List<Subgroup> subgroups) {
-        List<Subgroup> kept = new ArrayList<>();
-        int room = MAX_READINGS;
-        for (int i = subgroups.size() - 1; i >= 0 && room > 0; i--) {
-            Subgroup subgroup = subgroups.get(i);
-            List<Reading> readings = subgroup.readings();
-            if (readings.size() > room) {
-                readings = readings.subList(readings.size() - room, readings.size());
-                subgroup = new Subgroup(subgroup.inspectionId(), subgroup.inspectionNumber(), subgroup.batchNumber(),
-                        subgroup.submittedAt(), readings);
-            }
-            kept.addFirst(subgroup);
-            room -= readings.size();
-        }
-        return kept;
+    /** The WHERE clause of {@link #FROM} plus filters, to repeat it after a lateral join. */
+    private static String whereOf(String matching) {
+        return matching.substring(matching.indexOf("WHERE"));
     }
 
     private record Template(String code, String name) {
@@ -196,14 +211,14 @@ public class SpcService {
     }
 
     private record Row(UUID inspectionId, String inspectionNumber, String batchNumber, Instant submittedAt,
-            int sample, double value, String name, String uomId, Limits limits) {
+            int sample, double value, int version, String name, String uomId, Limits limits) {
     }
 
     private static Row row(ResultSet rows, int row) throws SQLException {
         return new Row(rows.getObject("id", UUID.class), rows.getString("inspection_number"),
                 rows.getString("batch_number"), rows.getTimestamp("submitted_at").toInstant(),
                 rows.getInt("sample_number"), rows.getBigDecimal("value_numeric").doubleValue(),
-                rows.getString("name"), rows.getString("uom_id"), Limits.of(decimal(rows, "min_value"),
+                rows.getInt("version_number"), rows.getString("name"), rows.getString("uom_id"), Limits.of(decimal(rows, "min_value"),
                         decimal(rows, "max_value"), decimal(rows, "nominal_value"), decimal(rows, "tolerance")));
     }
 

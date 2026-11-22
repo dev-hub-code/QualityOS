@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeSignals, formatIndex, formatMeasure, linear, stepPath, ticks, valueDomain, type SpcChart } from "./spc";
+import { coverage, describeSignals, formatIndex, formatMeasure, linear, stepPath, ticks, valueDomain, type SpcChart } from "./spc";
 
 describe("formatting", () => {
   it("shows measurements to five significant figures", () => {
@@ -63,5 +63,15 @@ describe("describeSignals", () => {
       "mean above the upper control limit",
       "range above the upper control limit; part of a run of 8 or more above the centre line",
     ]);
+  });
+});
+
+describe("coverage", () => {
+  const base = { points: new Array(500).fill({}), excluded: { singleReading: 0, tooLarge: 0 } };
+  it("says when only the latest part of the period is charted", () => {
+    expect(coverage({ ...base, chartType: "XBAR_R", truncated: true, subgroupsInPeriod: 812 } as unknown as SpcChart))
+      .toBe(`Charting the latest 500 of ${(812).toLocaleString()} inspections in the period.`);
+    expect(coverage({ ...base, points: new Array(30).fill({}), chartType: "I_MR", truncated: false, readingsInPeriod: 30 } as unknown as SpcChart))
+      .toBe("Charting all 30 readings in the period.");
   });
 });

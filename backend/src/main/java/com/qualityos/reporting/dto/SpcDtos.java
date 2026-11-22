@@ -35,9 +35,12 @@ public final class SpcDtos {
             String parameterName, long subgroups, Instant lastSubmittedAt) {
     }
 
-    /** The parameter as the latest charted inspection's specification has it. */
+    /**
+     * The parameter as the latest charted inspection's specification has it: the limits capability is judged against,
+     * from template version {@code specVersion}.
+     */
     public record ParameterSpec(String code, String name, String unit, Double lsl, Double usl, Double nominal,
-            boolean specChanged) {
+            boolean specChanged, int specVersion) {
     }
 
     /** Empty when it cannot be worked out; Cp needs both limits. */
@@ -58,8 +61,13 @@ public final class SpcDtos {
     public record Excluded(int singleReading, int tooLarge) {
     }
 
+    /**
+     * {@code subgroupsInPeriod} and {@code readingsInPeriod} are what the period holds, of which the points are the
+     * latest ones charted. {@code preliminary}: fewer than 25 points, so the limits and capability are not yet reliable.
+     */
     public record SpcChart(UUID templateId, String templateCode, String templateName, LocalDate from, LocalDate to,
             ChartType chartType, ParameterSpec parameter, double centre, double sigma, Capability capability,
-            List<Point> points, Excluded excluded, boolean truncated, List<String> warnings) {
+            List<Point> points, Excluded excluded, boolean truncated, long subgroupsInPeriod, long readingsInPeriod,
+            boolean preliminary, List<String> warnings) {
     }
 }

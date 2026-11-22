@@ -125,6 +125,10 @@ class SpcIT extends TraceabilityFixture {
         assertThat(JsonPath.<List<String>>read(chart, "$.data.warnings"))
                 .anyMatch(warning -> warning.startsWith("Fewer than 25 subgroups"));
         assertThat(JsonPath.<Boolean>read(chart, "$.data.truncated")).isFalse();
+        assertThat(JsonPath.<Integer>read(chart, "$.data.subgroupsInPeriod")).isEqualTo(5);
+        assertThat(JsonPath.<Integer>read(chart, "$.data.readingsInPeriod")).isEqualTo(25);
+        assertThat(JsonPath.<Integer>read(chart, "$.data.parameter.specVersion")).isEqualTo(1);
+        assertThat(JsonPath.<Boolean>read(chart, "$.data.preliminary")).isTrue();
 
         // The individuals chart takes all 25 readings, in submission and sample order.
         String individuals = chart(manager, template, "&chart=I_MR");
@@ -142,6 +146,76 @@ class SpcIT extends TraceabilityFixture {
                 .andExpect(status().isUnprocessableContent());
     }
 
+    /**
+     * Copies a submitted inspection and its readings, each copy a minute older than the last. Readings can only be
+     * added to an open inspection, and a receipt holds one open inspection, so the copies are written with triggers
+     * suspended for this one transaction: a test fixture, never what the application does.
+     */
+    private void copies(String inspection, int count) {
+        List<String> columns = asDatabaseSuperuser().queryForList("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'inspections' ORDER BY ordinal_position""", String.class);
+        String values = String.join(", ", columns.stream().map(column -> switch (column) {
+            case "id" -> "md5(i.id::text || g)::uuid";
+            case "inspection_number" -> "i.inspection_number || '-C' || g";
+            case "status" -> "'COMPLETED'";
+            case "submitted_at", "created_at" -> "i." + column + " - g * interval '1 minute'";
+            default -> "i." + column;
+        }).toList());
+        List<String> resultColumns = asDatabaseSuperuser().queryForList("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'inspection_results' ORDER BY ordinal_position""",
+                String.class);
+        String results = String.join(", ", resultColumns.stream().map(column -> switch (column) {
+            case "id" -> "gen_random_uuid()";
+            case "inspection_id" -> "md5(r.inspection_id::text || g)::uuid";
+            default -> "r." + column;
+        }).toList());
+        asDatabaseSuperuser().execute("""
+                BEGIN;
+                SET LOCAL session_replication_role = replica;
+                INSERT INTO inspections (%s) SELECT %s FROM inspections i, generate_series(1, %d) g WHERE i.id = '%s';
+                INSERT INTO inspection_results (%s) SELECT %s FROM inspection_results r, generate_series(1, %d) g
+                WHERE r.inspection_id = '%s';
+                COMMIT;""".formatted(String.join(", ", columns), values, count, inspection,
+                String.join(", ", resultColumns), results, count, inspection));
+    }
+
+    @Test
+    void chartsOnlyTheLatestSubgroupsOrReadingsAndSaysHowManyThePeriodHolds() throws Exception {
+        String template = shaftTemplate();
+        String newest = submitted(template, "20.00", "20.02", "19.98", "20.01", "19.99");
+        copies(newest, 520);
+
+        // 521 inspections of 5 readings: X̄-R takes the latest 500, whole and in order.
+        String chart = chart(manager, template, "");
+        assertThat(JsonPath.<String>read(chart, "$.data.chartType")).isEqualTo("XBAR_R");
+        assertThat(JsonPath.<List<Object>>read(chart, "$.data.points")).hasSize(500);
+        assertThat(JsonPath.<List<Integer>>read(chart, "$.data.points[*].n")).containsOnly(5);
+        assertThat(JsonPath.<Boolean>read(chart, "$.data.truncated")).isTrue();
+        assertThat(JsonPath.<Integer>read(chart, "$.data.subgroupsInPeriod")).isEqualTo(521);
+        assertThat(JsonPath.<Integer>read(chart, "$.data.readingsInPeriod")).isEqualTo(2605);
+        assertThat(JsonPath.<Boolean>read(chart, "$.data.preliminary")).isFalse();
+        List<String> times = JsonPath.read(chart, "$.data.points[*].submittedAt");
+        assertThat(times).isSorted();
+        assertThat(JsonPath.<String>read(chart, "$.data.points[499].inspectionId")).isEqualTo(newest);
+        assertThat(JsonPath.<String>read(chart, "$.data.points[0].inspectionNumber")).endsWith("-C499");
+
+        // I-MR takes the latest 1,000 readings, the newest inspection's five last.
+        String individuals = chart(manager, template, "&chart=I_MR");
+        assertThat(JsonPath.<List<Object>>read(individuals, "$.data.points")).hasSize(1000);
+        assertThat(JsonPath.<Boolean>read(individuals, "$.data.truncated")).isTrue();
+        assertThat(JsonPath.<List<String>>read(individuals, "$.data.points[*].submittedAt")).isSorted();
+        assertThat(JsonPath.<List<Integer>>read(individuals, "$.data.points[995:1000].sampleNumber"))
+                .containsExactly(1, 2, 3, 4, 5);
+        assertThat(JsonPath.<String>read(individuals, "$.data.points[999].inspectionId")).isEqualTo(newest);
+        assertThat(JsonPath.<Integer>read(individuals, "$.data.points[0].sampleNumber")).isEqualTo(1);
+
+        // Narrowed to another material, none of it remains: filters apply before the limit.
+        as(manager, get(SPC + "/chart?templateId=" + template + "&parameterCode=DIA&materialId=" + UUID.randomUUID()))
+                .andExpect(status().isUnprocessableContent());
+    }
+
     @Test
     void aNewSpecificationIsFlaggedAndItsLimitsUsed() throws Exception {
         String template = shaftTemplate();
@@ -154,6 +228,7 @@ class SpcIT extends TraceabilityFixture {
 
         String chart = chart(manager, template, "");
         assertThat(JsonPath.<Boolean>read(chart, "$.data.parameter.specChanged")).isTrue();
+        assertThat(JsonPath.<Integer>read(chart, "$.data.parameter.specVersion")).isEqualTo(2);
         assertThat(num(chart, "$.data.parameter.lsl")).isCloseTo(19.95, within(1e-9));
         assertThat(num(chart, "$.data.parameter.usl")).isCloseTo(20.05, within(1e-9));
         assertThat(JsonPath.<List<Object>>read(chart, "$.data.points")).hasSize(3);

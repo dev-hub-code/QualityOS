@@ -20,3 +20,4 @@ docs/Scale-1-User-to-1-Crore.pdf
 *.tfplan
 terraform.tfvars
 backend.hcl
+/backups/

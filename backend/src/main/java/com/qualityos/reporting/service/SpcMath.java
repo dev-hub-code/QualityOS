@@ -54,7 +54,7 @@ final class SpcMath {
     }
 
     record Result(ChartType chartType, double centre, double sigma, Capability capability, List<Point> points,
-            Excluded excluded, List<String> warnings) {
+            Excluded excluded, boolean preliminary, List<String> warnings) {
     }
 
     static double d2(int n) {
@@ -70,9 +70,13 @@ final class SpcMath {
      * inspections and large AQL samples still chart.
      */
     static ChartType auto(List<Subgroup> subgroups) {
-        long chartable = subgroups.stream().filter(subgroup -> subgroup.n() >= 2 && subgroup.n() <= MAX_SUBGROUP)
-                .count();
-        return chartable >= 2 && chartable * 2 >= subgroups.size() ? ChartType.XBAR_R : ChartType.I_MR;
+        return auto(subgroups.size(), subgroups.stream()
+                .filter(subgroup -> subgroup.n() >= 2 && subgroup.n() <= MAX_SUBGROUP).count());
+    }
+
+    /** The same rule from counts, as the database gives them for a whole period. */
+    static ChartType auto(long subgroups, long chartable) {
+        return chartable >= 2 && chartable * 2 >= subgroups ? ChartType.XBAR_R : ChartType.I_MR;
     }
 
     static Result xbarR(List<Subgroup> subgroups, Spec spec) {
@@ -136,8 +140,9 @@ final class SpcMath {
             warnings.add("Fewer than %d subgroups: the limits and capability are not yet reliable.".formatted(RELIABLE));
         }
         Capability capability = capability(centre, sigma, spec, warnings);
+        unstable(points, capability, warnings);
         return new Result(ChartType.XBAR_R, round(centre), round(sigma), capability, points,
-                new Excluded(single, tooLarge), warnings);
+                new Excluded(single, tooLarge), k < RELIABLE, warnings);
     }
 
     /** Every reading in order: the subgroups as given, each in sample order. */
@@ -184,8 +189,19 @@ final class SpcMath {
             warnings.add("Fewer than %d readings: the limits and capability are not yet reliable.".formatted(RELIABLE));
         }
         Capability capability = capability(centre, sigma, spec, warnings);
+        unstable(points, capability, warnings);
         return new Result(ChartType.I_MR, round(centre), round(sigma), capability, points, new Excluded(0, 0),
-                warnings);
+                m < RELIABLE, warnings);
+    }
+
+    /** Capability describes a stable process: signals on the chart say this one may not be. */
+    private static void unstable(List<Point> points, Capability capability, List<String> warnings) {
+        long signalled = points.stream().filter(point -> !point.signals().isEmpty()).count();
+        if (signalled > 0 && capability.cpk() != null) {
+            warnings.add(("%s, so the process may not be stable: Cp and Cpk assume a stable process and should be "
+                    + "read with care.").formatted(signalled == 1 ? "1 point has a signal"
+                    : signalled + " points have signals"));
+        }
     }
 
     /** Cp needs both limits; with one, Cpk is the one-sided CPU or CPL. */

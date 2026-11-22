@@ -10,8 +10,8 @@ interface ControlChartProps {
   valueName: string;
   unit: string | null;
   points: PanelPoint[];
-  /** Specification limits, drawn on the value panel only. */
-  spec?: { lower: number | null; upper: number | null };
+  /** Specification limits, drawn on the value panel only, with the template version they come from. */
+  spec?: { lower: number | null; upper: number | null; version?: number };
   /** Opens a point's inspection when it is clicked or chosen with Enter. */
   onOpen?: (point: PanelPoint) => void;
 }
@@ -206,7 +206,21 @@ export function ControlChart({ title, valueName, unit, points, spec, onOpen }: C
           </div>
         )}
       </div>
-      {stepped && <p className="text-right text-xs text-muted-foreground">Limits step with each inspection&apos;s sample size.</p>}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span className="flex items-center gap-1.5">
+            <svg aria-hidden width="18" height="4"><line x1="0" x2="18" y1="2" y2="2" className="stroke-muted-foreground" strokeDasharray="6 4" /></svg>
+            Control limits: how the process behaves
+          </span>
+          {spec && (spec.lower != null || spec.upper != null) && (
+            <span className="flex items-center gap-1.5">
+              <svg aria-hidden width="18" height="4"><line x1="0" x2="18" y1="2" y2="2" className="stroke-foreground" strokeWidth={1.25} strokeDasharray="2 3" /></svg>
+              Specification limits: what the design requires{spec.version ? ` (v${spec.version})` : ""}
+            </span>
+          )}
+        </span>
+        {stepped && <span>Limits step with each inspection&apos;s sample size.</span>}
+      </div>
       <details className="text-sm">
         <summary className="cursor-pointer text-muted-foreground">Show as a table</summary>
         <div className="max-h-72 overflow-auto">

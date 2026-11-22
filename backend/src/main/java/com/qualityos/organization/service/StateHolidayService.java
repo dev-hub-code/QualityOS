@@ -126,6 +126,18 @@ public class StateHolidayService {
     }
 
     /**
+     * Forgets the holidays a facility worked on that its state no longer gives it, as when it moves to another state:
+     * moving back starts it closed on them again, as any facility of that state.
+     */
+    @Transactional
+    public void forgetOutsideState(UUID facilityId, String facilityState) {
+        jdbc.update("""
+                DELETE FROM facility_working_holidays w USING state_holidays h
+                WHERE w.facility_id = ? AND h.id = w.state_holiday_id AND NOT (h.region = ANY (?))
+                """, facilityId, regionsOf(facilityState).toArray(String[]::new));
+    }
+
+    /**
      * The state and All India holidays each facility takes between the two days, both included, with those it works
      * on marked. A facility whose state is not in the list takes All India's only.
      */

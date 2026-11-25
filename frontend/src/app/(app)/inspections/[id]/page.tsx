@@ -51,6 +51,7 @@ import type {
   ParameterSpec,
 } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { formatDateTime } from "@/lib/dates";
 
 /** The lot's plan in words: one sample, or under double sampling the first and then both together. */
 function planText(specification: Inspection["specification"]): string {
@@ -65,7 +66,8 @@ const SEND_BACK_FIELDS: FieldDef[] = [
   { ...NOTE_FIELD, label: "What needs correcting", required: true },
 ];
 const SELECT_CLASS =
-  "h-11 w-full rounded-xl border border-input bg-white/70 px-2 text-base";
+  // Greyed out when locked, as the number fields are.
+  "h-11 w-full rounded-xl border border-input bg-white/70 px-2 text-base disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50";
 
 function SampleInput({
   parameter,
@@ -288,7 +290,7 @@ function Execution({
               </Label>
               <select
                 id={`instrument-${parameter.code}`}
-                className="h-9 rounded-xl border bg-white/70 px-2 text-sm"
+                className="h-9 rounded-xl border bg-white/70 px-2 text-sm disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50"
                 disabled={!editable}
                 value={measuredWith[parameter.code] ?? ""}
                 onChange={(event) =>
@@ -581,8 +583,9 @@ export default function InspectionPage() {
         subtitle={
           <span className="flex flex-wrap gap-2">
             <StatusBadge status={status} />
-            {inspection.evaluatedResult && (
-              <StatusBadge status={inspection.evaluatedResult} />
+            {/* Once reviewed, the reviewer's result replaces what the readings alone gave. */}
+            {(inspection.finalResult ?? inspection.evaluatedResult) && (
+              <StatusBadge status={(inspection.finalResult ?? inspection.evaluatedResult)!} />
             )}
             {inspection.disposition && (
               <StatusBadge status={inspection.disposition} />
@@ -706,7 +709,7 @@ export default function InspectionPage() {
                   {decision.note && ` – ${decision.note}`}
                 </span>
                 <span className="shrink-0 text-muted-foreground">
-                  {new Date(decision.decidedAt).toLocaleString()}
+                  {formatDateTime(decision.decidedAt)}
                 </span>
               </li>
             ))}

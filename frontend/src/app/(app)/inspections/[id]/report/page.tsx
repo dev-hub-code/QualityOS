@@ -9,6 +9,7 @@ import { api } from "@/lib/api";
 import { requirement, resultValue } from "@/lib/inspection";
 import { formatQuantity } from "@/lib/record-form";
 import type { Inspection } from "@/lib/types";
+import { formatDateTime } from "@/lib/dates";
 
 /** Built from the specification frozen into the inspection, so that it still reads the same in years to come. */
 export default function InspectionReportPage() {
@@ -82,7 +83,7 @@ export default function InspectionReportPage() {
                 {decision.decision.replaceAll("_", " ").toLowerCase()}
                 {decision.note && ` – ${decision.note}`}
               </span>
-              <span className="text-muted-foreground">{new Date(decision.decidedAt).toLocaleString()}</span>
+              <span className="text-muted-foreground">{formatDateTime(decision.decidedAt)}</span>
             </li>
           ))}
         </ul>

@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/records/parts";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type { ReportExport } from "@/lib/types";
+import { formatDay } from "@/lib/dates";
 
 const PATH = "/reports/exports";
 const STATES: Record<ReportExport["status"], string> = {
@@ -108,12 +109,12 @@ export function ReportExports() {
           {item.status === "READY" && (
             <>
               <span className="text-muted-foreground">
-                {item.rowCount} rows
+                {item.rowCount} {item.rowCount === 1 ? "row" : "rows"}
                 {item.sizeBytes != null && `, ${megabytes(item.sizeBytes)}`}
                 {item.truncated &&
                   ", stopped at the row limit: choose fewer dates for the rest"}
                 {item.expiresAt &&
-                  `. Kept until ${new Date(item.expiresAt).toLocaleDateString()}`}
+                  `. Kept until ${formatDay(item.expiresAt)}`}
               </span>
               <a className="underline" href={`/api/v1${PATH}/${item.id}/file`}>
                 Download Excel

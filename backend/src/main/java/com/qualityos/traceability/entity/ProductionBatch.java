@@ -197,7 +197,8 @@ public class ProductionBatch extends TenantOwnedEntity {
             throw new BusinessRuleException("Batch " + batchNumber + " has not been released.");
         }
         if (quantity.compareTo(availableQuantity()) > 0) {
-            throw new BusinessRuleException("Batch " + batchNumber + " has only " + availableQuantity() + " available.");
+            throw new BusinessRuleException("Batch %s has only %s available.".formatted(batchNumber,
+                    availableQuantity().stripTrailingZeros().toPlainString()));
         }
     }
 }

@@ -17,6 +17,7 @@ import { formatMinutes, LOSS_CATEGORY_LABELS, localDate, toInstant } from "@/lib
 import type { FieldDef } from "@/lib/record-form";
 import type { DepartmentOption, DowntimeGroupBy, DowntimeRecord, DowntimeSummary, LossCategory } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { formatDateTime } from "@/lib/dates";
 
 const PATH = "/manufacturing/downtime";
 const SELECT_CLASS = "h-9 rounded-xl border border-input bg-white/70 px-2 text-sm";
@@ -35,7 +36,7 @@ const CATEGORIES = (Object.keys(LOSS_CATEGORY_LABELS) as LossCategory[])
   .filter((category) => category !== "ORDER_ON_HOLD")
   .map((value) => ({ value, label: LOSS_CATEGORY_LABELS[value] }));
 
-const when = (value: string | null) => (value ? new Date(value).toLocaleString() : "–");
+const when = (value: string | null) => (value ? formatDateTime(value) : "–");
 
 /** A time typed as a date and a time; the API takes an instant. */
 const timeFields = (prefix: "start" | "end", label: string, required: boolean): FieldDef[] => [

@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
 import { AttachmentPanel } from "@/components/records/attachment-panel";
@@ -10,7 +10,7 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useMe } from "@/hooks/use-me";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import {
   LOSS_CATEGORY_LABELS,
   STAGE_LABELS,
@@ -22,7 +22,8 @@ import {
   reportMismatch,
 } from "@/lib/manufacturing";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
-import type { DefectCategory, LossCategory, OperationDetail } from "@/lib/types";
+import type { DefectCategory, LossCategory, OperationDetail, QualityGate } from "@/lib/types";
+import { formatDateTime } from "@/lib/dates";
 
 type Dialog = "start" | "pause" | "report" | "measure" | "complete" | "assign" | "block" | "skip" | { reverse: string } | null;
 
@@ -37,6 +38,7 @@ export default function OperationPage() {
   const me = useMe().data;
   const units = useUnits();
   const refresh = useRefresh();
+  const router = useRouter();
   const { run, pending, message } = useAction();
   const [dialog, setDialog] = useState<Dialog>(null);
   const [key, setKey] = useState(newRequestKey);
@@ -129,8 +131,9 @@ export default function OperationPage() {
                         onClick={() =>
                           run(() =>
                             api
-                              .post(`/manufacturing/work-orders/${operation.workOrderId}/quality-gates/${gate.id}/inspections`)
-                              .then(refresh),
+                              .post<QualityGate>(`/manufacturing/work-orders/${operation.workOrderId}/quality-gates/${gate.id}/inspections`)
+                              // Straight to the inspection just started, where the readings are entered.
+                              .then((started) => router.push(`/inspections/${started.inspections.at(-1)?.id}`)),
                           )
                         }
                       >
@@ -236,8 +239,8 @@ export default function OperationPage() {
             ["Running time", formatDuration(data.runningSeconds)],
             ["Planned", `Setup ${formatQuantity(data.plannedSetupMinutes)} min · run ${formatQuantity(data.plannedRunMinutes)} min`],
             ["Setup took", data.actualSetupMinutes === null ? "" : `${formatQuantity(data.actualSetupMinutes)} min`],
-            ["Started", operation.startedAt ? new Date(operation.startedAt).toLocaleString() : ""],
-            ["Completed", operation.completedAt ? new Date(operation.completedAt).toLocaleString() : ""],
+            ["Started", operation.startedAt ? formatDateTime(operation.startedAt) : ""],
+            ["Completed", operation.completedAt ? formatDateTime(operation.completedAt) : ""],
             ["Due", operation.plannedEnd],
           ]}
         />
@@ -268,7 +271,7 @@ export default function OperationPage() {
                     {measurement.comment && <span className="text-muted-foreground">· {measurement.comment}</span>}
                   </span>
                   <span className="text-muted-foreground">
-                    {measurement.measuredByName ?? "Former member"} · {new Date(measurement.measuredAt).toLocaleString()}
+                    {measurement.measuredByName ?? "Former member"} · {formatDateTime(measurement.measuredAt)}
                   </span>
                 </li>
               ))}
@@ -291,7 +294,7 @@ export default function OperationPage() {
                   {report.comment && <span className="text-muted-foreground"> · {report.comment}</span>}
                 </span>
                 <span className="flex items-center gap-2 text-muted-foreground">
-                  {report.reportedByName ?? "Former member"} · {new Date(report.reportedAt).toLocaleString()}
+                  {report.reportedByName ?? "Former member"} · {formatDateTime(report.reportedAt)}
                   {can.supervise && !report.reversed && !report.reversesReportId &&
                     operation.status !== "COMPLETED" && operation.status !== "CANCELLED" && (
                       <Button size="sm" variant="ghost" onClick={() => open({ reverse: report.id })}>
@@ -321,7 +324,7 @@ export default function OperationPage() {
                 {event.comment && <span className="text-muted-foreground">{event.comment}</span>}
               </span>
               <span className="text-muted-foreground">
-                {event.byName ?? "Former member"} · {new Date(event.at).toLocaleString()}
+                {event.byName ?? "Former member"} · {formatDateTime(event.at)}
               </span>
             </li>
           ))}
@@ -383,7 +386,7 @@ export default function OperationPage() {
           onClose={close}
           onSubmit={(values) => {
             const mismatch = reportMismatch(values as Record<"quantity" | "goodQuantity" | "rejectedQuantity" | "scrapQuantity", string>);
-            if (mismatch) return Promise.reject(new Error(mismatch));
+            if (mismatch) return Promise.reject(new ApiError(422, "QUANTITIES_DO_NOT_ADD_UP", mismatch));
             return post("/reports", values, { "Idempotency-Key": key });
           }}
         />

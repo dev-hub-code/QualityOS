@@ -478,8 +478,12 @@ public class TraceabilityService {
                         dispatch.dispatchedOn(), dispatch.shippedOn(), dispatch.lines().stream()
                                 .anyMatch(line -> returnedLines.contains(line.id()))))
                 .toList();
+        // A return is inspected only for the units that came back, not for the rest of the batch.
+        Set<UUID> ownReturns = returns.returnItemsOf(serial);
         List<InspectionHistory> inspected = permissions.contains(Permissions.INSPECTION_VIEW)
-                ? inspections.history(Set.of(), Set.of(batch.id()))
+                ? inspections.history(Set.of(), Set.of(batch.id())).stream()
+                        .filter(found -> found.returnItemId() == null || ownReturns.contains(found.returnItemId()))
+                        .toList()
                 : List.of();
         return new SerialTrace(serial, batch.batchNumber(), batch.productCode(), batch.productName(), batch.status(),
                 batch.completedAt(), inspected, deliveries);

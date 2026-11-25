@@ -58,6 +58,7 @@ export default function CapaPage() {
     useOrganizationSettings().data?.actionEvidenceRequired ?? false;
   const canManage = usePermission("CAPA_MANAGE");
   const canApprove = usePermission("CAPA_APPROVE");
+  const canView = usePermission("CAPA_VIEW");
   const assignees = useAssignees();
   const { run, pending, message } = useAction();
   const [step, setStep] = useState<Step | null>(null);
@@ -311,6 +312,7 @@ export default function CapaPage() {
                     !action.completedAt &&
                     " (required before it can be completed)"}
                 </p>
+                {canView || action.ownerId === me?.user.id ? (
                 <AttachmentList
                   entityType="CAPA_ACTION"
                   entityId={action.id}
@@ -323,6 +325,9 @@ export default function CapaPage() {
                   uploadLabel={`Upload evidence for: ${action.description}`}
                   emptyMessage="No evidence yet."
                 />
+                ) : (
+                  <p className="text-sm text-muted-foreground">Seen by its owner and those who can view CAPAs.</p>
+                )}
               </div>
             </li>
           ))}
@@ -341,11 +346,14 @@ export default function CapaPage() {
           </ul>
         </Section>
       )}
-      <AttachmentPanel
-        entityType="CAPA"
-        entityId={id}
-        canManage={canManage && !finished}
-      />
+      {/* An action owner may open the CAPA without CAPA_VIEW; its own files are not theirs to see. */}
+      {canView && (
+        <AttachmentPanel
+          entityType="CAPA"
+          entityId={id}
+          canManage={canManage && !finished}
+        />
+      )}
       <StatusHistory changes={capa.history} />
       {step && (
         <RecordDialog

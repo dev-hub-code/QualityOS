@@ -21,7 +21,12 @@ const COLUMNS: ColumnDef<Instrument>[] = [
   { header: "Next due", accessorKey: "nextDueOn" },
   {
     header: "Calibration",
-    cell: ({ row }) => <StatusBadge status={row.original.dueState === "OK" ? "IN_DATE" : row.original.dueState} />,
+    cell: ({ row }) =>
+      row.original.status === "ACTIVE" ? (
+        <StatusBadge status={row.original.dueState === "OK" ? "IN_DATE" : row.original.dueState} />
+      ) : (
+        "–"
+      ),
   },
   { header: "Status", cell: ({ row }) => <StatusBadge status={row.original.status} /> },
 ];

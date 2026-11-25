@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FormError } from "@/components/forms/field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import type { NotificationPreference } from "@/lib/types";
 
@@ -53,11 +54,29 @@ const LABELS: Record<string, string> = {
   SUPPORT_CHANGES_STARTED:
     "Support starts a session that can make changes in our organisation",
   REPORT_EXPORT_READY: "A report I exported is ready, or could not be made",
+  SUBSCRIPTION_EXPIRY: "Our subscription is about to end",
+  PAYMENT_RECEIVED: "A subscription payment is received",
+  REFUND_ISSUED: "A subscription payment is refunded",
+  RENEWAL_INVOICE: "A renewal invoice is issued",
+  INVOICE_OVERDUE: "A subscription invoice is overdue",
+  PLAN_CHANGED: "Our plan changes",
+  PLAN_LIMIT_WARNING: "We are close to a plan limit",
 };
+/** Billing mail goes only to those who manage the subscription, so only they are offered it. */
+const BILLING = new Set([
+  "SUBSCRIPTION_EXPIRY",
+  "PAYMENT_RECEIVED",
+  "REFUND_ISSUED",
+  "RENEWAL_INVOICE",
+  "INVOICE_OVERDUE",
+  "PLAN_CHANGED",
+  "PLAN_LIMIT_WARNING",
+]);
 const PATH = "/notifications/preferences";
 
 export function NotificationPreferences() {
   const queryClient = useQueryClient();
+  const billing = usePermission("SUBSCRIPTION_MANAGE");
   const { data } = useQuery({
     queryKey: [PATH],
     queryFn: () => api.get<NotificationPreference[]>(PATH),
@@ -74,7 +93,7 @@ export function NotificationPreferences() {
         These always appear under Notifications in the app.
       </p>
       <FormError message={update.error?.message} />
-      {data?.map(({ type, emailEnabled }) => (
+      {data?.filter(({ type }) => billing || !BILLING.has(type)).map(({ type, emailEnabled }) => (
         <div key={type} className="flex items-center gap-2">
           <Checkbox
             id={`email-${type}`}

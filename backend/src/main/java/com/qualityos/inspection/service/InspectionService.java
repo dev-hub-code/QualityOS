@@ -361,7 +361,8 @@ public class InspectionService implements AttachmentPolicy {
                         inspection.getStatus().name(),
                         name(inspection.getFinalResult()),
                         name(inspection.getDisposition()),
-                        inspection.getCreatedAt()))
+                        inspection.getCreatedAt(),
+                        inspection.getReturnItemId()))
                 .toList();
     }
 

@@ -2,6 +2,7 @@
 
 import { NcrStatusBadge } from "@/components/records/ncr-status-badge";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
 import { RecordLink, Section, StatusBadge, useAction, useRefresh, useUnits, useWorkCenters } from "@/components/records/parts";
@@ -47,8 +48,10 @@ export function WorkOrderQualityPanel({
     rework: usePermission("REWORK_MANAGE"),
   };
   const units = useUnits();
-  const workCenters = useWorkCenters();
+  // Only the rework dialog lists work centres, and an operator may not see them.
+  const workCenters = useWorkCenters(can.rework);
   const refresh = useRefresh();
+  const router = useRouter();
   const { run, pending, message } = useAction();
   const [dialog, setDialog] = useState<Dialog>(null);
   const { data } = useQuery({
@@ -125,7 +128,13 @@ export function WorkOrderQualityPanel({
                       size="sm"
                       variant="outline"
                       disabled={pending}
-                      onClick={() => run(() => api.post(`${path}/quality-gates/${gate.id}/inspections`))}
+                      onClick={() =>
+                        run(() =>
+                          api
+                            .post<QualityGate>(`${path}/quality-gates/${gate.id}/inspections`)
+                            .then((started) => router.push(`/inspections/${started.inspections.at(-1)?.id}`)),
+                        )
+                      }
                     >
                       {gate.status === "FAILED" ? "Inspect again" : "Inspect"}
                     </Button>

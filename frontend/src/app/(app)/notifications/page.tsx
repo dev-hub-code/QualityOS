@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/records/parts";
 import { Button } from "@/components/ui/button";
 import { api, type PageResponse } from "@/lib/api";
 import type { AppNotification } from "@/lib/types";
+import { formatDateTime } from "@/lib/dates";
 
 export default function NotificationsPage() {
   const queryClient = useQueryClient();
@@ -55,7 +56,7 @@ export default function NotificationsPage() {
               <span className={notification.read ? "block" : "block font-semibold"}>{notification.title}</span>
               <span className="block text-muted-foreground">{notification.body}</span>
               <span className="block text-xs text-muted-foreground">
-                {new Date(notification.createdAt).toLocaleString()}
+                {formatDateTime(notification.createdAt)}
               </span>
             </button>
           </li>

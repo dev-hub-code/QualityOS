@@ -23,6 +23,7 @@ import { humanize } from "@/lib/capa";
 import type { FieldDef } from "@/lib/record-form";
 import type { CorrectionDetail } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { formatDateTime } from "@/lib/dates";
 
 const noteField: FieldDef = { name: "note", label: "Note", type: "textarea", required: true };
 
@@ -126,7 +127,7 @@ export default function MaterialCorrectionPage() {
           <ul className="divide-y text-sm">
             {correction.approvals.map((approval) => (
               <li key={approval.at} className="py-2">
-                {approval.approverName} on {new Date(approval.at).toLocaleString()}
+                {approval.approverName} on {formatDateTime(approval.at)}
                 {approval.note && `: ${approval.note}`}
               </li>
             ))}

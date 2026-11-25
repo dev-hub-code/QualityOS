@@ -1,5 +1,6 @@
 package com.qualityos;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -57,9 +58,11 @@ class RecallIT extends TraceabilityFixture {
                 "customerResponse", "Stock quarantined")));
     }
 
+    /** Resolving says why, since in most of these tests the customer still holds units. */
     private ResultActions contactStatus(String recall, String next) throws Exception {
         return as(owner, postJson("/api/v1/recalls/" + recall + "/customers/" + customer + "/status",
-                Map.of("status", next)));
+                "RESOLVED".equals(next) ? Map.of("status", next, "note", "Scrapped on site, certificate on file")
+                        : Map.of("status", next)));
     }
 
     private void returnAll() throws Exception {
@@ -300,6 +303,32 @@ class RecallIT extends TraceabilityFixture {
         as(manager, postJson(exception, Map.of("reason", "Company has ceased trading")))
                 .andExpect(jsonPath("$.data.exceptionReason").value("Company has ceased trading"));
         requestClosure(owner, recall, true).andExpect(status().isOk());
+    }
+
+    @Test
+    void aCustomerStillHoldingUnitsIsResolvedOnlyWithAReason() throws Exception {
+        String recall = start();
+        attempt(recall, "PHONE", "REACHED").andExpect(status().isCreated());
+        acknowledge(recall).andExpect(status().isCreated());
+        String path = "/api/v1/recalls/" + recall + "/customers/" + customer + "/status";
+        as(owner, postJson(path, Map.of("status", "RESOLVED")))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(containsString("are still with this customer")));
+        as(owner, postJson(path, Map.of("status", "RESOLVED", "note", "Scrapped on site")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("RESOLVED"))
+                .andExpect(jsonPath("$.data.notes").value(containsString("Scrapped on site")));
+    }
+
+    @Test
+    void whatTheRegulatorWasToldCannotChangeOnceTheRecallIsClosed() throws Exception {
+        String recall = resolved();
+        regulatory(owner, recall, regulatoryBody(TODAY, 30)).andExpect(status().isOk());
+        requestClosure(owner, recall, true).andExpect(status().isOk());
+        as(manager, postJson("/api/v1/recalls/" + recall + "/close", Map.of())).andExpect(status().isOk());
+        regulatory(owner, recall, regulatoryBody(TODAY, 15))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(containsString("is closed")));
     }
 
     @Test

@@ -14,6 +14,8 @@ import { api } from "@/lib/api";
 import { formatQuantity } from "@/lib/record-form";
 import { receiptSchema, type ReceiptValues } from "@/lib/schemas";
 import type { PurchaseOrder, PurchaseOrderItem, Receipt } from "@/lib/types";
+import { today } from "@/lib/dates";
+import { useMe } from "@/hooks/use-me";
 
 const SELECT_CLASS = "h-9 w-full rounded-xl border border-input bg-white/70 px-2 text-sm";
 
@@ -35,7 +37,7 @@ function ReceiptForm({ order }: { order: PurchaseOrder }) {
   } = useForm<ReceiptValues>({
     resolver: zodResolver(receiptSchema),
     defaultValues: {
-      receivedOn: new Date().toISOString().slice(0, 10),
+      receivedOn: today(),
       deliveryNote: "",
       items: openItems.map((item) => ({ purchaseOrderItemId: item.id, supplierBatch: "", quantity: "", expiryDate: "" })),
     },
@@ -132,10 +134,21 @@ function ReceiptForm({ order }: { order: PurchaseOrder }) {
   );
 }
 
+// Receiving belongs to whoever holds RECEIPT_MANAGE. Others who open the address see why, not a form the server refuses.
 export default function ReceiveMaterialPage() {
   const { id } = useParams<{ id: string }>();
   const path = `/purchase-orders/${id}`;
-  const { data: order, error } = useQuery({ queryKey: [path], queryFn: () => api.get<PurchaseOrder>(path) });
+  const me = useMe();
+  const canReceive = me.data?.permissions.includes("RECEIPT_MANAGE") ?? false;
+  const { data: order, error } = useQuery({
+    queryKey: [path],
+    queryFn: () => api.get<PurchaseOrder>(path),
+    enabled: canReceive,
+  });
+  if (!me.data) return <QueryState error={me.error} />;
+  if (!canReceive) {
+    return <p>You do not have permission to do this.</p>;
+  }
   if (!order) return <QueryState error={error} />;
   return (
     <div className="space-y-6">

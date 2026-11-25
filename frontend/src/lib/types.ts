@@ -870,8 +870,8 @@ export interface CorrectionDetail extends CorrectionSummary {
     originalValue: string | null;
     correctedValue: string;
   }[];
-  approvals: { approverName: string | null; note: string | null; at: string }[];
-  impact: { inspected: boolean; batches: string[]; customers: string[] } | null;
+  approvals: { approverId: string; approverName: string | null; note: string | null; at: string }[];
+  impact: { inspected: boolean; batches: string[]; customers: string[]; transferredLots: string[] } | null;
   decisionNote: string | null;
   appliedAt: string | null;
 }
@@ -2188,6 +2188,8 @@ export interface WorkOrderDetail {
     routingId: string | null;
     routingRevision: number | null;
     problems: string[];
+    /** The recipe's process conditions, for orders made to a recipe. */
+    processParameters: ProcessParameter[];
   };
   materials: {
     lineNumber: number;

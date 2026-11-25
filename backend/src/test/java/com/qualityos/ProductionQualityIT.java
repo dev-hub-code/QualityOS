@@ -301,6 +301,9 @@ class ProductionQualityIT extends TraceabilityFixture {
                 .andExpect(jsonPath("$.error.message").value(containsString("needs a reinspection")));
         String reinspection = JsonPath.read(body(send(owner, path + "/reinspect", Map.of("templateId", ipqc))
                 .andExpect(status().isOk())), "$.data.reinspection.id");
+        // It inspects the two reworked pieces, not the whole batch.
+        as(owner, get("/api/v1/inspections/" + reinspection))
+                .andExpect(jsonPath("$.data.quantity").value(org.hamcrest.Matchers.startsWith("2")));
         send(owner, path + "/reinspect", Map.of("templateId", ipqc))
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.error.message").value(containsString("is already under way")));

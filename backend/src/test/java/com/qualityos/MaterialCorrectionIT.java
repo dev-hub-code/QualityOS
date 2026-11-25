@@ -182,6 +182,17 @@ class MaterialCorrectionIT extends TraceabilityFixture {
     }
 
     @Test
+    void aDraftAlreadySaysTwoApprovalsWhenTheMaterialHasGoneFurther() throws Exception {
+        Lot lot = releasedLot("10");
+        completedBatch(lot);
+        String draft = idOf(body(request(owner, Map.of("receiptItemId", lot.id(), "supplierBatch", "HEAT-7"))
+                .andExpect(status().isCreated())));
+        as(owner, get(PATH + "/" + draft))
+                .andExpect(jsonPath("$.data.status").value("DRAFT"))
+                .andExpect(jsonPath("$.data.approvalsNeeded").value(2));
+    }
+
+    @Test
     void materialThatHasGoneDownstreamNeedsTwoApproversAndAnAcknowledgement() throws Exception {
         Lot lot = releasedLot("10");
         Lot right = releasedLot("10");

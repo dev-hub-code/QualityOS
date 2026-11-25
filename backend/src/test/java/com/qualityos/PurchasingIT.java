@@ -21,6 +21,23 @@ import org.junit.jupiter.api.Test;
 
 class PurchasingIT extends MasterDataFixture {
 
+    /** The organisation's day decides: in India it is tomorrow already while the server's UTC date says today. */
+    @Test
+    void aReceiptDatedTheOrganisationsTodayIsAcceptedAndOneDatedLaterIsNot() throws Exception {
+        Session owner = register();
+        IssuedOrder order = issuedOrder(owner, "10");
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Kolkata"));
+        as(owner, postJson("/api/v1/material-receipts", Map.of("purchaseOrderId", order.id(),
+                        "receivedOn", today.plusDays(1).toString(),
+                        "items", List.of(Map.of("purchaseOrderItemId", order.itemId(), "supplierBatch", "H1", "quantity", "5")))))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value("The received date cannot be in the future."));
+        as(owner, postJson("/api/v1/material-receipts", Map.of("purchaseOrderId", order.id(),
+                        "receivedOn", today.toString(),
+                        "items", List.of(Map.of("purchaseOrderItemId", order.itemId(), "supplierBatch", "H1", "quantity", "5")))))
+                .andExpect(status().isCreated());
+    }
+
     @Test
     void anOrderMayBeDraftedForAnUnapprovedSupplierButNotIssued() throws Exception {
         Session owner = register();

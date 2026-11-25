@@ -104,7 +104,7 @@ function Regulator({ recall, path }: { recall: RecallDetail; path: string }) {
             {recall.status === "CLOSED" ? "Final" : "Interim"} report for the
             regulator (PDF)
           </a>
-          {canManage && (
+          {canManage && recall.status !== "CLOSED" && (
             <Button
               variant="outline"
               size="sm"

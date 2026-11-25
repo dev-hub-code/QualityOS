@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.qualityos.quality.entity.CapaAction;
 import com.qualityos.quality.entity.NonConformance;
 import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -244,7 +243,7 @@ public final class QualityDtos {
             @NotBlank @Size(max = 200) String title,
             @NotBlank @Size(max = MAX_TEXT) String problemStatement,
             @NotNull UUID ownerId,
-            @NotNull @Future LocalDate targetDate,
+            @NotNull LocalDate targetDate,
             boolean effectivenessRequired,
             UUID facilityId) {
     }

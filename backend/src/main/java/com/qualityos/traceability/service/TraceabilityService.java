@@ -392,7 +392,9 @@ public class TraceabilityService {
     @Transactional(readOnly = true)
     public CorrectionImpact lotImpact(UUID lotId, boolean inspected) {
         Set<UUID> reached = downstreamOfLot(lotId);
-        return impact(inspected, reached, reached);
+        List<String> moved = receipts.lots(receipts.transferredOn(Set.of(lotId))).stream()
+                .map(lot -> lot.internalBatch()).sorted().toList();
+        return impact(inspected, reached, reached, moved);
     }
 
     /** How far a batch has gone: later batches that used it, and customers who hold it or what was made from it. */
@@ -401,10 +403,10 @@ public class TraceabilityService {
         Set<UUID> later = downstream("parent_batch_id", batchId);
         Set<UUID> shipped = new HashSet<>(later);
         shipped.add(batchId);
-        return impact(false, later, shipped);
+        return impact(false, later, shipped, List.of());
     }
 
-    private CorrectionImpact impact(boolean inspected, Set<UUID> later, Set<UUID> shipped) {
+    private CorrectionImpact impact(boolean inspected, Set<UUID> later, Set<UUID> shipped, List<String> transferredLots) {
         return new CorrectionImpact(
                 inspected,
                 production.views(later).stream().map(ProductionBatchView::batchNumber).sorted().toList(),
@@ -413,7 +415,8 @@ public class TraceabilityService {
                         .map(DispatchResponse::customerName)
                         .distinct()
                         .sorted()
-                        .toList());
+                        .toList(),
+                transferredLots);
     }
 
     /** What a lot reached, including what the parts of it sent to other plants reached there. */

@@ -54,6 +54,7 @@ public class FacilityService {
     private final PlanLimits limits;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private final StateHolidayService stateHolidays;
+    private final OrganizationClock clock;
 
     FacilityService(
             FacilityRepository facilities,
@@ -65,7 +66,9 @@ public class FacilityService {
             AuditService audit,
             List<ArchiveGuard> archiveGuards,
             org.springframework.jdbc.core.JdbcTemplate jdbc,
-            StateHolidayService stateHolidays) {
+            StateHolidayService stateHolidays,
+            OrganizationClock clock) {
+        this.clock = clock;
         this.jdbc = jdbc;
         this.stateHolidays = stateHolidays;
         this.limits = limits;
@@ -89,7 +92,7 @@ public class FacilityService {
     public FacilityDetail get(UUID id) {
         Facility facility = load(id);
         DaysOff offs = daysOff(id);
-        java.time.LocalDate thisYear = java.time.LocalDate.now().withDayOfYear(1);
+        java.time.LocalDate thisYear = clock.today().withDayOfYear(1);
         return new FacilityDetail(
                 mapper.toResponse(facility),
                 departments.findByFacilityIdAndArchivedAtIsNullOrderByName(id).stream()

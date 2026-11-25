@@ -293,15 +293,30 @@ public class RecallService implements AttachmentPolicy {
     }
 
     @Transactional
-    public ContactView changeStatus(UUID id, UUID customerId, RecallContact.Status status, Set<String> permissions) {
+    public ContactView changeStatus(UUID id, UUID customerId, RecallContact.Status status, String note,
+            Set<String> permissions) {
         RecallContact contact = editable(id, customerId);
         RecallContact.Status previous = contact.getStatus();
+        String reason = blankToNull(note);
+        // Resolved with units still out must say why, or the recall reads as complete when it is not.
+        BigDecimal outstanding = status == RecallContact.Status.RESOLVED
+                ? view(id, customerId, permissions).outstandingQuantity() : BigDecimal.ZERO;
+        if (outstanding != null && outstanding.signum() > 0 && reason == null) {
+            throw new BusinessRuleException(("%s units are still with this customer. Say why it is resolved "
+                    + "without them.").formatted(outstanding.stripTrailingZeros().toPlainString()));
+        }
         List<UUID> record = List.of(contact.getId());
         contact.moveTo(status, attempts.findByContactRecordIdInOrderByAttemptedAt(record).size(),
                 !acknowledgements.findByContactRecordIdInOrderByAcknowledgedOn(record).isEmpty());
+        if (reason != null) {
+            contact.setNotes(contact.getNotes() == null ? reason : contact.getNotes() + "\n" + reason);
+        }
         contacts.flush();
-        audit.record("RECALL_CONTACT_STATUS_CHANGED", ENTITY, id, Map.of("status", previous),
-                Map.of("customerId", customerId, "status", status));
+        Map<String, Object> after = new java.util.LinkedHashMap<>(Map.of("customerId", customerId, "status", status));
+        if (reason != null) {
+            after.put("note", reason);
+        }
+        audit.record("RECALL_CONTACT_STATUS_CHANGED", ENTITY, id, Map.of("status", previous), after);
         return view(id, customerId, permissions);
     }
 
@@ -390,6 +405,9 @@ public class RecallService implements AttachmentPolicy {
     @Transactional
     public RecallDetail describeForRegulator(UUID id, RegulatoryRequest request, Set<String> permissions) {
         Recall recall = lock(id);
+        if (recall.getStatus() == Recall.Status.CLOSED) {
+            throw new BusinessRuleException("This recall is closed, so what the regulator was told cannot change.");
+        }
         Map<String, Object> before = regulatorySnapshot(recall);
         recall.describeForRegulator(request.hazardClass(), blankToNull(request.regulator()),
                 blankToNull(request.regulatorReference()), request.regulatorNotifiedOn(), request.responseDays());

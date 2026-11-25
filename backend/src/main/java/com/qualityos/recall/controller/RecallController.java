@@ -136,7 +136,7 @@ public class RecallController {
             @PathVariable UUID customerId,
             @Valid @RequestBody ContactStatusRequest request,
             Authentication caller) {
-        return ApiResponse.ok(recalls.changeStatus(id, customerId, request.status(), permissions(caller)));
+        return ApiResponse.ok(recalls.changeStatus(id, customerId, request.status(), request.note(), permissions(caller)));
     }
 
     @PostMapping("/{id}/customers/{customerId}/exception")

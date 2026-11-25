@@ -191,7 +191,9 @@ public final class WorkOrderDtos {
             Integer definitionRevision,
             UUID routingId,
             Integer routingRevision,
-            List<String> problems) {
+            List<String> problems,
+            /* The recipe's conditions, shown on the order even when it has no routing operations to carry them. */
+            List<com.qualityos.production.dto.ManufacturingDtos.ParameterResponse> processParameters) {
     }
 
     public record WorkOrderDetail(

@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { useOwnApprovalRefused } from "@/hooks/use-own-approval";
-import { PRIORITY_LABELS, reschedulable, workOrderActions } from "@/lib/manufacturing";
+import { PRIORITY_LABELS, describeLimits, reschedulable, workOrderActions } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
 import type { WorkOrderDetail, WorkOrderStatus } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -224,7 +224,7 @@ export default function WorkOrderPage() {
         <Details
           items={[
             [
-              definition.definitionKind === "RECIPE" ? "Recipe" : "BOM",
+              definition.definitionKind === "RECIPE" ? "Recipe" : definition.definitionKind === "BOM" ? "BOM" : "BOM or recipe",
               definition.definitionId ? (
                 <Link
                   key="definition"
@@ -249,6 +249,18 @@ export default function WorkOrderPage() {
             ],
           ]}
         />
+        {definition.processParameters.length > 0 && (
+          <div className="mt-4">
+            <h3 className="mb-1 text-sm font-medium">Process conditions</h3>
+            <ul className="space-y-0.5 text-sm">
+              {definition.processParameters.map((parameter) => (
+                <li key={parameter.id}>
+                  {parameter.code} – {parameter.name}: {describeLimits(parameter)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {!released && (
           <p className="mt-3 text-sm text-muted-foreground">
             Release uses the revisions in effect on the planned start and freezes them for this order.

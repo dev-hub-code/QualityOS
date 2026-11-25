@@ -244,6 +244,10 @@ public class RecallService implements AttachmentPolicy {
         if (request.assignedTo() != null && !access.activeMemberIds().contains(request.assignedTo())) {
             throw new BusinessRuleException("Assign this to someone in the organisation.");
         }
+        if (request.assignedTo() != null && !request.assignedTo().equals(contact.getAssignedTo())
+                && !access.holdersOf(Permissions.RECALL_MANAGE).contains(request.assignedTo())) {
+            throw new BusinessRuleException("Assign this to someone whose role can work on recalls.");
+        }
         contact.setContactPerson(request.contactPerson());
         contact.setContactDetails(request.contactDetails());
         contact.setAssignedTo(request.assignedTo());

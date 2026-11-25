@@ -4,6 +4,7 @@ import com.qualityos.common.response.ApiResponse;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.response.Pages;
 import com.qualityos.common.security.Permissions.Require;
+import com.qualityos.supplier.dto.SupplierDtos.ApproveRequest;
 import com.qualityos.supplier.dto.SupplierDtos.CategoryResponse;
 import com.qualityos.supplier.dto.SupplierDtos.ContactResponse;
 import com.qualityos.supplier.dto.SupplierDtos.SaveCategoryRequest;
@@ -125,8 +126,9 @@ public class SupplierController {
 
     @PostMapping("/{id}/approve")
     @PreAuthorize(Require.SUPPLIER_APPROVE)
-    public ApiResponse<SupplierResponse> approve(@PathVariable UUID id) {
-        return ApiResponse.ok(suppliers.changeStatus(id, Status.APPROVED, null));
+    public ApiResponse<SupplierResponse> approve(@PathVariable UUID id,
+            @Valid @RequestBody(required = false) ApproveRequest request) {
+        return ApiResponse.ok(suppliers.changeStatus(id, Status.APPROVED, request == null ? null : request.note()));
     }
 
     @PostMapping("/{id}/reject")

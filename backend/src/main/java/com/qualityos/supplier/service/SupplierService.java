@@ -9,6 +9,7 @@ import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.supplier.dto.SupplierDtos.CategoryResponse;
 import com.qualityos.supplier.dto.SupplierDtos.ContactResponse;
 import com.qualityos.supplier.dto.SupplierDtos.SaveContactRequest;
@@ -46,13 +47,16 @@ public class SupplierService implements AttachmentPolicy {
     private final SupplierContactRepository contacts;
     private final SupplierMapper mapper;
     private final AuditService audit;
+    private final ReviewPolicy reviewPolicy;
 
     SupplierService(
             SupplierRepository suppliers,
             SupplierCategoryRepository categories,
             SupplierContactRepository contacts,
             SupplierMapper mapper,
-            AuditService audit) {
+            AuditService audit,
+            ReviewPolicy reviewPolicy) {
+        this.reviewPolicy = reviewPolicy;
         this.suppliers = suppliers;
         this.categories = categories;
         this.contacts = contacts;
@@ -123,7 +127,17 @@ public class SupplierService implements AttachmentPolicy {
     public SupplierResponse changeStatus(UUID id, Status target, String note) {
         Supplier supplier = load(id);
         Status previous = supplier.getStatus();
-        supplier.transitionTo(target, TenantContext.getCurrentUserId(), note);
+        UUID actor = TenantContext.getCurrentUserId();
+        // Approval is a second person's check, as for inspections, NCRs and CAPAs. The note is the self-review reason
+        // where an organisation of one is allowed to review its own work.
+        if (previous == Status.PENDING_APPROVAL && target == Status.APPROVED && !reviewPolicy.permits(
+                actor, supplier.getSubmittedBy(), "Supplier", id, "SUPPLIER_APPROVE", note)) {
+            throw new BusinessRuleException("You submitted this supplier, so someone else must approve it.");
+        }
+        if (target == Status.APPROVED) {
+            note = null;
+        }
+        supplier.transitionTo(target, actor, note);
         suppliers.saveAndFlush(supplier);
         audit.record("SUPPLIER_STATUS_CHANGED", "Supplier", id,
                 Map.of("status", previous), Map.of("status", target));

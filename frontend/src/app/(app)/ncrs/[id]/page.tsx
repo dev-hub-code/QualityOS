@@ -53,7 +53,8 @@ export default function NcrPage() {
   const canAssign = usePermission("NCR_ASSIGN");
   const canClose = usePermission("NCR_CLOSE");
   const canRaiseCapa = usePermission("CAPA_MANAGE");
-  const assignees = useAssignees();
+  const ncrWorkers = useAssignees("NCR_ASSIGN");
+  const capaOwners = useAssignees("CAPA_MANAGE");
   const categories = useDefectCategories();
   const units = useUnits();
   const statusLabel = useNcrStatusLabel();
@@ -76,7 +77,7 @@ export default function NcrPage() {
         label: "Assign to",
         type: "select",
         required: true,
-        options: assignees,
+        options: ncrWorkers,
       },
     ],
     outline: Boolean(ncr.assignedTo),
@@ -178,7 +179,7 @@ export default function NcrPage() {
       label: "Owner",
       type: "select",
       required: true,
-      options: assignees,
+      options: capaOwners,
     },
     { name: "targetDate", label: "Target date", type: "date", required: true },
   ];

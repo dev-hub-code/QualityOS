@@ -77,7 +77,7 @@ class MasterDataIT extends MasterDataFixture {
                 .andExpect(jsonPath("$.data.status").value("REJECTED"))
                 .andExpect(jsonPath("$.data.statusNote").value("Missing certificate"));
         as(owner, postJson(path + "/submit", Map.of())).andExpect(status().isOk());
-        as(owner, postJson(path + "/approve", Map.of()))
+        as(addMember(owner, "SUPPLIER_MANAGER"), postJson(path + "/approve", Map.of()))
                 .andExpect(jsonPath("$.data.status").value("APPROVED"))
                 .andExpect(jsonPath("$.data.approvedAt").isNotEmpty());
         as(owner, postJson(path + "/block", Map.of("note", "Repeated rejections")))
@@ -108,6 +108,47 @@ class MasterDataIT extends MasterDataFixture {
         as(owner, postJson("/api/v1/suppliers/" + id + "/submit", Map.of())).andExpect(status().isOk());
 
         as(owner, postJson("/api/v1/suppliers/" + id + "/reject", Map.of())).andExpect(status().isBadRequest());
+    }
+
+    /** Found in human testing: the owner submitted and approved the same supplier. */
+    @Test
+    void whoeverSubmitsASupplierCannotApproveIt() throws Exception {
+        Session owner = register();
+        Session supplierManager = addMember(owner, "SUPPLIER_MANAGER");
+        String id = draftSupplier(owner);
+        as(owner, postJson("/api/v1/suppliers/" + id + "/submit", Map.of())).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.submittedBy").value(owner.userId().toString()));
+
+        as(owner, postJson("/api/v1/suppliers/" + id + "/approve", Map.of()))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message")
+                        .value("You submitted this supplier, so someone else must approve it."));
+        as(supplierManager, postJson("/api/v1/suppliers/" + id + "/approve", Map.of()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("APPROVED"));
+
+        // Blocking and reinstating is not a review of one's own work.
+        as(owner, postJson("/api/v1/suppliers/" + id + "/block", Map.of("note", "Late deliveries")))
+                .andExpect(status().isOk());
+        as(owner, postJson("/api/v1/suppliers/" + id + "/reinstate", Map.of())).andExpect(status().isOk());
+    }
+
+    @Test
+    void anOrganisationOfOneApprovesItsOwnSupplierOnlyAsARecordedSelfReview() throws Exception {
+        Session owner = register();
+        String id = draftSupplier(owner);
+        as(owner, postJson("/api/v1/suppliers/" + id + "/submit", Map.of())).andExpect(status().isOk());
+        as(owner, postJson("/api/v1/suppliers/" + id + "/approve", Map.of()))
+                .andExpect(status().isUnprocessableContent());
+
+        allowSinglePersonReview(owner);
+        as(owner, postJson("/api/v1/suppliers/" + id + "/approve", Map.of()))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value("You are reviewing your own work. Add a note saying why."));
+        as(owner, postJson("/api/v1/suppliers/" + id + "/approve", Map.of("note", "Only member; site visit done")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("APPROVED"))
+                .andExpect(jsonPath("$.data.statusNote").doesNotExist());
     }
 
     @Test

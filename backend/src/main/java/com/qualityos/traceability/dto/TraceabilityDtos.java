@@ -93,11 +93,13 @@ public final class TraceabilityDtos {
     public record CorrectionChange(String field, String originalValue, String correctedValue) {
     }
 
-    public record CorrectionApprovalView(String approverName, String note, Instant at) {
+    public record CorrectionApprovalView(UUID approverId, String approverName, String note, Instant at) {
     }
 
     /** How far the material has gone. Anything here calls for a second approver. */
-    public record CorrectionImpact(boolean inspected, List<String> batches, List<String> customers) {
+    /** @param transferredLots parts of the lot received at other plants, which a correction of what it is also changes */
+    public record CorrectionImpact(
+            boolean inspected, List<String> batches, List<String> customers, List<String> transferredLots) {
     }
 
     /**

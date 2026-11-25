@@ -318,6 +318,11 @@ public class RazorpayClient {
     private String call(Supplier<String> request) {
         try {
             return request.get();
+        } catch (org.springframework.web.client.HttpClientErrorException.Unauthorized e) {
+            // Wrong or revoked keys: retrying cannot help, so say it is a set-up fault rather than a timeout.
+            log.error("Razorpay refused our API keys (401). Check RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.");
+            throw new QualityOsException(ErrorCode.PAYMENT_GATEWAY_UNAVAILABLE,
+                    "Online payment is not set up correctly, so it cannot be taken now. Please contact support.");
         } catch (RestClientException e) {
             log.warn("Razorpay request failed: {}", e.getClass().getSimpleName());
             throw unavailable();

@@ -19,6 +19,7 @@ import { api } from "@/lib/api";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import { toTransferItems } from "@/lib/traceability";
 import type { ProductionBatch, ReleasedLot, StockTransfer } from "@/lib/types";
+import { today } from "@/lib/dates";
 
 const LOTS = "/material-receipts/released-lots";
 
@@ -213,6 +214,7 @@ function SendDialog({ onClose }: { onClose: () => void }) {
     <RecordDialog
       title="Send stock to another plant"
       fields={fields}
+      record={{ sentOn: today() }}
       onClose={onClose}
       extra={
         <Button

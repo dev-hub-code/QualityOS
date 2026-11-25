@@ -24,6 +24,7 @@ import { requirement } from "@/lib/inspection";
 import { templateEditFields } from "@/lib/record-fields";
 import type { FieldDef } from "@/lib/record-form";
 import type { TemplateDetail, TemplateVersion } from "@/lib/types";
+import { today } from "@/lib/dates";
 
 const PUBLISH_FIELDS: FieldDef[] = [
   { name: "effectiveFrom", label: "Effective from", type: "date", required: true },
@@ -121,7 +122,7 @@ export default function InspectionTemplatePage() {
         <RecordDialog
           title={`Publish version ${draft?.versionNumber}`}
           fields={PUBLISH_FIELDS}
-          record={{ effectiveFrom: new Date().toISOString().slice(0, 10) }}
+          record={{ effectiveFrom: today() }}
           onClose={() => setPublishing(false)}
           onSubmit={(values) => api.post(`${path}/publish`, values).then(refresh)}
         />

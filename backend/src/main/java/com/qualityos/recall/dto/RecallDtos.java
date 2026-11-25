@@ -67,7 +67,10 @@ public final class RecallDtos {
             @Size(max = 2000) String customerResponse) {
     }
 
-    public record ContactStatusRequest(@NotNull RecallContact.Status status) {
+    public record ContactStatusRequest(
+            @NotNull RecallContact.Status status,
+            /* Needed to resolve a customer who still holds recalled units: why that is acceptable. */
+            @Size(max = 2000) String note) {
     }
 
     public record ExceptionRequest(@NotBlank @Size(max = 2000) String reason) {

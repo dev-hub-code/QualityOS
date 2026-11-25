@@ -446,6 +446,9 @@ public class MaterialCorrectionService {
     private CorrectionDetail toDetail(MaterialCorrection correction) {
         Map<UUID, String> names = access.names();
         boolean open = correction.getStatus() == Status.DRAFT || correction.getStatus() == Status.PENDING_APPROVAL;
+        CorrectionImpact impact = open ? impactOf(correction) : null;
+        // Until the first approval records it, a second approver is already due when the material has gone further.
+        boolean additional = correction.isAdditionalApproval() || (impact != null && needsAdditionalApproval(impact));
         return new CorrectionDetail(
                 correction.getId(),
                 correction.getCorrectionNumber(),
@@ -457,17 +460,17 @@ public class MaterialCorrectionService {
                 correction.getCreatedBy(),
                 names.get(correction.getCreatedBy()),
                 correction.getCreatedAt(),
-                correction.isAdditionalApproval(),
-                correction.approvalsNeeded(),
+                additional,
+                additional ? 2 : 1,
                 items.findByCorrectionIdIn(List.of(correction.getId())).stream()
                         .map(item -> new CorrectionChange(
                                 item.getFieldName().name(), item.getOriginalLabel(), item.getCorrectedLabel()))
                         .toList(),
                 approvals.findByCorrectionIdOrderByCreatedAt(correction.getId()).stream()
                         .map(approval -> new CorrectionApprovalView(
-                                names.get(approval.getApproverId()), approval.getNote(), approval.getCreatedAt()))
+                                approval.getApproverId(), names.get(approval.getApproverId()), approval.getNote(), approval.getCreatedAt()))
                         .toList(),
-                open ? impactOf(correction) : null,
+                impact,
                 correction.getDecisionNote(),
                 correction.getAppliedAt());
     }

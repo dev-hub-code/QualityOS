@@ -58,6 +58,7 @@ public class InspectionTemplateService {
     private final ProductService products;
     private final AuditService audit;
     private final EntityManager entityManager;
+    private final com.qualityos.organization.service.OrganizationClock clock;
 
     InspectionTemplateService(
             InspectionTemplateRepository templates,
@@ -65,7 +66,9 @@ public class InspectionTemplateService {
             MaterialService materials,
             ProductService products,
             AuditService audit,
-            EntityManager entityManager) {
+            EntityManager entityManager,
+            com.qualityos.organization.service.OrganizationClock clock) {
+        this.clock = clock;
         this.templates = templates;
         this.versions = versions;
         this.materials = materials;
@@ -256,7 +259,7 @@ public class InspectionTemplateService {
     /** The version an inspection started today must use. */
     @Transactional(readOnly = true)
     public TemplateVersion versionInForce(UUID templateId) {
-        return versions.findInForce(templateId, LocalDate.now()).stream().findFirst()
+        return versions.findInForce(templateId, clock.today()).stream().findFirst()
                 .orElseThrow(() -> new BusinessRuleException("This template has no published version in force."));
     }
 
@@ -320,7 +323,7 @@ public class InspectionTemplateService {
         Specification<InspectionTemplate> filter = Specification.<InspectionTemplate>where(Searches.notArchived())
                 .and((root, query, builder) -> root.get("inspectionType").in(types))
                 .and(appliesTo(materialId, productId));
-        LocalDate today = LocalDate.now();
+        LocalDate today = clock.today();
         List<InspectionTemplate> usable = templates.findAll(filter).stream()
                 .filter(template -> !versions.findInForce(template.getId(), today).isEmpty())
                 .sorted(Comparator.comparing((InspectionTemplate template) -> isGeneral(template))

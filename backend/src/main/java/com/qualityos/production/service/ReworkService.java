@@ -9,7 +9,6 @@ import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.identity.service.TenantAccessService;
-import com.qualityos.inspection.dto.InspectionDtos.CreateInspectionRequest;
 import com.qualityos.inspection.dto.InspectionDtos.InspectionDetail;
 import com.qualityos.inspection.dto.InspectionDtos.InspectionHistory;
 import com.qualityos.inspection.service.InspectionService;
@@ -385,8 +384,10 @@ public class ReworkService {
                         .formatted(current.inspectionNumber()));
             }
         }
-        InspectionDetail created = inspections.create(new CreateInspectionRequest(null, rework.getProductionBatchId(),
-                null, request == null ? null : request.templateId()));
+        InspectionDetail created = inspections.createForRework(rework.getProductionBatchId(),
+                request == null ? null : request.templateId(),
+                rework.getReworkedQuantity() != null && rework.getReworkedQuantity().signum() > 0
+                        ? rework.getReworkedQuantity() : null);
         rework.reinspectedBy(created.id());
         reworks.saveAndFlush(rework);
         audit.record("REWORK_ORDER_REINSPECTION_STARTED", ENTITY, id, null,

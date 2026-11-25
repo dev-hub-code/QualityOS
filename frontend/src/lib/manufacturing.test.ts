@@ -246,6 +246,18 @@ describe("parseSteps", () => {
       { description: "Re-measure", workCenterId: "wc" },
     ]);
   });
+
+  it("sends a step to the work centre its line names, and keeps an unknown code in the text", () => {
+    const centres = [
+      { value: "turn", label: "WC-TURN – CNC Turning" },
+      { value: "mill", label: "WC-MILL – Keyway Milling" },
+    ];
+    expect(parseSteps("Re-turn OD @ wc-turn\nDeburr\nCheck @ WC-NONE", "mill", centres)).toEqual([
+      { description: "Re-turn OD", workCenterId: "turn" },
+      { description: "Deburr", workCenterId: "mill" },
+      { description: "Check @ WC-NONE", workCenterId: "mill" },
+    ]);
+  });
 });
 
 describe("completionActions", () => {

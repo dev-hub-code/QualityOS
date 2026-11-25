@@ -43,6 +43,8 @@ export default function MaterialCorrectionPage() {
   const { status, impact } = correction;
   const mine = me?.user.id === correction.requestedBy;
   const awaiting = status === "PENDING_APPROVAL";
+  // A second approval must come from someone else, so whoever gave the first one has nothing left to decide.
+  const approvedByMe = correction.approvals.some((approval) => approval.approverId === me?.user.id);
   const reachedFurther = Boolean(impact && (impact.inspected || impact.batches.length || impact.customers.length));
   const approveFields: FieldDef[] = [
     mine ? { ...noteField, label: "Why you are approving it yourself" } : { ...noteField, required: false },
@@ -74,10 +76,10 @@ export default function MaterialCorrectionPage() {
             Submit for approval
           </Button>
         )}
-        {canApprove && awaiting && (!mine || selfReviewInEffect) && (
+        {canApprove && awaiting && !approvedByMe && (!mine || selfReviewInEffect) && (
           <Button onClick={() => setDialog("approve")}>Approve</Button>
         )}
-        {canApprove && awaiting && !mine && (
+        {canApprove && awaiting && !mine && !approvedByMe && (
           <Button variant="outline" onClick={() => setDialog("reject")}>
             Reject
           </Button>
@@ -89,6 +91,12 @@ export default function MaterialCorrectionPage() {
         )}
       </PageHeader>
       <FormError message={message} />
+      {awaiting && approvedByMe && (
+        <p className="rounded-xl bg-muted px-3 py-2 text-sm">
+          You have approved this. It now needs {correction.approvalsNeeded - correction.approvals.length} more approval
+          {correction.approvalsNeeded - correction.approvals.length === 1 ? "" : "s"} from someone else.
+        </p>
+      )}
       {awaiting && mine && canApprove && selfReviewInEffect && <SelfReviewNotice />}
       {awaiting && mine && !(canApprove && selfReviewInEffect) && (
         <p className="text-sm text-muted-foreground">Someone other than you must approve this.</p>
@@ -119,6 +127,9 @@ export default function MaterialCorrectionPage() {
             {impact.inspected && <li>This lot has an inspection on record.</li>}
             {impact.batches.length > 0 && <li>Used in: {impact.batches.join(", ")}</li>}
             {impact.customers.length > 0 && <li>Customers holding this material: {impact.customers.join(", ")}</li>}
+            {impact.transferredLots.length > 0 && (
+              <li>Also corrected at other plants: {impact.transferredLots.join(", ")}</li>
+            )}
           </ul>
         </Section>
       )}

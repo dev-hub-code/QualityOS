@@ -660,6 +660,7 @@ class QualityIT extends AbstractIntegrationTest {
         Session outsider = register();
         act(owner, "/capas", capaRequest(null, outsider, FUTURE)).andExpect(status().isUnprocessableContent());
         act(owner, "/capas", capaRequest(null, owner, LocalDate.now().minusDays(1).toString()))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value("Choose a target date after today."));
     }
 }

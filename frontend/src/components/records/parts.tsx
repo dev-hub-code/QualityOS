@@ -99,7 +99,7 @@ export function useAction() {
     onSuccess: () => queryClient.invalidateQueries(),
     onError: (error) => setMessage(error.message),
   });
-  return { run: mutation.mutate, pending: mutation.isPending, message };
+  return { run: mutation.mutate, pending: mutation.isPending, message, clear: () => setMessage("") };
 }
 
 /** Lists that rarely change. A change made here refreshes them at once, since every action invalidates all queries. */

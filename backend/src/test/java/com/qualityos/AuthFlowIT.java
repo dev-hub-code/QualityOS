@@ -207,7 +207,11 @@ class AuthFlowIT extends AbstractIntegrationTest {
 
         as(session, postJson("/api/v1/auth/change-password",
                         Map.of("currentPassword", "wrong-current-password", "newPassword", "a-brand-new-password")))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.message").value("Your current password is incorrect."));
+        as(session, postJson("/api/v1/auth/change-password",
+                        Map.of("currentPassword", PASSWORD, "newPassword", PASSWORD)))
+                .andExpect(status().isUnprocessableEntity());
         as(session, postJson("/api/v1/auth/change-password",
                         Map.of("currentPassword", PASSWORD, "newPassword", "a-brand-new-password")))
                 .andExpect(status().isNoContent());

@@ -28,10 +28,12 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
+import { useOwnApprovalRefused } from "@/hooks/use-own-approval";
 import { PRIORITY_LABELS, reschedulable, workOrderActions } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
 import type { WorkOrderDetail, WorkOrderStatus } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { formatDateTime } from "@/lib/dates";
 
 /** The statuses whose reason is shown above the details. */
 const REASON_LABELS: Partial<Record<WorkOrderStatus, string>> = {
@@ -41,7 +43,7 @@ const REASON_LABELS: Partial<Record<WorkOrderStatus, string>> = {
   PARTIALLY_COMPLETED: "Closed short",
 };
 
-const when = (value: string | null) => (value ? new Date(value).toLocaleString() : "–");
+const when = (value: string | null) => (value ? formatDateTime(value) : "–");
 const link = "text-primary hover:underline";
 
 type Dialog = "edit" | "sendBack" | "approve" | "hold" | "cancel" | "reschedule" | null;
@@ -64,10 +66,11 @@ export default function WorkOrderPage() {
   const [dialog, setDialog] = useState<Dialog>(null);
   const [warnings, setWarnings] = useState<string[] | null>(null);
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<WorkOrderDetail>(path) });
+  const ownRefused = useOwnApprovalRefused(data?.workOrder.submittedBy ?? null);
   if (!data) return <QueryState error={error} />;
 
   const { workOrder: order, definition, materials, operations, history } = data;
-  const actions = workOrderActions(order, can);
+  const actions = workOrderActions(order, can).filter((action) => action !== "approve" || !ownRefused);
   const unit = units.label(order.uomId);
   const close = () => setDialog(null);
   const released = order.releasedAt !== null;
@@ -154,6 +157,9 @@ export default function WorkOrderPage() {
           </Button>
         )}
       </PageHeader>
+      {order.status === "SUBMITTED" && can.approve && ownRefused && (
+        <p className="text-sm text-muted-foreground">You submitted this work order, so someone else must approve it.</p>
+      )}
       <FormError message={message} />
       {warnings && (
         <div role="status" className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-200">
@@ -343,7 +349,7 @@ export default function WorkOrderPage() {
       {dialog === "approve" && (
         <RecordDialog
           title={`Approve ${order.workOrderNumber}`}
-          fields={[{ name: "note", label: "Note (needed if you are approving your own work order)", type: "textarea" }]}
+          fields={[{ name: "note", label: "Note", type: "textarea" }]}
           onClose={close}
           onSubmit={(values) => api.post(`${path}/approve`, values).then(refresh)}
         />

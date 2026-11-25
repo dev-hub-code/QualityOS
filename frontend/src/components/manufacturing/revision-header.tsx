@@ -8,12 +8,14 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
+import { useOwnApprovalRefused } from "@/hooks/use-own-approval";
 import { DEFINITIONS, revisionActions, type DefinitionKind } from "@/lib/manufacturing";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { Revision } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { formatDateTime } from "@/lib/dates";
 
-const when = (value: string | null) => (value ? new Date(value).toLocaleString() : "–");
+const when = (value: string | null) => (value ? formatDateTime(value) : "–");
 
 /** The revision's title, its stage, and the workflow actions open to this person. */
 export function RevisionHeader({
@@ -36,7 +38,9 @@ export function RevisionHeader({
   const router = useRouter();
   const { run, pending, message } = useAction();
   const [dialog, setDialog] = useState<"edit" | "sendBack" | "approve" | "retire" | null>(null);
-  const actions = revisionActions(revision.status, revision.submittedAt !== null, { manage: canManage, approve: canApprove });
+  const ownRefused = useOwnApprovalRefused(revision.submittedBy);
+  const actions = revisionActions(revision.status, revision.submittedAt !== null, { manage: canManage, approve: canApprove })
+    .filter((action) => action !== "approve" || !ownRefused);
   const close = () => setDialog(null);
 
   const editFields: FieldDef[] = [{ name: "changeNote", label: "What this revision is for", type: "textarea" }];
@@ -121,6 +125,9 @@ export function RevisionHeader({
           </Button>
         )}
       </PageHeader>
+      {revision.status === "SUBMITTED" && canApprove && ownRefused && (
+        <p className="text-sm text-muted-foreground">You submitted this revision, so someone else must approve it.</p>
+      )}
       <FormError message={message} />
       {revision.reviewNote && revision.status === "DRAFT" && (
         <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-200">
@@ -157,7 +164,7 @@ export function RevisionHeader({
           title={`Approve ${definition.one} revision ${revision.revision}`}
           fields={[
             { name: "effectiveFrom", label: "Takes effect on (today if left blank)", type: "date" },
-            { name: "note", label: "Note (needed if you are approving your own work)", type: "textarea" },
+            { name: "note", label: "Note", type: "textarea" },
           ]}
           onClose={close}
           onSubmit={(values) => api.post(`${path}/approve`, values).then(refresh)}

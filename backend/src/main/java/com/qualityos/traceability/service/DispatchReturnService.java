@@ -271,6 +271,13 @@ public class DispatchReturnService {
         return reversal;
     }
 
+    /** The return lines that brought this serial back, which its return inspections are made on. */
+    @Transactional(readOnly = true)
+    public Set<UUID> returnItemsOf(String serial) {
+        return reversalItems.findBySerial(serial).stream().map(DispatchReversalItem::getId)
+                .collect(Collectors.toSet());
+    }
+
     /** The dispatch lines this serial number came back from. */
     @Transactional(readOnly = true)
     public Set<UUID> returnedLines(String serial) {

@@ -74,7 +74,7 @@ class RecallPdfSamplesTest {
                 .map(batch -> new ReportProduct("DS-40", "Drive Shaft 40mm", batch, "RELEASED")).toList();
         List<String> serials = IntStream.range(0, serialCount).mapToObj(i -> "DS40-2026-%06d".formatted(i)).toList();
         List<InspectionHistory> inspections = batches.stream().map(batch -> new InspectionHistory(UUID.randomUUID(),
-                "INS-2026-00412", "FQC", batch, "COMPLETED", "PASS", "ACCEPT", Instant.parse("2026-10-10T06:30:00Z"))).toList();
+                "INS-2026-00412", "FQC", batch, "COMPLETED", "PASS", "ACCEPT", Instant.parse("2026-10-10T06:30:00Z"), null)).toList();
         List<NcrHistory> ncrs = List.of();
         return new RecallReport("Acme Forgings", "Acme Forgings Private Limited",
                 "Gat 121, Chakan Industrial Area, Pune 410501", "27ABCDE1234F1Z5", Instant.parse("2026-10-31T06:30:00Z"),

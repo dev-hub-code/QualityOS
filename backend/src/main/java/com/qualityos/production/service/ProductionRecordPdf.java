@@ -8,6 +8,7 @@ import com.qualityos.production.dto.CompletionDtos.OperationRecord;
 import com.qualityos.production.dto.CompletionDtos.ProductionRecord;
 import com.qualityos.production.dto.CompletionDtos.ReceiptResponse;
 import com.qualityos.production.dto.WorkOrderDtos.WorkOrderResponse;
+import com.qualityos.traceability.service.ProductionService;
 import com.samskivert.mustache.Template;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -29,11 +30,13 @@ public class ProductionRecordPdf {
     private final WorkOrderService workOrders;
     private final CompletionService completion;
     private final OrganizationService organizations;
+    private final ProductionService production;
     private final HtmlPdf pdf;
     private final Template template;
 
     ProductionRecordPdf(WorkOrderService workOrders, CompletionService completion, OrganizationService organizations,
-            HtmlPdf pdf) {
+            HtmlPdf pdf, ProductionService production) {
+        this.production = production;
         this.workOrders = workOrders;
         this.completion = completion;
         this.organizations = organizations;
@@ -73,6 +76,7 @@ public class ProductionRecordPdf {
         model.put("hasReworks", !record.reworkOrders().isEmpty());
         ReceiptResponse receipt = record.receipt();
         if (receipt != null) {
+            long serials = production.serialCount(order.productionBatchId());
             model.put("receipt", Map.of(
                     "quantity", plain(receipt.quantity()),
                     "expected", receipt.expectedQuantity() == null ? "" : plain(receipt.expectedQuantity()),
@@ -83,7 +87,8 @@ public class ProductionRecordPdf {
                     "at", when.format(receipt.receivedAt()),
                     "shortReason", receipt.shortReason() == null ? "" : receipt.shortReason(),
                     "varianceReason", receipt.varianceReason() == null ? "" : receipt.varianceReason(),
-                    "serials", receipt.serialCount()));
+                    // Counted now: serial numbers are often registered on the batch after it is received.
+                    "serials", serials == 0 ? List.of() : List.of(serials)));
         }
         return new Document(order.workOrderNumber() + "-production-record.pdf", pdf.render(template.execute(model)));
     }

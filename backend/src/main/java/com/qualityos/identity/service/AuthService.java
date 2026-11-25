@@ -379,8 +379,12 @@ public class AuthService {
     public void changePassword(ChangePasswordRequest request) {
         UUID userId = TenantContext.getCurrentUserId();
         User user = tx.execute(status -> users.findById(userId).orElseThrow());
+        // Not 401: the session is still good, and a 401 would sign the member out over a typing slip.
         if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
-            throw invalidCredentials();
+            throw new BusinessRuleException("Your current password is incorrect.");
+        }
+        if (passwordEncoder.matches(request.newPassword(), user.getPasswordHash())) {
+            throw new BusinessRuleException("Choose a new password that differs from your current one.");
         }
         String newHash = passwordEncoder.encode(request.newPassword());
         tx.executeWithoutResult(status -> {

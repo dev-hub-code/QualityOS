@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, type KeyboardEvent } from "react";
 import { formatMeasure, linear, stepPath, ticks, valueDomain, type PanelPoint } from "@/lib/spc";
+import { formatDateTime } from "@/lib/dates";
 
 interface ControlChartProps {
   title: string;
@@ -200,7 +201,7 @@ export function ControlChart({ title, valueName, unit, points, spec, onOpen }: C
               limits {formatMeasure(shown.lower)} to {formatMeasure(shown.upper)}
             </div>
             <div className="text-muted-foreground">{shown.label}</div>
-            <div className="text-muted-foreground">{new Date(shown.submittedAt).toLocaleString()}</div>
+            <div className="text-muted-foreground">{formatDateTime(shown.submittedAt)}</div>
             {shown.signal && <div className="font-medium">Signal</div>}
             {onOpen && <div className="text-muted-foreground">Click to open the inspection</div>}
           </div>
@@ -245,7 +246,7 @@ export function ControlChart({ title, valueName, unit, points, spec, onOpen }: C
                       {point.label}
                     </Link>
                   </td>
-                  <td className="pr-3">{new Date(point.submittedAt).toLocaleString()}</td>
+                  <td className="pr-3">{formatDateTime(point.submittedAt)}</td>
                   <td className="pr-3 tabular-nums">{withUnit(point.value)}</td>
                   <td className="pr-3 tabular-nums">{formatMeasure(point.lower)}</td>
                   <td className="pr-3 tabular-nums">{formatMeasure(point.upper)}</td>

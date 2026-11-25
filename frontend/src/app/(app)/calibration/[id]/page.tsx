@@ -81,7 +81,10 @@ export default function InstrumentPage() {
       <div className="print:hidden">
         <PageHeader title={instrument.instrumentCode} subtitle={instrument.name}>
           <StatusBadge status={instrument.status} />
-          <StatusBadge status={instrument.dueState === "OK" ? "IN_DATE" : instrument.dueState} />
+          {/* Out of service or retired, its due date says nothing about whether it can be used. */}
+          {instrument.status === "ACTIVE" && (
+            <StatusBadge status={instrument.dueState === "OK" ? "IN_DATE" : instrument.dueState} />
+          )}
           {canManage && !retired && (
             <>
               <Button onClick={() => setDialog("calibrate")}>Record calibration</Button>

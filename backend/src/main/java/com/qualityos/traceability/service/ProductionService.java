@@ -372,6 +372,12 @@ public class ProductionService {
         return detail(id);
     }
 
+    /** How many serial numbers the batch has now, including those registered after it was received. */
+    @Transactional(readOnly = true)
+    public long serialCount(UUID batchId) {
+        return finishedProducts.countByProductionBatchId(batchId);
+    }
+
     @Transactional
     public BatchDetail addSerials(UUID id, AddSerialsRequest request) {
         ProductionBatch batch = lock(id);
@@ -383,8 +389,13 @@ public class ProductionService {
         if (BigDecimal.valueOf(total).compareTo(batch.getProducedQuantity()) > 0) {
             throw new BusinessRuleException("This batch has more serial numbers than units.");
         }
-        if (!finishedProducts.findBySerialNumberIn(serials).isEmpty()) {
-            throw new ConflictException("One of these serial numbers is already registered.");
+        List<String> taken = finishedProducts.findBySerialNumberIn(serials).stream()
+                .map(FinishedProduct::getSerialNumber).sorted().toList();
+        if (!taken.isEmpty()) {
+            throw new ConflictException("%s already registered: %s.".formatted(
+                    taken.size() == 1 ? "This serial number is" : "These serial numbers are",
+                    String.join(", ", taken.size() > 10 ? taken.subList(0, 10) : taken)
+                            + (taken.size() > 10 ? " and %d more".formatted(taken.size() - 10) : "")));
         }
         serials.forEach(serial -> finishedProducts.save(new FinishedProduct(serial, id)));
         audit.record("SERIALS_REGISTERED", ENTITY, id, null, Map.of("count", serials.size()));

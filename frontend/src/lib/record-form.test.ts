@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatQuantity, recordSchema, toFormValues, toPayload, type FieldDef } from "./record-form";
+import { decimalProblem, formatQuantity, recordSchema, toFormValues, toPayload, type FieldDef } from "./record-form";
 
 const fields: FieldDef[] = [
   { name: "name", label: "Name", required: true },
@@ -38,5 +38,23 @@ describe("conversions", () => {
     expect(formatQuantity("250.000000")).toBe("250");
     expect(formatQuantity("19.900100")).toBe("19.9001");
     expect(formatQuantity("100")).toBe("100");
+  });
+});
+
+describe("decimal field messages", () => {
+  it("says what is wrong rather than one message for every mistake", () => {
+    expect(decimalProblem("abc")).toBe("Enter a number");
+    expect(decimalProblem("-5")).toBe("Cannot be negative");
+    expect(decimalProblem("1.1234567")).toBe("Use at most 6 decimal places");
+    expect(decimalProblem("1234567890123")).toBe("Enter a smaller number");
+  });
+
+  it("puts the message on the field", () => {
+    const schema = recordSchema([{ name: "quantity", label: "Quantity", type: "decimal" }]);
+    const result = schema.safeParse({ quantity: "-2" });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].message).toBe("Cannot be negative");
+    expect(schema.safeParse({ quantity: "2.5" }).success).toBe(true);
+    expect(schema.safeParse({ quantity: "" }).success).toBe(true);
   });
 });

@@ -1,6 +1,7 @@
 import { Section } from "@/components/records/parts";
 import { humanize } from "@/lib/capa";
 import type { StatusChange } from "@/lib/types";
+import { formatDateTime } from "@/lib/dates";
 
 /** @param label names a status; by default as it is written */
 export function StatusHistory({ changes, label = humanize }: { changes: StatusChange[]; label?: (status: string) => string }) {
@@ -13,7 +14,7 @@ export function StatusHistory({ changes, label = humanize }: { changes: StatusCh
               {label(change.toStatus)} by {change.actorName}
               {change.note && ` – ${change.note}`}
             </span>
-            <span className="shrink-0 text-muted-foreground">{new Date(change.at).toLocaleString()}</span>
+            <span className="shrink-0 text-muted-foreground">{formatDateTime(change.at)}</span>
           </li>
         ))}
       </ul>

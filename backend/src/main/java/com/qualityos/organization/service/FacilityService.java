@@ -304,6 +304,8 @@ public class FacilityService {
         facility.setCode(code);
         apply(facility, request);
         facilities.saveAndFlush(facility);
+        // A facility in another state takes that state's holidays: what it said of the old state's no longer applies.
+        stateHolidays.forgetOutsideState(id, facility.getState());
         audit.recordChange("FACILITY_UPDATED", "Facility", id, before, audit.state(mapper.toResponse(facility)));
         return mapper.toResponse(facility);
     }

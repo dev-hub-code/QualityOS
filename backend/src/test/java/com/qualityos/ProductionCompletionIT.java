@@ -285,6 +285,33 @@ class ProductionCompletionIT extends TraceabilityFixture {
                 .andExpect(jsonPath("$.data").doesNotExist());
     }
 
+    /** Found in human testing: started from the batch page, the final inspection left the order unable to close. */
+    @Test
+    void aFinalInspectionStartedFromTheBatchStillReleasesTheOrder() throws Exception {
+        as(manager, postJson(API + "/quality-checkpoints", Map.of("name", "Final", "stage", "FINAL_RELEASE",
+                "templateId", template("FQC"), "productId", product))).andExpect(status().isCreated());
+        String lot = lotIn("20");
+        String order = started("10");
+        String path = "/work-orders/" + order;
+        String batch = batchOf(order);
+        send(supervisor, path + "/issues", Map.of("lineNumber", 1, "lotId", lot, "quantity", "10"))
+                .andExpect(status().isOk());
+        run(order, 0, "10", "10", "0");
+        run(order, 1, "10", "10", "0");
+        send(supervisor, path + "/receipt", Map.of()).andExpect(status().isOk());
+
+        // Inspected from the batch, with a template of its own, not through the order's gate.
+        inspectBatch(batch, "FQC", "20.0", "ACCEPT");
+        assertThat(statusOf(batch)).isEqualTo("RELEASED");
+        String quality = body(as(owner, get(API + path + "/quality")));
+        assertThat(JsonPath.<List<String>>read(quality, "$.data.gates[?(@.name == 'Final')].status"))
+                .containsExactly("PASSED");
+        assertThat(JsonPath.<List<String>>read(quality, "$.data.unresolved")).isEmpty();
+        send(supervisor, path + "/complete", Map.of()).andExpect(status().isOk());
+        assertThat(JsonPath.<String>read(body(as(owner, get(API + path))), "$.data.workOrder.status"))
+                .isEqualTo("COMPLETED");
+    }
+
     @Test
     void excessOutputClosesInFullOnceAndOnlyWhereTheCallerMayWork() throws Exception {
         settings(Map.of("completionRequiresFinalInspection", false, "overReportPercent", "10", "allowOverIssue", true,

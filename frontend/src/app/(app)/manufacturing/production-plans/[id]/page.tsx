@@ -26,6 +26,7 @@ import { planActions } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
 import type { PlanDetail, PlanLine, WorkOrderDetail } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { formatDateTime } from "@/lib/dates";
 
 type Dialog = { kind: "edit" | "line" | "close" | "cancel" } | { kind: "editLine" | "order"; line: PlanLine } | null;
 
@@ -95,7 +96,7 @@ export default function ProductionPlanPage() {
       <Section title="Details">
         <Details
           items={[
-            ["Approved", plan.approvedAt ? `${plan.approvedByName ?? "Former member"}, ${new Date(plan.approvedAt).toLocaleString()}` : "–"],
+            ["Approved", plan.approvedAt ? `${plan.approvedByName ?? "Former member"}, ${formatDateTime(plan.approvedAt)}` : "–"],
             ["Notes", plan.notes ?? "–"],
             ...(plan.statusReason ? ([["Reason", plan.statusReason]] as [string, string][]) : []),
           ]}

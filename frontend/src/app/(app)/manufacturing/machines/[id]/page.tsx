@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import type { Instrument, InstrumentOption, Machine, MachineStatusEvent } from "@/lib/types";
 import { lookupAll } from "@/components/records/parts";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { formatDateTime } from "@/lib/dates";
 
 interface MachineDetail {
   machine: Machine;
@@ -76,7 +77,7 @@ export default function MachinePage() {
             ["Manufacturer", machine.manufacturer ?? "–"],
             ["Model", machine.model ?? "–"],
             ["Serial number", machine.serialNumber ?? "–"],
-            ["Status since", new Date(machine.statusChangedAt).toLocaleString()],
+            ["Status since", formatDateTime(machine.statusChangedAt)],
             ["Reason", machine.statusReason ?? "–"],
           ]}
         />
@@ -137,7 +138,7 @@ export default function MachinePage() {
                 {event.reason}
               </span>
               <span className="text-muted-foreground">
-                {event.changedByName ?? "Former member"} · {new Date(event.changedAt).toLocaleString()}
+                {event.changedByName ?? "Former member"} · {formatDateTime(event.changedAt)}
               </span>
             </li>
           ))}

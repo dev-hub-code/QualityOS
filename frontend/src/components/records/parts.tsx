@@ -149,10 +149,15 @@ export async function lookupAll<T>(path: string, filter = ""): Promise<T[]> {
   return [first, ...rest].flatMap((result) => result.items);
 }
 
-function useLookup<T extends { id: string; code: string; name: string }>(path: string, filter = ""): FieldOption[] {
+function useLookup<T extends { id: string; code: string; name: string }>(
+  path: string,
+  filter = "",
+  enabled = true,
+): FieldOption[] {
   const { data } = useQuery({
     queryKey: [path, `lookup${filter}`],
     queryFn: () => lookupAll<T>(path, filter),
+    enabled,
   });
   return (data ?? []).map((item) => ({ value: item.id, label: `${item.code} – ${item.name}` }));
 }
@@ -178,7 +183,8 @@ export function useDefectCategories() {
 export const useFacilities = () => useLookup<Facility>("/facilities");
 export const useMaterials = () => useLookup<Material>("/materials");
 export const useProducts = () => useLookup<Product>("/products");
-export const useWorkCenters = () => useLookup<WorkCenter>("/manufacturing/work-centers");
+/** @param enabled false for someone who cannot see work centres, so the page does not ask and get refused */
+export const useWorkCenters = (enabled = true) => useLookup<WorkCenter>("/manufacturing/work-centers", "", enabled);
 export const useMachines = () => useLookup<Machine>("/manufacturing/machines");
 
 export function SpecificationTable({

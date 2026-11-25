@@ -17,7 +17,8 @@ function useLogo(tenantId: string | undefined) {
     enabled: !!tenantId,
     queryFn: async () => {
       const response = await fetch(LOGO);
-      return response.ok ? URL.createObjectURL(await response.blob()) : null;
+      // 204 when the organisation has no logo.
+      return response.status === 200 ? URL.createObjectURL(await response.blob()) : null;
     },
   });
   useEffect(() => () => {

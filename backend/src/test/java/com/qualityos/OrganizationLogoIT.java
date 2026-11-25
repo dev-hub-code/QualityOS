@@ -35,7 +35,7 @@ class OrganizationLogoIT extends AbstractIntegrationTest {
     void anOwnerSetsALogoThatEveryMemberSeesAndEveryEmailCarries() throws Exception {
         Session owner = register();
         Session member = addMember(owner, "VIEWER");
-        as(member, get("/api/v1/organizations/current/logo")).andExpect(status().isNotFound());
+        as(member, get("/api/v1/organizations/current/logo")).andExpect(status().isNoContent());
 
         upload(owner, "logo.png", "image/png", PNG)
                 .andExpect(status().isOk())
@@ -61,7 +61,7 @@ class OrganizationLogoIT extends AbstractIntegrationTest {
 
         // Another organisation has none, and its emails carry none.
         Session other = register();
-        as(other, get("/api/v1/organizations/current/logo")).andExpect(status().isNotFound());
+        as(other, get("/api/v1/organizations/current/logo")).andExpect(status().isNoContent());
         String elsewhere = uniqueEmail();
         invite(other, elsewhere, "VIEWER");
         assertThat(mail.to(elsewhere).getLast().logo()).isNull();
@@ -71,7 +71,7 @@ class OrganizationLogoIT extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden());
         mvc.perform(delete("/api/v1/organizations/current/logo").header(HttpHeaders.AUTHORIZATION, owner.bearer()))
                 .andExpect(status().isNoContent());
-        as(member, get("/api/v1/organizations/current/logo")).andExpect(status().isNotFound());
+        as(member, get("/api/v1/organizations/current/logo")).andExpect(status().isNoContent());
     }
 
     /** The images drawn on a PDF's first page. */

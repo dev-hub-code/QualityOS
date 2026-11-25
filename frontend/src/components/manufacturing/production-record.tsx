@@ -6,8 +6,9 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { formatQuantity } from "@/lib/record-form";
 import type { ProductionRecord } from "@/lib/types";
+import { formatDateTime } from "@/lib/dates";
 
-const when = (value: string | null) => (value ? new Date(value).toLocaleString() : "–");
+const when = (value: string | null) => (value ? formatDateTime(value) : "–");
 
 /** The work order that made a batch, for those who may see work orders; null for a batch recorded by hand. */
 export function useProductionRecord(batchId: string): ProductionRecord | null {

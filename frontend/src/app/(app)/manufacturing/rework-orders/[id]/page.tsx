@@ -14,8 +14,9 @@ import { formatQuantity } from "@/lib/record-form";
 import type { ReworkDetail } from "@/lib/types";
 import { lookupAll } from "@/components/records/parts";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { formatDateTime } from "@/lib/dates";
 
-const when = (value: string | null) => (value ? new Date(value).toLocaleString() : "–");
+const when = (value: string | null) => (value ? formatDateTime(value) : "–");
 const words = (value: string | null) => (value ? value.replaceAll("_", " ").toLowerCase() : "–");
 
 type Dialog = "approve" | "complete" | "reinspect" | "cancel" | { step: string } | null;

@@ -22,14 +22,28 @@ export interface FieldDef {
 
 /** Matches NUMERIC(18,6), so that the database never has to round a value. */
 export const DECIMAL_PATTERN = /^\d{1,12}(\.\d{1,6})?$/;
-const DECIMAL_MESSAGE = "Enter a number with at most 6 decimal places";
+
+/** Says what is wrong with a value DECIMAL_PATTERN refuses, rather than one message for every case. */
+export function decimalProblem(value: string): string {
+  const number = Number(value);
+  if (value === "" || Number.isNaN(number)) return "Enter a number";
+  if (number < 0) return "Cannot be negative";
+  if (/\.\d{7,}$/.test(value)) return "Use at most 6 decimal places";
+  if (Math.abs(number) >= 1e12) return "Enter a smaller number";
+  return "Enter a number";
+}
+
+/** A decimal field's check, with a message that fits the mistake. */
+export function decimalCheck(value: string, ctx: z.RefinementCtx) {
+  if (value !== "" && !DECIMAL_PATTERN.test(value)) ctx.addIssue({ code: "custom", message: decimalProblem(value) });
+}
 
 function fieldSchema(field: FieldDef): z.ZodType {
   if (field.type === "checkbox") return z.boolean();
   let text = z.string().trim();
   if (field.required) text = text.min(1, `${field.label} is required`);
   if (field.type === "decimal") {
-    return text.refine((value) => value === "" || DECIMAL_PATTERN.test(value), DECIMAL_MESSAGE);
+    return text.superRefine(decimalCheck);
   }
   if (field.type === "email") {
     return text.refine((value) => value === "" || z.email().safeParse(value).success, "Enter a valid email");

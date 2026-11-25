@@ -36,6 +36,7 @@ import type {
   Subscription,
 } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { useMe } from "@/hooks/use-me";
 
 const STATE: Record<Subscription["state"], string> = {
   TRIAL: "Trial",
@@ -89,7 +90,7 @@ function PlanCard({
       </p>
       <p className="text-sm text-muted-foreground">
         {plan.maxUsers ?? "Unlimited"} users,{" "}
-        {plan.maxFacilities ?? "unlimited"} facilities
+        {plan.maxFacilities ?? "unlimited"} {plan.maxFacilities === 1 ? "facility" : "facilities"}
       </p>
       <div className="mt-auto pt-2">
         {price === null ? (
@@ -111,7 +112,18 @@ function PlanCard({
   );
 }
 
+// Billing belongs to whoever holds SUBSCRIPTION_MANAGE. Others who open the address see why, not a page of
+// failing requests and buttons the server refuses.
 export default function BillingPage() {
+  const me = useMe();
+  if (!me.data) return <QueryState error={me.error} />;
+  if (!me.data.permissions.includes("SUBSCRIPTION_MANAGE")) {
+    return <p>You do not have permission to do this.</p>;
+  }
+  return <Billing />;
+}
+
+function Billing() {
   const confirm = useConfirm();
   const { run, pending, message } = useAction();
   const [cycle, setCycle] = useState<BillingCycle>("MONTHLY");
@@ -286,9 +298,17 @@ export default function BillingPage() {
               current={plan.code === current.planCode}
               pending={pending}
               onChoose={() =>
-                run(() =>
-                  api.post("/subscription/plan", { planId: plan.id, cycle }),
-                )
+                confirm({
+                  title: `Choose the ${plan.name} plan?`,
+                  description:
+                    "We issue an invoice for it. The plan starts once that invoice is paid, and choosing another plan replaces it.",
+                  confirmLabel: `Choose ${plan.name}`,
+                }).then((ok) => {
+                  if (ok)
+                    void run(() =>
+                      api.post("/subscription/plan", { planId: plan.id, cycle }),
+                    );
+                })
               }
             />
           ))}

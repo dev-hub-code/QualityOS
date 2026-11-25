@@ -146,11 +146,21 @@
 .viz-root {
   --viz-1: #2a78d6;
   --viz-2: #eb6834;
+  /* Status steps, kept for states and never used as a series; always shown with an icon and a label. */
+  --viz-good: #0ca30c;
+  --viz-warning: #fab219;
+  --viz-critical: #d03b3b;
+  --viz-grid: #e1e0d9;
+  --viz-axis: #c3c2b7;
+  --viz-surface: #fcfcfb;
 }
 
 .dark .viz-root {
   --viz-1: #3987e5;
   --viz-2: #d95926;
+  --viz-grid: #2c2c2a;
+  --viz-axis: #383835;
+  --viz-surface: #1a1a19;
 }
 
 /* Frosted panel: cards, tables and dialogs share it. */

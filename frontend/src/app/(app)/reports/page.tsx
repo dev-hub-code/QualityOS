@@ -86,7 +86,7 @@ export default function ReportsPage() {
         <>
           <div className="flex flex-wrap items-center gap-4 text-sm">
             <span className="text-muted-foreground">
-              {data.rows.length} rows. {data.periodLabel}.
+              {data.rows.length} {data.rows.length === 1 ? "row" : "rows"}. {data.periodLabel}.
             </span>
             <a
               className="underline"

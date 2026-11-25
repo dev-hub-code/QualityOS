@@ -12,8 +12,9 @@ import type { FieldDef } from "@/lib/record-form";
 import { formatQuantity } from "@/lib/record-form";
 import { parseSerials } from "@/lib/traceability";
 import type { FinishedGoodsReceipt, MaterialVariance, WorkOrderCompletion, WorkOrderStatus } from "@/lib/types";
+import { formatDateTime } from "@/lib/dates";
 
-const when = (value: string) => new Date(value).toLocaleString();
+const when = (value: string) => formatDateTime(value);
 
 function Blockers({ title, items }: { title: string; items: string[] }) {
   if (items.length === 0) return null;

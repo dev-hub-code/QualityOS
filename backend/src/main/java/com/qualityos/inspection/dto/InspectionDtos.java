@@ -138,6 +138,7 @@ public final class InspectionDtos {
             String status,
             String finalResult,
             String disposition,
-            java.time.Instant createdAt) {
+            java.time.Instant createdAt,
+            UUID returnItemId) {
     }
 }

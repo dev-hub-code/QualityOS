@@ -221,6 +221,8 @@ export interface Supplier {
   postalCode: string | null;
   status: string;
   statusNote: string | null;
+  /** Who sent it for approval; null for suppliers submitted before this was recorded. */
+  submittedBy: string | null;
   version: number;
 }
 

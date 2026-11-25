@@ -73,8 +73,8 @@ public class NcrController {
 
     @GetMapping("/quality/assignees")
     @PreAuthorize(Require.NCR_VIEW + " or " + Require.CAPA_VIEW)
-    public ApiResponse<List<Assignee>> assignees() {
-        return ApiResponse.ok(ncrs.assignees());
+    public ApiResponse<List<Assignee>> assignees(@RequestParam(required = false) String permission) {
+        return ApiResponse.ok(ncrs.assignees(permission));
     }
 
     @GetMapping("/defect-categories")

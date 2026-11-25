@@ -41,6 +41,11 @@ class QualityIT extends AbstractIntegrationTest {
         manager = addMember(owner, "QUALITY_MANAGER");
     }
 
+    private static List<String> ids(ResultActions result) throws Exception {
+        return JsonPath.read(result.andExpect(status().isOk()).andReturn().getResponse().getContentAsString(),
+                "$.data[*].id");
+    }
+
     private String read(ResultActions result, String path) throws Exception {
         return JsonPath.read(result.andReturn().getResponse().getContentAsString(), path);
     }
@@ -307,6 +312,38 @@ class QualityIT extends AbstractIntegrationTest {
         act(engineer, "/ncrs/" + ncr + "/reject", Map.of("note", "X")).andExpect(status().isForbidden());
         act(manager, "/ncrs/" + ncr + "/reject", Map.of("note", "Within tolerance"))
                 .andExpect(jsonPath("$.data.status").value("REJECTED"));
+    }
+
+    /** Found in human testing: NCRs and CAPAs could be handed to people whose role cannot work on them. */
+    @Test
+    void workGoesOnlyToPeopleWhoseRoleCanDoIt() throws Exception {
+        Session viewer = addMember(owner, "VIEWER");
+        Session operator = addMember(owner, "PRODUCTION_OPERATOR");
+        Session engineer = addMember(owner, "QUALITY_ENGINEER");
+        String ncr = raise(owner, "MINOR");
+
+        List<String> everyone = ids(as(owner, get("/api/v1/quality/assignees")));
+        assertThat(everyone).contains(viewer.userId().toString(), operator.userId().toString());
+        List<String> ncrWorkers = ids(as(owner, get("/api/v1/quality/assignees")
+                .param("permission", "NCR_ASSIGN")));
+        assertThat(ncrWorkers).contains(engineer.userId().toString(), manager.userId().toString())
+                .doesNotContain(viewer.userId().toString(), operator.userId().toString());
+        List<String> capaOwners = ids(as(owner, get("/api/v1/quality/assignees")
+                .param("permission", "CAPA_MANAGE")));
+        assertThat(capaOwners).contains(engineer.userId().toString())
+                .doesNotContain(viewer.userId().toString());
+        as(owner, get("/api/v1/quality/assignees").param("permission", "TENANT_MANAGE"))
+                .andExpect(status().isUnprocessableContent());
+
+        act(owner, "/ncrs/" + ncr + "/assign", Map.of("assigneeId", viewer.userId()))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message")
+                        .value("This person cannot work on NCRs. Assign it to someone whose role can."));
+        act(owner, "/capas", capaRequest(ncr, operator, FUTURE))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message")
+                        .value("This person cannot work on CAPAs. Choose an owner whose role can."));
+        act(owner, "/ncrs/" + ncr + "/assign", Map.of("assigneeId", engineer.userId())).andExpect(status().isOk());
     }
 
     @Test

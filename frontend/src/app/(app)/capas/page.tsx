@@ -36,7 +36,7 @@ export default function CapasPage() {
   const canManage = usePermission("CAPA_MANAGE");
   const router = useRouter();
   const refresh = useRefresh();
-  const assignees = useAssignees();
+  const assignees = useAssignees("CAPA_MANAGE");
   const facilities = useFacilities();
   const [adding, setAdding] = useState(false);
   const fields: FieldDef[] = [

@@ -63,7 +63,7 @@ export function ContactTable({
   const canManage = usePermission("RECALL_MANAGE") && open;
   const canClose = usePermission("RECALL_CLOSE") && open;
   const canSeeFiles = usePermission("RECALL_VIEW");
-  const assignees = useAssignees();
+  const assignees = useAssignees("RECALL_MANAGE");
   const refresh = useRefresh();
   const { run, message } = useAction();
   const [active, setActive] = useState<{ contact: RecallContact; dialog: Dialog } | null>(null);

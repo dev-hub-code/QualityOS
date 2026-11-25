@@ -125,9 +125,19 @@ public class NcrService implements AttachmentPolicy {
         return places.options(scope::allows);
     }
 
+    /** Work that can be handed to someone, by the permission it needs. Other permissions are not listed. */
+    private static final Set<String> ASSIGNABLE = Set.of(Permissions.NCR_ASSIGN, Permissions.CAPA_MANAGE,
+            Permissions.AUDIT_MANAGE, Permissions.RECALL_MANAGE);
+
+    /** @param permission null for every active member, or one of {@link #ASSIGNABLE} for those who hold it */
     @Transactional(readOnly = true)
-    public List<Assignee> assignees() {
+    public List<Assignee> assignees(String permission) {
+        if (permission != null && !ASSIGNABLE.contains(permission)) {
+            throw new BusinessRuleException("People can be listed only for NCR, CAPA, audit or recall work.");
+        }
+        Set<UUID> holders = permission == null ? null : access.holdersOf(permission);
         return access.activeMembers().entrySet().stream()
+                .filter(member -> holders == null || holders.contains(member.getKey()))
                 .map(member -> new Assignee(member.getKey(), member.getValue()))
                 .toList();
     }
@@ -421,7 +431,8 @@ public class NcrService implements AttachmentPolicy {
 
     @Transactional
     public NcrDetail assign(UUID id, UUID assigneeId) {
-        requireMember(assigneeId);
+        requireMemberWho(assigneeId, Permissions.NCR_ASSIGN,
+                "This person cannot work on NCRs. Assign it to someone whose role can.");
         NonConformance ncr = lock(id);
         scope.requireAllowedFor(assigneeId, ncr.getFacilityId());
         NonConformance.Status previous = ncr.getStatus();
@@ -619,6 +630,17 @@ public class NcrService implements AttachmentPolicy {
     void requireMember(UUID userId) {
         if (access.activeMemberContact(userId).isEmpty()) {
             throw new BusinessRuleException("This person is not an active member of the organisation.");
+        }
+    }
+
+    /**
+     * An active member who holds {@code permission}, so the work handed to them is work they can do. Without it they
+     * would be named on a record they cannot act on.
+     */
+    void requireMemberWho(UUID userId, String permission, String refusal) {
+        requireMember(userId);
+        if (!access.holdersOf(permission).contains(userId)) {
+            throw new BusinessRuleException(refusal);
         }
     }
 

@@ -52,7 +52,7 @@ export default function AuditsPage() {
   const router = useRouter();
   const canManage = usePermission("AUDIT_MANAGE");
   const facilities = useFacilities();
-  const assignees = useAssignees();
+  const assignees = useAssignees("AUDIT_MANAGE");
   const suppliers = useApprovedSuppliers();
   const products = useProducts();
   const [planning, setPlanning] = useState(false);

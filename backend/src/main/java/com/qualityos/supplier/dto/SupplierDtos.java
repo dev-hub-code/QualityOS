@@ -44,6 +44,7 @@ public final class SupplierDtos {
             String countryCode,
             String status,
             String statusNote,
+            UUID submittedBy,
             Instant approvedAt,
             long version) {
     }
@@ -52,6 +53,10 @@ public final class SupplierDtos {
     }
 
     public record StatusNoteRequest(@NotBlank @Size(max = 1000) String note) {
+    }
+
+    /** @param note needed only when a sole member approves their own submission */
+    public record ApproveRequest(@Size(max = 1000) String note) {
     }
 
     public record SaveContactRequest(

@@ -437,6 +437,9 @@ public class QualityAuditService implements AttachmentPolicy {
         if (access.activeMemberContact(userId).isEmpty()) {
             throw new BusinessRuleException("The lead auditor must be an active member of this organisation.");
         }
+        if (!access.holdersOf(Permissions.AUDIT_MANAGE).contains(userId)) {
+            throw new BusinessRuleException("The lead auditor must be someone whose role can run audits.");
+        }
     }
 
     private QualityAudit load(UUID id) {

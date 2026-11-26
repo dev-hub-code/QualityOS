@@ -2,6 +2,7 @@ package com.qualityos.materialreceipt.entity;
 
 import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.persistence.TenantOwnedEntity;
+import com.qualityos.common.util.DayLabels;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -123,7 +124,8 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
     /** Expired stock is not used in production, whoever asks. */
     public void requireNotExpired(java.time.LocalDate today) {
         if (isExpiredOn(today)) {
-            throw new BusinessRuleException("Batch " + internalBatch + " expired on " + expiryDate + ".");
+            throw new BusinessRuleException(
+                    "Batch " + internalBatch + " expired on " + DayLabels.label(expiryDate) + ".");
         }
     }
 

@@ -10,7 +10,7 @@ import type { RecallReport } from "@/lib/types";
 import { formatCalendarDay } from "@/lib/dates";
 
 const CELL = "border p-1.5 align-top";
-const HEAD = `${CELL} bg-muted text-left font-medium`;
+const HEAD = `${CELL} text-left font-medium`;
 
 function ReportTable({ headings, rows }: { headings: string[]; rows: React.ReactNode[][] }) {
   return (
@@ -75,7 +75,7 @@ export default function RecallReportPage() {
           .join(", ")}
       </p>
       <p className="text-sm">
-        Recall date {formatCalendarDay(recall.recallDate)} · Status {recall.status} · Generated {data.generatedLabel}
+        Recall date {formatCalendarDay(recall.recallDate)} · Status {recall.status.replaceAll("_", " ").toLowerCase()} · Generated {data.generatedLabel}
       </p>
       <Part title="Reason for recall">
         <p className="text-sm whitespace-pre-wrap">{recall.reason}</p>

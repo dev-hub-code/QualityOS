@@ -9,6 +9,7 @@ import com.qualityos.common.security.Permissions;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.common.util.DayLabels;
 import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.identity.service.TenantAccessService;
@@ -472,7 +473,8 @@ public class RecallService implements AttachmentPolicy {
                     : names.size() + " customers have") + " not acknowledged the recall";
             String body = String.join(", ", names.size() > 10 ? names.subList(0, 10) : names)
                     + (names.size() > 10 ? " and " + (names.size() - 10) + " more" : "")
-                    + ". They had " + recall.getResponseDays() + " days from " + recall.getRecallDate() + ".";
+                    + ". They had " + recall.getResponseDays() + " days from "
+                    + DayLabels.label(recall.getRecallDate()) + ".";
             notifications.notify(recipients, com.qualityos.notification.service.NotificationType.RECALL_UNANSWERED,
                     title, body, "/recalls/" + recallId,
                     new com.qualityos.common.mail.EmailContent(com.qualityos.common.mail.EmailTemplate.RECALL_UNANSWERED,

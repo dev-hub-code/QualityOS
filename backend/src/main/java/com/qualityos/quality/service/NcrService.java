@@ -10,6 +10,7 @@ import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.common.util.DayLabels;
 import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.identity.service.TenantAccessService;
@@ -317,7 +318,8 @@ public class NcrService implements AttachmentPolicy {
                         failure.instrumentId(),
                         failure.instrumentCode() + " " + failure.instrumentName() + " failed calibration",
                         "Failed calibration on %s. Measurements since its last good calibration are in doubt: %s."
-                                .formatted(failure.calibratedOn(), String.join(", ", failure.inspectionNumbers())))));
+                                .formatted(DayLabels.label(failure.calibratedOn()),
+                                        String.join(", ", failure.inspectionNumbers())))));
         return new NcrOutcome(ncr.getId(), ncr.getNcrNumber(), ncr.getStatus().name(), ncr.getStatus().isFinished(),
                 List.of());
     }
@@ -370,7 +372,7 @@ public class NcrService implements AttachmentPolicy {
                 NonConformance.Severity.valueOf(complaint.severity()),
                 "Customer complaint from %s about %s".formatted(complaint.customerName(), complaint.dispatchNumber()),
                 "%s reported on %s (reference %s) about dispatch %s (%s): %s".formatted(
-                        complaint.customerName(), complaint.receivedOn(), complaint.reference(),
+                        complaint.customerName(), DayLabels.label(complaint.receivedOn()), complaint.reference(),
                         complaint.dispatchNumber(), String.join(", ", complaint.lines()), complaint.description())));
         return new NcrOutcome(ncr.getId(), ncr.getNcrNumber(), ncr.getStatus().name(), false, List.of());
     }
@@ -680,10 +682,13 @@ public class NcrService implements AttachmentPolicy {
         }
         if (request.rejectedUomId() != null) {
             materials.requireUnit(request.rejectedUomId());
+            materials.requireWholeInUnit("The rejected quantity", request.rejectedUomId(), request.rejectedQuantity());
             return request.rejectedUomId();
         }
-        return request.materialId() == null ? null
+        UUID unit = request.materialId() == null ? null
                 : materials.references(Set.of(request.materialId())).get(request.materialId()).uomId();
+        materials.requireWholeInUnit("The rejected quantity", unit, request.rejectedQuantity());
+        return unit;
     }
 
     private void requireCategory(UUID id) {

@@ -163,6 +163,7 @@ public class ProductionService {
     public BatchDetail create(CreateBatchRequest request) {
         products.requireExists(request.productId());
         facilities.requireActive(request.facilityId());
+        requireWholeOfProduct(request.productId(), request.plannedQuantity());
         ProductionBatch batch = batches.saveAndFlush(new ProductionBatch(
                 numbers.next("PB"), request.productId(), request.facilityId(), request.plannedQuantity()));
         audit.record("PRODUCTION_BATCH_STARTED", ENTITY, batch.getId(), null, Map.of("number", batch.getBatchNumber()));
@@ -255,6 +256,10 @@ public class ProductionService {
             throw new BusinessRuleException("Return between 0 and %s.".formatted(
                     edge.getQuantity().stripTrailingZeros().toPlainString()));
         }
+        UUID sourceUnit = edge.getParentLotId() != null
+                ? receipts.lots(List.of(edge.getParentLotId())).getFirst().uomId()
+                : unitOf(lock(edge.getParentBatchId()));
+        materials.requireWholeInUnit("This lot or batch", sourceUnit, quantity);
         if (edge.getParentLotId() != null) {
             receipts.restore(edge.getParentLotId(), quantity);
         } else {
@@ -283,8 +288,16 @@ public class ProductionService {
     }
 
     private BigDecimal inUnit(ConsumeRequest request, UUID sourceUnit) {
-        return request.uomId() == null ? request.quantity()
+        BigDecimal quantity = request.uomId() == null ? request.quantity()
                 : materials.convert(request.quantity(), request.uomId(), sourceUnit);
+        materials.requireWholeInUnit("This lot or batch", sourceUnit, quantity);
+        return quantity;
+    }
+
+    /** A product counted in pieces is planned, made, shipped and moved in whole pieces. */
+    public void requireWholeOfProduct(UUID productId, BigDecimal quantity) {
+        ProductReference product = products.references(Set.of(productId)).get(productId);
+        materials.requireWholeInUnit(product.code(), product.uomId(), quantity);
     }
 
     private UUID unitOf(ProductionBatch batch) {
@@ -367,6 +380,7 @@ public class ProductionService {
         if (relationships.findActiveByChildBatchIdIn(List.of(id)).isEmpty()) {
             throw new BusinessRuleException("Record what went into this batch first, or it cannot be traced.");
         }
+        requireWholeOfProduct(batch.getProductId(), request.producedQuantity());
         batch.complete(request.producedQuantity(), Instant.now());
         audit.record("PRODUCTION_BATCH_COMPLETED", ENTITY, id, null, Map.of("produced", request.producedQuantity()));
         return detail(id);

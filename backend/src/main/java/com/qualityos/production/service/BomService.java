@@ -448,6 +448,16 @@ public class BomService {
         }
         // Refuses a unit of another kind, such as pieces for a material kept in kilograms.
         materials.convert(request.quantity(), request.uomId(), componentUom);
+        // A component listed twice would be needed twice over, with nothing on the screen to say so.
+        UUID component = request.materialId() != null ? request.materialId() : request.componentProductId();
+        lines.findByBomIdOrderByLineNumber(bom.getId()).stream()
+                .filter(other -> !other.getId().equals(line.getId()) && component.equals(other.componentId()))
+                .findFirst()
+                .ifPresent(other -> {
+                    throw new BusinessRuleException(
+                            "This component is already line %d. Change that line's quantity instead."
+                                    .formatted(other.getLineNumber()));
+                });
         line.setMaterialId(request.materialId());
         line.setComponentProductId(request.componentProductId());
         line.setQuantity(request.quantity());

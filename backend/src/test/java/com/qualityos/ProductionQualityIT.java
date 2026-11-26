@@ -3,6 +3,7 @@ package com.qualityos;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -295,6 +296,9 @@ class ProductionQualityIT extends TraceabilityFixture {
         send(operator, path + "/complete", Map.of("reworkedQuantity", "2", "scrappedQuantity", "0"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.rework.status").value("AWAITING_INSPECTION"));
+        // No inspection queue lists it, so whoever can inspect is told.
+        as(owner, get("/api/v1/notifications"))
+                .andExpect(jsonPath("$.data.items[*].type", hasItem("REWORK_AWAITING_INSPECTION")));
 
         // It closes on the reinspection's decision, which also takes the batch off hold.
         send(supervisor, path + "/close", Map.of())

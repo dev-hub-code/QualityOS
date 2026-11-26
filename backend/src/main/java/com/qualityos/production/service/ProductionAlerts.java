@@ -3,6 +3,7 @@ package com.qualityos.production.service;
 import com.qualityos.common.mail.EmailContent;
 import com.qualityos.common.mail.EmailTemplate;
 import com.qualityos.common.security.Permissions;
+import com.qualityos.common.util.DayLabels;
 import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.notification.service.NotificationService;
@@ -42,8 +43,9 @@ class ProductionAlerts {
     }
 
     void workOrderSubmitted(WorkOrder order, String productCode) {
-        String summary = productCode + " × " + plain(order.getQuantity()) + ", planned " + com.qualityos.common.util.DayLabels.label(order.getPlannedStart())
-                + " to " + com.qualityos.common.util.DayLabels.label(order.getPlannedEnd());
+        String summary = productCode + " × " + plain(order.getQuantity())
+                + ", planned " + DayLabels.label(order.getPlannedStart())
+                + " to " + DayLabels.label(order.getPlannedEnd());
         atFacility(order.getFacilityId(), access.holdersOf(Permissions.WORK_ORDER_APPROVE),
                 NotificationType.WORK_ORDER_AWAITING_APPROVAL, order.getWorkOrderNumber() + " needs approval", summary,
                 WORK_ORDERS + order.getId(), approval(order.getWorkOrderNumber(), summary));
@@ -77,6 +79,14 @@ class ProductionAlerts {
         atFacility(order.getFacilityId(), access.holdersOf(Permissions.REWORK_APPROVE),
                 NotificationType.REWORK_AWAITING_APPROVAL, rework.getReworkNumber() + " needs approval", summary,
                 "/manufacturing/rework-orders/" + rework.getId(), approval(rework.getReworkNumber(), summary));
+    }
+
+    /** Reworked goods wait for a reinspection, which no inspection queue lists, so the inspectors are told. */
+    void reworkAwaitingInspection(ReworkOrder rework, WorkOrder order) {
+        notifications.notify(scope.allowedIn(order.getFacilityId(), access.holdersOf(Permissions.INSPECTION_CREATE)),
+                NotificationType.REWORK_AWAITING_INSPECTION, rework.getReworkNumber() + " is ready for reinspection",
+                plain(rework.getReworkedQuantity()) + " reworked from " + order.getWorkOrderNumber(),
+                "/manufacturing/rework-orders/" + rework.getId());
     }
 
     void qualityHold(WorkOrder order, String reason) {
@@ -118,7 +128,8 @@ class ProductionAlerts {
                 .toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
         atFacility(order.getFacilityId(), access.holdersOf(Permissions.WORK_ORDER_MANAGE),
                 NotificationType.WORK_ORDER_OVERDUE, order.getWorkOrderNumber() + " is past its planned end",
-                "Planned to end on " + order.getPlannedEnd() + ". " + summary, WORK_ORDERS + order.getId(),
+                "Planned to end on " + DayLabels.label(order.getPlannedEnd()) + ". " + summary,
+                WORK_ORDERS + order.getId(),
                 overdue(order.getWorkOrderNumber(), order.getPlannedEnd(), summary));
     }
 

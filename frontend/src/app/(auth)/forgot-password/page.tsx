@@ -34,7 +34,12 @@ export default function ForgotPasswordPage() {
     return <p className="text-sm">If that address has an account, a reset link is on its way. It works for one hour.</p>;
   }
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+    <form
+      // A message from the last attempt goes, even when this one stops in the browser.
+      onSubmit={(event) => {
+        setFormError("");
+        return handleSubmit(onSubmit)(event);
+      }} className="space-y-4" noValidate>
       <h1 className="text-lg font-medium">Reset your password</h1>
       <FormError message={formError} />
       {/* The sign-in page stays mounted but hidden after navigating here, so "email" would label its input. */}

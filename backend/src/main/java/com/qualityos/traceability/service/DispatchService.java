@@ -298,6 +298,7 @@ public class DispatchService {
                 .orElseThrow(() -> new BusinessRuleException("This batch does not exist."));
         scope.requireAllowed(batch.getFacilityId(), "Batch", batch.getId().toString());
         requireNoOutgoingInspection(batch);
+        production.requireWholeOfProduct(batch.getProductId(), line.quantity());
         batch.dispatch(line.quantity());
         DispatchItem item = items.saveAndFlush(new DispatchItem(dispatch.getId(), batch.getId(), line.quantity()));
         List<String> serials = line.serialNumbers() == null ? List.of() : line.serialNumbers();

@@ -223,10 +223,23 @@ public class MaterialService implements AttachmentPolicy {
         if (quantity == null || material.uomId() == null || quantity.stripTrailingZeros().scale() <= 0) {
             return;
         }
-        UnitOfMeasure unit = visibleUnit(material.uomId());
+        requireWholeInUnit(material.code(), material.uomId(), quantity);
+    }
+
+    /**
+     * Anything counted, in pieces or any other unit of the Count dimension, comes in whole numbers.
+     *
+     * @param what names the item in the message, such as its code
+     */
+    @Transactional(readOnly = true)
+    public void requireWholeInUnit(String what, UUID uomId, BigDecimal quantity) {
+        if (quantity == null || uomId == null || quantity.stripTrailingZeros().scale() <= 0) {
+            return;
+        }
+        UnitOfMeasure unit = visibleUnit(uomId);
         if ("Count".equalsIgnoreCase(unit.getDimension())) {
             throw new BusinessRuleException("%s is counted in %s, so give a whole number, not %s."
-                    .formatted(material.code(), unit.getCode(), quantity.stripTrailingZeros().toPlainString()));
+                    .formatted(what, unit.getCode(), quantity.stripTrailingZeros().toPlainString()));
         }
     }
 

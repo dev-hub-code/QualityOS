@@ -1,6 +1,7 @@
 package com.qualityos.subscription.service;
 
 import com.qualityos.common.report.HtmlPdf;
+import com.qualityos.common.util.DayLabels;
 import com.qualityos.subscription.entity.CreditNote;
 import com.qualityos.subscription.entity.Refund;
 import com.qualityos.subscription.entity.Subscription;
@@ -98,7 +99,7 @@ public class InvoicePdfRenderer {
         model.put("refund", refund == null ? List.of() : List.of(Map.of(
                 "how", Refund.GATEWAY.equals(refund.getProvider()) ? "to the original payment method" : "by bank transfer",
                 "state", switch (refund.getStatus()) {
-                    case SUCCEEDED -> "made on " + refund.getRefundedOn();
+                    case SUCCEEDED -> "made on " + DayLabels.label(refund.getRefundedOn());
                     case PENDING -> "in progress";
                     case FAILED -> "failed";
                 },

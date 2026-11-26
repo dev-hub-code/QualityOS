@@ -7,6 +7,7 @@ import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.common.util.DayLabels;
 import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.material.dto.MaterialDtos.MaterialReference;
@@ -431,6 +432,7 @@ public class WorkOrderService {
             throw new BusinessRuleException("The planned end cannot be before the planned start.");
         }
         order.setProductId(product.id());
+        materials.requireWholeInUnit(product.code(), product.uomId(), request.quantity());
         order.setUomId(product.uomId());
         order.setFacilityId(request.facilityId());
         order.setProductionLineId(request.productionLineId());
@@ -456,12 +458,12 @@ public class WorkOrderService {
             problems.add(kind.isEmpty()
                     ? "Choose whether %s is made by discrete or process manufacturing.".formatted(product.code())
                     : "%s has no approved %s in effect on %s.".formatted(product.code(),
-                            kind.get() == Bom.Kind.BOM ? "BOM" : "recipe", on));
+                            kind.get() == Bom.Kind.BOM ? "BOM" : "recipe", DayLabels.label(on)));
         }
         Routing routing = routings.findApprovedOn(order.getProductId(), on, RevisionedDefinition.Status.APPROVED)
                 .stream().findFirst().orElse(null);
         if (routing == null && settings.workOrderRequiresRouting()) {
-            problems.add("%s has no approved routing in effect on %s.".formatted(product.code(), on));
+            problems.add("%s has no approved routing in effect on %s.".formatted(product.code(), DayLabels.label(on)));
         }
         qualityGates.finalInspectionProblem(order.getProductId(), product.code(),
                 settings.rules().completionRequiresFinalInspection()).ifPresent(problems::add);

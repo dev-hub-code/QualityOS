@@ -31,6 +31,7 @@ import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.common.util.DayLabels;
 import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.notification.service.NotificationService;
@@ -414,7 +415,7 @@ public class InstrumentService implements AttachmentPolicy {
         }
         if (instrument.getNextDueOn().isBefore(today())) {
             throw new BusinessRuleException("%s is overdue for calibration, since %s.".formatted(
-                    instrument.getInstrumentCode(), instrument.getNextDueOn()));
+                    instrument.getInstrumentCode(), DayLabels.label(instrument.getNextDueOn())));
         }
         return option(instrument);
     }
@@ -483,7 +484,7 @@ public class InstrumentService implements AttachmentPolicy {
             }
             if (instrument.getNextDueOn().isBefore(today)) {
                 throw new BusinessRuleException("%s is overdue for calibration, since %s.".formatted(
-                        instrument.getInstrumentCode(), instrument.getNextDueOn()));
+                        instrument.getInstrumentCode(), DayLabels.label(instrument.getNextDueOn())));
             }
             usages.save(new InstrumentUsage(id, inspectionId, inspectionNumber, today));
         }

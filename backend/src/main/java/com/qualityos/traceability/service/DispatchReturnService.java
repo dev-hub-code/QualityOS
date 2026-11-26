@@ -220,6 +220,9 @@ public class DispatchReturnService {
         request.items().forEach(line -> {
             List<String> serials = line.serialNumbers() == null ? List.of() : line.serialNumbers();
             requireSerials(line, serials, alreadyReturned);
+            UUID batchId = lines.get(line.dispatchItemId()).getProductionBatchId();
+            batches.findById(batchId).ifPresent(batch ->
+                    production.requireWholeOfProduct(batch.getProductId(), line.quantity()));
             alreadyReturned.addAll(serials);
             reversalItems.save(new DispatchReversalItem(reversal.getId(), line.dispatchItemId(),
                     lines.get(line.dispatchItemId()).getProductionBatchId(), line.quantity(), serials, request.isExpected()));

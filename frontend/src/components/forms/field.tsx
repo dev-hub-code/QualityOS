@@ -1,4 +1,6 @@
-import type { ComponentProps } from "react";
+"use client";
+
+import { type ComponentProps, useEffect, useRef } from "react";
 import type { FieldError } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,10 +31,15 @@ export function Field({ label, id, error, ...inputProps }: FieldProps) {
   );
 }
 
+/** Sits at the top of a form, so it brings itself into view: in a long dialog, Save is far below it. */
 export function FormError({ message }: { message?: string | null }) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (message) ref.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  }, [message]);
   if (!message) return null;
   return (
-    <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+    <p ref={ref} role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
       {message}
     </p>
   );

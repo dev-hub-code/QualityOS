@@ -151,14 +151,17 @@ public class StockTransferService {
                     if (line.lotId() != null) {
                         LotView lot = receipts.transferOut(line.lotId(), line.quantity());
                         if (!lot.facilityId().equals(from)) {
-                            throw new BusinessRuleException("Batch " + lot.internalBatch() + " is at another plant.");
+                            throw new BusinessRuleException(
+                                    "Lot " + lot.internalBatch() + " is not at the plant it is sent from.");
                         }
                         lines.save(StockTransferItem.ofLot(transfer.getId(), line.lotId(), line.quantity()));
                     } else {
                         ProductionBatch batch = lockBatch(line.batchId());
                         if (!batch.getFacilityId().equals(from)) {
-                            throw new BusinessRuleException("Batch " + batch.getBatchNumber() + " is at another plant.");
+                            throw new BusinessRuleException(
+                                    "Batch " + batch.getBatchNumber() + " is not at the plant it is sent from.");
                         }
+                        production.requireWholeOfProduct(batch.getProductId(), line.quantity());
                         batch.transferOut(line.quantity());
                         lines.save(StockTransferItem.ofBatch(transfer.getId(), line.batchId(), line.quantity()));
                     }

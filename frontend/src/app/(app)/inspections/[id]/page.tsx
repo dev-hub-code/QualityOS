@@ -273,7 +273,8 @@ function Execution({
           title={parameter.name}
           action={
             parameter.criticality === "CRITICAL" ? (
-              <StatusBadge status="HOLD" />
+              // What a failure here does, not a state: the parameter itself may well pass.
+              <StatusBadge status="HOLD" label="critical: a failure holds the batch" />
             ) : undefined
           }
         >

@@ -187,6 +187,13 @@ class AdvancedManufacturingIT extends TraceabilityFixture {
         String manual = idOf(body(send(supervisor, "/downtime", power).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.minutes").value("20.0"))
                 .andExpect(jsonPath("$.data.planned").value(false))));
+        // The same minutes are not down twice over.
+        Map<String, Object> again = new HashMap<>(power);
+        again.put("startedAt", hourAgo.plus(10, ChronoUnit.MINUTES).toString());
+        again.put("endedAt", hourAgo.plus(40, ChronoUnit.MINUTES).toString());
+        send(supervisor, "/downtime", again)
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(containsString("already has a stop from")));
         power.put("startedAt", Instant.now().plus(1, ChronoUnit.DAYS).toString());
         power.remove("endedAt");
         send(supervisor, "/downtime", power)

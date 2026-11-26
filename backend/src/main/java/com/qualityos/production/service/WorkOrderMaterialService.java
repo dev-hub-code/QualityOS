@@ -141,6 +141,7 @@ public class WorkOrderMaterialService {
             throw new BusinessRuleException("Line %d is a sub-assembly. It is issued from its batches, not reserved."
                     .formatted(line.getLineNumber()));
         }
+        requireWhole(line, request.quantity());
         Coverage coverage = coverage(order).get(line.getId());
         if (request.quantity().compareTo(coverage.outstanding()) > 0) {
             throw new BusinessRuleException("Line %d needs only %s more.".formatted(
@@ -255,6 +256,7 @@ public class WorkOrderMaterialService {
         if ((request.lotId() == null) == (request.sourceBatchId() == null)) {
             throw new BusinessRuleException("Choose one lot or batch to issue from.");
         }
+        requireWhole(line, request.quantity());
         Coverage coverage = coverage(order).get(line.getId());
         if (!settings.rules().allowOverIssue()
                 && coverage.issued().add(request.quantity()).compareTo(line.getRequiredQuantity()) > 0) {
@@ -310,6 +312,10 @@ public class WorkOrderMaterialService {
         audit.record("WORK_ORDER_MATERIAL_ISSUED", ENTITY, id, null, Map.of(
                 "line", line.getLineNumber(), "quantity", request.quantity().toPlainString(), "entries", issue.entries));
         return view(order);
+    }
+
+    private void requireWhole(WorkOrderMaterial line, BigDecimal quantity) {
+        materials.requireWholeInUnit("Line " + line.getLineNumber(), line.getUomId(), quantity);
     }
 
     /** Gives back part or all of one consumption to where it came from. The genealogy keeps what stayed used. */

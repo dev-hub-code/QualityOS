@@ -1,6 +1,6 @@
 "use client";
 
-import { formatCalendarDay } from "@/lib/dates";
+import { formatCalendarDay, today } from "@/lib/dates";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
 import { AttachmentPanel } from "@/components/records/attachment-panel";
@@ -164,6 +164,7 @@ export function ContactTable({
         <RecordDialog
           title={`Contact attempt: ${active.contact.customerName}`}
           fields={ATTEMPT_FIELDS}
+          record={{ attemptedOn: today() }}
           onClose={close}
           onSubmit={async ({ attemptedOn, ...values }) => {
             await api.post(`${customer(active.contact)}/contact-attempts`, {
@@ -178,6 +179,7 @@ export function ContactTable({
         <RecordDialog
           title={`Acknowledgement: ${active.contact.customerName}`}
           fields={ACKNOWLEDGEMENT_FIELDS}
+          record={{ acknowledgedOn: today() }}
           onClose={close}
           onSubmit={async (values) => {
             await api.post(`${base}/acknowledgements`, { ...values, customerId: active.contact.customerId });

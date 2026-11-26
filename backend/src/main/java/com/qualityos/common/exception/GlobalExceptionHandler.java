@@ -56,8 +56,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return validationFailure(violations);
     }
 
+    /** An id in the path that is not one at all, such as a mistyped link, names no record rather than a bad form. */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     ResponseEntity<ApiResponse<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        if (ex.getParameter().hasParameterAnnotation(org.springframework.web.bind.annotation.PathVariable.class)
+                && java.util.UUID.class.equals(ex.getRequiredType())) {
+            ErrorCode code = ErrorCode.RESOURCE_NOT_FOUND;
+            return respond(code, new ApiError(code.name(), "Nothing was found at this address."));
+        }
         return validationFailure(List.of(new FieldViolation(ex.getName(), "Invalid value")));
     }
 

@@ -363,6 +363,9 @@ public class ReworkService {
                 });
         requireWhole(locked.order(), List.of(request.reworkedQuantity(), request.scrappedQuantity()));
         rework.complete(request.reworkedQuantity(), request.scrappedQuantity(), Instant.now());
+        if (rework.getStatus() == Status.AWAITING_INSPECTION) {
+            alerts.reworkAwaitingInspection(rework, locked.order());
+        }
         return changed(rework, from, "Reworked %s, scrapped %s".formatted(plain(request.reworkedQuantity()),
                 plain(request.scrappedQuantity())), "REWORK_ORDER_COMPLETED");
     }

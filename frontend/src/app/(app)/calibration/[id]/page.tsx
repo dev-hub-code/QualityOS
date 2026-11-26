@@ -1,6 +1,6 @@
 "use client";
 
-import { formatCalendarDay } from "@/lib/dates";
+import { formatCalendarDay, today } from "@/lib/dates";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -143,6 +143,7 @@ export default function InstrumentPage() {
         <RecordDialog
           title="Record calibration"
           fields={CALIBRATION_FIELDS}
+          record={{ calibratedOn: today() }}
           onClose={close}
           onSubmit={async (values) => {
             await api.post(`${path}/calibrations`, values);

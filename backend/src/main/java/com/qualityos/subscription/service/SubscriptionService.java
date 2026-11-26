@@ -6,6 +6,7 @@ import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.mail.EmailTemplate;
 import com.qualityos.common.persistence.DocumentNumberService;
+import com.qualityos.common.util.DayLabels;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.common.mail.EmailContent;
 import com.qualityos.notification.service.NotificationService;
@@ -287,7 +288,7 @@ public class SubscriptionService {
         invoices.saveAndFlush(invoice);
         notifications.notify(access.holdersOf(PlanAccess.SUBSCRIPTION_MANAGE), NotificationType.RENEWAL_INVOICE,
                 "Renewal invoice", "Invoice " + invoice.getInvoiceNumber() + " for ₹" + invoice.getTotal()
-                        + " renews the " + plan.getName() + " plan. Pay it by " + invoice.getDueOn()
+                        + " renews the " + plan.getName() + " plan. Pay it by " + DayLabels.label(invoice.getDueOn())
                         + " to keep working without a break.", LINK,
                 new EmailContent(EmailTemplate.RENEWAL_INVOICE, Map.of(
                         "invoiceNumber", invoice.getInvoiceNumber(), "amount", "₹" + invoice.getTotal(),
@@ -538,7 +539,8 @@ public class SubscriptionService {
                     invoice.setOverdueNotifiedAt(Instant.now());
                     notifications.notify(access.holdersOf(PlanAccess.SUBSCRIPTION_MANAGE), NotificationType.INVOICE_OVERDUE,
                             "Invoice overdue", "Invoice " + invoice.getInvoiceNumber() + " was due on "
-                                    + invoice.getDueOn() + ". Please pay it to keep your subscription.", LINK,
+                                    + DayLabels.label(invoice.getDueOn())
+                                    + ". Please pay it to keep your subscription.", LINK,
                             new EmailContent(EmailTemplate.INVOICE_OVERDUE, Map.of(
                                     "invoiceNumber", invoice.getInvoiceNumber(),
                                     "dueDate", invoice.getDueOn().toString())));

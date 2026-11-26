@@ -79,6 +79,20 @@ class EvaluationEngineTest {
     }
 
     @Test
+    void aYesNoAnswerWrittenAsAWordIsReadAsOne() {
+        // Templates saved before the answer was a choice say "Yes" or "No"; read as false, every good answer failed.
+        ParameterSpec yes = spec(DataType.BOOLEAN, null, null, null, null, "Yes", Criticality.CRITICAL);
+        ParameterSpec no = spec(DataType.BOOLEAN, null, null, null, null, " no ", Criticality.MINOR);
+        ParameterSpec unclear = spec(DataType.BOOLEAN, null, null, null, null, "maybe", Criticality.MINOR);
+
+        assertThat(EvaluationEngine.evaluate(yes, new Value(null, null, true, null))).isEqualTo(Evaluation.PASS);
+        assertThat(EvaluationEngine.evaluate(yes, new Value(null, null, false, null))).isEqualTo(Evaluation.FAIL);
+        assertThat(EvaluationEngine.evaluate(no, new Value(null, null, false, null))).isEqualTo(Evaluation.PASS);
+        assertThat(EvaluationEngine.evaluate(unclear, new Value(null, null, true, null)))
+                .isEqualTo(Evaluation.PENDING_REVIEW);
+    }
+
+    @Test
     void oneFailedCriticalSampleFailsEvenWithinTheAcceptanceNumber() {
         ParameterSpec critical = spec(DataType.NUMERIC, null, "1", "2", null, null, Criticality.CRITICAL);
 

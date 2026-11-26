@@ -12,7 +12,7 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { Dispatch, DispatchReturn } from "@/lib/types";
-import { formatCalendarDay } from "@/lib/dates";
+import { formatCalendarDay, today } from "@/lib/dates";
 
 interface Complaint {
   id: string;
@@ -53,6 +53,7 @@ function ComplaintDialog({ dispatch, onClose }: { dispatch: Dispatch; onClose: (
     <RecordDialog
       title={`Record complaint about ${dispatch.dispatchNumber}`}
       fields={fields}
+      record={{ receivedOn: today() }}
       onClose={onClose}
       onSubmit={(values) =>
         api

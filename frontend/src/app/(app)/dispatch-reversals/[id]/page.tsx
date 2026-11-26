@@ -1,6 +1,6 @@
 "use client";
 
-import { formatCalendarDay } from "@/lib/dates";
+import { formatCalendarDay, today } from "@/lib/dates";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -68,6 +68,7 @@ export default function DispatchReversalPage() {
         <RecordDialog
           title="Goods received"
           fields={RECEIVE_FIELDS}
+          record={{ receivedOn: today() }}
           onClose={() => setReceiving(false)}
           onSubmit={(values) => api.post(`${path}/receive`, values).then(refresh)}
         />

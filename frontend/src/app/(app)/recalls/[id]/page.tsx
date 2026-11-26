@@ -417,7 +417,7 @@ export default function RecallPage() {
             {history.map((entry) => (
               <li key={entry.id} className="py-2">
                 <p>
-                  {entry.on} · {entry.customerName} · {entry.kindLabel}
+                  {formatCalendarDay(entry.on)} · {entry.customerName} · {entry.kindLabel}
                   {entry.outcomeLabel && ` · ${entry.outcomeLabel}`}
                 </p>
                 {entry.customerResponse && (

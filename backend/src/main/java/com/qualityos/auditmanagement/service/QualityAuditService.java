@@ -28,6 +28,7 @@ import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.common.util.DayLabels;
 import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.identity.service.TenantAccessService;
@@ -231,7 +232,7 @@ public class QualityAuditService implements AttachmentPolicy {
         for (QualityAudit row : due) {
             row.reminded(now);
             notifications.notify(Set.of(row.getLeadAuditorId()), NotificationType.AUDIT_DUE_SOON,
-                    row.getAuditNumber() + " is on " + row.getPlannedOn(), row.getTitle(), link(row),
+                    row.getAuditNumber() + " is on " + DayLabels.label(row.getPlannedOn()), row.getTitle(), link(row),
                     new EmailContent(EmailTemplate.AUDIT_DUE_SOON, Map.of(
                             "auditNumber", row.getAuditNumber(),
                             "auditTitle", row.getTitle(),
@@ -269,6 +270,11 @@ public class QualityAuditService implements AttachmentPolicy {
         row.requireInProgress();
         AuditItem item = items.findByIdAndAuditId(itemId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Audit item", itemId.toString()));
+        if (request.result() == AuditItem.Result.CONFORMING && findings.findByAuditIdOrderByCreatedAt(id).stream()
+                .anyMatch(finding -> itemId.equals(finding.getAuditItemId()) && finding.getGrade().isNonconformity())) {
+            throw new BusinessRuleException("Question " + item.getPosition()
+                    + " has a nonconformity recorded against it, so it cannot be answered Conforming.");
+        }
         item.answer(request.result(), request.note());
         return toDetail(row);
     }
@@ -278,11 +284,18 @@ public class QualityAuditService implements AttachmentPolicy {
     public AuditDetail addFinding(UUID id, FindingRequest request) {
         QualityAudit row = load(id);
         row.requireInProgress();
-        if (request.auditItemId() != null && items.findByIdAndAuditId(request.auditItemId(), id).isEmpty()) {
-            throw new ResourceNotFoundException("Audit item", request.auditItemId().toString());
+        AuditItem item = request.auditItemId() == null ? null : items.findByIdAndAuditId(request.auditItemId(), id)
+                .orElseThrow(() -> new ResourceNotFoundException("Audit item", request.auditItemId().toString()));
+        if (item != null && request.grade().isNonconformity() && item.getResult() == AuditItem.Result.CONFORMING) {
+            throw new BusinessRuleException("Question " + item.getPosition()
+                    + " was answered Conforming. Change its answer before recording a nonconformity against it.");
         }
+        // A finding against a question cites the question's clause unless the auditor names another.
+        String clause = request.clauseReference() == null || request.clauseReference().isBlank()
+                ? item == null ? null : item.getClauseReference()
+                : request.clauseReference().trim();
         AuditFinding finding = findings.saveAndFlush(new AuditFinding(id, request.auditItemId(), request.grade(),
-                request.statement().trim(), request.evidence().trim(), request.clauseReference()));
+                request.statement().trim(), request.evidence().trim(), clause));
         audit.record("AUDIT_FINDING_RECORDED", ENTITY, id, null, Map.of("grade", request.grade().name()));
         if (request.grade().isNonconformity()) {
             raise(row, finding);
@@ -428,7 +441,8 @@ public class QualityAuditService implements AttachmentPolicy {
 
     private void tellLead(QualityAudit row) {
         notifications.notify(Set.of(row.getLeadAuditorId()), NotificationType.AUDIT_SCHEDULED,
-                row.getAuditNumber() + " is scheduled", row.getTitle() + " on " + row.getPlannedOn() + ".", link(row),
+                row.getAuditNumber() + " is scheduled",
+                row.getTitle() + " on " + DayLabels.label(row.getPlannedOn()) + ".", link(row),
                 new EmailContent(EmailTemplate.AUDIT_SCHEDULED, Map.of(
                         "auditNumber", row.getAuditNumber(), "dueDate", row.getPlannedOn().toString())));
     }

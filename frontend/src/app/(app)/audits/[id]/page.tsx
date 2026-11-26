@@ -68,7 +68,7 @@ export default function AuditPage() {
       },
       { name: "statement", label: "Finding", type: "textarea", required: true },
       { name: "evidence", label: "Objective evidence", type: "textarea", required: true },
-      { name: "clauseReference", label: "Clause" },
+      { name: "clauseReference", label: "Clause, if not the question's own" },
     ],
   };
   return (

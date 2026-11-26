@@ -10,6 +10,7 @@ import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.mail.EmailContent;
 import com.qualityos.common.mail.EmailTemplate;
 import com.qualityos.common.security.Permissions;
+import com.qualityos.common.util.DayLabels;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.notification.service.NotificationService;
 import com.qualityos.notification.service.NotificationType;
@@ -147,6 +148,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
         for (ReceiptItemRequest item : request.items()) {
             ReceiptLine line = lines.get(item.purchaseOrderItemId());
             MaterialReference material = referenced.get(line.materialId());
+            materials.requireWholeIfCounted(material, item.quantity());
             MaterialReceiptItem lot = new MaterialReceiptItem(
                     receipt,
                     line.itemId(),
@@ -171,7 +173,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
                 : material.shelfLifeDays() == null ? null : receivedOn.plusDays(material.shelfLifeDays());
         if (expiry != null && expiry.isBefore(receivedOn)) {
             throw new BusinessRuleException("%s (%s) expired on %s, before it was received."
-                    .formatted(item.supplierBatch().trim(), material.code(), expiry));
+                    .formatted(item.supplierBatch().trim(), material.code(), DayLabels.label(expiry)));
         }
         return expiry;
     }
@@ -251,6 +253,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
     public LotView transferOut(UUID itemId, BigDecimal quantity) {
         MaterialReceiptItem item = lockUsable(itemId);
         item.requireNotExpired(today());
+        materials.requireWholeInUnit("Batch " + item.getInternalBatch(), item.getUomId(), quantity);
         item.transferOut(quantity);
         items.flush();
         return lots(List.of(item)).getFirst();
@@ -418,6 +421,9 @@ public class MaterialReceiptService implements AttachmentPolicy {
             receipt.getItems().forEach(line -> affected.add(line.getId()));
         }
         if (correction.quantity() != null) {
+            UUID materialId = correction.materialId() != null ? correction.materialId() : item.getMaterialId();
+            materials.requireWholeIfCounted(materials.references(List.of(materialId)).get(materialId),
+                    correction.quantity());
             BigDecimal change = correction.quantity().subtract(item.getQuantity());
             Map<UUID, BigDecimal> moved = Map.of(item.getPurchaseOrderItemId(), change.abs());
             if (change.signum() > 0) {

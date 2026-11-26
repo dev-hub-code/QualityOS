@@ -1,8 +1,10 @@
 package com.qualityos;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -152,6 +154,24 @@ class AuditManagementIT extends TraceabilityFixture {
         complete(audit).andExpect(status().isUnprocessableEntity());
         finding(audit, itemId(audit, 0), "MINOR_NONCONFORMITY").andExpect(status().isCreated());
         complete(audit).andExpect(status().isOk());
+    }
+
+    @Test
+    void aFindingAgainstAQuestionCitesItsClauseAndAgreesWithItsAnswer() throws Exception {
+        String audit = started();
+        String gauges = itemId(audit, 0);
+        answer(audit, 0, "CONFORMING");
+        finding(audit, gauges, "MAJOR_NONCONFORMITY").andExpect(status().isUnprocessableEntity())
+                .andExpect(content().string(containsString("was answered Conforming")));
+
+        answer(audit, 0, "NONCONFORMING");
+        finding(audit, gauges, "MINOR_NONCONFORMITY").andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.findings[0].clauseReference").value("7.1.5"));
+        as(owner, put(AUDITS + "/" + audit + "/items/" + gauges).contentType("application/json")
+                        .content(json.writeValueAsString(Map.of("result", "CONFORMING"))))
+                .andExpect(status().isUnprocessableEntity());
+        // An observation on a conforming question is fine.
+        finding(audit, itemId(audit, 1), "OBSERVATION").andExpect(status().isCreated());
     }
 
     @Test

@@ -83,10 +83,18 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void wrongPathVariableTypeIsAValidationFailure() throws Exception {
+    void aPathIdThatIsNoIdNamesNoRecord() throws Exception {
+        // A mistyped link, such as /ncrs/new, used to read "Request validation failed".
         mvc.perform(get("/test/items/not-a-uuid"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error.code").value("RESOURCE_NOT_FOUND"));
+    }
+
+    @Test
+    void aQueryParameterOfTheWrongTypeIsStillAValidationFailure() throws Exception {
+        mvc.perform(get("/test/count?size=many"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.violations[0].field").value("id"));
+                .andExpect(jsonPath("$.error.violations[0].field").value("size"));
     }
 
     @Test
@@ -202,6 +210,10 @@ class GlobalExceptionHandlerTest {
 
         @GetMapping("/test/items/{id}")
         void item(@PathVariable UUID id) {
+        }
+
+        @GetMapping("/test/count")
+        void count(@RequestParam int size) {
         }
 
         @GetMapping("/test/stale")

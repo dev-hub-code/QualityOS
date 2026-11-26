@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { ApiError } from "@/lib/api";
 import { FACILITY_FIELDS } from "@/lib/record-fields";
 import { RecordDialog } from "./record-dialog";
 
@@ -115,5 +116,30 @@ describe("RecordDialog's state from GSTIN", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByText(/Not a valid GSTIN/)).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+});
+
+describe("RecordDialog's form error", () => {
+  it("drops a server error once the form is tried again and fails in the browser", async () => {
+    const onSubmit = vi.fn(async () => {
+      throw new ApiError(422, "BUSINESS_RULE_VIOLATION", "The GSTIN is registered in Maharashtra, not in Tamil Nadu.");
+    });
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RecordDialog
+          title="Thing"
+          fields={[{ name: "name", label: "Name", required: true }]}
+          record={{ name: "Hosur" }}
+          onSubmit={onSubmit}
+          onClose={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText(/registered in Maharashtra/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByText(/registered in Maharashtra/)).not.toBeInTheDocument());
+    expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 });

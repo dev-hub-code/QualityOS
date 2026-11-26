@@ -179,7 +179,15 @@ export function RecordDialog({ title, fields, record, onSubmit, onClose, extra }
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(submit)} className="space-y-4" noValidate>
+        <form
+          onSubmit={(event) => {
+            // A server error from an earlier try no longer applies once the values change.
+            setFormError("");
+            return handleSubmit(submit)(event);
+          }}
+          className="space-y-4"
+          noValidate
+        >
           <FormError message={formError} />
           {fields.map((field) => {
             const id = `field-${field.name}`;

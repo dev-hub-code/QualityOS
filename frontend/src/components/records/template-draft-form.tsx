@@ -9,6 +9,7 @@ import { Section, useRefresh, useUnits } from "@/components/records/parts";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
+import { yesNoValue } from "@/lib/inspection";
 import { formatQuantity } from "@/lib/record-form";
 import { templateDraftSchema, type TemplateDraftValues } from "@/lib/schemas";
 import type { ParameterSpec, TemplateVersion } from "@/lib/types";
@@ -42,7 +43,8 @@ function toParameterValues(parameter: ParameterSpec): TemplateDraftValues["param
     maxValue: formatQuantity(parameter.maxValue),
     nominalValue: formatQuantity(parameter.nominalValue),
     tolerance: formatQuantity(parameter.tolerance),
-    expectedText: parameter.expectedText ?? "",
+    expectedText:
+      parameter.dataType === "BOOLEAN" ? yesNoValue(parameter.expectedText) : (parameter.expectedText ?? ""),
     inspectionMethod: parameter.inspectionMethod ?? "",
   };
 }
@@ -111,7 +113,12 @@ export function TemplateDraftForm({ templateId, draft }: { templateId: string; d
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+    <form
+      // A message from the last attempt goes, even when this one stops in the browser.
+      onSubmit={(event) => {
+        setFormError("");
+        return handleSubmit(onSubmit)(event);
+      }} className="space-y-6" noValidate>
       <FormError message={formError} />
       <Section title={`Draft version ${draft.versionNumber}`}>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -221,12 +228,19 @@ export function TemplateDraftForm({ templateId, draft }: { templateId: string; d
                   </div>
                 </>
               ) : (
-                dataType !== "DATE" && (
-                  <Field
-                    label={dataType === "BOOLEAN" ? "Expected (true or false)" : "Expected text"}
-                    id={`expected-${index}`}
-                    {...register(`parameters.${index}.expectedText`)}
-                  />
+                dataType === "BOOLEAN" ? (
+                  <div className="space-y-1.5">
+                    <Label htmlFor={`expected-${index}`}>Expected answer</Label>
+                    <select id={`expected-${index}`} className={SELECT_CLASS} {...register(`parameters.${index}.expectedText`)}>
+                      <option value="">Reviewer decides</option>
+                      <option value="true">Yes</option>
+                      <option value="false">No</option>
+                    </select>
+                  </div>
+                ) : (
+                  dataType !== "DATE" && (
+                    <Field label="Expected text" id={`expected-${index}`} {...register(`parameters.${index}.expectedText`)} />
+                  )
                 )
               )}
               <div className="space-y-1.5">

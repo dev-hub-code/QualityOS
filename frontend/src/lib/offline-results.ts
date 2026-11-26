@@ -66,6 +66,9 @@ function write(queue: Queue): boolean {
   return kept;
 }
 
+/** Only inspection results are kept on the device. Anything else saved without a connection is simply not saved. */
+export const NOT_SAVED_OFFLINE = "No connection, so this was not saved. Try again when you are back online.";
+
 /** True when a request failed for want of a connection, not because the server refused it. */
 export function isConnectionLost(error: unknown): boolean {
   if (error instanceof ApiError) return false;

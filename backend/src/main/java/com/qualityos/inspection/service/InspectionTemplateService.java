@@ -339,6 +339,13 @@ public class InspectionTemplateService {
                 tier.size() == 1 ? tier.getFirst().getId() : null);
     }
 
+    /** Whether a published final (FQC) template fits the product, its own or a general one, so a final inspection can be done. */
+    @Transactional(readOnly = true)
+    public boolean hasFinalTemplateFor(UUID productId) {
+        Set<InspectionTemplate.Type> fqc = Set.of(InspectionTemplate.Type.FQC);
+        return !applicable(null, productId, fqc, fqc).templates().isEmpty();
+    }
+
     private static boolean isGeneral(InspectionTemplate template) {
         return template.getMaterialId() == null && template.getProductId() == null;
     }

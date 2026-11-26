@@ -8,6 +8,7 @@ import { useState } from "react";
 import { AttachmentPanel } from "@/components/records/attachment-panel";
 import {
   Details,
+  lookupAll,
   PageHeader,
   QueryState,
   RecordLink,
@@ -60,6 +61,13 @@ export default function NcrPage() {
   const statusLabel = useNcrStatusLabel();
   const [step, setStep] = useState<Step | null>(null);
   const [raisingCapa, setRaisingCapa] = useState(false);
+  const [linkingCapa, setLinkingCapa] = useState(false);
+  // Existing CAPAs, to link one that shares this NCR's root cause instead of raising a duplicate.
+  const { data: existingCapas = [] } = useQuery({
+    queryKey: ["/capas", "lookup"],
+    queryFn: () => lookupAll<{ id: string; capaNumber: string; title: string; status: string }>("/capas"),
+    enabled: linkingCapa,
+  });
   const { data: ncr, error } = useQuery({
     queryKey: [path],
     queryFn: () => api.get<Ncr>(path),
@@ -201,6 +209,11 @@ export default function NcrPage() {
             Raise CAPA
           </Button>
         )}
+        {canAssign && !finished && status !== "PENDING_VERIFICATION" && (
+          <Button variant="outline" onClick={() => setLinkingCapa(true)}>
+            Link existing CAPA
+          </Button>
+        )}
         {steps.map((candidate) => (
           <Button
             key={candidate.action}
@@ -321,6 +334,25 @@ export default function NcrPage() {
           onSubmit={(values) =>
             api.post(`${path}/${step.action}`, values).then(refresh)
           }
+        />
+      )}
+      {linkingCapa && (
+        <RecordDialog
+          title="Link an existing CAPA"
+          fields={[
+            {
+              name: "capaId",
+              label: "CAPA",
+              type: "select",
+              required: true,
+              options: existingCapas
+                .filter((capa) => capa.status !== "CANCELLED" && !ncr.capas.some((linked) => linked.id === capa.id))
+                .map((capa) => ({ value: capa.id, label: `${capa.capaNumber} – ${capa.title} (${capa.status.toLowerCase().replaceAll("_", " ")})` })),
+            },
+            { name: "note", label: "Why it answers this NCR (the shared root cause)", type: "textarea", required: true },
+          ]}
+          onClose={() => setLinkingCapa(false)}
+          onSubmit={(values) => api.post(`${path}/capas`, values).then(refresh)}
         />
       )}
       {raisingCapa && (

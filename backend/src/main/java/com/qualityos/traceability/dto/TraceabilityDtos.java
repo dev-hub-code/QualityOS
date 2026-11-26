@@ -26,7 +26,7 @@ public final class TraceabilityDtos {
     public record SaveCustomerRequest(
             @NotBlank @Size(max = 50) String code,
             @NotBlank @Size(max = 200) String name,
-            @Size(max = 15) String gstin,
+            @Size(max = 15) @com.qualityos.common.validation.Gstin String gstin,
             @Size(max = 200) String contactPerson,
             @Email @Size(max = 254) String email,
             @Size(max = 30) String phone,
@@ -339,8 +339,13 @@ public final class TraceabilityDtos {
             String fromBatch, String toBatch, @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity) {
     }
 
+    /** @param dateOnly the event has a day but no time, such as a receipt dated by its GRN: show the day alone */
     public record TimelineEvent(
-            Instant at, String kind, String title, String batchNumber, String status, String link) {
+            Instant at, String kind, String title, String batchNumber, String status, String link, boolean dateOnly) {
+
+        public TimelineEvent(Instant at, String kind, String title, String batchNumber, String status, String link) {
+            this(at, kind, title, batchNumber, status, link, false);
+        }
     }
 
     /**

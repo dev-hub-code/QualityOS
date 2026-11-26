@@ -92,6 +92,18 @@ class ProductionAlerts {
                 reason, "/manufacturing/shop-floor/" + operation.getId(), stopped(where, reason));
     }
 
+    /** A reading outside its limits goes to the production supervisors and quality, who decide what to do with it. */
+    void readingOutOfLimits(WorkOrder order, WorkOrderOperation operation, String parameter, String reading,
+            String comment) {
+        String where = order.getWorkOrderNumber() + " operation " + operation.getSequence();
+        Set<UUID> people = new HashSet<>(supervisors());
+        people.addAll(access.holdersOf(Permissions.NCR_CREATE));
+        String body = parameter + " read " + reading + ". " + comment;
+        atFacility(order.getFacilityId(), people, NotificationType.PROCESS_OUT_OF_LIMITS,
+                parameter + " is outside its limits on " + where, body,
+                "/manufacturing/shop-floor/" + operation.getId(), stopped(where, body));
+    }
+
     void machineBrokeDown(Machine machine, UUID facilityId, String reason) {
         String where = machine.getCode() + " – " + machine.getName();
         String why = reason == null || reason.isBlank() ? "breakdown" : reason.trim();

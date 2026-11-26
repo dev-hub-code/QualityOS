@@ -41,6 +41,11 @@ public class ManufacturingSettingsController {
         return ApiResponse.ok(settings.update(request));
     }
 
+    @GetMapping("/products/models")
+    public ApiResponse<com.qualityos.production.dto.ManufacturingDtos.ProductModels> productModels() {
+        return ApiResponse.ok(settings.productModels());
+    }
+
     @GetMapping("/products/{productId}/settings")
     public ApiResponse<ProductSettingsResponse> getProduct(@PathVariable UUID productId) {
         return ApiResponse.ok(settings.getProduct(productId));

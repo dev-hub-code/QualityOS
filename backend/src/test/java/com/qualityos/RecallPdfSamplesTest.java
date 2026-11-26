@@ -78,7 +78,8 @@ class RecallPdfSamplesTest {
         List<NcrHistory> ncrs = List.of();
         return new RecallReport("Acme Forgings", "Acme Forgings Private Limited",
                 "Gat 121, Chakan Industrial Area, Pune 410501", "27ABCDE1234F1Z5", Instant.parse("2026-10-31T06:30:00Z"),
-                "31 Oct 2026, 12:00 IST", detail, products, customers, lines, serials, inspections, ncrs, history);
+                "31 Oct 2026, 12:00 IST", detail, products, customers, lines, serials, inspections, ncrs, history,
+                detail.closedAt() == null ? null : "31 Oct 2026, 12:00 IST");
     }
 
     private static HistoryEntry entry(String customer, String method, String outcome, String response, int day) {

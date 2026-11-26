@@ -526,7 +526,15 @@ public class ReworkService {
                         .map(change -> new ReworkHistory(change.getFromStatus(), change.getToStatus(),
                                 change.getReason(), change.getCreatedBy(), members.get(change.getCreatedBy()),
                                 change.getCreatedAt()))
-                        .toList());
+                        .toList(),
+                settings.separateApprover() && !reviewPolicy.selfReviewInEffect()
+                        && Objects.equals(rework.getCreatedBy(), TenantContext.getCurrentUserId()),
+                finalInspectable(production.batch(rework.getProductionBatchId())));
+    }
+
+    /** As the batch allows a final inspection: produced, and completed or held after completion. */
+    private static boolean finalInspectable(com.qualityos.traceability.dto.TraceabilityDtos.ProductionBatchView batch) {
+        return batch.producedQuantity() != null && ("COMPLETED".equals(batch.status()) || "ON_HOLD".equals(batch.status()));
     }
 
     static GateInspection gateInspection(InspectionHistory inspection) {

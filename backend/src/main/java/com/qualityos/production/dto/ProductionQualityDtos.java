@@ -203,6 +203,10 @@ public final class ProductionQualityDtos {
             GateInspection reinspection,
             Instant closedAt,
             List<StepResponse> steps,
-            List<ReworkHistory> history) {
+            List<ReworkHistory> history,
+            /* The viewer raised it and approval is separated: someone else approves it. */
+            boolean othersMustApprove,
+            /* The batch has been completed, so a final inspection can check it. */
+            boolean batchCompleted) {
     }
 }

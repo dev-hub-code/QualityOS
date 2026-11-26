@@ -357,9 +357,9 @@ public class ShopFloorService implements AttachmentPolicy {
         BigDecimal setup = request == null ? null : request.setupMinutes();
         if (setup != null && setup.multiply(BigDecimal.valueOf(60))
                 .compareTo(BigDecimal.valueOf(operation.runningSecondsAt(now))) > 0) {
-            throw new BusinessRuleException("Setting up cannot have taken longer than the %s minutes the operation ran."
-                    .formatted(BigDecimal.valueOf(operation.runningSecondsAt(now))
-                            .divide(BigDecimal.valueOf(60), 0, RoundingMode.DOWN).toPlainString()));
+            long ran = operation.runningSecondsAt(now) / 60;
+            throw new BusinessRuleException("Setting up cannot have taken longer than the %d %s the operation ran."
+                    .formatted(ran, ran == 1 ? "minute" : "minutes"));
         }
         qualityGates.requirePassed(order, operation, EnumSet.of(Stage.IN_PROCESS, Stage.OPERATION_COMPLETION),
                 "completed");
@@ -503,6 +503,10 @@ public class ShopFloorService implements AttachmentPolicy {
         }
         if (request.defectCategoryId() != null) {
             ncrs.requireDefectCategory(request.defectCategoryId());
+        } else if (rejected.add(scrap).signum() > 0 && settings.rules().rejectionRaisesNcr()
+                && ncrs.hasDefectCategories()) {
+            // Without one, the NCR raised for it says nothing of what went wrong, and Pareto cannot count it.
+            throw new BusinessRuleException("Choose the defect category of what was rejected or scrapped.");
         }
         OperationReport report = reports.saveAndFlush(new OperationReport(order.getId(), id, good, rejected, scrap,
                 rework, blankToNull(request.comment()), key).categorised(request.defectCategoryId()));
@@ -582,6 +586,16 @@ public class ShopFloorService implements AttachmentPolicy {
                 parameter.code(), parameter.name(), parameter.unit(), parameter.target(), parameter.minimum(),
                 parameter.maximum(), request.value(), blankToNull(request.comment()), key)
                 .takenWith(request.instrumentId()));
+        if (!measurement.isWithinLimits()) {
+            if (blankToNull(request.comment()) == null) {
+                throw new BusinessRuleException("%s %s is outside its limits. Say what was seen and what was done about it."
+                        .formatted(parameter.code(), plain(request.value())));
+            }
+            alerts.readingOutOfLimits(order, operation, parameter.code(),
+                    plain(request.value()) + (parameter.unit() == null ? "" : " " + parameter.unit())
+                            + " against " + limits(parameter.minimum(), parameter.maximum()),
+                    request.comment().trim());
+        }
         Map<String, Object> measured = new HashMap<>(Map.of(
                 "parameter", parameter.code(), "value", plain(request.value()),
                 "withinLimits", measurement.isWithinLimits()));
@@ -1068,5 +1082,12 @@ public class ShopFloorService implements AttachmentPolicy {
                     operation.getRejectedQuantity(), operation.getScrapQuantity(), operation.getReworkQuantity(),
                     waiting, operation.getStartedAt(), operation.getCompletedAt());
         };
+    }
+
+    private static String limits(BigDecimal minimum, BigDecimal maximum) {
+        if (minimum != null && maximum != null) {
+            return plain(minimum) + "–" + plain(maximum);
+        }
+        return minimum != null ? "at least " + plain(minimum) : "at most " + plain(maximum);
     }
 }

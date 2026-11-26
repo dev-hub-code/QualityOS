@@ -53,6 +53,7 @@ public class FacilityService {
     private final List<ArchiveGuard> archiveGuards;
     private final PlanLimits limits;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final com.qualityos.identity.service.FacilityScope scope;
     private final StateHolidayService stateHolidays;
     private final OrganizationClock clock;
 
@@ -67,8 +68,10 @@ public class FacilityService {
             List<ArchiveGuard> archiveGuards,
             org.springframework.jdbc.core.JdbcTemplate jdbc,
             StateHolidayService stateHolidays,
-            OrganizationClock clock) {
+            OrganizationClock clock,
+            com.qualityos.identity.service.FacilityScope scope) {
         this.clock = clock;
+        this.scope = scope;
         this.jdbc = jdbc;
         this.stateHolidays = stateHolidays;
         this.limits = limits;
@@ -85,7 +88,8 @@ public class FacilityService {
     public PageResponse<FacilityResponse> list(String search, boolean archived, Pageable pageable) {
         Specification<Facility> filter = Specification.<Facility>where(Searches.archived(archived))
                 .and(Searches.contains(search, "code", "name", "city"));
-        return PageResponse.from(facilities.findAll(filter, pageable), mapper::toResponse);
+        // A member limited to some plants is offered only those, in filters and pickers as in this list.
+        return PageResponse.from(facilities.findAll(scope.limit(filter, "id"), pageable), mapper::toResponse);
     }
 
     @Transactional(readOnly = true)

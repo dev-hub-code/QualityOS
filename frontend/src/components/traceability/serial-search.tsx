@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCalendarDay, formatDay } from "@/lib/dates";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
@@ -166,7 +167,7 @@ export function SerialSearch() {
                       {unit.productCode} – {unit.productName}
                     </TableCell>
                     <TableCell>{unit.batchNumber}</TableCell>
-                    <TableCell>{unit.manufacturedAt?.slice(0, 10)}</TableCell>
+                    <TableCell>{unit.manufacturedAt && formatDay(unit.manufacturedAt)}</TableCell>
                     <TableCell>{unit.inspectionStatus && <StatusBadge status={unit.inspectionStatus} />}</TableCell>
                     <TableCell>
                       <StatusBadge status={unit.qualityStatus} />
@@ -175,7 +176,7 @@ export function SerialSearch() {
                       <StatusBadge status={unit.dispatchStatus} />
                     </TableCell>
                     <TableCell>{unit.customerName}</TableCell>
-                    <TableCell>{unit.dispatchedOn}</TableCell>
+                    <TableCell>{formatCalendarDay(unit.dispatchedOn)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

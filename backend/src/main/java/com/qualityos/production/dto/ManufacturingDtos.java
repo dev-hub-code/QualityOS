@@ -337,4 +337,10 @@ public final class ManufacturingDtos {
 
     public record RoutingDetail(RevisionResponse revision, List<OperationResponse> operations) {
     }
+
+    /** @param products the products whose model was chosen on their own; the rest follow the organisation */
+    public record ProductModels(
+            com.qualityos.production.entity.ManufacturingModel organisation,
+            java.util.Map<UUID, com.qualityos.production.entity.ManufacturingModel> products) {
+    }
 }

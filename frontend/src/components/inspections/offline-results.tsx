@@ -91,7 +91,7 @@ export function OfflineResults() {
         <CloudOff className="size-4" aria-hidden />
         {online
           ? "Inspection results kept on this device"
-          : "No connection. Results you save are kept on this device and sent when it is back."}
+          : "No connection. Inspection results you save are kept on this device and sent when it is back. Other changes need a connection."}
       </p>
       {items.length > 0 && (
         <ul className="space-y-1">

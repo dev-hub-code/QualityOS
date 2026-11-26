@@ -19,7 +19,7 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { CorrectionDetail, TimelineEvent, TraceNode, TraceReport } from "@/lib/types";
-import { formatDateTime } from "@/lib/dates";
+import { formatCalendarDay, formatDateTime } from "@/lib/dates";
 
 function Node({ node }: { node: TraceNode }) {
   const unit = useUnits().label(node.uomId);
@@ -62,7 +62,7 @@ function Timeline({ events }: { events: TimelineEvent[] }) {
         {events.map((event, index) => (
           <li key={index} className="relative">
             <span className="absolute top-1.5 -left-[21px] size-2.5 rounded-full bg-primary" aria-hidden />
-            <p className="text-muted-foreground">{formatDateTime(event.at)}</p>
+            <p className="text-muted-foreground">{event.dateOnly ? formatCalendarDay(event.at) : formatDateTime(event.at)}</p>
             <p className="flex flex-wrap items-center gap-2">
               {event.link ? <RecordLink href={event.link}>{event.title}</RecordLink> : event.title}
               {event.status && <StatusBadge status={event.status} />}
@@ -140,7 +140,7 @@ export default function TraceReportPage() {
           <ul className="divide-y text-sm">
             {dispatches.map((dispatch) => (
               <li key={dispatch.id} className="py-2">
-                {dispatch.dispatchNumber} to {dispatch.customerName} on {dispatch.dispatchedOn}:{" "}
+                {dispatch.dispatchNumber} to {dispatch.customerName} on {formatCalendarDay(dispatch.dispatchedOn)}:{" "}
                 {dispatch.lines.map((line) => `${line.batchNumber} × ${formatQuantity(line.quantity)}`).join(", ")}
                 {dispatch.reversalReason && ` (reversed: ${dispatch.reversalReason})`}
               </li>

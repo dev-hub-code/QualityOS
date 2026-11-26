@@ -99,6 +99,9 @@ public class ReportService {
         return read(type, scopes.resolve(from, to, facilityId), limit, sink);
     }
 
+    private static final java.util.Set<String> WORDED = java.util.Set.of("Type", "Result", "Disposition", "Severity",
+            "Status", "Source", "Category", "Last result");
+
     private ReportTable build(ReportType type, Resolved scope, int limit) {
         List<List<String>> rows = new ArrayList<>();
         ReportTable[] heading = new ReportTable[1];
@@ -138,10 +141,16 @@ public class ReportService {
             Definition definition = definition(type, scope);
             int width = definition.columns().size();
             sink.start(heading(type, scope, definition.columns(), definition.note()));
+            // Columns that hold a stored state or kind are shown in words, not as PASS or CONDITIONAL_ACCEPTANCE.
+            boolean[] worded = new boolean[width];
+            for (int column = 0; column < width; column++) {
+                worded[column] = WORDED.contains(definition.columns().get(column).label());
+            }
             streaming.query(definition.sql() + " LIMIT " + (limit + 1L), scope.params(), (RowCallbackHandler) row -> {
                 List<String> values = new ArrayList<>(width);
                 for (int column = 1; column <= width; column++) {
-                    values.add(row.getString(column));
+                    String value = row.getString(column);
+                    values.add(worded[column - 1] ? com.qualityos.common.util.EnumLabels.label(value) : value);
                 }
                 capped.accept(values);
             });

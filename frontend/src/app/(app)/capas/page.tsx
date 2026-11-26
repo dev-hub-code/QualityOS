@@ -11,6 +11,7 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import type { FieldDef } from "@/lib/record-form";
 import type { Capa, CapaSummary } from "@/lib/types";
+import { formatCalendarDay } from "@/lib/dates";
 
 const column = createColumnHelper<CapaSummary>();
 const columns = [
@@ -25,7 +26,7 @@ const columns = [
     header: "Target",
     cell: (info) => (
       <span className="flex items-center gap-2">
-        {info.getValue()}
+        {formatCalendarDay(info.getValue())}
         {info.row.original.overdue && <StatusBadge status="OVERDUE" />}
       </span>
     ),

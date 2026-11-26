@@ -1,3 +1,4 @@
+import { isValidGstin } from "@/lib/gstin";
 import { z } from "zod";
 import { DECIMAL_PATTERN, decimalCheck } from "@/lib/record-form";
 
@@ -21,7 +22,11 @@ export const registerSchema = z.object({
 export const organizationSchema = z.object({
   name: z.string().trim().min(1, "Enter a name").max(200),
   legalName: z.string().trim().max(200),
-  gstin: z.string().trim().toUpperCase().regex(/^$|^[0-9]{2}[A-Z0-9]{13}$/, "Must be a 15 character GSTIN"),
+  gstin: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .refine((value) => value === "" || isValidGstin(value), "Not a valid GSTIN: check the 15 characters, the last is a check character"),
   industry: z.string().trim().max(100),
   address: z.string().trim().max(1000),
   contactPhone: z

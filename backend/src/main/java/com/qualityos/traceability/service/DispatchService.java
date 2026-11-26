@@ -302,6 +302,11 @@ public class DispatchService {
         DispatchItem item = items.saveAndFlush(new DispatchItem(dispatch.getId(), batch.getId(), line.quantity()));
         List<String> serials = line.serialNumbers() == null ? List.of() : line.serialNumbers();
         if (serials.isEmpty()) {
+            // A batch whose units carry serial numbers ships them by number, or trace and recall lose them.
+            if (finishedProducts.countByProductionBatchIdAndDispatchItemIdIsNull(batch.getId()) > 0) {
+                throw new BusinessRuleException("Batch %s is tracked by serial number. Give the serial number of each unit sent."
+                        .formatted(batch.getBatchNumber()));
+            }
             return;
         }
         if (BigDecimal.valueOf(serials.size()).compareTo(line.quantity()) != 0) {

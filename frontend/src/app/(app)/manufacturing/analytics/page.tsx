@@ -143,14 +143,29 @@ export default function ProductionAnalyticsPage() {
             </Section>
             <Section title="Quality and material">
               <dl className="grid grid-cols-2 gap-2 text-sm">
-                <dt className="text-muted-foreground">Reported</dt>
-                <dd>{formatQuantity(data.quality.processed)}</dd>
-                <dt className="text-muted-foreground">Good · rejected · scrap</dt>
-                <dd>
-                  {formatQuantity(data.quality.good)} · {formatQuantity(data.quality.rejected)} · {formatQuantity(data.quality.scrap)}
-                </dd>
-                <dt className="text-muted-foreground">Sent to rework</dt>
-                <dd>{formatQuantity(data.quality.rework)}</dd>
+                {(data.quality.byUnit && data.quality.byUnit.length > 1
+                  ? data.quality.byUnit
+                  : [{ ...data.quality, uomId: data.quality.byUnit?.[0]?.uomId ?? null }]
+                ).map((row) => {
+                  const unit = row.uomId ? ` ${units.label(row.uomId)}` : "";
+                  return (
+                    <div key={row.uomId ?? "all"} className="col-span-2 grid grid-cols-2 gap-2">
+                      <dt className="text-muted-foreground">Reported{unit && ` in${unit}`}</dt>
+                      <dd>{formatQuantity(row.processed)}{unit}</dd>
+                      <dt className="text-muted-foreground">Good · rejected · scrap</dt>
+                      <dd>
+                        {formatQuantity(row.good)} · {formatQuantity(row.rejected)} · {formatQuantity(row.scrap)}
+                      </dd>
+                      <dt className="text-muted-foreground">Sent to rework</dt>
+                      <dd>{formatQuantity(row.rework)}</dd>
+                    </div>
+                  );
+                })}
+                {data.quality.byUnit && data.quality.byUnit.length > 1 && (
+                  <p className="col-span-2 text-xs text-muted-foreground">
+                    Reported in more than one unit, so each rate is the mean of the units&apos; own rates.
+                  </p>
+                )}
                 <dt className="text-muted-foreground">Running time against plan</dt>
                 <dd>
                   {formatMinutes(data.efficiency.actualMinutes)} for {formatMinutes(data.efficiency.plannedMinutes)} planned (

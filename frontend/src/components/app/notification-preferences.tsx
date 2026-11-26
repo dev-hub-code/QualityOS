@@ -30,6 +30,8 @@ const LABELS: Record<string, string> = {
     "A CAPA or one of its actions is long overdue (for CAPA approvers)",
   CAPA_CLOSED: "My CAPA is closed",
   RECALL_UNANSWERED: "Customers on a recall have not acknowledged it in time",
+  RECALL_AWAITING_CLOSURE: "A recall is ready to close",
+  RECALL_SENT_BACK: "A recall closure you asked for is sent back",
   DISPATCH_SHIPMENT_UNCONFIRMED:
     "Dispatches are waiting for shipment confirmation",
   CALIBRATION_DUE_SOON: "An instrument is due for calibration",
@@ -46,6 +48,7 @@ const LABELS: Record<string, string> = {
   REWORK_AWAITING_APPROVAL: "A rework order needs approval",
   PRODUCTION_QUALITY_HOLD: "A work order goes on quality hold",
   OPERATION_BLOCKED: "An operation is blocked on the shop floor",
+  PROCESS_OUT_OF_LIMITS: "A process reading is outside its limits",
   MACHINE_BREAKDOWN: "A machine breaks down",
   WORK_ORDER_OVERDUE: "A work order is past its planned end",
   PLAN_LINE_OVERDUE: "A production plan line is past its due date",

@@ -33,7 +33,7 @@ import { PRIORITY_LABELS, describeLimits, reschedulable, workOrderActions } from
 import { formatQuantity } from "@/lib/record-form";
 import type { WorkOrderDetail, WorkOrderStatus } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { formatDateTime } from "@/lib/dates";
+import { formatCalendarDay, formatDateTime } from "@/lib/dates";
 
 /** The statuses whose reason is shown above the details. */
 const REASON_LABELS: Partial<Record<WorkOrderStatus, string>> = {
@@ -186,7 +186,7 @@ export default function WorkOrderPage() {
         <Details
           items={[
             ["Facility", order.facilityCode],
-            ["Planned", `${order.plannedStart} to ${order.plannedEnd}`],
+            ["Planned", `${formatCalendarDay(order.plannedStart)} to ${formatCalendarDay(order.plannedEnd)}`],
             ["Priority", PRIORITY_LABELS[order.priority]],
             [
               "Plan",

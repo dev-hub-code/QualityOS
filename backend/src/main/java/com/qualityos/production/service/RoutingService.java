@@ -145,6 +145,7 @@ public class RoutingService {
         RoutingOperation operation = new RoutingOperation(id);
         apply(operation, request);
         operations.saveAndFlush(operation);
+        requireOnePlant(operations.findByRoutingIdOrderBySequence(id));
         audit.record("ROUTING_OPERATION_ADDED", ENTITY, id, null, operationState(routing, operation.getId()));
         return detail(routing);
     }
@@ -167,6 +168,7 @@ public class RoutingService {
         var before = operationState(routing, operationId);
         apply(operation, request);
         operations.flush();
+        requireOnePlant(operations.findByRoutingIdOrderBySequence(id));
         audit.recordChange("ROUTING_OPERATION_CHANGED", ENTITY, id, before, operationState(routing, operationId));
         return detail(routing);
     }
@@ -223,6 +225,7 @@ public class RoutingService {
             throw new BusinessRuleException("Add at least one operation before submitting.");
         }
         requireWorkCentresInUse(steps);
+        requireOnePlant(steps);
         support.submit(routing);
         audit.record("ROUTING_SUBMITTED", ENTITY, id);
         alerts.definitionSubmitted(routing, label(routing), Permissions.ROUTING_APPROVE, link(routing));
@@ -303,6 +306,21 @@ public class RoutingService {
                 .ifPresent(centre -> {
                     throw new BusinessRuleException("Work centre %s is archived. Choose another for its operations."
                             .formatted(centre.getCode()));
+                });
+    }
+
+    /** A work order runs in one plant, so a routing whose operations span plants could never be released. */
+    private void requireOnePlant(List<RoutingOperation> steps) {
+        Map<UUID, WorkCenter> centres = workCenters.byId(steps.stream().map(RoutingOperation::getWorkCenterId).toList());
+        WorkCenter first = centres.get(steps.getFirst().getWorkCenterId());
+        steps.stream()
+                .map(step -> centres.get(step.getWorkCenterId()))
+                .filter(centre -> !centre.getFacilityId().equals(first.getFacilityId()))
+                .findFirst()
+                .ifPresent(centre -> {
+                    throw new BusinessRuleException(("Work centre %s is in another plant than %s. A work order runs in "
+                            + "one plant, so all operations of a routing must be at work centres in the same plant.")
+                            .formatted(centre.getCode(), first.getCode()));
                 });
     }
 

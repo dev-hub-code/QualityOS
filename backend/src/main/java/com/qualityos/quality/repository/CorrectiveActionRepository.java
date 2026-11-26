@@ -22,6 +22,19 @@ public interface CorrectiveActionRepository
 
     List<CorrectiveAction> findByNcrIdOrderByCapaNumber(UUID ncrId);
 
+    /** The CAPAs an NCR answers to: those raised from it, and existing ones it was linked to. */
+    @Query(value = """
+            SELECT c.* FROM corrective_actions c
+            WHERE c.ncr_id = :ncrId OR c.id IN (SELECT l.capa_id FROM ncr_capa_links l WHERE l.ncr_id = :ncrId)
+            ORDER BY c.capa_number""", nativeQuery = true)
+    List<CorrectiveAction> findAnsweringNcr(UUID ncrId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query(value = """
+            INSERT INTO ncr_capa_links (tenant_id, ncr_id, capa_id, note, linked_by)
+            VALUES (current_tenant_id(), :ncrId, :capaId, :note, :linkedBy) ON CONFLICT DO NOTHING""", nativeQuery = true)
+    int linkToNcr(UUID ncrId, UUID capaId, String note, UUID linkedBy);
+
     List<CorrectiveAction> findByNcrIdInOrderByCreatedAt(Collection<UUID> ncrIds);
 
     /** Skips anyone reminded since {@code remindedBefore}, so that a CAPA does not nag on every run. */

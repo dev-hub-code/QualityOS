@@ -198,6 +198,17 @@ public class ManufacturingSettingsService {
         return get();
     }
 
+    /**
+     * How each product is made, for the products chosen one by one, with the organisation's model for the rest, so a
+     * new BOM offers only products made from one and a new recipe only those made to one.
+     */
+    @Transactional(readOnly = true)
+    public com.qualityos.production.dto.ManufacturingDtos.ProductModels productModels() {
+        Map<UUID, ManufacturingModel> chosen = new java.util.HashMap<>();
+        productSettings.findAll().forEach(row -> chosen.put(row.getProductId(), row.getManufacturingModel()));
+        return new com.qualityos.production.dto.ManufacturingDtos.ProductModels(current().getManufacturingModel(), chosen);
+    }
+
     /** Whether the product takes a BOM or a recipe. Empty when a hybrid organisation has not chosen for it. */
     @Transactional(readOnly = true)
     public java.util.Optional<Bom.Kind> definitionKind(UUID productId) {

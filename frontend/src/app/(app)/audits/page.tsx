@@ -21,6 +21,7 @@ import { api } from "@/lib/api";
 import type { FieldDef } from "@/lib/record-form";
 import type { Audit, AuditSummary, ChecklistSummary } from "@/lib/types";
 import { lookupAll } from "@/components/records/parts";
+import { formatCalendarDay } from "@/lib/dates";
 
 const TYPES = ["INTERNAL", "SUPPLIER", "PROCESS", "PRODUCT"].map((value) => ({
   value,
@@ -34,7 +35,7 @@ const COLUMNS: ColumnDef<AuditSummary>[] = [
   },
   { header: "Title", accessorKey: "title" },
   { header: "Type", cell: ({ row }) => row.original.auditType.toLowerCase() },
-  { header: "Planned", accessorKey: "plannedOn" },
+  { header: "Planned", accessorKey: "plannedOn", cell: ({ getValue }) => formatCalendarDay(getValue<string>()) },
   { header: "Lead auditor", accessorKey: "leadAuditorName" },
   {
     header: "Status",

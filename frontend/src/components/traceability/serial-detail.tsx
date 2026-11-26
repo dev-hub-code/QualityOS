@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDay } from "@/lib/dates";
 import { useQuery } from "@tanstack/react-query";
 import { Details, PageHeader, QueryState, RecordLink, Section, StatusBadge } from "@/components/records/parts";
 import { api } from "@/lib/api";
@@ -36,7 +37,7 @@ export function SerialDetail({ serial, backHref }: { serial: string; backHref: s
               </RecordLink>,
             ],
             ["Batch status", <StatusBadge key="status" status={data.batchStatus} />],
-            ["Made", data.manufacturedAt?.slice(0, 10) ?? "Not finished"],
+            ["Made", data.manufacturedAt ? formatDay(data.manufacturedAt) : "Not finished"],
           ]}
         />
       </Section>

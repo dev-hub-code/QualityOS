@@ -31,7 +31,7 @@ class DoubleSamplingIT extends MasterDataFixture {
     void series() throws Exception {
         owner = register();
         manager = addMember(owner, "QUALITY_MANAGER");
-        material = material(owner);
+        material = material(owner, true, "PCS"); // AQL samples count units, so the lots are counted
         supplier = approvedSupplier(owner);
         facility = facility(owner);
         template = JsonPath.read(body(as(owner, postJson("/api/v1/inspection-templates",

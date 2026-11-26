@@ -8,6 +8,7 @@ import { PageHeader, QueryState, RecordLink, Section, StatusBadge } from "@/comp
 import { usePermission } from "@/hooks/use-me";
 import { api, type PageResponse } from "@/lib/api";
 import { searchHitLink } from "@/lib/search";
+import { formatCalendarDay } from "@/lib/dates";
 import type {
   AuditSummary,
   CapaSummary,
@@ -326,7 +327,7 @@ function Results() {
                   key: receipt.id,
                   href: `/material-receipts/${receipt.id}`,
                   label: receipt.grnNumber,
-                  description: `${receipt.supplierName}, received ${receipt.receivedOn}`,
+                  description: `${receipt.supplierName}, received ${formatCalendarDay(receipt.receivedOn)}`,
                   detail: <StatusBadge status={receipt.status} />,
                 }))
               }
@@ -342,7 +343,7 @@ function Results() {
                   key: dispatch.id,
                   href: `/dispatches/${dispatch.id}`,
                   label: dispatch.dispatchNumber,
-                  description: `${dispatch.customerName}, dispatched ${dispatch.dispatchedOn}`,
+                  description: `${dispatch.customerName}, dispatched ${formatCalendarDay(dispatch.dispatchedOn)}`,
                   detail: dispatch.reference ? `Reference ${dispatch.reference}` : undefined,
                 }))
               }

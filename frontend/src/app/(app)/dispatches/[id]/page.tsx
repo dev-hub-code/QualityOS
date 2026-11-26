@@ -12,6 +12,7 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { Dispatch, DispatchReturn } from "@/lib/types";
+import { formatCalendarDay } from "@/lib/dates";
 
 interface Complaint {
   id: string;
@@ -83,7 +84,7 @@ export default function DispatchPage() {
   const canComplain = canRaiseNcr && dispatch.shippedOn !== null && !dispatch.reversalReason;
   return (
     <div className="space-y-6">
-      <PageHeader title={dispatch.dispatchNumber} subtitle={`To ${dispatch.customerName}, dispatched ${dispatch.dispatchedOn}`}>
+      <PageHeader title={dispatch.dispatchNumber} subtitle={`To ${dispatch.customerName}, dispatched ${formatCalendarDay(dispatch.dispatchedOn)}`}>
         <div className="flex flex-wrap items-center gap-2">
           <DispatchActions dispatch={dispatch} />
           {canComplain && (

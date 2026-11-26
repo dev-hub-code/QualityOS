@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiError, type PageResponse } from "@/lib/api";
+import { isConnectionLost, NOT_SAVED_OFFLINE } from "@/lib/offline-results";
 import { formatQuantity, type FieldDef, type FieldOption } from "@/lib/record-form";
 import type {
   Assignee,
@@ -97,7 +98,7 @@ export function useAction() {
     mutationFn: (action: () => Promise<unknown>) => action(),
     onMutate: () => setMessage(""),
     onSuccess: () => queryClient.invalidateQueries(),
-    onError: (error) => setMessage(error.message),
+    onError: (error) => setMessage(isConnectionLost(error) ? NOT_SAVED_OFFLINE : error.message),
   });
   return { run: mutation.mutate, pending: mutation.isPending, message, clear: () => setMessage("") };
 }

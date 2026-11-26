@@ -143,6 +143,23 @@ public class TemplateVersion extends TenantOwnedEntity {
 
     /** @param severity for an AQL plan, where its series stands under the switching rules */
     public SamplingPlan planFor(BigDecimal quantity, AqlTable.Severity severity) {
+        return planFor(quantity, severity, null);
+    }
+
+    /**
+     * @param bulkUnit the lot's unit when it is weighed or measured (KG, LTR), or null when it is counted. Plans that count
+     *     units (AQL, a percentage, every unit) cannot sample a weight, and a fixed size never asks for more samples than
+     *     a counted lot has.
+     */
+    public SamplingPlan planFor(BigDecimal quantity, AqlTable.Severity severity, String bulkUnit) {
+        if (bulkUnit != null && samplingType != SamplingType.FIXED) {
+            throw new BusinessRuleException(("This template samples by counting units, but the lot is measured in %s. "
+                    + "Publish a version with a fixed number of samples for it.").formatted(bulkUnit));
+        }
+        if (samplingType == SamplingType.FIXED && bulkUnit == null && quantity.signum() > 0) {
+            int units = quantity.setScale(0, RoundingMode.CEILING).min(BigDecimal.valueOf(Integer.MAX_VALUE)).intValue();
+            return new SamplingPlan(Math.max(checked(Math.min(sampleSize, units)), 1), acceptanceNumber);
+        }
         if (samplingType == SamplingType.AQL) {
             long lot = quantity.setScale(0, RoundingMode.CEILING).longValueExact();
             if (doubleSampling) {

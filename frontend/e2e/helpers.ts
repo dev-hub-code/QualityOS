@@ -24,7 +24,7 @@ export async function registerOwner(page: Page, email: string, organization = `A
 }
 
 export async function finishOnboarding(page: Page) {
-  await page.getByLabel("GSTIN").fill("27ABCDE1234F1Z5");
+  await page.getByLabel("GSTIN").fill("27AAPFU0939F1ZV");
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/dashboard/);
 }

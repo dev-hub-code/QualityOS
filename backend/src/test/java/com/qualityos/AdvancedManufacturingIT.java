@@ -38,6 +38,7 @@ class AdvancedManufacturingIT extends TraceabilityFixture {
     /** A shaft takes 1 kg of bar and an hour of turning on one machine; the plant works 08:00 to 16:00. */
     @BeforeEach
     void plant() throws Exception {
+        finalInspectionTemplate();
         supervisor = addMember(owner, "PRODUCTION_MANAGER");
         operator = addMember(owner, "PRODUCTION_OPERATOR");
         planner = addMember(owner, "PRODUCTION_PLANNER");

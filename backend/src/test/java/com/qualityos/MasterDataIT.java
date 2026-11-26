@@ -73,11 +73,15 @@ class MasterDataIT extends MasterDataFixture {
         as(owner, postJson(path + "/approve", Map.of())).andExpect(status().isUnprocessableContent());
         as(owner, postJson(path + "/submit", Map.of()))
                 .andExpect(jsonPath("$.data.status").value("PENDING_APPROVAL"));
+        // The submitter does not review their own supplier, either way.
         as(owner, postJson(path + "/reject", Map.of("note", "Missing certificate")))
+                .andExpect(status().isUnprocessableContent());
+        Session reviewer = addMember(owner, "SUPPLIER_MANAGER");
+        as(reviewer, postJson(path + "/reject", Map.of("note", "Missing certificate")))
                 .andExpect(jsonPath("$.data.status").value("REJECTED"))
                 .andExpect(jsonPath("$.data.statusNote").value("Missing certificate"));
         as(owner, postJson(path + "/submit", Map.of())).andExpect(status().isOk());
-        as(addMember(owner, "SUPPLIER_MANAGER"), postJson(path + "/approve", Map.of()))
+        as(reviewer, postJson(path + "/approve", Map.of()))
                 .andExpect(jsonPath("$.data.status").value("APPROVED"))
                 .andExpect(jsonPath("$.data.approvedAt").isNotEmpty());
         as(owner, postJson(path + "/block", Map.of("note", "Repeated rejections")))

@@ -55,6 +55,7 @@ public class ProductService implements AttachmentPolicy {
     private final ProductMapper mapper;
     private final AuditService audit;
     private final List<ArchiveGuard> archiveGuards;
+    private final com.qualityos.organization.service.OrganizationClock clock;
 
     ProductService(
             ProductRepository products,
@@ -64,7 +65,9 @@ public class ProductService implements AttachmentPolicy {
             MaterialService materials,
             ProductMapper mapper,
             AuditService audit,
-            List<ArchiveGuard> archiveGuards) {
+            List<ArchiveGuard> archiveGuards,
+            com.qualityos.organization.service.OrganizationClock clock) {
+        this.clock = clock;
         this.products = products;
         this.revisions = revisions;
         this.specifications = specifications;
@@ -105,7 +108,7 @@ public class ProductService implements AttachmentPolicy {
         Product product = new Product(code);
         apply(product, request);
         products.saveAndFlush(product);
-        revisions.save(new ProductRevision(product.getId(), INITIAL_REVISION, "Initial revision", LocalDate.now()));
+        revisions.save(new ProductRevision(product.getId(), INITIAL_REVISION, "Initial revision", clock.today()));
         var created = mapper.toResponse(product);
         audit.record("PRODUCT_CREATED", "Product", product.getId(), null, audit.state(created));
         return created;

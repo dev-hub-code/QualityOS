@@ -53,8 +53,15 @@ describe("ContactTable", () => {
     expect(screen.queryByRole("button", { name: "Log attempt" })).not.toBeInTheDocument();
   });
 
-  it("sends the status chosen, although the select returns to blank", async () => {
+  it("asks why before resolving a customer who still holds units", async () => {
     show([CONTACT]);
+    fireEvent.change(screen.getByLabelText("Move Tata Motors to"), { target: { value: "RESOLVED" } });
+    expect(await screen.findByLabelText(/still with this customer/)).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalledWith(expect.stringContaining("/status"), expect.anything());
+  });
+
+  it("sends the status chosen, although the select returns to blank", async () => {
+    show([{ ...CONTACT, outstandingQuantity: "0.000000" }]);
     fireEvent.change(screen.getByLabelText("Move Tata Motors to"), { target: { value: "RESOLVED" } });
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(

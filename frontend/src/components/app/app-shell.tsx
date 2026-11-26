@@ -186,6 +186,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-svh flex-col md:flex-row md:gap-6 md:p-4 print:block print:p-0">
+      {/* The first thing Tab reaches, so keyboard users need not walk the whole menu on every page (WCAG 2.4.1). */}
+      <a
+        href="#main"
+        className="sr-only z-50 rounded-lg bg-white px-3 py-2 text-sm font-medium text-foreground shadow focus:not-sr-only focus:fixed focus:top-2 focus:left-2 print:hidden"
+      >
+        Skip to content
+      </a>
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/70 bg-white/70 px-4 py-3 backdrop-blur-lg md:hidden print:hidden">
         <Brand name={controlCenter ? "Control Center" : "ProductionOS"} light={false} />
         <span className="flex-1" />
@@ -423,7 +430,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </button>
       </div>
 
-      <main className="min-w-0 flex-1 p-4 md:py-4 md:pr-4 md:pl-0">
+      <main id="main" tabIndex={-1} className="min-w-0 flex-1 p-4 outline-none md:py-4 md:pr-4 md:pl-0">
         {me.support && <SupportSessionBanner organizationName={me.support.organizationName} expiresAt={me.support.expiresAt} allowChanges={me.support.allowChanges} />}
         {!me.user.emailVerified && <VerifyEmailBanner email={me.user.email} />}
         {!controlCenter && <PlatformNotices />}

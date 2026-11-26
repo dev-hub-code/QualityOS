@@ -270,6 +270,10 @@ class RazorpayPaymentsIT extends AbstractIntegrationTest {
         as(owner, postJson(BASE + "/gateway-orders/" + order + "/confirm", Map.of()))
                 .andExpect(jsonPath("$.data.status").value("PAID"));
         assertThat(invoiceStatus()).isEqualTo("PAID");
+        // The owner who paid is usually the only billing manager, so the receipt must reach them too.
+        assertThat(asDatabaseSuperuser().queryForObject(
+                "SELECT count(*) FROM notifications WHERE tenant_id = ? AND user_id = ? AND type = 'PAYMENT_RECEIVED'",
+                Integer.class, owner.tenantId(), owner.userId())).isEqualTo(1);
     }
 
     @Test

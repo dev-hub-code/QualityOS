@@ -17,7 +17,9 @@ import {
 } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
-import { usePermission } from "@/hooks/use-me";
+import { SelfReviewNotice } from "@/components/app/review-policy";
+import { useMe, usePermission } from "@/hooks/use-me";
+import { useSelfReviewInEffect } from "@/hooks/use-organization-settings";
 import { api } from "@/lib/api";
 import { supplierFields } from "@/lib/record-fields";
 import type { FieldDef } from "@/lib/record-form";
@@ -42,13 +44,17 @@ export default function SupplierPage() {
   const categories = useSupplierCategories();
   const refresh = useRefresh();
   const { run, pending, message } = useAction();
-  const [dialog, setDialog] = useState<"edit" | "contact" | "reject" | "block" | null>(null);
+  const [dialog, setDialog] = useState<"edit" | "contact" | "reject" | "block" | "selfApprove" | null>(null);
+  const { data: me } = useMe();
+  const selfReviewInEffect = useSelfReviewInEffect();
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<SupplierDetail>(path) });
   if (!data) return <QueryState error={error} />;
 
   const { supplier, contacts } = data;
   const act = (action: string) => run(() => api.post(`${path}/${action}`));
   const { status } = supplier;
+  // Approval is a second person's check. A sole member may approve their own only with a reason.
+  const mine = supplier.submittedBy !== null && supplier.submittedBy === me?.user.id;
 
   return (
     <div className="space-y-6">
@@ -68,6 +74,12 @@ export default function SupplierPage() {
         )}
         {canApprove && status === "PENDING_APPROVAL" && (
           <>
+            {mine && selfReviewInEffect && (
+              <Button disabled={pending} onClick={() => setDialog("selfApprove")}>
+                Approve
+              </Button>
+            )}
+            {!mine && (
             <Button disabled={pending} onClick={() =>
                 confirm({
                   title: "Approve this supplier?",
@@ -79,6 +91,7 @@ export default function SupplierPage() {
               }>
               Approve
             </Button>
+            )}
             <Button variant="destructive" onClick={() => setDialog("reject")}>
               Reject
             </Button>
@@ -109,6 +122,10 @@ export default function SupplierPage() {
         )}
       </PageHeader>
       <FormError message={message} />
+      {canApprove && status === "PENDING_APPROVAL" && mine && !selfReviewInEffect && (
+        <p className="text-sm text-muted-foreground">You submitted this supplier, so someone else must approve it.</p>
+      )}
+      {canApprove && status === "PENDING_APPROVAL" && mine && selfReviewInEffect && <SelfReviewNotice />}
       {supplier.statusNote && <p className="text-sm">Status note: {supplier.statusNote}</p>}
       <Section title="Details">
         <Details
@@ -181,6 +198,14 @@ export default function SupplierPage() {
           fields={CONTACT_FIELDS}
           onClose={() => setDialog(null)}
           onSubmit={(values) => api.post(`${path}/contacts`, values).then(refresh)}
+        />
+      )}
+      {dialog === "selfApprove" && (
+        <RecordDialog
+          title="Approve your own supplier"
+          fields={[{ name: "note", label: "Why you are approving it yourself", type: "textarea", required: true }]}
+          onClose={() => setDialog(null)}
+          onSubmit={(values) => api.post(`${path}/approve`, values).then(refresh)}
         />
       )}
       {(dialog === "reject" || dialog === "block") && (

@@ -83,8 +83,9 @@ class InspectionIT extends MasterDataFixture {
         return publishedTemplate(session, draft(2, 0, List.of(parameter("DIA", "CRITICAL", "19.9", "20.1"))));
     }
 
+    /** A counted lot of 100 pieces, which every sampling plan can sample. */
     private String receivedItem(Session session) throws Exception {
-        IssuedOrder order = issuedOrder(session, "100");
+        IssuedOrder order = issuedOrder(session, material(session, true, "PCS"), "100");
         return JsonPath.read(body(receive(session, order, "100").andExpect(status().isCreated())),
                 "$.data.items[0].id");
     }
@@ -533,7 +534,7 @@ class InspectionIT extends MasterDataFixture {
         as(owner, postJson("/api/v1/material-receipts/" + receiptId + "/void", Map.of("reason", "Mistake")))
                 .andExpect(status().isUnprocessableContent());
 
-        as(owner, postJson("/api/v1/inspections/" + id + "/cancel", Map.of()))
+        as(owner, postJson("/api/v1/inspections/" + id + "/cancel", Map.of("reason", "Started by mistake")))
                 .andExpect(jsonPath("$.data.status").value("CANCELLED"));
         as(owner, postJson("/api/v1/material-receipts/" + receiptId + "/void", Map.of("reason", "Mistake")))
                 .andExpect(status().isOk());
@@ -564,7 +565,7 @@ class InspectionIT extends MasterDataFixture {
                         "receiptItemId", receivedItem(owner), "templateId", publishedTemplate(owner, percent))))
                 .andExpect(jsonPath("$.data.sampleSize").value(3));
 
-        IssuedOrder big = issuedOrder(owner, "1000");
+        IssuedOrder big = issuedOrder(owner, material(owner, true, "PCS"), "1000");
         String item = JsonPath.read(body(receive(owner, big, "1000")), "$.data.items[0].id");
         as(owner, postJson("/api/v1/inspections", Map.of(
                         "receiptItemId", item, "templateId", publishedTemplate(owner, full))))

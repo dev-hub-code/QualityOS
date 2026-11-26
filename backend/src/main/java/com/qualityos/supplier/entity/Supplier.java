@@ -53,6 +53,12 @@ public class Supplier extends TenantOwnedEntity {
     private String statusNote;
 
     @Setter(AccessLevel.NONE)
+    private UUID submittedBy;
+
+    @Setter(AccessLevel.NONE)
+    private Instant submittedAt;
+
+    @Setter(AccessLevel.NONE)
     private UUID approvedBy;
 
     @Setter(AccessLevel.NONE)
@@ -69,6 +75,10 @@ public class Supplier extends TenantOwnedEntity {
         }
         status = target;
         statusNote = note;
+        if (target == Status.PENDING_APPROVAL) {
+            submittedBy = actor;
+            submittedAt = Instant.now();
+        }
         if (target == Status.APPROVED) {
             approvedBy = actor;
             approvedAt = Instant.now();

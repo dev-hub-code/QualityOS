@@ -27,6 +27,7 @@ class InstrumentLinksIT extends TraceabilityFixture {
 
     @BeforeEach
     void plant() throws Exception {
+        finalInspectionTemplate();
         supervisor = addMember(owner, "PRODUCTION_MANAGER");
         operator = addMember(owner, "PRODUCTION_OPERATOR");
         facility = facility(owner);

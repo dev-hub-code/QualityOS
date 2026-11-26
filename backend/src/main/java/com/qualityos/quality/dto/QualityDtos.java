@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.qualityos.quality.entity.CapaAction;
 import com.qualityos.quality.entity.NonConformance;
 import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -244,7 +243,7 @@ public final class QualityDtos {
             @NotBlank @Size(max = 200) String title,
             @NotBlank @Size(max = MAX_TEXT) String problemStatement,
             @NotNull UUID ownerId,
-            @NotNull @Future LocalDate targetDate,
+            @NotNull LocalDate targetDate,
             boolean effectivenessRequired,
             UUID facilityId) {
     }
@@ -326,5 +325,10 @@ public final class QualityDtos {
 
     /** A CAPA as a trace shows it. */
     public record CapaHistory(UUID id, String capaNumber, String title, String status, UUID ncrId, Instant createdAt) {
+    }
+
+    /** An existing CAPA an NCR shares its root cause with, and why. */
+    public record LinkCapaRequest(@jakarta.validation.constraints.NotNull UUID capaId,
+            @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 1000) String note) {
     }
 }

@@ -249,7 +249,7 @@ class AuthFlowIT extends AbstractIntegrationTest {
         Session session = register();
         String path = "/api/v1/organizations/" + session.tenantId();
         Map<String, Object> update = new java.util.HashMap<>(Map.of(
-                "name", "Acme Forgings", "gstin", "27ABCDE1234F1Z5", "countryCode", "IN",
+                "name", "Acme Forgings", "gstin", "27AAPFU0939F1ZV", "countryCode", "IN",
                 "timezone", "Asia/Kolkata", "currency", "INR", "locale", "en-IN", "version", 0));
 
         as(session, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path)

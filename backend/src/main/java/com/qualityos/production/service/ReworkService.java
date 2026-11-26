@@ -9,7 +9,6 @@ import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.ReviewPolicy;
 import com.qualityos.identity.service.TenantAccessService;
-import com.qualityos.inspection.dto.InspectionDtos.CreateInspectionRequest;
 import com.qualityos.inspection.dto.InspectionDtos.InspectionDetail;
 import com.qualityos.inspection.dto.InspectionDtos.InspectionHistory;
 import com.qualityos.inspection.service.InspectionService;
@@ -385,8 +384,10 @@ public class ReworkService {
                         .formatted(current.inspectionNumber()));
             }
         }
-        InspectionDetail created = inspections.create(new CreateInspectionRequest(null, rework.getProductionBatchId(),
-                null, request == null ? null : request.templateId()));
+        InspectionDetail created = inspections.createForRework(rework.getProductionBatchId(),
+                request == null ? null : request.templateId(),
+                rework.getReworkedQuantity() != null && rework.getReworkedQuantity().signum() > 0
+                        ? rework.getReworkedQuantity() : null);
         rework.reinspectedBy(created.id());
         reworks.saveAndFlush(rework);
         audit.record("REWORK_ORDER_REINSPECTION_STARTED", ENTITY, id, null,
@@ -525,7 +526,15 @@ public class ReworkService {
                         .map(change -> new ReworkHistory(change.getFromStatus(), change.getToStatus(),
                                 change.getReason(), change.getCreatedBy(), members.get(change.getCreatedBy()),
                                 change.getCreatedAt()))
-                        .toList());
+                        .toList(),
+                settings.separateApprover() && !reviewPolicy.selfReviewInEffect()
+                        && Objects.equals(rework.getCreatedBy(), TenantContext.getCurrentUserId()),
+                finalInspectable(production.batch(rework.getProductionBatchId())));
+    }
+
+    /** As the batch allows a final inspection: produced, and completed or held after completion. */
+    private static boolean finalInspectable(com.qualityos.traceability.dto.TraceabilityDtos.ProductionBatchView batch) {
+        return batch.producedQuantity() != null && ("COMPLETED".equals(batch.status()) || "ON_HOLD".equals(batch.status()));
     }
 
     static GateInspection gateInspection(InspectionHistory inspection) {

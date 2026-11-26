@@ -484,7 +484,7 @@ test("results saved without a connection are kept on the device and sent when it
   ).toBeVisible();
   await expect(page.getByText("On this device, not sent yet")).toBeVisible();
   await expect(
-    page.getByText("No connection. Results you save are kept on this device", {
+    page.getByText("No connection. Inspection results you save are kept on this device", {
       exact: false,
     }),
   ).toBeVisible();

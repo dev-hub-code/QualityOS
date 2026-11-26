@@ -44,9 +44,11 @@ export default function AnalyticsPage() {
             <Section
               title="Production"
               action={
-                <Link className="text-sm text-primary hover:underline" href="/manufacturing/analytics">
-                  OEE and output
-                </Link>
+                me?.permissions.includes("PRODUCTION_ANALYTICS_VIEW") && (
+                  <Link className="text-sm text-primary hover:underline" href="/manufacturing/analytics">
+                    OEE and output
+                  </Link>
+                )
               }
             >
               <ProductionTiles figures={data.production} access={access} />

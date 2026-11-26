@@ -22,6 +22,9 @@ public class AuditPdfRenderer {
         Map<String, Object> model = new HashMap<>(Map.of(
                 "report", report, "hasFindings", !report.audit().findings().isEmpty()));
         model.put("footerName", HtmlPdf.cssString(report.organizationName()));
+        // Stored states and kinds in words: "Supplier", not SUPPLIER.
+        model.put("label", (com.samskivert.mustache.Mustache.Lambda) (fragment, out) ->
+                out.write(com.qualityos.common.util.EnumLabels.label(fragment.execute().trim())));
         return pdf.render(template.execute(model));
     }
 }

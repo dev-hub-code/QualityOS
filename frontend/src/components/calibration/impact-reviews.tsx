@@ -73,8 +73,17 @@ function ReinspectFollowUp({ inspectionId }: { inspectionId: string }) {
           </p>
         ) : (
           <p>
-            The new inspection could not start on its own. Start it from the
-            inspection queue: the goods are held until then.
+            The new inspection could not start on its own. Start it from{" "}
+            <RecordLink
+              href={
+                inspection.productionBatchId
+                  ? `/production-batches/${inspection.productionBatchId}`
+                  : `/traceability/${encodeURIComponent(inspection.batchNumber)}`
+              }
+            >
+              {inspection.batchNumber}
+            </RecordLink>
+            : the goods are held until then.
           </p>
         ))}
       {reach && (reach.usedIn.length > 0 || reach.customers.length > 0) && (

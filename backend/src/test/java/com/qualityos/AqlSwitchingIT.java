@@ -30,7 +30,7 @@ class AqlSwitchingIT extends MasterDataFixture {
     void series() throws Exception {
         owner = register();
         manager = addMember(owner, "QUALITY_MANAGER");
-        material = material(owner);
+        material = material(owner, true, "PCS"); // AQL samples count units, so the lots are counted
         supplier = approvedSupplier(owner);
         facility = facility(owner);
         // A template not tied to one material, so it fits the lots received.

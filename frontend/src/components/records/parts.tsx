@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api, ApiError, type PageResponse } from "@/lib/api";
+import { isConnectionLost, NOT_SAVED_OFFLINE } from "@/lib/offline-results";
 import { formatQuantity, type FieldDef, type FieldOption } from "@/lib/record-form";
 import type {
   Assignee,
@@ -97,9 +98,9 @@ export function useAction() {
     mutationFn: (action: () => Promise<unknown>) => action(),
     onMutate: () => setMessage(""),
     onSuccess: () => queryClient.invalidateQueries(),
-    onError: (error) => setMessage(error.message),
+    onError: (error) => setMessage(isConnectionLost(error) ? NOT_SAVED_OFFLINE : error.message),
   });
-  return { run: mutation.mutate, pending: mutation.isPending, message };
+  return { run: mutation.mutate, pending: mutation.isPending, message, clear: () => setMessage("") };
 }
 
 /** Lists that rarely change. A change made here refreshes them at once, since every action invalidates all queries. */
@@ -163,10 +164,16 @@ function useLookup<T extends { id: string; code: string; name: string }>(
 }
 
 export const useApprovedSuppliers = () => useLookup<Supplier>("/suppliers", "&status=APPROVED");
-export function useAssignees() {
+/**
+ * Active members to hand work to. With a permission, only those who hold it, so nobody is named on work their role
+ * cannot do: NCR_ASSIGN for an NCR, CAPA_MANAGE for a CAPA owner, AUDIT_MANAGE for a lead auditor and RECALL_MANAGE
+ * for recall contacts. Without one, everyone, as for CAPA action owners and instrument custodians.
+ */
+export function useAssignees(permission?: "NCR_ASSIGN" | "CAPA_MANAGE" | "AUDIT_MANAGE" | "RECALL_MANAGE") {
+  const path = permission ? `/quality/assignees?permission=${permission}` : "/quality/assignees";
   const { data = [] } = useQuery({
-    queryKey: ["/quality/assignees"],
-    queryFn: () => api.get<Assignee[]>("/quality/assignees"),
+    queryKey: [path],
+    queryFn: () => api.get<Assignee[]>(path),
   });
   return data.map((person): FieldOption => ({ value: person.id, label: person.fullName }));
 }

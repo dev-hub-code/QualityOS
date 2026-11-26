@@ -2,7 +2,7 @@
 
 import { levelLabel } from "@/components/records/aql-switching";
 import { useNcrStatusLabel } from "@/hooks/use-ncr-status-labels";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { InspectionInstruments } from "@/components/calibration/inspection-instruments";
@@ -561,12 +561,13 @@ function LinkedNcr({ inspectionId }: { inspectionId: string }) {
 }
 
 export default function InspectionPage() {
-  const confirm = useConfirm();
   const { id } = useParams<{ id: string }>();
   const path = `/inspections/${id}`;
   const canExecute = usePermission("INSPECTION_EXECUTE");
   const canCreate = usePermission("INSPECTION_CREATE");
-  const { run, message } = useAction();
+  const { message } = useAction();
+  const [cancelling, setCancelling] = useState(false);
+  const queryClient = useQueryClient();
   const { data: inspection, error } = useQuery({
     queryKey: [path],
     queryFn: () => api.get<Inspection>(path),
@@ -596,20 +597,20 @@ export default function InspectionPage() {
         {status === "PENDING" && canCreate && (
           <Button
             variant="outline"
-            onClick={() =>
-              confirm({
-                title: "Cancel this inspection?",
-                description:
-                  "The inspection is cancelled. This cannot be undone.",
-                confirmLabel: "Cancel inspection",
-                danger: true,
-              }).then((ok) => {
-                if (ok) void run(() => api.post(`${path}/cancel`));
-              })
-            }
+            onClick={() => setCancelling(true)}
           >
             Cancel
           </Button>
+        )}
+        {cancelling && (
+          <RecordDialog
+            title="Cancel this inspection? This cannot be undone."
+            fields={[{ name: "reason", label: "Reason", type: "textarea", required: true }]}
+            onClose={() => setCancelling(false)}
+            onSubmit={(values) =>
+              api.post(`${path}/cancel`, { reason: values.reason }).then(() => queryClient.invalidateQueries())
+            }
+          />
         )}
         <Button
           variant="outline"
@@ -623,10 +624,10 @@ export default function InspectionPage() {
         <Details
           items={[
             [
-              "Material",
+              inspection.productionBatchId ? "Product" : "Material",
               `${inspection.materialCode} – ${inspection.materialName}`,
             ],
-            ["Lot", inspection.batchNumber],
+            [inspection.productionBatchId ? "Batch" : "Lot", inspection.batchNumber],
             ["Supplier", inspection.supplierName],
             ["Quantity", formatQuantity(inspection.quantity)],
             ["Samples", inspection.sampleSize],

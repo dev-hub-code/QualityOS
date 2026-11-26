@@ -9,6 +9,7 @@ import { DispatchActions } from "@/components/traceability/dispatch-actions";
 import { api } from "@/lib/api";
 import { formatQuantity } from "@/lib/record-form";
 import type { Customer, Dispatch } from "@/lib/types";
+import { formatCalendarDay } from "@/lib/dates";
 
 const column = createColumnHelper<Dispatch>();
 const columns = [
@@ -16,7 +17,7 @@ const columns = [
     header: "Number",
     cell: (info) => <RecordLink href={`/dispatches/${info.row.original.id}`}>{info.getValue()}</RecordLink>,
   }),
-  column.accessor("dispatchedOn", { header: "Date" }),
+  column.accessor("dispatchedOn", { header: "Date", cell: (info) => formatCalendarDay(info.getValue()) }),
   column.accessor("lines", {
     header: "Shipped",
     enableSorting: false,

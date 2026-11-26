@@ -244,6 +244,10 @@ public class RecallService implements AttachmentPolicy {
         if (request.assignedTo() != null && !access.activeMemberIds().contains(request.assignedTo())) {
             throw new BusinessRuleException("Assign this to someone in the organisation.");
         }
+        if (request.assignedTo() != null && !request.assignedTo().equals(contact.getAssignedTo())
+                && !access.holdersOf(Permissions.RECALL_MANAGE).contains(request.assignedTo())) {
+            throw new BusinessRuleException("Assign this to someone whose role can work on recalls.");
+        }
         contact.setContactPerson(request.contactPerson());
         contact.setContactDetails(request.contactDetails());
         contact.setAssignedTo(request.assignedTo());
@@ -289,15 +293,30 @@ public class RecallService implements AttachmentPolicy {
     }
 
     @Transactional
-    public ContactView changeStatus(UUID id, UUID customerId, RecallContact.Status status, Set<String> permissions) {
+    public ContactView changeStatus(UUID id, UUID customerId, RecallContact.Status status, String note,
+            Set<String> permissions) {
         RecallContact contact = editable(id, customerId);
         RecallContact.Status previous = contact.getStatus();
+        String reason = blankToNull(note);
+        // Resolved with units still out must say why, or the recall reads as complete when it is not.
+        BigDecimal outstanding = status == RecallContact.Status.RESOLVED
+                ? view(id, customerId, permissions).outstandingQuantity() : BigDecimal.ZERO;
+        if (outstanding != null && outstanding.signum() > 0 && reason == null) {
+            throw new BusinessRuleException(("%s units are still with this customer. Say why it is resolved "
+                    + "without them.").formatted(outstanding.stripTrailingZeros().toPlainString()));
+        }
         List<UUID> record = List.of(contact.getId());
         contact.moveTo(status, attempts.findByContactRecordIdInOrderByAttemptedAt(record).size(),
                 !acknowledgements.findByContactRecordIdInOrderByAcknowledgedOn(record).isEmpty());
+        if (reason != null) {
+            contact.setNotes(contact.getNotes() == null ? reason : contact.getNotes() + "\n" + reason);
+        }
         contacts.flush();
-        audit.record("RECALL_CONTACT_STATUS_CHANGED", ENTITY, id, Map.of("status", previous),
-                Map.of("customerId", customerId, "status", status));
+        Map<String, Object> after = new java.util.LinkedHashMap<>(Map.of("customerId", customerId, "status", status));
+        if (reason != null) {
+            after.put("note", reason);
+        }
+        audit.record("RECALL_CONTACT_STATUS_CHANGED", ENTITY, id, Map.of("status", previous), after);
         return view(id, customerId, permissions);
     }
 
@@ -354,15 +373,23 @@ public class RecallService implements AttachmentPolicy {
         recall.requestClosure(TenantContext.getCurrentUserId(), request.note().trim(), Instant.now());
         recalls.flush();
         audit.record("RECALL_CLOSURE_REQUESTED", ENTITY, id);
+        notifications.notify(access.holdersOf(Permissions.RECALL_CLOSE),
+                com.qualityos.notification.service.NotificationType.RECALL_AWAITING_CLOSURE,
+                recall.getRecallNumber() + " is ready to close", request.note().trim(), "/recalls/" + id);
         return detail(recall, permissions);
     }
 
     @Transactional
     public RecallDetail sendBack(UUID id, String reason, Set<String> permissions) {
         Recall recall = lock(id);
+        UUID requester = recall.getClosureRequestedBy();
         recall.sendBack();
         recalls.flush();
         audit.record("RECALL_CLOSURE_SENT_BACK", ENTITY, id, null, Map.of("reason", reason));
+        if (requester != null) {
+            notifications.notify(Set.of(requester), com.qualityos.notification.service.NotificationType.RECALL_SENT_BACK,
+                    recall.getRecallNumber() + " closure was sent back", reason, "/recalls/" + id);
+        }
         return detail(recall, permissions);
     }
 
@@ -386,6 +413,9 @@ public class RecallService implements AttachmentPolicy {
     @Transactional
     public RecallDetail describeForRegulator(UUID id, RegulatoryRequest request, Set<String> permissions) {
         Recall recall = lock(id);
+        if (recall.getStatus() == Recall.Status.CLOSED) {
+            throw new BusinessRuleException("This recall is closed, so what the regulator was told cannot change.");
+        }
         Map<String, Object> before = regulatorySnapshot(recall);
         recall.describeForRegulator(request.hazardClass(), blankToNull(request.regulator()),
                 blankToNull(request.regulatorReference()), request.regulatorNotifiedOn(), request.responseDays());
@@ -513,11 +543,12 @@ public class RecallService implements AttachmentPolicy {
                     contact.attempts(), contact.acknowledgedOn(), contact.exceptionReason(), contact.quantity(),
                     contact.returnedQuantity(), contact.outstandingQuantity());
         }).toList();
+        DateTimeFormatter label = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm z").withZone(zone);
         return new RecallReport(organization.name(), organization.legalName(), organization.address(),
-                organization.gstin(), now,
-                DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm z").withZone(zone).format(now),
+                organization.gstin(), now, label.format(now),
                 detail(recall, covered), products(covered), customers, covered.lines(), covered.serialNumbers(),
-                covered.inspections(), covered.ncrs(), historyOf(contacts.findByRecallId(id)));
+                covered.inspections(), covered.ncrs(), historyOf(contacts.findByRecallId(id)),
+                recall.getClosedAt() == null ? null : label.format(recall.getClosedAt()));
     }
 
     private static List<ReportProduct> products(RecallScope covered) {

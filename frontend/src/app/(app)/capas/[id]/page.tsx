@@ -33,6 +33,7 @@ import { api } from "@/lib/api";
 import { FISHBONE_BRANCHES, isReadyForVerification } from "@/lib/capa";
 import type { FieldDef } from "@/lib/record-form";
 import type { Capa, CapaAction } from "@/lib/types";
+import { formatCalendarDay } from "@/lib/dates";
 
 interface Step {
   title: string;
@@ -241,7 +242,7 @@ export default function CapaPage() {
               ),
             ],
             ["Owner", capa.ownerName],
-            ["Target date", capa.targetDate],
+            ["Target date", formatCalendarDay(capa.targetDate)],
             [
               "Effectiveness check",
               capa.effectivenessRequired ? "Required" : "Not required",
@@ -290,7 +291,7 @@ export default function CapaPage() {
                     :
                   </span>{" "}
                   {action.description} · {action.ownerName} · due{" "}
-                  {action.targetDate}
+                  {formatCalendarDay(action.targetDate)}
                   {action.completionNote && ` · done: ${action.completionNote}`}
                 </span>
                 {(canManage || action.ownerId === me?.user.id) &&

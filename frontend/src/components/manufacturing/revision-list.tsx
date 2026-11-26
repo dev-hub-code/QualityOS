@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -12,12 +13,15 @@ import { api } from "@/lib/api";
 import { DEFINITIONS, type DefinitionKind } from "@/lib/manufacturing";
 import type { FieldDef } from "@/lib/record-form";
 import type { Revision } from "@/lib/types";
+import { formatCalendarDay } from "@/lib/dates";
 
 const SUBTITLES: Record<DefinitionKind, string> = {
   BOM: "What goes into a discrete product, level by level.",
   RECIPE: "What goes into a batch of a process product, with the conditions it is made under.",
   ROUTING: "The operations, in order, that make a product.",
 };
+
+type Model = "DISCRETE" | "PROCESS" | "HYBRID";
 
 function columns(kind: DefinitionKind): ColumnDef<Revision>[] {
   return [
@@ -35,7 +39,7 @@ function columns(kind: DefinitionKind): ColumnDef<Revision>[] {
       header: "In effect",
       cell: ({ row }) =>
         row.original.effectiveFrom
-          ? `${row.original.effectiveFrom} to ${row.original.effectiveTo ?? "open"}${row.original.inEffect ? " (now)" : ""}`
+          ? `${formatCalendarDay(row.original.effectiveFrom)} to ${row.original.effectiveTo ? formatCalendarDay(row.original.effectiveTo) : "open"}${row.original.inEffect ? " (now)" : ""}`
           : "–",
     },
   ];
@@ -44,9 +48,22 @@ function columns(kind: DefinitionKind): ColumnDef<Revision>[] {
 export function RevisionList({ kind }: { kind: DefinitionKind }) {
   const definition = DEFINITIONS[kind];
   const canManage = usePermission(definition.manage);
-  const products = useProducts();
+  const allProducts = useProducts();
   const router = useRouter();
   const [adding, setAdding] = useState(false);
+  const { data: models } = useQuery({
+    queryKey: ["/manufacturing/products/models"],
+    queryFn: () =>
+      api.get<{ organisation: Model; products: Record<string, Model> }>("/manufacturing/products/models"),
+    enabled: adding && kind !== "ROUTING",
+  });
+  // A BOM is only for products made from one, a recipe only for products made to one. Undecided products stay.
+  const ruledOut: Model | null = kind === "BOM" ? "PROCESS" : kind === "RECIPE" ? "DISCRETE" : null;
+  const products = allProducts.filter((product) => {
+    if (!ruledOut || !models) return true;
+    const model = models.products[product.value] ?? models.organisation;
+    return model !== ruledOut;
+  });
   const fields: FieldDef[] = [
     { name: "productId", label: "Product", type: "select", required: true, options: products },
     { name: "changeNote", label: "What this revision is for", type: "textarea" },

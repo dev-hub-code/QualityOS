@@ -26,6 +26,14 @@ abstract class TraceabilityFixture extends MasterDataFixture {
         manager = addMember(owner, "QUALITY_MANAGER");
     }
 
+    /**
+     * A general final (FQC) template, published, so work orders can be released: a release is refused while the
+     * organisation needs a final inspection before closing and no final template fits the product.
+     */
+    protected String finalInspectionTemplate() throws Exception {
+        return template("FQC");
+    }
+
     /** Leaves the owner as the only active member, allowed to review their own work. */
     protected void workAlone() throws Exception {
         as(owner, postJson("/api/v1/users/" + membershipId(owner, manager.userId()) + "/deactivate", Map.of()))

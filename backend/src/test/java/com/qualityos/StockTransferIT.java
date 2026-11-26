@@ -73,6 +73,28 @@ class StockTransferIT extends TraceabilityFixture {
     }
 
     @Test
+    void aCorrectionOfWhatTheLotIsReachesThePartSentToAnotherPlant() throws Exception {
+        Lot lot = releasedLot("10");
+        String from = (String) lotView(lot.id()).get("facilityId");
+        String transfer = idOf(body(send(owner, from, facility(owner), "lotId", lot.id(), "4")
+                .andExpect(status().isCreated())));
+        receive(owner, transfer).andExpect(status().isOk());
+
+        String correction = idOf(body(as(owner, postJson("/api/v1/material-corrections", Map.of(
+                "receiptItemId", lot.id(), "supplierBatch", "HEAT-99", "reason", "Heat number misread")))
+                .andExpect(status().isCreated())));
+        as(owner, postJson("/api/v1/material-corrections/" + correction + "/submit", Map.of())).andExpect(status().isOk());
+        as(owner, get("/api/v1/material-corrections/" + correction))
+                .andExpect(jsonPath("$.data.impact.transferredLots[0]").value(lot.batch() + "-T1"));
+        as(manager, postJson("/api/v1/material-corrections/" + correction + "/approve",
+                        Map.of("note", "Checked", "impactAcknowledged", true)))
+                .andExpect(jsonPath("$.data.status").value("APPLIED"));
+
+        as(owner, get("/api/v1/traceability/batches/" + lot.batch() + "-T1"))
+                .andExpect(jsonPath("$.data.subject.supplierBatch").value("HEAT-99"));
+    }
+
+    @Test
     void partOfABatchIsReleasedAtTheOtherPlantAndADispatchLeavesFromOnePlant() throws Exception {
         String batch = releasedBatch(releasedLot("10").id(), "10", "10");
         String from = facilityOfBatch(batch);

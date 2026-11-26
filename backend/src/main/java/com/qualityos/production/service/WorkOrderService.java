@@ -463,6 +463,8 @@ public class WorkOrderService {
         if (routing == null && settings.workOrderRequiresRouting()) {
             problems.add("%s has no approved routing in effect on %s.".formatted(product.code(), on));
         }
+        qualityGates.finalInspectionProblem(order.getProductId(), product.code(),
+                settings.rules().completionRequiresFinalInspection()).ifPresent(problems::add);
         if (routing != null) {
             List<RoutingOperation> operations = routingOperations.findByRoutingIdOrderBySequence(routing.getId());
             Map<UUID, WorkCenter> centres = workCenters.byId(
@@ -555,21 +557,26 @@ public class WorkOrderService {
         if (order.getReleasedAt() != null) {
             Bom bom = order.getBomId() == null ? null : boms.findById(order.getBomId()).orElseThrow();
             Routing routing = order.getRoutingId() == null ? null : routings.findById(order.getRoutingId()).orElseThrow();
-            definition = definition(bom, routing, List.of());
+            definition = definition(bom, routing, List.of(), order);
         } else if (order.getStatus().isOpen()) {
             Resolution resolution = resolve(order);
-            definition = definition(resolution.definition(), resolution.routing(), resolution.problems());
+            definition = definition(resolution.definition(), resolution.routing(), resolution.problems(), order);
         } else {
-            definition = definition(null, null, List.of());
+            definition = definition(null, null, List.of(), order);
         }
         return new WorkOrderDetail(response, definition, requirementResponses(order), operationResponses(order),
                 historyResponses(order));
     }
 
-    private static ReleaseDefinition definition(Bom bom, Routing routing, List<String> problems) {
-        return new ReleaseDefinition(bom == null ? null : bom.getKind().name(), bom == null ? null : bom.getId(),
+    /** With nothing in effect, the kind still follows how the product is made, so a recipe product never reads "BOM". */
+    private ReleaseDefinition definition(Bom bom, Routing routing, List<String> problems, WorkOrder order) {
+        String kind = bom != null ? bom.getKind().name()
+                : settings.definitionKind(order.getProductId()).map(Enum::name).orElse(null);
+        var conditions = bom == null || bom.getKind() != Bom.Kind.RECIPE ? List.<com.qualityos.production.dto.ManufacturingDtos.ParameterResponse>of()
+                : parameters.findByBomIdOrderByCode(bom.getId()).stream().map(Parameters::toResponse).toList();
+        return new ReleaseDefinition(kind, bom == null ? null : bom.getId(),
                 bom == null ? null : bom.getRevision(), routing == null ? null : routing.getId(),
-                routing == null ? null : routing.getRevision(), problems);
+                routing == null ? null : routing.getRevision(), problems, conditions);
     }
 
     private List<RequirementResponse> requirementResponses(WorkOrder order) {

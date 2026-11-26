@@ -22,14 +22,15 @@ const words = (value: string | null) => (value ? value.replaceAll("_", " ").toLo
 type Dialog = "approve" | "complete" | "reinspect" | "cancel" | { step: string } | null;
 type Template = { id: string; code: string; name: string; inspectionType: string; publishedVersion: number | null };
 
-/** Published in-process and final templates, to reinspect with. */
-function useBatchTemplates(enabled: boolean) {
+/** Published in-process templates, and final ones once the batch is completed, to reinspect with. */
+function useBatchTemplates(enabled: boolean, completed: boolean) {
+  const types = completed ? ["IPQC", "FQC"] : ["IPQC"];
   const { data } = useQuery({
-    queryKey: ["/inspection-templates", "batch"],
+    queryKey: ["/inspection-templates", "batch", ...types],
     enabled,
     queryFn: async () => {
       const lists = await Promise.all(
-        ["IPQC", "FQC"].map((type) => lookupAll<Template>("/inspection-templates", `&type=${type}`)),
+        types.map((type) => lookupAll<Template>("/inspection-templates", `&type=${type}`)),
       );
       return lists.flat();
     },
@@ -53,8 +54,8 @@ export default function ReworkOrderPage() {
   const refresh = useRefresh();
   const { run, pending, message } = useAction();
   const [dialog, setDialog] = useState<Dialog>(null);
-  const templates = useBatchTemplates(dialog === "reinspect");
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<ReworkDetail>(path) });
+  const templates = useBatchTemplates(dialog === "reinspect", data?.batchCompleted ?? false);
   if (!data) return <QueryState error={error} />;
 
   const { rework } = data;
@@ -73,7 +74,7 @@ export default function ReworkOrderPage() {
           </span>
         }
       >
-        {actions.includes("approve") && <Button onClick={() => setDialog("approve")}>Approve</Button>}
+        {actions.includes("approve") && !data.othersMustApprove && <Button onClick={() => setDialog("approve")}>Approve</Button>}
         {actions.includes("start") && (
           <Button disabled={pending} onClick={() => run(() => api.post(`${path}/start`))}>
             Start rework
@@ -197,7 +198,7 @@ export default function ReworkOrderPage() {
       {dialog === "approve" && (
         <RecordDialog
           title={`Approve ${rework.reworkNumber}`}
-          fields={[{ name: "note", label: "Note (needed if you are approving your own rework order)", type: "textarea" }]}
+          fields={[{ name: "note", label: "Note", type: "textarea" }]}
           onClose={close}
           onSubmit={(values) => api.post(`${path}/approve`, values).then(refresh)}
         />

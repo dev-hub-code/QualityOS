@@ -32,6 +32,7 @@ import type {
   RecallHistoryEntry,
 } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { formatCalendarDay } from "@/lib/dates";
 
 const STATUSES = [
   "PENDING",
@@ -104,7 +105,7 @@ function Regulator({ recall, path }: { recall: RecallDetail; path: string }) {
             {recall.status === "CLOSED" ? "Final" : "Interim"} report for the
             regulator (PDF)
           </a>
-          {canManage && (
+          {canManage && recall.status !== "CLOSED" && (
             <Button
               variant="outline"
               size="sm"
@@ -128,7 +129,7 @@ function Regulator({ recall, path }: { recall: RecallDetail; path: string }) {
           ["Told on", recall.regulatorNotifiedOn],
           [
             "Customers must acknowledge within",
-            `${recall.responseDays} days of ${recall.recallDate}`,
+            `${recall.responseDays} days of ${formatCalendarDay(recall.recallDate)}`,
           ],
         ]}
       />

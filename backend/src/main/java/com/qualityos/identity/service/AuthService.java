@@ -419,8 +419,8 @@ public class AuthService {
     private UUID chooseTenant(UUID userId, UUID preferred) {
         List<OrganizationSummary> memberOf = access.organizationsOf(userId);
         if (memberOf.isEmpty()) {
-            throw new QualityOsException(
-                    ErrorCode.NO_ACTIVE_MEMBERSHIP, "This account does not belong to an active organisation.");
+            throw new QualityOsException(ErrorCode.NO_ACTIVE_MEMBERSHIP,
+                    "This account is not active in any organisation. Ask your administrator to reactivate it.");
         }
         return memberOf.stream()
                 .map(OrganizationSummary::id)

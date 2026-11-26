@@ -221,6 +221,8 @@ export interface Supplier {
   postalCode: string | null;
   status: string;
   statusNote: string | null;
+  /** Who sent it for approval; null for suppliers submitted before this was recorded. */
+  submittedBy: string | null;
   version: number;
 }
 
@@ -501,6 +503,8 @@ export interface InspectionDecision {
 export interface Inspection {
   id: string;
   inspectionNumber: string;
+  /** Set when a production batch, or returned goods of one, were inspected. */
+  productionBatchId?: string | null;
   inspectionType: string;
   supplierName: string | null;
   materialCode: string;
@@ -833,6 +837,8 @@ export interface TimelineEvent {
   batchNumber: string | null;
   status: string | null;
   link: string | null;
+  /** The event has a day but no time: `at` is that day's midnight UTC. */
+  dateOnly?: boolean;
 }
 
 export interface TraceReport {
@@ -868,8 +874,8 @@ export interface CorrectionDetail extends CorrectionSummary {
     originalValue: string | null;
     correctedValue: string;
   }[];
-  approvals: { approverName: string | null; note: string | null; at: string }[];
-  impact: { inspected: boolean; batches: string[]; customers: string[] } | null;
+  approvals: { approverId: string; approverName: string | null; note: string | null; at: string }[];
+  impact: { inspected: boolean; batches: string[]; customers: string[]; transferredLots: string[] } | null;
   decisionNote: string | null;
   appliedAt: string | null;
 }
@@ -2186,6 +2192,8 @@ export interface WorkOrderDetail {
     routingId: string | null;
     routingRevision: number | null;
     problems: string[];
+    /** The recipe's process conditions, for orders made to a recipe. */
+    processParameters: ProcessParameter[];
   };
   materials: {
     lineNumber: number;
@@ -2312,6 +2320,7 @@ export type LossCategory =
   | "PLANNED_MAINTENANCE"
   | "CHANGEOVER"
   | "ORDER_ON_HOLD"
+  | "SHIFT_END"
   | "OTHER";
 
 /** A work order operation on the shop floor. Quantities are in the work order's unit. */
@@ -2550,6 +2559,10 @@ export interface ReworkDetail {
     changedByName: string | null;
     changedAt: string;
   }[];
+  /** The viewer raised it and approval is separated, so someone else approves it. */
+  othersMustApprove: boolean;
+  /** The batch is completed, so a final inspection can check it. */
+  batchCompleted: boolean;
 }
 
 export interface WorkOrderQuality {
@@ -2891,6 +2904,15 @@ export interface ProductionAnalytics {
     rejectionRate: string | null;
     scrapRate: string | null;
     reworkRate: string | null;
+    /** The quantities per unit they were reported in. With more than one, the totals above mix units. */
+    byUnit?: {
+      uomId: string | null;
+      processed: string;
+      good: string;
+      rejected: string;
+      scrap: string;
+      rework: string;
+    }[];
   };
   efficiency: {
     operations: number;

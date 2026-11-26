@@ -127,7 +127,9 @@ class CalibrationIT extends TraceabilityFixture {
     @Test
     void aCalibrationCannotBeInTheFutureOrBeforeTheLastOne() throws Exception {
         String id = instrument(days(5));
-        calibrate(id, days(1), "PASS").andExpect(status().isBadRequest());
+        // Checked against the organisation's day (Asia/Kolkata), which can be ahead of the server's UTC date.
+        calibrate(id, days(2), "PASS").andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.message").value("The calibration date cannot be in the future."));
         calibrate(id, days(0), "PASS").andExpect(status().isCreated());
         calibrate(id, days(-1), "PASS").andExpect(status().isUnprocessableEntity());
     }

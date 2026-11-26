@@ -21,6 +21,23 @@ import org.junit.jupiter.api.Test;
 
 class PurchasingIT extends MasterDataFixture {
 
+    /** The organisation's day decides: in India it is tomorrow already while the server's UTC date says today. */
+    @Test
+    void aReceiptDatedTheOrganisationsTodayIsAcceptedAndOneDatedLaterIsNot() throws Exception {
+        Session owner = register();
+        IssuedOrder order = issuedOrder(owner, "10");
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Kolkata"));
+        as(owner, postJson("/api/v1/material-receipts", Map.of("purchaseOrderId", order.id(),
+                        "receivedOn", today.plusDays(1).toString(),
+                        "items", List.of(Map.of("purchaseOrderItemId", order.itemId(), "supplierBatch", "H1", "quantity", "5")))))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value("The received date cannot be in the future."));
+        as(owner, postJson("/api/v1/material-receipts", Map.of("purchaseOrderId", order.id(),
+                        "receivedOn", today.toString(),
+                        "items", List.of(Map.of("purchaseOrderItemId", order.itemId(), "supplierBatch", "H1", "quantity", "5")))))
+                .andExpect(status().isCreated());
+    }
+
     @Test
     void anOrderMayBeDraftedForAnUnapprovedSupplierButNotIssued() throws Exception {
         Session owner = register();
@@ -157,7 +174,7 @@ class PurchasingIT extends MasterDataFixture {
         receive(owner, draft, "1").andExpect(status().isUnprocessableContent());
 
         IssuedOrder cancelled = issuedOrder(owner, "100");
-        as(owner, postJson("/api/v1/purchase-orders/" + cancelled.id() + "/cancel", Map.of()))
+        as(owner, postJson("/api/v1/purchase-orders/" + cancelled.id() + "/cancel", Map.of("reason", "Supplier cannot deliver")))
                 .andExpect(status().isOk());
         receive(owner, cancelled, "1").andExpect(status().isUnprocessableContent());
 
@@ -174,7 +191,7 @@ class PurchasingIT extends MasterDataFixture {
         IssuedOrder order = issuedOrder(owner, "100");
         receive(owner, order, "10").andExpect(status().isCreated());
 
-        as(owner, postJson("/api/v1/purchase-orders/" + order.id() + "/cancel", Map.of()))
+        as(owner, postJson("/api/v1/purchase-orders/" + order.id() + "/cancel", Map.of("reason", "Not needed")))
                 .andExpect(status().isUnprocessableContent());
     }
 
@@ -274,7 +291,7 @@ class PurchasingIT extends MasterDataFixture {
 
         as(viewer, get("/api/v1/purchase-orders")).andExpect(status().isOk());
         receive(viewer, order, "1").andExpect(status().isForbidden());
-        as(viewer, postJson("/api/v1/purchase-orders/" + order.id() + "/cancel", Map.of()))
+        as(viewer, postJson("/api/v1/purchase-orders/" + order.id() + "/cancel", Map.of("reason", "Not needed")))
                 .andExpect(status().isForbidden());
     }
 }

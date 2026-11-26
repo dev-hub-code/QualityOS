@@ -32,6 +32,20 @@ public interface NonConformanceRepository
 
     List<NonConformance> findByDispatchReversalIdIn(java.util.Collection<UUID> dispatchReversalIds);
 
+    /** NCRs raised by the inspections of returned goods, with the return each belongs to. */
+    @org.springframework.data.jpa.repository.Query(value = """
+            SELECT n.id AS ncrId, ri.reversal_id AS reversalId FROM non_conformances n
+            JOIN inspections i ON i.id = n.inspection_id AND i.tenant_id = n.tenant_id
+            JOIN dispatch_reversal_items ri ON ri.id = i.return_item_id AND ri.tenant_id = i.tenant_id
+            WHERE ri.reversal_id IN (:reversalIds) ORDER BY n.created_at""", nativeQuery = true)
+    List<ReturnInspectionNcr> findRaisedByReturnInspections(java.util.Collection<UUID> reversalIds);
+
+    interface ReturnInspectionNcr {
+        UUID getNcrId();
+
+        UUID getReversalId();
+    }
+
     java.util.List<NonConformance> findByCalibrationRecordIdIn(java.util.Collection<UUID> calibrationRecordIds);
 
     /** NCRs an inspection raised, and those raised by hand against the batch. */

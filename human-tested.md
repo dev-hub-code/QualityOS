@@ -11,11 +11,11 @@
 
 | | |
 |---|---|
-| Workflows tested | 22 |
+| Workflows tested | 33 (W1–W22 first pass, W23–W33 second pass) |
 | Scenarios checked | 186 (in the tables below) |
 | Roles tested with their own login | 12 (every system role) |
 | Server permission checks (role × action) | 115, 0 mismatches |
-| Bugs found | 1 high, 6 medium, 13 low or cosmetic |
+| Bugs found | First pass: 1 high, 6 medium, 13 low or cosmetic (B1–B20, fixed). Second pass: 5 medium, 9 low (B21–B34, fixed on `fix/second-pass-bugs`) |
 | Tenant isolation | Passed: another organisation sees "This record does not exist." for every record |
 
 **Overall:** The core quality loop works end to end, from goods-in and inspection through NCR, CAPA and closure, and so do traceability, recall, calibration, audits, reports and user administration. Role permissions are enforced on the server as well as hidden in the UI, and maker/checker (no one approves their own work) holds everywhere it applies. One high-severity bug traps a work order permanently (see B1). The rest are mostly error messages that are missing or misleading.
@@ -87,6 +87,46 @@ Possible fixes: link a final inspection on a work-order batch to that order's fi
 | B18 | The work order page, opened as an Operator, makes a failing call (403 on `/manufacturing/work-centers`). | WO page |
 | B19 | Small UX gaps. "Inspect" on an operation's quality gate creates the inspection but stays on the page. The Lot isn't pre-selected when only one reserved lot exists. "One of these serial numbers is already registered." doesn't say which one. "Choose Growth" creates an invoice with no confirmation. Text reads "1 rows" and "1 facilities". | various |
 | B20 | Inspection yes/no dropdowns are disabled after submit but aren't greyed out like the number fields. | Inspection page |
+
+### Found in the second pass (26 Nov 2026, see section 6)
+
+| ID | Severity | Issue | Where |
+|---|---|---|---|
+| **B21** | Medium | **Paying online sends no confirmation to anyone.** The Owner is the only person with SUBSCRIPTION_MANAGE, and `notify()` leaves out whoever acted. So after the Owner pays, nobody gets "Payment received" or "Plan changed", and no receipt email goes out. No such notification was created for BILL-2026-00001 or -00002. | `SubscriptionService.markPaid` → use `notifyIncludingActor` for PAYMENT_RECEIVED and PLAN_CHANGED |
+| **B22** | Medium | **"Today" is the UTC date, not the organisation's.** Between 00:00 and 05:30 IST, a receipt dated today is refused: "The date cannot be in the future." (server `@PastOrPresent` uses the JVM clock). The receipt "Received on", PO "Order date" and template "Effective from" fields also default to yesterday. | `purchase-orders/[id]/receive/page.tsx:38`, `purchase-order-form.tsx:50`, `inspection-templates/[id]/page.tsx:124`; backend date checks |
+| **B23** | Medium | **A material correction doesn't reach stock transferred to another plant.** After MC-2026-00001 changed LOT-2026-00001's supplier batch from HEAT-A to BS-H2291-B, the Chakan copy LOT-2026-00001-T1 still shows HEAT-A. The correction's impact list doesn't mention the transferred lot either. | Material corrections × stock transfers |
+| **B24** | Medium (a11y) | **Dialogs don't hold keyboard focus.** After the last button (Close), Tab moves to the page behind (WCAG 2.4.3). Escape correctly returns focus to the button that opened the dialog. | `components/ui/dialog.tsx` (Base UI), every RecordDialog |
+| **B25** | Medium (a11y) | **No "skip to content" link.** The first Tab stop is Notifications, and a keyboard user passes about 40 menu items before reaching the page (WCAG 2.4.1). | `app-shell.tsx` |
+| B26 | Low | With wrong Razorpay keys (401 from Razorpay), the payer sees "The payment service did not respond. Please try again." That hides a configuration fault. | Billing → Pay online |
+| B27 | Low | Before release, a work order for a **recipe** product says "Will be made from **BOM**: None in effect". After release it correctly says "Recipe, Revision 1". | WO-2026-00003 |
+| B28 | Low | A recipe's process parameters (MIX-T mixing temperature, 35 to 45 °C) are not shown on the work order, so the operator never sees them. | WO page / shop floor |
+| B29 | Low | A correction of used material shows "Approvals 0 of 1" until the first approval, then "1 of 2". The first approver still sees Approve and Reject afterwards (the server refuses: "A second person must give the other approval."). | Material correction page |
+| B30 | Low | Rework: the NCR raised automatically by the shop-floor report (NCR-2026-00006) isn't pre-selected or linked on the rework order, so it stays open on its own. All steps share one work centre. The reinspection shows Quantity 20 (the whole batch) instead of the 3 reworked pieces. | RW-2026-00001, INS-2026-00008 |
+| B31 | Low | The NCR raised from a conditional acceptance reads "Disposition: CONDITIONAL_ACCEPTANCE." (raw code). | NCR-2026-00007 |
+| B32 | Low (a11y) | axe: the dashboard and analytics bar charts put `aria-label` on role-less `div`s (27 elements), which screen readers ignore. The dashboard "Production" summary nests `dt`/`dd` in extra divs, which breaks the description list. | `/dashboard`, `/analytics` |
+| B33 | Low | Small UX gaps. "Sent on" on Send stock starts empty although it is required (other forms default to today). After adding a recipe line, "Add at least one line before submitting." stays on screen. The Receive page opened by URL shows the form to people who cannot receive, and saving gives 403. | various |
+| B34 | Low | Recall: marking a customer "Resolved" asks for no note while units are still out. "Edit regulator details" is still offered on a closed recall. | RCL-2026-00001 |
+
+### Fix status, second pass (branch `fix/second-pass-bugs`)
+
+| Bug | Status | Fix |
+|---|---|---|
+| B21 | ✅ Fixed | "Payment received" and "Plan changed" now reach the person who paid as well (`notifyIncludingActor`). Test: `RazorpayPaymentsIT.returningFromCheckoutAsksRazorpayWhatHappened`. |
+| B22 | ✅ Fixed | A new `OrganizationClock` gives "today" in the organisation's time zone. It is used for receipt and calibration dates, CAPA target dates, the template in force, product revisions and facility year. The forms default to the browser's local date (`lib/dates.ts` `today()`). Test: `PurchasingIT.aReceiptDatedTheOrganisationsTodayIsAcceptedAndOneDatedLaterIsNot`. |
+| B23 | ✅ Fixed | Correcting a lot's material or supplier batch also corrects the parts transferred to other plants. The impact lists them under "Also corrected at other plants". Test: `StockTransferIT.aCorrectionOfWhatTheLotIsReachesThePartSentToAnotherPlant`. |
+| B24 | ✅ Fixed, re-tested | The shared dialog keeps Tab and Shift+Tab inside it, which covers confirmation boxes too. Test: `components/ui/dialog.test.tsx`. |
+| B25 | ✅ Fixed, re-tested | A "Skip to content" link is the first Tab stop and moves focus to `<main id="main">`. |
+| B26 | ✅ Fixed | A 401 from Razorpay is logged as a key problem, and the payer sees "Online payment is not set up correctly … Please contact support." |
+| B27 | ✅ Fixed, re-tested | With nothing in effect, the kind follows how the product is made, e.g. "Recipe: None in effect". Test: `WorkOrderIT.anOrderForARecipeProductSaysRecipeAndShowsTheRecipesConditions`. |
+| B28 | ✅ Fixed, re-tested | The work order lists the recipe's process conditions, e.g. "MIX-T – Mixing temperature: 35 to 45 °C". Routing operations already carried them onto the shop floor. Same test. |
+| B29 | ✅ Fixed | A correction that needs two approvals says "0 of 2" from the start. Someone who has already approved sees "You have approved this…" instead of the buttons. Test: `MaterialCorrectionIT.aDraftAlreadySaysTwoApprovalsWhenTheMaterialHasGoneFurther`. |
+| B30 | ✅ Fixed | The reinspection covers only the reworked quantity and its sample is sized to that (test added to `ProductionQualityIT`). When there is one open NCR, the rework dialog pre-selects it, and the quantity starts at what is still to rework. A step line ending "@ WC-CODE" goes to that work centre. |
+| B31 | ✅ Fixed | The NCR says "Disposition: conditional acceptance." |
+| B32 | ✅ Fixed, re-tested | Chart bars with a label have `role="img"`. Tile `dt`/`dd` are now direct children of the list's row (the icon is decoration). |
+| B33 | ✅ Fixed, re-tested | "Sent on" defaults to today. A refusal on a revision clears once the revision changes. The Receive page shows "You do not have permission to do this." without RECEIPT_MANAGE. |
+| B34 | ✅ Fixed, re-tested | Resolving a customer who still holds units needs a reason, which is kept on the customer and in the audit; the UI asks for it. Regulator details cannot be changed on a closed recall, and the button is hidden. Tests: `RecallIT.aCustomerStillHoldingUnitsIsResolvedOnlyWithAReason`, `whatTheRegulatorWasToldCannotChangeOnceTheRecallIsClosed`. |
+
+Tests for the second pass: in the full backend `mvn verify`, unit tests pass, and 767 of 768 integration tests passed on the first run. The one failure was `QualityIT`, which expected the old 400 for a past CAPA target; it now expects 422 with the message, and `QualityIT` passes 26/26. Frontend typecheck and lint are clean, and 220 unit tests pass. Browser re-check: axe finds no violations on /dashboard or /analytics, Tab does not leave a dialog, the skip link is the first stop, and the Operator gets "You do not have permission" on Receive.
 
 ### Observations (by design or for product review)
 
@@ -499,14 +539,137 @@ Each of the 11 non-owner roles tried: create facility, supplier, material, produ
 
 ---
 
-## 6. Not covered in this pass
+## 6. Second pass: the areas left out of the first pass (26 Nov 2026)
 
-- Paying an invoice through Razorpay (would call an external service).
-- Stock transfers between plants (needs a second active facility).
-- Material corrections, rework orders end to end, recipes (process manufacturing), AQL sampling, conditional acceptance.
-- Closing the recall and the audit (both left open on purpose after their guards were checked).
-- Control Center (/platform) operator roles and the support console from the operator side.
-- Offline inspection mode, browsers other than Chromium, and accessibility (screen reader, keyboard-only).
+Same stack and accounts, on branch `fix/supplier-approval-assignees`. Razorpay ran in **test mode** with the organisation's test keys (in the git-ignored `.env`). Each step was done by the role that owns it.
+
+### W23 Paying an invoice through Razorpay (Owner)
+
+| # | Scenario | Result |
+|---|---|---|
+| 23.1 | Old test keys: Razorpay answers 401; the payer sees "The payment service did not respond." | ⚠️ B26 |
+| 23.2 | Pay ₹7,078.82 online → Razorpay Checkout (Test Mode) → contact number → Netbanking → bank → Razorpay's demo bank page → Success | ✅ |
+| 23.3 | Back in the app: "Payment received. Thank you."; BILL-2026-00001 **paid**; payment history shows `pay_U4VMV4nUBGX2rV`; plan **Growth, Active** | ✅ |
+| 23.4 | Invoice PDF: "Paid", GSTIN, ₹5,999 + GST 18% ₹1,079.82 = ₹7,078.82 | ✅ |
+| 23.5 | Upgrade Growth → Professional: confirmation dialog; BILL-2026-00002 ₹4,720.57 = ₹9,999 less ₹5,998.52 credit for unused Growth time, plus GST; paid the same way; plan **Professional, Active** | ✅ |
+| 23.6 | "Payment received" / "Plan changed" notification or email to anyone | ❌ B21 |
+
+### W24 Closing the audit (Auditor, QE, QM)
+
+| # | Scenario | Result |
+|---|---|---|
+| 24.1 | Finding NCR-2026-00005 → assigned to QE → containment, investigation → CAPA-2026-00002 | ✅ |
+| 24.2 | "Finish analysis" with an empty root cause → "Required" | ✅ |
+| 24.3 | Supplier Manager completes the CAPA action; QE submits verification; QM verifies effective and closes CAPA; QE requests NCR verification; QM closes NCR | ✅ |
+| 24.4 | On the **Growth** plan, nobody (not even the QM) sees audit closure buttons. Audits belong to the Advanced feature set, but the page still opened and listed audits. Closure appeared after the move to Professional. | ⚠️ the page should say the plan does not include it |
+| 24.5 | Auditor: Request closure (note) → QM: "Approve closing this audit?" → AUD-2026-00001 **closed** | ✅ |
+
+### W25 Closing the recall (QE, QM)
+
+| # | Scenario | Result |
+|---|---|---|
+| 25.1 | Both customers moved to Resolved (no note asked, units still out) | ⚠️ B34 |
+| 25.2 | Request closure without the acceptance box → "This recall cannot close yet: Goods remain with customers. Confirm this and explain it in the note." | ✅ |
+| 25.3 | With the box and a note → QM approves → RCL-2026-00001 **closed**; "Edit regulator details" still shown | ✅ / ⚠️ B34 |
+
+### W26 Stock transfers between plants (Production Manager, QE)
+
+| # | Scenario | Result |
+|---|---|---|
+| 26.1 | Restore archived CHAKAN facility (Professional allows 5) | ✅ |
+| 26.2 | Send stock: empty → each field "is required"; "Sent on" not pre-filled | ✅ / ⚠️ B33 |
+| 26.3 | Same plant both sides → "A transfer goes to another plant." | ✅ |
+| 26.4 | 5,000 from a lot with 480 free → "Batch LOT-2026-00001 has only 480 free." | ✅ |
+| 26.5 | 100 KG EN8 PUNE-1 → CHAKAN → STR-2026-00001 "in transit"; free stock at PUNE-1 drops to 380 | ✅ |
+| 26.6 | Receive at Chakan → new lot **LOT-2026-00001-T1** (100 free at CHAKAN) | ✅ |
+| 26.7 | Second transfer (5 L oil) → Cancel with reason → "cancelled"; the oil stays at PUNE-1 (20 free) | ✅ |
+
+### W27 Material corrections (QE requests; QM and Plant Head approve)
+
+| # | Scenario | Result |
+|---|---|---|
+| 27.1 | From the lot's trace page: Request correction; empty → "Why this record is wrong is required" | ✅ |
+| 27.2 | MC-2026-00001: supplier batch HEAT-A → BS-H2291-B; impact shows PB-2026-00001 and the two customers holding the material; submit | ✅ |
+| 27.3 | Requester has no Approve button | ✅ |
+| 27.4 | QM approves without ticking "I have reviewed the impact" → "This material has gone further than the lot. Review and acknowledge the impact." | ✅ |
+| 27.5 | QM approves (1 of 2), Plant Head approves (2 of 2) → **applied**; lot trace shows BS-H2291-B and the correction history | ✅ (counts ⚠️ B29) |
+| 27.6 | Transferred lot LOT-2026-00001-T1 still HEAT-A | ❌ B23 |
+| 27.7 | MC-2026-00002 rejected by QM with a note → "rejected", decision note shown, lot unchanged | ✅ |
+
+### W28 Rework order end to end (Planner, Production Manager, Operator, QE, Inspector, QM)
+
+| # | Scenario | Result |
+|---|---|---|
+| 28.1 | WO-2026-00002 (20 × DS-100) planned, approved, released, started; Operator reports op 10: 16 good, 4 rejected for rework → NCR-2026-00006 raised automatically | ✅ |
+| 28.2 | QE: Raise rework order, 6 PCS → "Operation 10 has 4 marked for rework that is not on a rework order yet."; 4 PCS → RW-2026-00001 "open" | ✅ |
+| 28.3 | Raiser sees only Cancel; Production Manager approves with a note | ✅ |
+| 28.4 | Operator: Start rework → Complete before the steps → "Step 1 is not done yet."; marks 3 steps done; 4 reworked + 1 scrapped refused; 3 reworked + 1 scrapped → "awaiting inspection" | ✅ |
+| 28.5 | QE: Reinspect → INS-2026-00008 (IPQC); Inspector records; QM approves and Accepts | ✅ (quantity ⚠️ B30) |
+| 28.6 | QE: "Close on the reinspection" → **closed**; WO quality: "reworked and accepted 3 · scrapped 1"; operation 20 now has 19 waiting (16 + 3) | ✅ |
+
+### W29 Recipes / process manufacturing (Production Manager, Plant Head, Owner, Planner)
+
+| # | Scenario | Result |
+|---|---|---|
+| 29.1 | Discrete model: recipe for DS-100-M → "DS-100-M is made by discrete manufacturing, so it takes a BOM, not a recipe." | ✅ |
+| 29.2 | Manufacturing settings → Hybrid; product CB-200 Coolant blend (LTR) → "Set how it is made" → Process | ✅ |
+| 29.3 | Recipe revision 1, batch 200 L; submit with no lines → "Add at least one line before submitting." | ✅ |
+| 29.4 | Line OIL-68 10 L; parameter lower 45 > upper 35 → "The lower limit is above the upper limit."; MIX-T 35 to 45 °C, target 40 | ✅ |
+| 29.5 | Scale to 500 L → 25 L oil | ✅ |
+| 29.6 | Submitter sees only "Send back"; send back with a note → draft "Sent back: …"; resubmit; Plant Head approves → **approved, in effect from 2026-11-26** | ✅ |
+| 29.7 | WO-2026-00003 (100 L CB-200) planned 25 Nov → release refused "CB-200 has no approved recipe in effect on 2026-11-25." Rescheduled to 26 Nov → released, "Made from Recipe, Revision 1", OIL-68 needed 5 L, planned cost ₹1,550 (₹15.50/L) | ✅ (B27, B28) |
+
+### W30 AQL sampling (ISO 2859-1) and conditional acceptance (QE, QM, Inspector)
+
+| # | Scenario | Result |
+|---|---|---|
+| 30.1 | QE: template BRG-IQC for BRG-6205, Sampling = AQL 1.0, level II, BORE 24.990 to 25.000 mm; QM publishes | ✅ (effective date ⚠️ B22) |
+| 30.2 | PO-2026-00002 (500 bearings) issued; receipt dated today refused "The date cannot be in the future." | ❌ B22 |
+| 30.3 | Received as Inspector (QE gets 403 by URL, button correctly hidden) → LOT-2026-00006; Inspect → "AQL 1, level II, normal inspection, letter H: accept up to 1 nonconforming, reject from 2", **50 samples** (correct per Table II-A) | ✅ |
+| 30.4 | 48 in tolerance, 2 at 25.004 → **fail** | ✅ |
+| 30.5 | QM: dispositions offered for a fail: Reject, Hold, Rework, Conditional acceptance (no Accept) | ✅ |
+| 30.6 | Conditional acceptance without justification → "Conditional acceptance needs a justification." With it → completed; NCR-2026-00007 raised; lot usable (500 free) | ✅ (B31) |
+| 30.7 | Second lot LOT-2026-00007 fails (3 of 50) → Reject → Bharat Steels moves to **tightened** ("two rejections in five lots") | ✅ |
+| 30.8 | Third lot LOT-2026-00008 → "tightened inspection … accept up to 1, reject from 2", **80 samples** (Table II-B, letter H at AQL 1.0 points to n = 80) | ✅ |
+
+### W31 Offline inspection (Inspector)
+
+| # | Scenario | Result |
+|---|---|---|
+| 31.1 | Network cut on INS-2026-00011 → "No connection. Results you save are kept on this device and sent when it is back." | ✅ |
+| 31.2 | 10 samples + Save offline → "10 values waiting to be sent", each "On this device, not sent yet" | ✅ |
+| 31.3 | Sign out while values wait → "INS-2026-00011 has inspection values not sent yet. They stay on this device and are sent only when you sign in here again. Sign out anyway?"; Cancel keeps the session | ✅ |
+| 31.4 | Tab closed, connection restored, new tab → queue sent by itself; server has the 10 results; form shows them | ✅ |
+| 31.5 | There is no service worker, so a page can't be opened or reloaded offline. The inspection must already be open when the connection drops. | ℹ️ limitation |
+
+### W32 Other browsers (same 8-step smoke: sign in, menu → NCR, 80-input inspection, dialog with date, select and validation, global search, traceability, report PDF, sign out)
+
+| Browser | Result |
+|---|---|
+| Chromium (Playwright build) | ✅ 8/8, no console errors, no failed calls |
+| Firefox 157 | ✅ 8/8, no console errors, no failed calls; layout matches Chromium |
+| WebKit (Safari engine), headless Linux | ⚠️ Not conclusive. The session cookie is `Secure`, and WebKit drops Secure cookies on `http://localhost` (Chromium and Firefox accept them), so every page bounced to /login. With the cookie copied in without Secure: full page loads, forms, dates, selects, search, traceability, PDF and sign-out work. Client-side link navigation (menu → NCRs, Report) still hangs, and Next.js prefetches report "access control checks". Check in real Safari on UAT over HTTPS before treating this as an app bug. |
+
+### W33 Accessibility
+
+| # | Check | Result |
+|---|---|---|
+| 33.1 | axe-core WCAG 2.1 A/AA on 15 screens: sign-in, register, NCR list and detail, the 80-input inspection, Send stock dialog with errors, work order, rework order, recipe, traceability, new PO, billing, notifications | ✅ clean |
+| 33.2 | axe on dashboard and analytics | ❌ B32 |
+| 33.3 | Keyboard: logical Tab order (Notifications → Search → menu); visible focus on every stop; Enter opens links and dialogs; Tab moves through 80 sample inputs in order | ✅ |
+| 33.4 | Dialog opens with focus on its first field; Escape closes and returns focus to the button that opened it | ✅ |
+| 33.5 | Focus stays inside an open dialog | ❌ B24 |
+| 33.6 | Skip to content | ❌ B25 |
+| 33.7 | Screen reader (NVDA/VoiceOver) by ear | not done: needs a person |
+
+### Data this pass leaves behind
+
+Professional plan (paid in Razorpay test mode); manufacturing model **Hybrid**; CHAKAN active again; WO-2026-00002 in progress; WO-2026-00003 released; NCR-2026-00006 and -00007 open; INS-2026-00011 (LOT-2026-00008) pending with 11 results; CB-200 recipe in effect.
+
+### Still not covered
+
+- Control Center (/platform) operator roles and the support console from the operator side (left out on request).
+- Safari on a real Mac or iPhone over HTTPS, and a screen-reader pass by a person.
 
 ---
 

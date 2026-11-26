@@ -200,6 +200,18 @@ public class InspectionService implements AttachmentPolicy {
         return toDetail(inspection);
     }
 
+    /**
+     * A reinspection of reworked goods covers only those goods, so its quantity and sample follow what was reworked,
+     * not the whole batch.
+     */
+    @Transactional
+    public InspectionDetail createForRework(UUID productionBatchId, UUID templateId, BigDecimal reworked) {
+        CreateInspectionRequest given = new CreateInspectionRequest(null, productionBatchId, null, templateId);
+        CreateInspectionRequest request = templateId != null ? given
+                : new CreateInspectionRequest(null, productionBatchId, null, chooseTemplate(given));
+        return toDetail(inspectProductionBatch(request, reworked));
+    }
+
     /** Freezes the specification in force today. Later template changes never reach this inspection. */
     @Transactional
     public InspectionDetail create(CreateInspectionRequest given) {
@@ -209,7 +221,7 @@ public class InspectionService implements AttachmentPolicy {
         if (request.receiptItemId() != null) {
             return toDetail(inspectLot(request));
         }
-        return toDetail(request.returnItemId() != null ? inspectReturn(request) : inspectProductionBatch(request));
+        return toDetail(request.returnItemId() != null ? inspectReturn(request) : inspectProductionBatch(request, null));
     }
 
     /**
@@ -268,7 +280,8 @@ public class InspectionService implements AttachmentPolicy {
             throw new BusinessRuleException("Returned goods take a final or outgoing inspection template.");
         }
         TemplateVersion version = templates.versionInForce(template.getId());
-        TemplateVersion.SamplingPlan plan = version.planFor(goods.quantity());
+        TemplateVersion.SamplingPlan plan = version.planFor(goods.quantity(), AqlTable.Severity.NORMAL,
+                materials.bulkUnitCode(batch.uomId()));
         Inspection inspection = new Inspection(
                 numbers.next("INS"),
                 template.getInspectionType(),
@@ -291,7 +304,8 @@ public class InspectionService implements AttachmentPolicy {
         InspectionTemplate template = templates.requireUsableFor(request.templateId(), batch.materialId());
         TemplateVersion version = templates.versionInForce(template.getId());
         TemplateVersion.SamplingPlan plan = version.planFor(batch.quantity(),
-                severityFor(version, template.getId(), batch.supplierId()));
+                severityFor(version, template.getId(), batch.supplierId()),
+                materials.bulkUnitCode(materials.references(List.of(batch.materialId())).get(batch.materialId()).uomId()));
         receipts.startInspection(batch.itemId());
         return save(new Inspection(
                 numbers.next("INS"),
@@ -308,16 +322,19 @@ public class InspectionService implements AttachmentPolicy {
                 plan.sampleSize()));
     }
 
-    private Inspection inspectProductionBatch(CreateInspectionRequest request) {
+    /** @param only how much of the batch is inspected, or null for the whole of it */
+    private Inspection inspectProductionBatch(CreateInspectionRequest request, BigDecimal only) {
         ProductionBatchView unlocked = production.batch(request.productionBatchId());
         InspectionTemplate template = templates.requireUsableForProduct(request.templateId(), unlocked.productId());
         // Quantities are read again under the batch's lock, so a dispatch committed meanwhile is counted.
         ProductionBatchView batch = production.lockForInspection(unlocked.id(), template.getInspectionType().name());
         TemplateVersion version = templates.versionInForce(template.getId());
         // An outgoing check covers what is left to ship. Earlier checks cover the whole batch.
-        BigDecimal quantity = template.getInspectionType() == InspectionTemplate.Type.OQC ? batch.availableQuantity()
+        BigDecimal quantity = only != null ? only
+                : template.getInspectionType() == InspectionTemplate.Type.OQC ? batch.availableQuantity()
                 : batch.producedQuantity() != null ? batch.producedQuantity() : batch.plannedQuantity();
-        TemplateVersion.SamplingPlan plan = version.planFor(quantity, severityFor(version, template.getId(), null));
+        TemplateVersion.SamplingPlan plan = version.planFor(quantity, severityFor(version, template.getId(), null),
+                materials.bulkUnitCode(batch.uomId()));
         return save(new Inspection(
                 numbers.next("INS"),
                 template.getInspectionType(),
@@ -428,9 +445,10 @@ public class InspectionService implements AttachmentPolicy {
         boolean open = inspections.findByReinspectionOfOrderByCreatedAtDesc(earlierId).stream()
                 .anyMatch(later -> later.getStatus() != Inspection.Status.COMPLETED
                         && later.getStatus() != Inspection.Status.CANCELLED);
-        if (open || earlier.getReturnItemId() != null) {
+        if (open) {
             return;
         }
+        // Returned goods that were accepted went back into their batch, which is what is held: the batch is checked again.
         UUID template = earlier.getInspectionType() == InspectionTemplate.Type.OQC ? null
                 : templates.templateOf(earlier.getTemplateVersionId());
         InspectionDetail started = create(new CreateInspectionRequest(
@@ -454,8 +472,11 @@ public class InspectionService implements AttachmentPolicy {
     }
 
     @Transactional
-    public InspectionDetail cancel(UUID id) {
+    public InspectionDetail cancel(UUID id, String reason) {
         Inspection inspection = lock(id);
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessRuleException("Say why the inspection is cancelled.");
+        }
         inspection.cancel();
         if (inspection.getReturnItemId() != null) {
             returns.inspectionCancelled(inspection.getReturnItemId());
@@ -463,7 +484,7 @@ public class InspectionService implements AttachmentPolicy {
             receipts.releaseInspection(inspection.getReceiptItemId());
         }
         inspections.saveAndFlush(inspection);
-        audit.record("INSPECTION_CANCELLED", ENTITY, id);
+        audit.record("INSPECTION_CANCELLED", ENTITY, id, null, Map.of("reason", reason.trim()));
         return toDetail(inspection);
     }
 
@@ -692,9 +713,11 @@ public class InspectionService implements AttachmentPolicy {
                 .map(InspectionResult::getParameterCode)
                 .distinct()
                 .toList();
+        // Plain words, as a person would write them: "conditional acceptance", not CONDITIONAL_ACCEPTANCE.
+        String disposition = decision.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
         String description = failed.isEmpty()
-                ? "Material disposed of as " + decision + "."
-                : "Failed parameters: " + String.join(", ", failed) + ". Disposition: " + decision + ".";
+                ? "Material disposed of as " + disposition + "."
+                : "Failed parameters: " + String.join(", ", failed) + ". Disposition: " + disposition + ".";
         ncrs.raiseFromInspection(new InspectionFailure(
                 inspection.getId(),
                 inspection.getInspectionNumber(),

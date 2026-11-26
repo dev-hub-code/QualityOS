@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useState, type ReactNode, useEffect } from "react";
 import { FormError } from "@/components/forms/field";
 import { Details, PageHeader, Section, StatusBadge, useAction, useRefresh } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
@@ -13,7 +13,7 @@ import { DEFINITIONS, revisionActions, type DefinitionKind } from "@/lib/manufac
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { Revision } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { formatDateTime } from "@/lib/dates";
+import { formatCalendarDay, formatDateTime } from "@/lib/dates";
 
 const when = (value: string | null) => (value ? formatDateTime(value) : "–");
 
@@ -36,7 +36,9 @@ export function RevisionHeader({
   const canApprove = usePermission(definition.approve);
   const refresh = useRefresh();
   const router = useRouter();
-  const { run, pending, message } = useAction();
+  const { run, pending, message, clear } = useAction();
+  // A refusal such as "Add at least one line" stops being true once the revision changes, so it is not left showing.
+  useEffect(clear, [revision]); // eslint-disable-line react-hooks/exhaustive-deps
   const [dialog, setDialog] = useState<"edit" | "sendBack" | "approve" | "retire" | null>(null);
   const ownRefused = useOwnApprovalRefused(revision.submittedBy);
   const actions = revisionActions(revision.status, revision.submittedAt !== null, { manage: canManage, approve: canApprove })
@@ -142,7 +144,7 @@ export function RevisionHeader({
               : []),
             ...details,
             ["What it is for", revision.changeNote ?? "–"],
-            ["Effective", revision.effectiveFrom ? `${revision.effectiveFrom} to ${revision.effectiveTo ?? "open"}` : "Not yet approved"],
+            ["Effective", revision.effectiveFrom ? `${formatCalendarDay(revision.effectiveFrom)} to ${revision.effectiveTo ? formatCalendarDay(revision.effectiveTo) : "open"}` : "Not yet approved"],
             ["Submitted", revision.submittedAt ? `${revision.submittedByName ?? "Former member"}, ${when(revision.submittedAt)}` : "–"],
             ["Approved", revision.approvedAt ? `${revision.approvedByName ?? "Former member"}, ${when(revision.approvedAt)}` : "–"],
           ]}

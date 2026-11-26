@@ -35,10 +35,17 @@ abstract class MasterDataFixture extends AbstractIntegrationTest {
                 .andExpect(status().isCreated())));
     }
 
+    /**
+     * A supplier ready for purchase orders. Approval needs a second person, and adding one would change tests that
+     * depend on how many members an organisation has, so this setup marks it approved directly. Approval itself is
+     * tested in MasterDataIT.
+     */
     protected String approvedSupplier(Session session) throws Exception {
         String id = draftSupplier(session);
         as(session, postJson("/api/v1/suppliers/" + id + "/submit", Map.of())).andExpect(status().isOk());
-        as(session, postJson("/api/v1/suppliers/" + id + "/approve", Map.of())).andExpect(status().isOk());
+        asDatabaseSuperuser().update("""
+                UPDATE suppliers SET status = 'APPROVED', approved_by = ?, approved_at = now(), version = version + 1
+                WHERE id = ?""", session.userId(), UUID.fromString(id));
         return id;
     }
 

@@ -12,6 +12,7 @@ import { api } from "@/lib/api";
 import { useStates } from "@/lib/places";
 import type { FieldDef } from "@/lib/record-form";
 import type { StateHoliday } from "@/lib/types";
+import { formatCalendarDay } from "@/lib/dates";
 
 const SELECT_CLASS = "h-9 rounded-xl border border-input bg-white/70 px-2 text-sm";
 const ALL_INDIA = "ALL";
@@ -120,7 +121,7 @@ export default function StateHolidaysPage() {
                       onClick={() =>
                         confirm({
                           title: `Remove ${holiday.name}?`,
-                          description: `Facilities in ${holiday.regionName} will work on ${holiday.date}.`,
+                          description: `Facilities in ${holiday.regionName} will work on ${formatCalendarDay(holiday.date)}.`,
                           confirmLabel: "Remove holiday",
                           danger: true,
                         }).then((ok) => {

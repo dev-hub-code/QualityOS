@@ -129,6 +129,10 @@ public class MaterialReceiptService implements AttachmentPolicy {
 
     @Transactional
     public ReceiptDetail create(CreateReceiptRequest request) {
+        // The organisation's day, not the server's: in India the server's UTC date is still yesterday until 05:30.
+        if (request.receivedOn().isAfter(today())) {
+            throw new BusinessRuleException("The received date cannot be in the future.");
+        }
         Map<UUID, BigDecimal> totals = request.items().stream().collect(Collectors.toMap(
                 ReceiptItemRequest::purchaseOrderItemId, ReceiptItemRequest::quantity, BigDecimal::add));
         ReceiptTarget target = purchaseOrders.recordReceipt(request.purchaseOrderId(), totals);
@@ -190,7 +194,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
         String list = String.join(", ", lots);
         notifications.notify(scope.allowedIn(receipt.getFacilityId(), access.holdersOf(Permissions.INSPECTION_CREATE)),
                 NotificationType.MATERIAL_AWAITING_INSPECTION,
-                receipt.getGrnNumber() + ": " + lots.size() + " lot(s) to inspect", list, "/inspections",
+                receipt.getGrnNumber() + ": " + lots.size() + (lots.size() == 1 ? " lot" : " lots") + " to inspect", list, "/inspections",
                 new EmailContent(EmailTemplate.MATERIAL_RECEIVED, Map.of("receiptNumber", receipt.getGrnNumber(),
                         "supplierName", supplier, "lots", list)));
     }
@@ -423,6 +427,16 @@ public class MaterialReceiptService implements AttachmentPolicy {
             }
         }
         item.correct(correction.materialId(), correction.supplierBatch(), correction.quantity());
+        // Stock sent to other plants is the same material from the same supplier batch, so what it is follows the
+        // correction; how much each plant received does not.
+        if (correction.materialId() != null || correction.supplierBatch() != null) {
+            for (MaterialReceiptItem moved : items.findAllById(transferredOn(List.of(itemId)))) {
+                moved.correct(correction.materialId(), correction.supplierBatch(), null);
+                if (correction.materialId() != null) {
+                    affected.add(moved.getId());
+                }
+            }
+        }
         items.flush();
         return new AppliedLotCorrection(List.copyOf(affected));
     }

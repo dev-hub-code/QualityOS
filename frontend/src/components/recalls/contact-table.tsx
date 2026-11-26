@@ -49,7 +49,7 @@ export function attemptMoment(date: string, now = new Date()): string {
   return (midday > now ? now : midday).toISOString();
 }
 
-type Dialog = "attempt" | "acknowledge" | "edit" | "exception";
+type Dialog = "attempt" | "acknowledge" | "edit" | "exception" | "resolve";
 
 export function ContactTable({
   recallId,
@@ -63,7 +63,7 @@ export function ContactTable({
   const canManage = usePermission("RECALL_MANAGE") && open;
   const canClose = usePermission("RECALL_CLOSE") && open;
   const canSeeFiles = usePermission("RECALL_VIEW");
-  const assignees = useAssignees();
+  const assignees = useAssignees("RECALL_MANAGE");
   const refresh = useRefresh();
   const { run, message } = useAction();
   const [active, setActive] = useState<{ contact: RecallContact; dialog: Dialog } | null>(null);
@@ -98,7 +98,7 @@ export function ContactTable({
             </p>
             <p>
               {formatQuantity(contact.quantity)} dispatched, {formatQuantity(contact.returnedQuantity)} returned,{" "}
-              {formatQuantity(contact.outstandingQuantity)} still out · {contact.attempts} attempts
+              {formatQuantity(contact.outstandingQuantity)} still out · {contact.attempts} {contact.attempts === 1 ? "attempt" : "attempts"}
               {contact.acknowledgedOn && ` · Acknowledged ${contact.acknowledgedOn}`}
             </p>
             {contact.exceptionReason && <p>Exception: {contact.exceptionReason}</p>}
@@ -121,6 +121,11 @@ export function ContactTable({
                     onChange={(event) => {
                       // Read now: this select snaps back to blank before the request is built.
                       const status = event.target.value;
+                      // Resolving someone who still holds units needs a reason, so ask for it first.
+                      if (status === "RESOLVED" && Number(contact.outstandingQuantity) > 0) {
+                        setActive({ contact, dialog: "resolve" });
+                        return;
+                      }
                       run(() => api.post(`${customer(contact)}/status`, { status }));
                     }}
                   >
@@ -187,6 +192,24 @@ export function ContactTable({
           onClose={close}
           onSubmit={async (values) => {
             await api.put(customer(active.contact), values);
+            refresh();
+          }}
+        />
+      )}
+      {active?.dialog === "resolve" && (
+        <RecordDialog
+          title={`Resolve ${active.contact.customerName}`}
+          fields={[
+            {
+              name: "note",
+              label: `${formatQuantity(active.contact.outstandingQuantity)} units are still with this customer. Why is it resolved without them?`,
+              type: "textarea",
+              required: true,
+            },
+          ]}
+          onClose={close}
+          onSubmit={async (values) => {
+            await api.post(`${customer(active.contact)}/status`, { status: "RESOLVED", note: values.note });
             refresh();
           }}
         />

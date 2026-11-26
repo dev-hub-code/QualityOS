@@ -114,6 +114,19 @@ public class QualityGateService {
      *
      * @return how many gates the order took
      */
+    /**
+     * A problem to stop a release when the order will need a final inspection to close but no published final template
+     * fits the product: otherwise it is found only once the goods are made and received.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Optional<String> finalInspectionProblem(UUID productId, String productCode, boolean required) {
+        if (!required || templates.hasFinalTemplateFor(productId)) {
+            return java.util.Optional.empty();
+        }
+        return java.util.Optional.of(("No published final inspection (FQC) template fits %s, and Configuration needs a "
+                + "final inspection before an order closes. Publish one before releasing.").formatted(productCode));
+    }
+
     @Transactional(propagation = Propagation.MANDATORY)
     public int writeGates(WorkOrder order, List<WorkOrderOperation> steps) {
         List<QualityGate> made = new ArrayList<>();

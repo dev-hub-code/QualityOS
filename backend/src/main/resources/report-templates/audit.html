@@ -38,8 +38,8 @@ td { font-size: 8.5pt; overflow-wrap: break-word; word-wrap: break-word; }
 <p class="muted">{{report.organizationName}}{{#report.organizationLegalName}} ({{.}}){{/report.organizationLegalName}}{{#report.organizationAddress}}, {{.}}{{/report.organizationAddress}}</p>
 
 <table class="meta">
-<tr><td class="label">Audit reference</td><td>{{report.audit.auditNumber}}</td><td class="label">Status</td><td>{{report.audit.status}}</td></tr>
-<tr><td class="label">Title</td><td>{{report.audit.title}}</td><td class="label">Type</td><td>{{report.audit.auditType}}</td></tr>
+<tr><td class="label">Audit reference</td><td>{{report.audit.auditNumber}}</td><td class="label">Status</td><td>{{#label}}{{report.audit.status}}{{/label}}</td></tr>
+<tr><td class="label">Title</td><td>{{report.audit.title}}</td><td class="label">Type</td><td>{{#label}}{{report.audit.auditType}}{{/label}}</td></tr>
 <tr><td class="label">Facility</td><td>{{report.audit.facilityName}}</td><td class="label">Planned for</td><td>{{report.audit.plannedOn}}</td></tr>
 <tr><td class="label">Lead auditor</td><td>{{report.audit.leadAuditorName}}</td><td class="label">Checklist</td><td>{{report.audit.checklistName}}</td></tr>
 {{#report.audit.supplierName}}<tr><td class="label">Supplier</td><td>{{.}}</td><td></td><td></td></tr>{{/report.audit.supplierName}}
@@ -59,7 +59,7 @@ td { font-size: 8.5pt; overflow-wrap: break-word; word-wrap: break-word; }
 <table>
 <thead><tr><th style="width:4%">No.</th><th style="width:13%">Grade</th><th style="width:30%">Finding</th><th style="width:29%">Evidence</th><th style="width:8%">Clause</th><th style="width:16%">NCR and CAPA</th></tr></thead>
 <tbody>
-{{#report.audit.findings}}<tr><td>{{number}}</td><td>{{gradeLabel}}</td><td>{{statement}}</td><td>{{evidence}}</td><td>{{clauseReference}}</td><td>{{#ncr}}{{ncrNumber}} ({{status}}){{#capas}}<br/>{{capaNumber}} ({{status}}){{/capas}}{{/ncr}}</td></tr>
+{{#report.audit.findings}}<tr><td>{{number}}</td><td>{{gradeLabel}}</td><td>{{statement}}</td><td>{{evidence}}</td><td>{{clauseReference}}</td><td>{{#ncr}}{{ncrNumber}} ({{#label}}{{status}}{{/label}}){{#capas}}<br/>{{capaNumber}} ({{#label}}{{status}}{{/label}}){{/capas}}{{/ncr}}</td></tr>
 {{/report.audit.findings}}
 </tbody>
 </table>

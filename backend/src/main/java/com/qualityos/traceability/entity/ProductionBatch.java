@@ -114,7 +114,8 @@ public class ProductionBatch extends TenantOwnedEntity {
             }
         } else if (FINAL.equals(inspectionType)) {
             if (producedQuantity == null || (status != Status.COMPLETED && status != Status.ON_HOLD)) {
-                throw new BusinessRuleException("Final inspection needs a completed batch.");
+                throw new BusinessRuleException(
+                        "Final inspection needs a completed batch. Receive the finished goods on the work order first.");
             }
         } else if (OUTGOING.equals(inspectionType)) {
             if (status != Status.RELEASED || availableQuantity().signum() <= 0) {

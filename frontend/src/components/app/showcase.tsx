@@ -156,14 +156,17 @@ export function Pending({ icon: Icon, label, value, href }: { icon: LucideIcon; 
 /** A figure tile for a `<dl>`. */
 export function Tile({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: ReactNode }) {
   return (
-    <div className="glass flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-center">
-      <span className={`grid size-10 shrink-0 place-items-center rounded-xl ${NAVY} text-white shadow`}>
-        <Icon className="size-5" />
-      </span>
-      <div className="min-w-0">
-        <dt className="truncate text-xs text-slate-500">{label}</dt>
-        <dd className="text-xl font-semibold break-words text-[#1b2a55] tabular-nums sm:text-2xl">{value}</dd>
-      </div>
+    <div className="glass relative min-w-0 rounded-2xl p-4 pl-[4.5rem]">
+      <dt className="truncate text-xs text-slate-500">
+        <span
+          aria-hidden="true"
+          className={`absolute top-1/2 left-4 grid size-10 -translate-y-1/2 place-items-center rounded-xl ${NAVY} text-white shadow`}
+        >
+          <Icon className="size-5" />
+        </span>
+        {label}
+      </dt>
+      <dd className="text-xl font-semibold break-words text-[#1b2a55] tabular-nums sm:text-2xl">{value}</dd>
     </div>
   );
 }

@@ -337,7 +337,7 @@ public class TraceabilityService {
         lots.forEach(lot -> events.add(new TimelineEvent(
                 lot.receivedOn().atStartOfDay().toInstant(ZoneOffset.UTC), "RECEIVED",
                 "Received " + lot.materialCode() + " from " + lot.supplierName() + " on " + lot.grnNumber(),
-                lot.internalBatch(), lot.disposition(), null)));
+                lot.internalBatch(), lot.disposition(), null, true)));
         batches.forEach(batch -> {
             events.add(new TimelineEvent(batch.createdAt(), "PRODUCTION_STARTED",
                     "Production started: " + batch.productCode(), batch.batchNumber(), null, null));
@@ -392,7 +392,9 @@ public class TraceabilityService {
     @Transactional(readOnly = true)
     public CorrectionImpact lotImpact(UUID lotId, boolean inspected) {
         Set<UUID> reached = downstreamOfLot(lotId);
-        return impact(inspected, reached, reached);
+        List<String> moved = receipts.lots(receipts.transferredOn(Set.of(lotId))).stream()
+                .map(lot -> lot.internalBatch()).sorted().toList();
+        return impact(inspected, reached, reached, moved);
     }
 
     /** How far a batch has gone: later batches that used it, and customers who hold it or what was made from it. */
@@ -401,19 +403,27 @@ public class TraceabilityService {
         Set<UUID> later = downstream("parent_batch_id", batchId);
         Set<UUID> shipped = new HashSet<>(later);
         shipped.add(batchId);
-        return impact(false, later, shipped);
+        return impact(false, later, shipped, List.of());
     }
 
-    private CorrectionImpact impact(boolean inspected, Set<UUID> later, Set<UUID> shipped) {
+    private CorrectionImpact impact(boolean inspected, Set<UUID> later, Set<UUID> shipped, List<String> transferredLots) {
+        Set<String> shippedNumbers = production.views(shipped).stream().map(ProductionBatchView::batchNumber)
+                .collect(java.util.stream.Collectors.toSet());
         return new CorrectionImpact(
                 inspected,
                 production.views(later).stream().map(ProductionBatchView::batchNumber).sorted().toList(),
                 dispatches.forBatches(shipped).stream()
                         .filter(dispatch -> dispatch.reversalReason() == null)
+                        // Only customers who still hold some of it: those who sent everything back hold nothing.
+                        .filter(dispatch -> dispatch.lines().stream()
+                                .filter(line -> shippedNumbers.contains(line.batchNumber()))
+                                .anyMatch(line -> line.quantity().compareTo(
+                                        line.returnedQuantity() == null ? BigDecimal.ZERO : line.returnedQuantity()) > 0))
                         .map(DispatchResponse::customerName)
                         .distinct()
                         .sorted()
-                        .toList());
+                        .toList(),
+                transferredLots);
     }
 
     /** What a lot reached, including what the parts of it sent to other plants reached there. */

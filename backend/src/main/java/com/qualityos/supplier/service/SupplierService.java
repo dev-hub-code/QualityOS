@@ -10,6 +10,9 @@ import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.common.tenant.TenantContext;
 import com.qualityos.identity.service.ReviewPolicy;
+import com.qualityos.identity.service.TenantAccessService;
+import com.qualityos.notification.service.NotificationService;
+import com.qualityos.notification.service.NotificationType;
 import com.qualityos.supplier.dto.SupplierDtos.CategoryResponse;
 import com.qualityos.supplier.dto.SupplierDtos.ContactResponse;
 import com.qualityos.supplier.dto.SupplierDtos.SaveContactRequest;
@@ -29,6 +32,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -49,6 +53,8 @@ public class SupplierService implements AttachmentPolicy {
     private final AuditService audit;
     private final ReviewPolicy reviewPolicy;
     private final com.qualityos.organization.service.IndiaPlaces places;
+    private final TenantAccessService access;
+    private final NotificationService notifications;
 
     SupplierService(
             SupplierRepository suppliers,
@@ -57,7 +63,11 @@ public class SupplierService implements AttachmentPolicy {
             SupplierMapper mapper,
             AuditService audit,
             ReviewPolicy reviewPolicy,
-            com.qualityos.organization.service.IndiaPlaces places) {
+            com.qualityos.organization.service.IndiaPlaces places,
+            TenantAccessService access,
+            NotificationService notifications) {
+        this.access = access;
+        this.notifications = notifications;
         this.places = places;
         this.reviewPolicy = reviewPolicy;
         this.suppliers = suppliers;
@@ -108,6 +118,7 @@ public class SupplierService implements AttachmentPolicy {
         if (supplier.getStatus() == Status.APPROVED && !identity.equals(identity(supplier))) {
             supplier.sendBackForApproval(TenantContext.getCurrentUserId(),
                     "Name, legal name or GSTIN changed, so it needs approving again.");
+            tellApprovers(supplier);
         }
         suppliers.saveAndFlush(supplier);
         audit.recordChange("SUPPLIER_UPDATED", "Supplier", id, before, audit.state(mapper.toResponse(supplier)));
@@ -152,9 +163,35 @@ public class SupplierService implements AttachmentPolicy {
         }
         supplier.transitionTo(target, actor, note);
         suppliers.saveAndFlush(supplier);
+        if (target == Status.PENDING_APPROVAL) {
+            tellApprovers(supplier);
+        }
+        if (previous == Status.PENDING_APPROVAL && target == Status.REJECTED) {
+            tellSubmitter(supplier);
+        }
         audit.record("SUPPLIER_STATUS_CHANGED", "Supplier", id,
                 Map.of("status", previous), Map.of("status", target));
         return mapper.toResponse(supplier);
+    }
+
+    /** The other supplier managers learn that a supplier waits for them; the one who submitted it is left out. */
+    private void tellApprovers(Supplier supplier) {
+        String summary = supplier.getStatusNote() != null ? supplier.getStatusNote()
+                : supplier.getCode() + (supplier.getGstin() == null ? "" : " · GSTIN " + supplier.getGstin());
+        notifications.notify(access.holdersOf(Permissions.SUPPLIER_APPROVE),
+                NotificationType.SUPPLIER_AWAITING_APPROVAL,
+                supplier.getName() + " needs approval", summary, "/suppliers/" + supplier.getId());
+    }
+
+    /** The one review outcome the submitter must act on, so they hear of it as of an inspection sent back. */
+    private void tellSubmitter(Supplier supplier) {
+        if (supplier.getSubmittedBy() == null) {
+            return;
+        }
+        notifications.notify(Set.of(supplier.getSubmittedBy()), NotificationType.SUPPLIER_REJECTED,
+                supplier.getName() + " was rejected",
+                supplier.getStatusNote() == null ? supplier.getCode() : supplier.getStatusNote(),
+                "/suppliers/" + supplier.getId());
     }
 
     @Transactional

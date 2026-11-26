@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import com.qualityos.common.util.DayLabels;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -263,7 +264,8 @@ class WorkOrderMaterialIT extends TraceabilityFixture {
         send(approver, "/work-orders/" + other + "/reservations", Map.of("lineNumber", 1, "lotId", expired,
                 "quantity", "1"))
                 .andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.error.message").value(containsString("expired on " + today.minusDays(2))));
+                .andExpect(jsonPath("$.error.message")
+                        .value(containsString("expired on " + DayLabels.label(today.minusDays(2)))));
         consumeLot(startBatch(product()), expired, "1")
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.error.message").value(containsString("expired on")));

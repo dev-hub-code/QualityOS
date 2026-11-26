@@ -4,6 +4,7 @@ import static com.qualityos.reporting.dto.ReportingDtos.Column.number;
 import static com.qualityos.reporting.dto.ReportingDtos.Column.text;
 
 import com.qualityos.common.audit.AuditService;
+import com.qualityos.common.util.DayLabels;
 import com.qualityos.organization.service.FacilityService;
 import com.qualityos.organization.service.OrganizationService;
 import com.qualityos.reporting.dto.ReportingDtos.Column;
@@ -164,7 +165,9 @@ public class ReportService {
                 organizations.getCurrent().name(),
                 scope.facilityId() == null ? "All facilities you can see"
                         : facilities.get(scope.facilityId()).facility().name(),
-                type == ReportType.CALIBRATION ? "As of " + scope.today() : scope.from() + " to " + scope.to(),
+                type == ReportType.CALIBRATION ? "As of " + DayLabels.label(scope.today())
+                        : DayLabels.label(scope.from()) + " to "
+                                + DayLabels.label(scope.to()),
                 DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm z").withZone(scope.zone()).format(Instant.now()),
                 note,
                 columns,

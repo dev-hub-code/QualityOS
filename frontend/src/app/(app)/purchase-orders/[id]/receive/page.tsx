@@ -62,7 +62,12 @@ function ReceiptForm({ order }: { order: PurchaseOrder }) {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+    <form
+      // A message from the last attempt goes, even when this one stops in the browser.
+      onSubmit={(event) => {
+        setFormError("");
+        return handleSubmit(onSubmit)(event);
+      }} className="space-y-6" noValidate>
       <FormError message={formError} />
       <Section title="Delivery">
         <div className="grid gap-4 sm:grid-cols-2">

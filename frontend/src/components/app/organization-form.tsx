@@ -57,10 +57,11 @@ export function OrganizationForm({ organization, submitLabel, readOnly, onSaved 
 
   return (
     <form
-      onSubmit={handleSubmit((values) => {
+      // A message from the last attempt goes, even when this one stops in the browser.
+      onSubmit={(event) => {
         setFormError("");
-        save.mutate(values);
-      })}
+        return handleSubmit((values) => save.mutate(values))(event);
+      }}
       className="space-y-4"
       noValidate
     >

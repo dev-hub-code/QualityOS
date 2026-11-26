@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { formatCalendarDay } from "@/lib/dates";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -175,7 +176,7 @@ export function QualityDashboard({ name }: { name?: string }) {
                   <RecordLink href={item.link}>{item.reference}</RecordLink>
                   <StatusBadge status={item.status} />
                   <span className="ml-auto text-xs text-slate-500">
-                    {item.kind}, {item.on}
+                    {item.kind}, {formatCalendarDay(item.on)}
                   </span>
                 </li>
               ))}

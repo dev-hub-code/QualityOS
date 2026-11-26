@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import { DEFINITIONS, SUBSTITUTE_FIELDS, describeLimits, toLineRequest } from "@/lib/manufacturing";
 import { DECIMAL_PATTERN, formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { BomDetail, BomLine, Explosion, ScaledRecipe } from "@/lib/types";
+import { formatCalendarDay } from "@/lib/dates";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const PARAMETER_FIELDS: FieldDef[] = [
@@ -75,7 +76,7 @@ function Explode({ path, unit }: { path: string; unit: string }) {
               ))}
             </ul>
             <div>
-              <h3 className="mb-1 text-sm font-medium">In total, on {data.on}</h3>
+              <h3 className="mb-1 text-sm font-medium">In total, on {formatCalendarDay(data.on)}</h3>
               <ul className="divide-y text-sm">
                 {data.totals.map((total) => (
                   <li key={total.componentId} className="flex justify-between gap-3 py-1.5">

@@ -1,6 +1,7 @@
 package com.qualityos.reporting.service;
 
 import com.qualityos.common.report.HtmlPdf;
+import com.qualityos.common.util.DayLabels;
 import com.qualityos.reporting.dto.ReportingDtos.Column;
 import com.qualityos.reporting.dto.ReportingDtos.ReportTable;
 import com.samskivert.mustache.Template;
@@ -43,7 +44,8 @@ public class ReportExporter {
             List<Map<String, Object>> cells = new ArrayList<>();
             for (int index = 0; index < values.size(); index++) {
                 cells.add(Map.of(
-                        "value", values.get(index) == null ? "" : values.get(index).replace('_', ' '),
+                        "value", values.get(index) == null ? ""
+                                : DayLabels.cell(values.get(index)).replace('_', ' '),
                         "align", report.columns().get(index).numeric() ? "num" : ""));
             }
             rows.add(Map.of("cells", cells));

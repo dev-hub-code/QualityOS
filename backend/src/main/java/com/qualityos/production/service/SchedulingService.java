@@ -3,6 +3,7 @@ package com.qualityos.production.service;
 import com.qualityos.common.audit.AuditService;
 import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ResourceNotFoundException;
+import com.qualityos.common.util.DayLabels;
 import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.organization.dto.FacilityDtos.ShiftCalendar;
 import com.qualityos.product.dto.ProductDtos.ProductReference;
@@ -185,7 +186,7 @@ public class SchedulingService {
             LocalDate windowStart = order.getPlannedStart().isAfter(today) ? order.getPlannedStart() : today;
             LocalDate windowEnd = order.getPlannedEnd();
             if (windowEnd.isBefore(today)) {
-                notes.add("It was planned to finish on %s, which has passed.".formatted(windowEnd));
+                notes.add("It was planned to finish on %s, which has passed.".formatted(DayLabels.label(windowEnd)));
                 windowStart = today;
                 windowEnd = today;
             }
@@ -243,7 +244,7 @@ public class SchedulingService {
                     conflicts.add(new Conflict(centre.getId(), centre.getCode(), day, minutes(capacity),
                             minutes(booked), List.copyOf(numbers)));
                     numbers.forEach(number -> overloadNotes.computeIfAbsent(number, ignored -> new LinkedHashSet<>())
-                            .add("%s on %s".formatted(centre.getCode(), day)));
+                            .add("%s on %s".formatted(centre.getCode(), DayLabels.label(day))));
                 }
             }
             centreLoads.add(new CentreLoad(centre.getId(), centre.getCode(), centre.getName(),

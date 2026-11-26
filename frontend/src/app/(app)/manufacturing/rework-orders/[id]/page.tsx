@@ -11,8 +11,7 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { reinspectionState, reworkActions } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
-import type { ReworkDetail } from "@/lib/types";
-import { lookupAll } from "@/components/records/parts";
+import type { ApplicableTemplates, ReworkDetail } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { formatDateTime } from "@/lib/dates";
 
@@ -20,24 +19,15 @@ const when = (value: string | null) => (value ? formatDateTime(value) : "–");
 const words = (value: string | null) => (value ? value.replaceAll("_", " ").toLowerCase() : "–");
 
 type Dialog = "approve" | "complete" | "reinspect" | "cancel" | { step: string } | null;
-type Template = { id: string; code: string; name: string; inspectionType: string; publishedVersion: number | null };
-
-/** Published in-process templates, and final ones once the batch is completed, to reinspect with. */
-function useBatchTemplates(enabled: boolean, completed: boolean) {
-  const types = completed ? ["IPQC", "FQC"] : ["IPQC"];
+/** Published templates that fit the batch at its stage and for its product, as starting an inspection offers them. */
+function useBatchTemplates(batchId: string | undefined, enabled: boolean) {
+  const query = `productionBatchId=${batchId}`;
   const { data } = useQuery({
-    queryKey: ["/inspection-templates", "batch", ...types],
-    enabled,
-    queryFn: async () => {
-      const lists = await Promise.all(
-        types.map((type) => lookupAll<Template>("/inspection-templates", `&type=${type}`)),
-      );
-      return lists.flat();
-    },
+    queryKey: ["/inspections/applicable-templates", query],
+    queryFn: () => api.get<ApplicableTemplates>(`/inspections/applicable-templates?${query}`),
+    enabled: enabled && batchId !== undefined,
   });
-  return (data ?? [])
-    .filter((template) => template.publishedVersion !== null)
-    .map((template) => ({ value: template.id, label: `${template.inspectionType} · ${template.code} – ${template.name}` }));
+  return data;
 }
 
 export default function ReworkOrderPage() {
@@ -55,7 +45,7 @@ export default function ReworkOrderPage() {
   const { run, pending, message } = useAction();
   const [dialog, setDialog] = useState<Dialog>(null);
   const { data, error } = useQuery({ queryKey: [path], queryFn: () => api.get<ReworkDetail>(path) });
-  const templates = useBatchTemplates(dialog === "reinspect", data?.batchCompleted ?? false);
+  const fitting = useBatchTemplates(data?.rework.productionBatchId, dialog === "reinspect");
   if (!data) return <QueryState error={error} />;
 
   const { rework } = data;
@@ -215,10 +205,29 @@ export default function ReworkOrderPage() {
           onSubmit={(values) => api.post(`${path}/complete`, values).then(refresh)}
         />
       )}
-      {dialog === "reinspect" && (
+      {/* Opened once the fitting templates are known, so that a single fit is already chosen. */}
+      {dialog === "reinspect" && fitting && (
         <RecordDialog
           title="Reinspect the reworked goods"
-          fields={[{ name: "templateId", label: "Template (left blank, the one that fits the batch)", type: "select", options: templates }]}
+          fields={[
+            {
+              name: "templateId",
+              label: "Template (left blank, the one that fits the batch)",
+              type: "select",
+              options: fitting.templates.map((template) => ({
+                value: template.id,
+                label: `${template.inspectionType} · ${template.code} – ${template.name}`,
+              })),
+            },
+          ]}
+          record={{ templateId: fitting.suggestedId ?? "" }}
+          extra={
+            fitting.templates.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No published template fits this batch at its stage. Publish one under Inspection templates first.
+              </p>
+            ) : undefined
+          }
           onClose={close}
           onSubmit={(values) => api.post(`${path}/reinspect`, values).then(refresh)}
         />

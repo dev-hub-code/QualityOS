@@ -11,7 +11,7 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { usePermission } from "@/hooks/use-me";
+import { useMe, usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { formatMinutes, LOSS_CATEGORY_LABELS, localDate, toInstant } from "@/lib/manufacturing";
 import type { FieldDef } from "@/lib/record-form";
@@ -154,6 +154,7 @@ function Summary() {
 export default function DowntimePage() {
   const confirm = useConfirm();
   const canManage = usePermission("DOWNTIME_MANAGE");
+  const { data: me } = useMe();
   const machines = useMachines();
   const workCenters = useWorkCenters();
   const departments = useDepartments();
@@ -251,6 +252,15 @@ export default function DowntimePage() {
     return { ...record, startDate: start.date, startTime: start.time, endDate: end.date, endTime: end.time };
   };
 
+  // Someone who cannot see manufacturing gets one plain answer, not a page of filters that each refuse.
+  if (me && !me.permissions.includes("MANUFACTURING_VIEW")) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Downtime" />
+        <p className="text-sm text-destructive">You do not have permission to do this.</p>
+      </div>
+    );
+  }
   return (
     <div className="space-y-6">
       <PageHeader title="Downtime" subtitle="Every stop, from the shop floor, machine status changes and entries by hand.">

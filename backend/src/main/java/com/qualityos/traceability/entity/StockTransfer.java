@@ -2,6 +2,7 @@ package com.qualityos.traceability.entity;
 
 import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.persistence.TenantOwnedEntity;
+import com.qualityos.common.util.DayLabels;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -48,7 +49,8 @@ public class StockTransfer extends TenantOwnedEntity {
     public void receive(LocalDate on, UUID by) {
         requireInTransit();
         if (on.isBefore(sentOn)) {
-            throw new BusinessRuleException("Goods cannot arrive before they were sent, on " + sentOn + ".");
+            throw new BusinessRuleException(
+                    "Goods cannot arrive before they were sent, on " + DayLabels.label(sentOn) + ".");
         }
         status = Status.RECEIVED;
         receivedOn = on;

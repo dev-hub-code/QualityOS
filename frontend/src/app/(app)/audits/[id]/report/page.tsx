@@ -29,7 +29,7 @@ export default function AuditReportPage() {
       </div>
       <PageHeader title={`Quality audit report: ${audit.auditNumber}`} subtitle={data.organizationName} />
       <p className="text-sm">
-        {audit.title} · {audit.facilityName} · Lead auditor {audit.leadAuditorName} · Status {audit.status} · Generated{" "}
+        {audit.title} · {audit.facilityName} · Lead auditor {audit.leadAuditorName} · Status {audit.status.replaceAll("_", " ").toLowerCase()} · Generated{" "}
         {data.generatedLabel}
       </p>
       <section className="space-y-1 text-sm">
@@ -61,7 +61,7 @@ export default function AuditReportPage() {
             <thead className="print:table-header-group">
               <tr>
                 {["No.", "Question", "Clause", "Result", "Note"].map((heading) => (
-                  <th key={heading} className={`${CELL} bg-muted text-left font-medium`}>
+                  <th key={heading} className={`${CELL} text-left font-medium`}>
                     {heading}
                   </th>
                 ))}

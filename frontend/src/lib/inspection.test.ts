@@ -42,6 +42,15 @@ describe("requirement", () => {
     );
     expect(requirement(parameter({}))).toBe("Reviewer decides");
   });
+
+  it("names a yes/no check's answer as Yes or No, whatever words a template kept", () => {
+    const check = (expectedText: string | null) => requirement(parameter({ dataType: "BOOLEAN", expectedText }));
+    expect(check("true")).toBe("Yes");
+    expect(check("Yes")).toBe("Yes");
+    expect(check("false")).toBe("No");
+    expect(check(null)).toBe("Reviewer decides");
+    expect(check("maybe")).toBe("Reviewer decides");
+  });
 });
 
 describe("toEntries", () => {

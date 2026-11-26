@@ -23,7 +23,7 @@ import {
 } from "@/lib/manufacturing";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { DefectCategory, LossCategory, OperationDetail, QualityGate } from "@/lib/types";
-import { formatDateTime } from "@/lib/dates";
+import { formatCalendarDay, formatDateTime } from "@/lib/dates";
 
 type Dialog = "start" | "pause" | "report" | "measure" | "complete" | "assign" | "block" | "skip" | { reverse: string } | null;
 
@@ -241,7 +241,7 @@ export default function OperationPage() {
             ["Setup took", data.actualSetupMinutes === null ? "" : `${formatQuantity(data.actualSetupMinutes)} min`],
             ["Started", operation.startedAt ? formatDateTime(operation.startedAt) : ""],
             ["Completed", operation.completedAt ? formatDateTime(operation.completedAt) : ""],
-            ["Due", operation.plannedEnd],
+            ["Due", formatCalendarDay(operation.plannedEnd)],
           ]}
         />
         {data.instructions && <p className="mt-4 whitespace-pre-line rounded-xl bg-muted px-3 py-2 text-sm">{data.instructions}</p>}

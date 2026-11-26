@@ -10,7 +10,7 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { newRequestKey } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
-import type { WorkOrderCompletion, WorkOrderMaterials, WorkOrderStatus } from "@/lib/types";
+import type { ManufacturingSettings, WorkOrderCompletion, WorkOrderMaterials, WorkOrderStatus } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { formatDateTime, formatCalendarDay } from "@/lib/dates";
 
@@ -56,6 +56,10 @@ export function WorkOrderMaterialsPanel({ orderId, status }: { orderId: string; 
     queryKey: [`${path}/completion`],
     queryFn: () => api.get<WorkOrderCompletion>(`${path}/completion`),
     enabled: status === "IN_PROGRESS",
+  });
+  const { data: settings } = useQuery({
+    queryKey: ["/manufacturing/settings"],
+    queryFn: () => api.get<ManufacturingSettings>("/manufacturing/settings"),
   });
   if (!data || data.lines.length === 0) return null;
 
@@ -147,7 +151,10 @@ export function WorkOrderMaterialsPanel({ orderId, status }: { orderId: string; 
                         Reserve
                       </Button>
                     )}
-                    {issuable && (line.sources.length > 0 || Number(line.reserved) > 0) && (
+                    {issuable &&
+                      (line.sources.length > 0 || Number(line.reserved) > 0) &&
+                      // A line fully issued takes no more unless the organisation allows over-issuing.
+                      (settings?.allowOverIssue || Number(line.issued) < Number(line.required)) && (
                       <Button size="sm" variant="outline" onClick={() => setDialog({ kind: "issue", line, key: newRequestKey() })}>
                         Issue
                       </Button>

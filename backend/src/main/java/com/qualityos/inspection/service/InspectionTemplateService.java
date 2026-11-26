@@ -508,6 +508,23 @@ public class InspectionTemplateService {
                 parameter.getRemarks());
     }
 
+    /** A yes/no check keeps its answer as true or false, whatever words it came in. */
+    private static String expectedText(ParameterRequest request) {
+        String text = request.expectedText();
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        if (request.dataType() != null && "BOOLEAN".equals(request.dataType().name())) {
+            Boolean answer = YesNo.parse(text);
+            if (answer == null) {
+                throw new BusinessRuleException(
+                        "The expected answer of " + request.code().trim() + " must be Yes or No.");
+            }
+            return answer.toString();
+        }
+        return text;
+    }
+
     private static InspectionParameter toEntity(ParameterRequest request, TemplateVersion version, int order) {
         InspectionParameter parameter = new InspectionParameter(version);
         parameter.setCode(request.code().trim());
@@ -519,7 +536,7 @@ public class InspectionTemplateService {
         parameter.setMinValue(request.minValue());
         parameter.setMaxValue(request.maxValue());
         parameter.setTolerance(request.tolerance());
-        parameter.setExpectedText(request.expectedText());
+        parameter.setExpectedText(expectedText(request));
         parameter.setCriticality(request.criticality());
         parameter.setMandatory(request.mandatory());
         parameter.setPerSample(request.perSample());

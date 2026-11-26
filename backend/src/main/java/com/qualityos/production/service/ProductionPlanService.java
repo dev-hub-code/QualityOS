@@ -7,9 +7,11 @@ import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.persistence.Searches;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.common.util.DayLabels;
 import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.organization.service.FacilityService;
 import com.qualityos.product.dto.ProductDtos.ProductReference;
+import com.qualityos.material.service.MaterialService;
 import com.qualityos.product.service.ProductService;
 import com.qualityos.production.dto.WorkOrderDtos.NoteRequest;
 import com.qualityos.production.dto.WorkOrderDtos.PlanDetail;
@@ -55,6 +57,7 @@ public class ProductionPlanService {
     private final ProductionPlanLineRepository lines;
     private final WorkOrderRepository workOrders;
     private final ProductService products;
+    private final MaterialService materials;
     private final FacilityService facilities;
     private final FacilityScope scope;
     private final RevisionSupport support;
@@ -66,6 +69,7 @@ public class ProductionPlanService {
             ProductionPlanLineRepository lines,
             WorkOrderRepository workOrders,
             ProductService products,
+            MaterialService materials,
             FacilityService facilities,
             FacilityScope scope,
             RevisionSupport support,
@@ -75,6 +79,7 @@ public class ProductionPlanService {
         this.lines = lines;
         this.workOrders = workOrders;
         this.products = products;
+        this.materials = materials;
         this.facilities = facilities;
         this.scope = scope;
         this.support = support;
@@ -232,6 +237,7 @@ public class ProductionPlanService {
 
     private ProductReference applyLine(ProductionPlan plan, ProductionPlanLine line, SavePlanLineRequest request) {
         ProductReference product = products.requireActive(request.productId());
+        materials.requireWholeInUnit(product.code(), product.uomId(), request.quantity());
         requireInPeriod(plan, request.dueDate());
         line.setProductId(product.id());
         line.setQuantity(request.quantity());
@@ -243,7 +249,7 @@ public class ProductionPlanService {
     private static void requireInPeriod(ProductionPlan plan, java.time.LocalDate due) {
         if (due.isBefore(plan.getPeriodStart()) || due.isAfter(plan.getPeriodEnd())) {
             throw new BusinessRuleException("Each line is due within the plan's period, %s to %s."
-                    .formatted(plan.getPeriodStart(), plan.getPeriodEnd()));
+                    .formatted(DayLabels.label(plan.getPeriodStart()), DayLabels.label(plan.getPeriodEnd())));
         }
     }
 

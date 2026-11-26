@@ -202,6 +202,11 @@ class ManufacturingIT extends TraceabilityFixture {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.lines[0].lineNumber").value(1))
                 .andExpect(jsonPath("$.data.lines[0].componentType").value("MATERIAL"));
+        // Listed twice, a component would be needed twice over.
+        line("/boms", bom, "materialId", material, "1", "KG")
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message")
+                        .value("This component is already line 1. Change that line's quantity instead."));
         send(owner, "/boms", Map.of("productId", product))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error.message").value(containsString("already has a BOM revision in progress")));

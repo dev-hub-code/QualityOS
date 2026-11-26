@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCalendarDay } from "@/lib/dates";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -144,7 +145,9 @@ export default function ReportsPage() {
                             data.columns[column].numeric ? "text-right" : ""
                           }
                         >
-                          {value?.replaceAll("_", " ")}
+                          {/^\d{4}-\d{2}-\d{2}$/.test(value ?? "")
+                            ? formatCalendarDay(value)
+                            : value?.replaceAll("_", " ")}
                         </TableCell>
                       ))}
                     </TableRow>

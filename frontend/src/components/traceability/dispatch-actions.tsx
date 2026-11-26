@@ -81,6 +81,7 @@ export function DispatchActions({ dispatch }: { dispatch: Dispatch }) {
         <RecordDialog
           title={`Record return against ${dispatch.dispatchNumber}`}
           fields={returnFields}
+          record={{ reversalDate: today() }}
           extra={<ReturnStanding dispatchId={dispatch.id} />}
           onClose={() => setReturning(false)}
           onSubmit={async (values) => {

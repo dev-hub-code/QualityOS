@@ -7,6 +7,7 @@ import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
 import com.qualityos.common.security.Permissions;
 import com.qualityos.common.tenant.TenantContext;
+import com.qualityos.common.util.DayLabels;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.notification.service.NotificationService;
 import com.qualityos.notification.service.NotificationType;
@@ -182,8 +183,9 @@ public class ReportExports {
                         "format", "EXCEL", "background", true, "from", done.getFromDate().toString(),
                         "to", done.getToDate().toString(), "rows", rows));
                 notifications.notifyIncludingActor(Set.of(done.getRequestedBy()), NotificationType.REPORT_EXPORT_READY,
-                        type.title() + " is ready", "Your Excel export of " + rows + " rows, " + done.getFromDate()
-                                + " to " + done.getToDate() + ", can be downloaded for 7 days.", LINK, null);
+                        type.title() + " is ready", "Your Excel export of " + rows + " rows, "
+                                + DayLabels.label(done.getFromDate()) + " to " + DayLabels.label(done.getToDate())
+                                + ", can be downloaded for 7 days.", LINK, null);
             });
         } catch (BusinessRuleException | ConflictException | ResourceNotFoundException ex) {
             fail(id, type, ex.getMessage());

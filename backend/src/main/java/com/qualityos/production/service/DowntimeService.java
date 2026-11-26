@@ -35,6 +35,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -65,6 +66,11 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class DowntimeService implements AttachmentPolicy {
+
+    /** Stands for "not ended" when looking for stops that overlap an open one. */
+    private static final Instant OPEN_END = Instant.parse("9999-12-31T00:00:00Z");
+    private static final DateTimeFormatter STOP_TIME =
+            DateTimeFormatter.ofPattern("d MMM uuuu, h:mm", Locale.ENGLISH);
 
     static final String ENTITY = "DowntimeRecord";
     private static final int MAX_SUMMARY_DAYS = 366;
@@ -316,6 +322,7 @@ public class DowntimeService implements AttachmentPolicy {
             record.end(request.endedAt(), TenantContext.getCurrentUserId());
         }
         requireSensible(record);
+        requireNoOverlap(record, machine == null ? null : machine.getCode());
         records.saveAndFlush(record);
         audit.record("DOWNTIME_RECORDED", ENTITY, record.getId(), null, snapshot(record));
         return get(record.getId());
@@ -351,6 +358,10 @@ public class DowntimeService implements AttachmentPolicy {
         blame(record, request.responsibleDepartmentId());
         record.setComments(blankToNull(request.comments()));
         requireSensible(record);
+        if (retimable) {
+            requireNoOverlap(record, record.getMachineId() == null ? null
+                    : machines.findById(record.getMachineId()).map(Machine::getCode).orElse(null));
+        }
         records.saveAndFlush(record);
         audit.record("DOWNTIME_UPDATED", ENTITY, id, before, snapshot(record));
         return get(id);
@@ -415,6 +426,33 @@ public class DowntimeService implements AttachmentPolicy {
         if (record.isPlanned() && record.getStartedAt().isAfter(now) && record.getEndedAt() == null) {
             throw new BusinessRuleException("Say when the planned maintenance ends.");
         }
+    }
+
+    /**
+     * A machine, or a work centre stopped as a whole, is down only once at a time: a second stop over the same minutes
+     * would count them twice in every total.
+     */
+    private void requireNoOverlap(DowntimeRecord record, String machineCode) {
+        Instant end = record.getEndedAt() != null ? record.getEndedAt() : OPEN_END;
+        records.overlapping(Set.of(record.getFacilityId()), record.getStartedAt(), end).stream()
+                .filter(other -> !other.getId().equals(record.getId()))
+                .filter(other -> Objects.equals(other.getMachineId(), record.getMachineId())
+                        && other.getWorkCenterId().equals(record.getWorkCenterId()))
+                .findFirst()
+                .ifPresent(other -> {
+                    ZoneId zone = calendar.zone();
+                    String from = stopTime(other.getStartedAt(), zone);
+                    String until = other.getEndedAt() == null ? "still down"
+                            : "until " + stopTime(other.getEndedAt(), zone);
+                    throw new BusinessRuleException("%s already has a stop from %s, %s. Change that stop instead."
+                            .formatted(machineCode != null ? machineCode : "This work centre", from, until));
+                });
+    }
+
+    /** As the screens show a time: 26 Nov 2026, 2:00 pm. */
+    private static String stopTime(Instant at, ZoneId zone) {
+        var local = at.atZone(zone);
+        return STOP_TIME.format(local) + (local.getHour() < 12 ? " am" : " pm");
     }
 
     private DowntimeRecord load(UUID id) {

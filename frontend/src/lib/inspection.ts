@@ -1,6 +1,17 @@
 import { DECIMAL_PATTERN, formatQuantity } from "@/lib/record-form";
 import type { InspectionResult, ParameterSpec } from "@/lib/types";
 
+/** A yes/no check's expected answer, kept as true or false; older templates may say Yes or No. */
+export function yesNoValue(text: string | null | undefined): "" | "true" | "false" {
+  const t = (text ?? "").trim().toLowerCase();
+  if (["true", "yes", "y"].includes(t)) return "true";
+  if (["false", "no", "n"].includes(t)) return "false";
+  return "";
+}
+
+export const yesNoLabel = (text: string | null | undefined) =>
+  ({ true: "Yes", false: "No", "": null })[yesNoValue(text)];
+
 export const sampleKey = (code: string, sample: number) => `${code}#${sample}`;
 
 export const samplesOf = (parameter: ParameterSpec, sampleSize: number) =>
@@ -10,6 +21,8 @@ export const samplesOf = (parameter: ParameterSpec, sampleSize: number) =>
 export function requirement(parameter: ParameterSpec): string {
   const { minValue, maxValue, nominalValue, tolerance, expectedText } =
     parameter;
+  if (parameter.dataType === "BOOLEAN")
+    return yesNoLabel(expectedText) ?? "Reviewer decides";
   if (parameter.dataType !== "NUMERIC")
     return expectedText ?? "Reviewer decides";
   if (minValue && maxValue)

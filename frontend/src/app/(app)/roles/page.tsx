@@ -17,6 +17,7 @@ import { api } from "@/lib/api";
 import { roleSchema, type RoleValues } from "@/lib/schemas";
 import type { Permission, Role } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { QueryState } from "@/components/records/parts";
 
 function RoleDialog({
   role,
@@ -64,7 +65,12 @@ function RoleDialog({
         <DialogHeader>
           <DialogTitle>{role ? `Edit ${role.name}` : "New role"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <form
+      // A message from the last attempt goes, even when this one stops in the browser.
+      onSubmit={(event) => {
+        setFormError("");
+        return handleSubmit(onSubmit)(event);
+      }} className="space-y-4" noValidate>
           <FormError message={formError} />
           <Field label="Name" id="name" error={errors.name} {...register("name")} />
           <Field label="Description" id="description" error={errors.description} {...register("description")} />
@@ -123,6 +129,7 @@ export default function RolesPage() {
         {canManage && <Button onClick={() => setDialog({ role: null })}>New role</Button>}
       </div>
       <FormError message={remove.error?.message} />
+      {roles.error && <QueryState error={roles.error} />}
       <div className="overflow-x-auto glass rounded-2xl">
         <Table>
           <TableHeader>

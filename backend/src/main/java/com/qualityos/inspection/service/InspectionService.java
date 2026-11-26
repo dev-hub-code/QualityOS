@@ -261,8 +261,23 @@ public class InspectionService implements AttachmentPolicy {
             return fit.suggestedId();
         }
         throw new BusinessRuleException(fit.templates().isEmpty()
-                ? "No published template fits this inspection. Publish one first."
+                ? "No published template fits this inspection. Publish %s first.".formatted(missingTemplate(request))
                 : "More than one template fits this inspection. Choose one.");
+    }
+
+    /** Which template would do, so that a batch waiting on it says what to publish. */
+    private String missingTemplate(CreateInspectionRequest request) {
+        if (request.productionBatchId() == null) {
+            return "one";
+        }
+        ProductionBatchView batch = production.batch(request.productionBatchId());
+        return production.dueInspection(request.productionBatchId())
+                .map(type -> "%s template for %s".formatted(switch (type) {
+                    case "IPQC" -> "an in-process (IPQC)";
+                    case "FQC" -> "a final (FQC)";
+                    default -> "an outgoing (OQC)";
+                }, batch.productCode()))
+                .orElse("one");
     }
 
     private static void requireOneSubject(UUID receiptItemId, UUID productionBatchId, UUID returnItemId) {

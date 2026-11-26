@@ -36,7 +36,7 @@ function Queue() {
   const [starting, setStarting] = useState<ReceivedBatch | null>(null);
   const [returning, setReturning] = useState<{ id: string; label: string } | null>(null);
   const path = "/material-receipts/awaiting-inspection";
-  const { data } = useQuery({
+  const { data, error } = useQuery({
     queryKey: [path],
     queryFn: () => api.get<PageResponse<ReceivedBatch>>(`${path}?size=50`),
   });
@@ -51,6 +51,8 @@ function Queue() {
   const returnedItems = returns.flatMap((reversal) =>
     reversal.items.map((item) => ({ reversal, item })),
   );
+  // Someone who may not see the queue is told so by the list below; "Nothing is waiting" would not be true.
+  if (error) return null;
   return (
     <Section title="Awaiting inspection">
       {batches.length === 0 && returnedItems.length === 0 && (
@@ -81,7 +83,9 @@ function Queue() {
                 <RecordLink href={`/dispatch-reversals/${reversal.id}`}>{reversal.reversalNumber}</RecordLink>
               </p>
             </div>
-            <Button onClick={() => setReturning({ id: item.id, label: item.batchNumber })}>Inspect</Button>
+            {canCreate && (
+              <Button onClick={() => setReturning({ id: item.id, label: item.batchNumber })}>Inspect</Button>
+            )}
           </li>
         ))}
       </ul>

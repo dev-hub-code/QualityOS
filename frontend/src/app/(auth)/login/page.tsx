@@ -96,7 +96,12 @@ export default function LoginPage() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+    <form
+      // A message from the last attempt goes, even when this one stops in the browser.
+      onSubmit={(event) => {
+        setFormError("");
+        return handleSubmit(onSubmit)(event);
+      }} className="space-y-4" noValidate>
       <h1 className="text-lg font-medium">Sign in</h1>
       <FormError message={formError} />
       <Field label="Email" id="email" type="email" autoComplete="email" error={errors.email} {...register("email")} />

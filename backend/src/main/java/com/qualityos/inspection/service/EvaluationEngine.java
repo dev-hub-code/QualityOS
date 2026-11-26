@@ -59,10 +59,8 @@ public final class EvaluationEngine {
     }
 
     private static Evaluation evaluateBoolean(ParameterSpec spec, Boolean actual) {
-        if (spec.expectedText() == null || spec.expectedText().isBlank()) {
-            return Evaluation.PENDING_REVIEW;
-        }
-        return pass(Boolean.parseBoolean(spec.expectedText().trim()) == actual);
+        Boolean expected = YesNo.parse(spec.expectedText());
+        return expected == null ? Evaluation.PENDING_REVIEW : pass(expected.equals(actual));
     }
 
     private static Evaluation evaluateText(ParameterSpec spec, String actual) {

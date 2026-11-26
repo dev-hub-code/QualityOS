@@ -110,7 +110,14 @@ public class InspectionPdf {
     /** The same wording as the report page. */
     static String requirement(ParameterSpec parameter) {
         if (parameter.dataType() == null || !"NUMERIC".equals(parameter.dataType().name())) {
-            return parameter.expectedText() == null ? "Reviewer decides" : parameter.expectedText();
+            if (parameter.expectedText() == null) {
+                return "Reviewer decides";
+            }
+            if ("BOOLEAN".equals(parameter.dataType().name())) {
+                String answer = YesNo.label(parameter.expectedText());
+                return answer == null ? "Reviewer decides" : answer;
+            }
+            return parameter.expectedText();
         }
         if (parameter.minValue() != null && parameter.maxValue() != null) {
             return plain(parameter.minValue()) + " to " + plain(parameter.maxValue());

@@ -65,7 +65,9 @@ export default function InspectionReportPage() {
                     {parameter && requirement(parameter)} {units.label(parameter?.uomId ?? null)}
                   </TableCell>
                   <TableCell>{result.sampleNumber}</TableCell>
-                  <TableCell>{resultValue(result)}</TableCell>
+                  <TableCell>
+                    {result.valueBoolean === null ? resultValue(result) : result.valueBoolean ? "Yes" : "No"}
+                  </TableCell>
                   <TableCell>
                     <StatusBadge status={result.evaluation} />
                   </TableCell>

@@ -109,7 +109,7 @@ export default function SchedulingPage() {
                 <table className="min-w-full text-xs">
                   <thead className="text-left text-muted-foreground">
                     <tr>
-                      <th className="sticky left-0 bg-card py-1 pr-3 font-medium">Work centre</th>
+                      <th className="sticky left-0 py-1 pr-3 font-medium [background:var(--table-head-bg)]">Work centre</th>
                       {data.workCenters[0].days.map((day) => (
                         <th key={day.date} className="px-1 py-1 font-medium whitespace-nowrap">
                           {weekday(day.date)}

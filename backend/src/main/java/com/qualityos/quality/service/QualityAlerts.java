@@ -3,6 +3,7 @@ package com.qualityos.quality.service;
 import com.qualityos.common.mail.EmailContent;
 import com.qualityos.common.mail.EmailTemplate;
 import com.qualityos.common.security.Permissions;
+import com.qualityos.common.util.DayLabels;
 import com.qualityos.identity.service.FacilityScope;
 import com.qualityos.identity.service.TenantAccessService;
 import com.qualityos.notification.service.NotificationService;
@@ -51,13 +52,14 @@ class QualityAlerts {
     void capaAssigned(CorrectiveAction capa) {
         capa(Set.of(capa.getOwnerId()), NotificationType.CAPA_ASSIGNED, capa,
                 capa.getCapaNumber() + " was assigned to you",
-                capa.getTitle() + ". Due " + capa.getTargetDate() + ".", capaEmail(EmailTemplate.CAPA_ASSIGNED, capa));
+                capa.getTitle() + ". Due " + DayLabels.label(capa.getTargetDate()) + ".",
+                capaEmail(EmailTemplate.CAPA_ASSIGNED, capa));
     }
 
     void actionAssigned(CorrectiveAction capa, CapaAction action) {
         capa(Set.of(action.getOwnerId()), NotificationType.CAPA_ACTION_ASSIGNED, capa,
                 "New action on " + capa.getCapaNumber(),
-                action.getDescription() + ". Due " + action.getTargetDate() + ".",
+                action.getDescription() + ". Due " + DayLabels.label(action.getTargetDate()) + ".",
                 actionEmail(EmailTemplate.CAPA_ACTION_ASSIGNED, capa, action));
     }
 
@@ -69,7 +71,7 @@ class QualityAlerts {
 
     void capaDueSoon(CorrectiveAction capa) {
         capa(Set.of(capa.getOwnerId()), NotificationType.CAPA_DUE_SOON, capa,
-                capa.getCapaNumber() + " is due on " + capa.getTargetDate(), capa.getTitle(),
+                capa.getCapaNumber() + " is due on " + DayLabels.label(capa.getTargetDate()), capa.getTitle(),
                 capaEmail(EmailTemplate.CAPA_DUE_REMINDER, capa));
     }
 
@@ -87,7 +89,7 @@ class QualityAlerts {
         recipients.add(capa.getOwnerId());
         capa(recipients, NotificationType.CAPA_ACTION_OVERDUE, capa,
                 "An action on " + capa.getCapaNumber() + " is overdue",
-                action.getDescription() + ". It was due on " + action.getTargetDate() + ".",
+                action.getDescription() + ". It was due on " + DayLabels.label(action.getTargetDate()) + ".",
                 actionEmail(EmailTemplate.CAPA_ACTION_OVERDUE, capa, action));
     }
 
@@ -118,7 +120,8 @@ class QualityAlerts {
     void capaOverdue(CorrectiveAction capa) {
         capa(Set.of(capa.getOwnerId()), NotificationType.CAPA_OVERDUE, capa,
                 capa.getCapaNumber() + " is overdue",
-                capa.getTitle() + " was due on " + capa.getTargetDate() + ".", capaEmail(EmailTemplate.CAPA_OVERDUE, capa));
+                capa.getTitle() + " was due on " + DayLabels.label(capa.getTargetDate()) + ".",
+                capaEmail(EmailTemplate.CAPA_OVERDUE, capa));
     }
 
     private static EmailContent ncrEmail(EmailTemplate template, NonConformance ncr) {

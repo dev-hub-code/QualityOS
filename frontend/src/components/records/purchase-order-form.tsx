@@ -7,7 +7,15 @@ import { useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { applyServerErrors } from "@/components/forms/apply-server-errors";
 import { Field, FormError } from "@/components/forms/field";
-import { PageHeader, Section, useApprovedSuppliers, useFacilities, useMaterials } from "@/components/records/parts";
+import {
+  PageHeader,
+  QueryState,
+  Section,
+  useApprovedSuppliers,
+  useFacilities,
+  useMaterials,
+} from "@/components/records/parts";
+import { useMe } from "@/hooks/use-me";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
@@ -18,7 +26,17 @@ import { today } from "@/lib/dates";
 
 const SELECT_CLASS = "h-9 w-full rounded-xl border border-input bg-white/70 px-2 text-sm";
 
+/** Opened by its address, the form still needs the permission: without it, its pickers load nothing. */
 export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
+  const me = useMe();
+  if (!me.data) return <QueryState error={me.error} />;
+  if (!me.data.permissions.includes("PURCHASE_MANAGE")) {
+    return <p>You do not have permission to do this.</p>;
+  }
+  return <PurchaseOrderEditor order={order} />;
+}
+
+function PurchaseOrderEditor({ order }: { order?: PurchaseOrder }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const suppliers = useApprovedSuppliers();
@@ -76,7 +94,12 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
   return (
     <div className="space-y-6">
       <PageHeader title={order ? `Edit ${order.poNumber}` : "New purchase order"} />
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+      <form
+      // A message from the last attempt goes, even when this one stops in the browser.
+      onSubmit={(event) => {
+        setFormError("");
+        return handleSubmit(onSubmit)(event);
+      }} className="space-y-6" noValidate>
         <FormError message={formError} />
         <Section title="Order">
           <div className="grid gap-4 sm:grid-cols-2">

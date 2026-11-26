@@ -33,6 +33,7 @@ class ProductionQualityIT extends TraceabilityFixture {
     /** A shaft is turned, then ground, at one work centre. */
     @BeforeEach
     void shaft() throws Exception {
+        finalInspectionTemplate();
         supervisor = addMember(owner, "PRODUCTION_MANAGER");
         operator = addMember(owner, "PRODUCTION_OPERATOR");
         facility = facility(owner);

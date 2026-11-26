@@ -11,6 +11,7 @@ import { PRIORITY_LABELS } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
 import type { PageResponse } from "@/lib/api";
 import type { OperationSummary } from "@/lib/types";
+import { formatCalendarDay } from "@/lib/dates";
 
 const PAGE_SIZE = 20;
 const select = "h-11 rounded-xl border bg-background px-3 text-sm";
@@ -119,7 +120,7 @@ export default function ShopFloorPage() {
                 </div>
                 <div>
                   <dt className="text-muted-foreground">Due</dt>
-                  <dd className="font-medium">{operation.plannedEnd}</dd>
+                  <dd className="font-medium">{formatCalendarDay(operation.plannedEnd)}</dd>
                 </div>
               </dl>
               <p className="mt-2 text-sm text-muted-foreground">

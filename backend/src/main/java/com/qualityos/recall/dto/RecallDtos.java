@@ -283,6 +283,8 @@ public final class RecallDtos {
             List<String> serialNumbers,
             List<InspectionHistory> inspections,
             List<NcrHistory> ncrs,
-            List<HistoryEntry> history) {
+            List<HistoryEntry> history,
+            /* When it closed, in the organisation's time zone, as the report prints it. Null while open. */
+            String closedLabel) {
     }
 }

@@ -312,6 +312,7 @@ public class DowntimeService implements AttachmentPolicy {
         blame(record, request.responsibleDepartmentId());
         record.setComments(blankToNull(request.comments()));
         if (request.endedAt() != null) {
+            requireEndAfterStart(record, request.endedAt());
             record.end(request.endedAt(), TenantContext.getCurrentUserId());
         }
         requireSensible(record);
@@ -341,6 +342,7 @@ public class DowntimeService implements AttachmentPolicy {
             record.setStartedAt(request.startedAt());
         }
         if (request.endedAt() != null) {
+            requireEndAfterStart(record, request.endedAt());
             record.end(request.endedAt(), TenantContext.getCurrentUserId());
         }
         if (request.reason() != null && !request.reason().isBlank()) {
@@ -380,6 +382,9 @@ public class DowntimeService implements AttachmentPolicy {
                     ? "This stop ends when the operation is resumed or unblocked."
                     : "This stop ends when the machine is set back to work.");
         }
+        if (request != null && request.endedAt() != null) {
+            requireEndAfterStart(record, request.endedAt());
+        }
         record.end(request == null || request.endedAt() == null ? Instant.now() : request.endedAt(),
                 TenantContext.getCurrentUserId());
         requireSensible(record);
@@ -389,6 +394,13 @@ public class DowntimeService implements AttachmentPolicy {
     }
 
     // Rules
+
+    /** A time someone gives for the end must not come before the start; the record would otherwise shorten it to nothing. */
+    private static void requireEndAfterStart(DowntimeRecord record, Instant endedAt) {
+        if (endedAt.isBefore(record.getStartedAt())) {
+            throw new BusinessRuleException("A stop cannot end before it starts.");
+        }
+    }
 
     /** Only planned maintenance can be entered ahead; a stop cannot end before it starts or end in the future. */
     private static void requireSensible(DowntimeRecord record) {

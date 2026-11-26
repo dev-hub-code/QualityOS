@@ -21,10 +21,13 @@ public class OperationEvent extends TenantOwnedEntity {
 
     public enum Type { READY, STARTED, PAUSED, RESUMED, COMPLETED, BLOCKED, UNBLOCKED, CANCELLED, ASSIGNED, COMMENT }
 
-    /** Why an operation stopped. The same categories later feed downtime reporting. */
+    /**
+     * Why an operation stopped. The same categories later feed downtime reporting. SHIFT_END is the hand-over at the end
+     * of a shift: planned, and the machine stays available for the next shift.
+     */
     public enum LossCategory {
         MACHINE_BREAKDOWN, MATERIAL_SHORTAGE, POWER_FAILURE, QUALITY_ISSUE, OPERATOR_UNAVAILABLE,
-        PLANNED_MAINTENANCE, CHANGEOVER, ORDER_ON_HOLD, OTHER
+        PLANNED_MAINTENANCE, CHANGEOVER, ORDER_ON_HOLD, SHIFT_END, OTHER
     }
 
     private UUID workOrderId;

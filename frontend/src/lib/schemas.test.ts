@@ -31,9 +31,9 @@ describe("organizationSchema", () => {
   };
 
   it("allows an empty GSTIN and normalises case", () => {
-    const result = organizationSchema.parse({ ...valid, gstin: "27abcde1234f1z5" });
+    const result = organizationSchema.parse({ ...valid, gstin: "27aapfu0939f1zv" });
 
-    expect(result.gstin).toBe("27ABCDE1234F1Z5");
+    expect(result.gstin).toBe("27AAPFU0939F1ZV");
     expect(result.currency).toBe("INR");
   });
 

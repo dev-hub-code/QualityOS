@@ -80,4 +80,8 @@ public final class PurchaseOrderDtos {
     /** A purchase price per unit of {@code uomId}, in the organisation's currency; null when the line has none. */
     public record UnitPrice(UUID materialId, UUID uomId, BigDecimal price) {
     }
+
+    /** Why an order is cancelled: needed once it was issued to the supplier. */
+    public record CancelOrderRequest(@jakarta.validation.constraints.Size(max = 1000) String reason) {
+    }
 }

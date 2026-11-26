@@ -149,6 +149,13 @@ public class NcrController {
         return ApiResponse.ok(ncrs.recordInvestigation(id, request));
     }
 
+    @PostMapping("/ncrs/{id}/capas")
+    @PreAuthorize(Require.NCR_ASSIGN)
+    public ApiResponse<NcrDetail> linkCapa(@PathVariable UUID id,
+            @Valid @RequestBody com.qualityos.quality.dto.QualityDtos.LinkCapaRequest request) {
+        return ApiResponse.ok(ncrs.linkCapa(id, request.capaId(), request.note()));
+    }
+
     @PostMapping("/ncrs/{id}/request-verification")
     @PreAuthorize(Require.NCR_ASSIGN)
     public ApiResponse<NcrDetail> requestVerification(@PathVariable UUID id, @Valid @RequestBody NoteRequest request) {

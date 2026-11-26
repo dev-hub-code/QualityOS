@@ -503,6 +503,8 @@ export interface InspectionDecision {
 export interface Inspection {
   id: string;
   inspectionNumber: string;
+  /** Set when a production batch, or returned goods of one, were inspected. */
+  productionBatchId?: string | null;
   inspectionType: string;
   supplierName: string | null;
   materialCode: string;
@@ -835,6 +837,8 @@ export interface TimelineEvent {
   batchNumber: string | null;
   status: string | null;
   link: string | null;
+  /** The event has a day but no time: `at` is that day's midnight UTC. */
+  dateOnly?: boolean;
 }
 
 export interface TraceReport {
@@ -2316,6 +2320,7 @@ export type LossCategory =
   | "PLANNED_MAINTENANCE"
   | "CHANGEOVER"
   | "ORDER_ON_HOLD"
+  | "SHIFT_END"
   | "OTHER";
 
 /** A work order operation on the shop floor. Quantities are in the work order's unit. */
@@ -2554,6 +2559,10 @@ export interface ReworkDetail {
     changedByName: string | null;
     changedAt: string;
   }[];
+  /** The viewer raised it and approval is separated, so someone else approves it. */
+  othersMustApprove: boolean;
+  /** The batch is completed, so a final inspection can check it. */
+  batchCompleted: boolean;
 }
 
 export interface WorkOrderQuality {
@@ -2895,6 +2904,15 @@ export interface ProductionAnalytics {
     rejectionRate: string | null;
     scrapRate: string | null;
     reworkRate: string | null;
+    /** The quantities per unit they were reported in. With more than one, the totals above mix units. */
+    byUnit?: {
+      uomId: string | null;
+      processed: string;
+      good: string;
+      rejected: string;
+      scrap: string;
+      rework: string;
+    }[];
   };
   efficiency: {
     operations: number;

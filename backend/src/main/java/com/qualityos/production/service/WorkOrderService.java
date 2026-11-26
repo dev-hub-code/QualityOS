@@ -463,6 +463,8 @@ public class WorkOrderService {
         if (routing == null && settings.workOrderRequiresRouting()) {
             problems.add("%s has no approved routing in effect on %s.".formatted(product.code(), on));
         }
+        qualityGates.finalInspectionProblem(order.getProductId(), product.code(),
+                settings.rules().completionRequiresFinalInspection()).ifPresent(problems::add);
         if (routing != null) {
             List<RoutingOperation> operations = routingOperations.findByRoutingIdOrderBySequence(routing.getId());
             Map<UUID, WorkCenter> centres = workCenters.byId(

@@ -14,6 +14,7 @@ import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import { toDispatchItems } from "@/lib/traceability";
 import type { Customer, Dispatch, ProductionBatch } from "@/lib/types";
 import { lookupAll } from "@/components/records/parts";
+import { formatCalendarDay } from "@/lib/dates";
 
 const RELEASED = "/production-batches?status=RELEASED";
 
@@ -27,7 +28,7 @@ const columns = [
     header: "Customer",
     cell: (info) => <RecordLink href={`/customers/${info.row.original.customerId}`}>{info.getValue()}</RecordLink>,
   }),
-  column.accessor("dispatchedOn", { header: "Date" }),
+  column.accessor("dispatchedOn", { header: "Date", cell: (info) => formatCalendarDay(info.getValue()) }),
   column.accessor("lines", {
     header: "Shipped",
     enableSorting: false,

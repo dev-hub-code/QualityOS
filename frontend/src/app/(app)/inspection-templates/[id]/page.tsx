@@ -24,7 +24,7 @@ import { requirement } from "@/lib/inspection";
 import { templateEditFields } from "@/lib/record-fields";
 import type { FieldDef } from "@/lib/record-form";
 import type { TemplateDetail, TemplateVersion } from "@/lib/types";
-import { today } from "@/lib/dates";
+import { formatCalendarDay, today } from "@/lib/dates";
 
 const PUBLISH_FIELDS: FieldDef[] = [
   { name: "effectiveFrom", label: "Effective from", type: "date", required: true },
@@ -33,7 +33,7 @@ const PUBLISH_FIELDS: FieldDef[] = [
 function sampling(version: TemplateVersion) {
   if (version.samplingType === "FULL") return "Every unit";
   if (version.samplingType === "AQL") return `AQL ${Number(version.aql)}, inspection level ${levelLabel(version.inspectionLevel)}`;
-  return version.samplingType === "FIXED" ? `${version.sampleSize} samples` : `${version.samplePercent}% of the lot`;
+  return version.samplingType === "FIXED" ? `${version.sampleSize} ${version.sampleSize === 1 ? "sample" : "samples"}` : `${version.samplePercent}% of the lot`;
 }
 
 function PublishedVersion({ version }: { version: TemplateVersion }) {
@@ -44,8 +44,8 @@ function PublishedVersion({ version }: { version: TemplateVersion }) {
         {version.samplingType === "AQL"
           ? `${version.doubleSampling ? "double sampling, " : ""}with sample size and acceptance set by each lot's size`
           : `up to ${version.acceptanceNumber} failures allowed`}{" "}
-        · from {version.effectiveFrom}
-        {version.effectiveTo && ` to ${version.effectiveTo}`}
+        · from {formatCalendarDay(version.effectiveFrom)}
+        {version.effectiveTo && ` to ${formatCalendarDay(version.effectiveTo)}`}
       </p>
       <ul className="divide-y text-sm">
         {version.parameters.map((parameter) => (

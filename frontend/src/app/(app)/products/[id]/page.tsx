@@ -29,6 +29,7 @@ import { productFields } from "@/lib/record-fields";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { ProductDetail, ProductionBatch } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { formatCalendarDay } from "@/lib/dates";
 
 const REVISION_FIELDS: FieldDef[] = [
   { name: "revision", label: "Revision", required: true },
@@ -123,7 +124,7 @@ export default function ProductPage() {
             <li key={revision.id} className="flex justify-between gap-3 py-2">
               <span className="font-medium">{revision.revision}</span>
               <span className="text-muted-foreground">
-                {revision.changeNote} · from {revision.effectiveFrom}
+                {revision.changeNote} · from {formatCalendarDay(revision.effectiveFrom)}
               </span>
             </li>
           ))}

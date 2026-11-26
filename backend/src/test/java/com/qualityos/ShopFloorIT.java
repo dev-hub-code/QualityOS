@@ -44,6 +44,7 @@ class ShopFloorIT extends TraceabilityFixture {
      */
     @BeforeEach
     void gearbox() throws Exception {
+        finalInspectionTemplate();
         supervisor = addMember(owner, "PRODUCTION_MANAGER");
         operator = addMember(owner, "PRODUCTION_OPERATOR");
         facility = facility(owner);
@@ -183,6 +184,9 @@ class ShopFloorIT extends TraceabilityFixture {
 
         // Measurements are kept, and flagged when outside the limits.
         send(operator, path + "/measurements", Map.of("parameterCode", "RPM", "value", "1300"))
+                .andExpect(status().isUnprocessableContent());
+        send(operator, path + "/measurements", Map.of("parameterCode", "RPM", "value", "1300",
+                        "comment", "Belt slipping, tightened"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.measurements[0].withinLimits").value(false));
         send(operator, path + "/measurements", Map.of("parameterCode", "rpm", "value", "1000"))

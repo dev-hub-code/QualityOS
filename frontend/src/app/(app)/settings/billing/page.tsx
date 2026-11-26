@@ -37,6 +37,7 @@ import type {
 } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useMe } from "@/hooks/use-me";
+import { formatCalendarDay } from "@/lib/dates";
 
 const STATE: Record<Subscription["state"], string> = {
   TRIAL: "Trial",
@@ -262,7 +263,7 @@ function Billing() {
         <div className="rounded-md border bg-muted px-3 py-2 text-sm">
           <p role="status">
             Invoice {open.invoiceNumber} for {formatMoney(open.total)} is due by{" "}
-            {open.dueOn}. The {open.planName} plan starts once it is paid.
+            {formatCalendarDay(open.dueOn)}. The {open.planName} plan starts once it is paid.
             Choosing another plan replaces this invoice.
           </p>
           {gateway.data?.available && (

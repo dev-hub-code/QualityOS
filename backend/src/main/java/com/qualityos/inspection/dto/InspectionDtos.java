@@ -141,4 +141,8 @@ public final class InspectionDtos {
             java.time.Instant createdAt,
             UUID returnItemId) {
     }
+
+    /** Why an inspection is cancelled, kept in the audit trail. */
+    public record CancelInspectionRequest(@jakarta.validation.constraints.Size(max = 1000) String reason) {
+    }
 }

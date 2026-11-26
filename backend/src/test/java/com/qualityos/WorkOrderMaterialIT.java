@@ -37,6 +37,7 @@ class WorkOrderMaterialIT extends TraceabilityFixture {
     /** A gearbox takes 2 kg of bar with 10% scrap, so ten need 22 kg. */
     @BeforeEach
     void gearbox() throws Exception {
+        finalInspectionTemplate();
         approver = addMember(owner, "PRODUCTION_MANAGER");
         facility = facility(owner);
         material = material(owner, false, "KG");

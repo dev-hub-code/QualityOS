@@ -17,6 +17,8 @@ public interface FinishedProductRepository extends JpaRepository<FinishedProduct
 
     long countByProductionBatchId(UUID batchId);
 
+    long countByProductionBatchIdAndDispatchItemIdIsNull(UUID batchId);
+
     List<FinishedProduct> findBySerialNumberIn(Collection<String> serialNumbers);
 
     List<FinishedProduct> findBySerialNumberContainingIgnoreCaseOrderBySerialNumber(String term, Pageable pageable);

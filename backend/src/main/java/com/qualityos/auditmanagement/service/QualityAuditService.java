@@ -329,7 +329,7 @@ public class QualityAuditService implements AttachmentPolicy {
             Set<UUID> people = new HashSet<>(access.holdersOf(Permissions.AUDIT_CLOSE));
             people.add(row.getLeadAuditorId());
             notifications.notify(scope.allowedIn(row.getFacilityId(), people), NotificationType.AUDIT_FINDINGS,
-                    "%s has %d finding(s)".formatted(row.getAuditNumber(), recorded.size()), row.getTitle(), link(row),
+                    "%s has %d %s".formatted(row.getAuditNumber(), recorded.size(), recorded.size() == 1 ? "finding" : "findings"), row.getTitle(), link(row),
                     new EmailContent(EmailTemplate.AUDIT_FINDINGS, Map.of("auditNumber", row.getAuditNumber())));
         }
         return toDetail(row);

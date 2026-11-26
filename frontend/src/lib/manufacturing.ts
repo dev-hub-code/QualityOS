@@ -205,6 +205,7 @@ export const LOSS_CATEGORY_LABELS: Record<LossCategory, string> = {
   PLANNED_MAINTENANCE: "Planned maintenance",
   CHANGEOVER: "Changeover",
   ORDER_ON_HOLD: "Work order on hold",
+  SHIFT_END: "End of shift / hand-over",
   OTHER: "Other",
 };
 

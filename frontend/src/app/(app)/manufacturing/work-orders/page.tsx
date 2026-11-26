@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import { PRIORITY_LABELS } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
 import type { WorkOrder, WorkOrderDetail } from "@/lib/types";
+import { formatCalendarDay } from "@/lib/dates";
 
 const COLUMNS: ColumnDef<WorkOrder>[] = [
   {
@@ -24,7 +25,7 @@ const COLUMNS: ColumnDef<WorkOrder>[] = [
   { header: "Product", cell: ({ row }) => `${row.original.productCode} – ${row.original.productName}` },
   { header: "Quantity", cell: ({ row }) => formatQuantity(row.original.quantity) },
   { header: "Facility", accessorKey: "facilityCode" },
-  { header: "Planned", cell: ({ row }) => `${row.original.plannedStart} to ${row.original.plannedEnd}` },
+  { header: "Planned", cell: ({ row }) => `${formatCalendarDay(row.original.plannedStart)} to ${formatCalendarDay(row.original.plannedEnd)}` },
   { header: "Priority", cell: ({ row }) => PRIORITY_LABELS[row.original.priority] },
   { header: "Status", cell: ({ row }) => <StatusBadge status={row.original.status} /> },
 ];

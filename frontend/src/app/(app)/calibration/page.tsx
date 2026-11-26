@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import type { Instrument } from "@/lib/types";
+import { formatCalendarDay } from "@/lib/dates";
 
 const COLUMNS: ColumnDef<Instrument>[] = [
   {
@@ -18,7 +19,7 @@ const COLUMNS: ColumnDef<Instrument>[] = [
   },
   { header: "Name", accessorKey: "name" },
   { header: "Category", accessorKey: "category" },
-  { header: "Next due", accessorKey: "nextDueOn" },
+  { header: "Next due", accessorKey: "nextDueOn", cell: ({ getValue }) => formatCalendarDay(getValue<string | null>()) },
   {
     header: "Calibration",
     cell: ({ row }) =>

@@ -194,7 +194,7 @@ public class MaterialReceiptService implements AttachmentPolicy {
         String list = String.join(", ", lots);
         notifications.notify(scope.allowedIn(receipt.getFacilityId(), access.holdersOf(Permissions.INSPECTION_CREATE)),
                 NotificationType.MATERIAL_AWAITING_INSPECTION,
-                receipt.getGrnNumber() + ": " + lots.size() + " lot(s) to inspect", list, "/inspections",
+                receipt.getGrnNumber() + ": " + lots.size() + (lots.size() == 1 ? " lot" : " lots") + " to inspect", list, "/inspections",
                 new EmailContent(EmailTemplate.MATERIAL_RECEIVED, Map.of("receiptNumber", receipt.getGrnNumber(),
                         "supplierName", supplier, "lots", list)));
     }

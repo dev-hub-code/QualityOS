@@ -174,7 +174,7 @@ class PurchasingIT extends MasterDataFixture {
         receive(owner, draft, "1").andExpect(status().isUnprocessableContent());
 
         IssuedOrder cancelled = issuedOrder(owner, "100");
-        as(owner, postJson("/api/v1/purchase-orders/" + cancelled.id() + "/cancel", Map.of()))
+        as(owner, postJson("/api/v1/purchase-orders/" + cancelled.id() + "/cancel", Map.of("reason", "Supplier cannot deliver")))
                 .andExpect(status().isOk());
         receive(owner, cancelled, "1").andExpect(status().isUnprocessableContent());
 
@@ -191,7 +191,7 @@ class PurchasingIT extends MasterDataFixture {
         IssuedOrder order = issuedOrder(owner, "100");
         receive(owner, order, "10").andExpect(status().isCreated());
 
-        as(owner, postJson("/api/v1/purchase-orders/" + order.id() + "/cancel", Map.of()))
+        as(owner, postJson("/api/v1/purchase-orders/" + order.id() + "/cancel", Map.of("reason", "Not needed")))
                 .andExpect(status().isUnprocessableContent());
     }
 
@@ -291,7 +291,7 @@ class PurchasingIT extends MasterDataFixture {
 
         as(viewer, get("/api/v1/purchase-orders")).andExpect(status().isOk());
         receive(viewer, order, "1").andExpect(status().isForbidden());
-        as(viewer, postJson("/api/v1/purchase-orders/" + order.id() + "/cancel", Map.of()))
+        as(viewer, postJson("/api/v1/purchase-orders/" + order.id() + "/cancel", Map.of("reason", "Not needed")))
                 .andExpect(status().isForbidden());
     }
 }

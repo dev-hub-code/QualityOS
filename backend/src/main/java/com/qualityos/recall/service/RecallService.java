@@ -373,15 +373,23 @@ public class RecallService implements AttachmentPolicy {
         recall.requestClosure(TenantContext.getCurrentUserId(), request.note().trim(), Instant.now());
         recalls.flush();
         audit.record("RECALL_CLOSURE_REQUESTED", ENTITY, id);
+        notifications.notify(access.holdersOf(Permissions.RECALL_CLOSE),
+                com.qualityos.notification.service.NotificationType.RECALL_AWAITING_CLOSURE,
+                recall.getRecallNumber() + " is ready to close", request.note().trim(), "/recalls/" + id);
         return detail(recall, permissions);
     }
 
     @Transactional
     public RecallDetail sendBack(UUID id, String reason, Set<String> permissions) {
         Recall recall = lock(id);
+        UUID requester = recall.getClosureRequestedBy();
         recall.sendBack();
         recalls.flush();
         audit.record("RECALL_CLOSURE_SENT_BACK", ENTITY, id, null, Map.of("reason", reason));
+        if (requester != null) {
+            notifications.notify(Set.of(requester), com.qualityos.notification.service.NotificationType.RECALL_SENT_BACK,
+                    recall.getRecallNumber() + " closure was sent back", reason, "/recalls/" + id);
+        }
         return detail(recall, permissions);
     }
 
@@ -535,11 +543,12 @@ public class RecallService implements AttachmentPolicy {
                     contact.attempts(), contact.acknowledgedOn(), contact.exceptionReason(), contact.quantity(),
                     contact.returnedQuantity(), contact.outstandingQuantity());
         }).toList();
+        DateTimeFormatter label = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm z").withZone(zone);
         return new RecallReport(organization.name(), organization.legalName(), organization.address(),
-                organization.gstin(), now,
-                DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm z").withZone(zone).format(now),
+                organization.gstin(), now, label.format(now),
                 detail(recall, covered), products(covered), customers, covered.lines(), covered.serialNumbers(),
-                covered.inspections(), covered.ncrs(), historyOf(contacts.findByRecallId(id)));
+                covered.inspections(), covered.ncrs(), historyOf(contacts.findByRecallId(id)),
+                recall.getClosedAt() == null ? null : label.format(recall.getClosedAt()));
     }
 
     private static List<ReportProduct> products(RecallScope covered) {

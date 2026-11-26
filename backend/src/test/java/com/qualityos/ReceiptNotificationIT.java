@@ -24,7 +24,7 @@ class ReceiptNotificationIT extends TraceabilityFixture {
         limit(elsewhere, facility(owner));
 
         Lot lot = lot(material(owner, true), "25");
-        assertThat(titles(inspector)).singleElement().asString().endsWith(": 1 lot(s) to inspect");
+        assertThat(titles(inspector)).singleElement().asString().endsWith(": 1 lot to inspect");
         String body = body(as(inspector, get("/api/v1/notifications")));
         assertThat(body).contains(lot.batch()).contains("\"link\":\"/inspections\"");
         assertThat(titles(elsewhere)).isEmpty();

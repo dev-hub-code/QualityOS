@@ -326,4 +326,9 @@ public final class QualityDtos {
     /** A CAPA as a trace shows it. */
     public record CapaHistory(UUID id, String capaNumber, String title, String status, UUID ncrId, Instant createdAt) {
     }
+
+    /** An existing CAPA an NCR shares its root cause with, and why. */
+    public record LinkCapaRequest(@jakarta.validation.constraints.NotNull UUID capaId,
+            @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 1000) String note) {
+    }
 }

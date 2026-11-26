@@ -98,7 +98,7 @@ export function ContactTable({
             </p>
             <p>
               {formatQuantity(contact.quantity)} dispatched, {formatQuantity(contact.returnedQuantity)} returned,{" "}
-              {formatQuantity(contact.outstandingQuantity)} still out · {contact.attempts} attempts
+              {formatQuantity(contact.outstandingQuantity)} still out · {contact.attempts} {contact.attempts === 1 ? "attempt" : "attempts"}
               {contact.acknowledgedOn && ` · Acknowledged ${contact.acknowledgedOn}`}
             </p>
             {contact.exceptionReason && <p>Exception: {contact.exceptionReason}</p>}

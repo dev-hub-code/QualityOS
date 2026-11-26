@@ -4,6 +4,7 @@ import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/records/data-table";
 import { PageHeader, RecordLink, StatusBadge } from "@/components/records/parts";
 import type { DispatchReturn } from "@/lib/types";
+import { formatCalendarDay } from "@/lib/dates";
 
 const column = createColumnHelper<DispatchReturn>();
 const columns = [
@@ -14,7 +15,7 @@ const columns = [
   column.accessor("returnReference", { header: "Reference" }),
   column.accessor("dispatchNumber", { header: "Dispatch" }),
   column.accessor("customerName", { header: "Customer" }),
-  column.accessor("reversalDate", { header: "Date" }),
+  column.accessor("reversalDate", { header: "Date", cell: (info) => formatCalendarDay(info.getValue()) }),
   column.accessor("status", { header: "Status", cell: (info) => <StatusBadge status={info.getValue()} /> }),
 ];
 

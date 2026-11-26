@@ -10,7 +10,7 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { newRequestKey } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
-import type { WorkOrderMaterials, WorkOrderStatus } from "@/lib/types";
+import type { WorkOrderCompletion, WorkOrderMaterials, WorkOrderStatus } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { formatDateTime } from "@/lib/dates";
 
@@ -51,10 +51,17 @@ export function WorkOrderMaterialsPanel({ orderId, status }: { orderId: string; 
     queryKey: [`${path}/materials`],
     queryFn: () => api.get<WorkOrderMaterials>(`${path}/materials`),
   });
+  // Once finished goods are received the batch is complete: nothing more goes into it, and nothing comes back out.
+  const { data: completion } = useQuery({
+    queryKey: [`${path}/completion`],
+    queryFn: () => api.get<WorkOrderCompletion>(`${path}/completion`),
+    enabled: status === "IN_PROGRESS",
+  });
   if (!data || data.lines.length === 0) return null;
 
-  const reservable = canReserve && (status === "RELEASED" || status === "IN_PROGRESS");
-  const issuable = canIssue && status === "IN_PROGRESS";
+  const received = completion?.receipt != null;
+  const reservable = canReserve && (status === "RELEASED" || status === "IN_PROGRESS") && !received;
+  const issuable = canIssue && status === "IN_PROGRESS" && !received;
   const amount = (value: string, uomId: string) => `${formatQuantity(value)} ${units.label(uomId)}`;
   const close = () => setDialog(null);
 

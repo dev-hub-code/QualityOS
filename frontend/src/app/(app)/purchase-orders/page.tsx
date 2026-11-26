@@ -7,6 +7,7 @@ import { PageHeader, RecordLink, StatusBadge } from "@/components/records/parts"
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import type { PurchaseOrderSummary } from "@/lib/types";
+import { formatCalendarDay } from "@/lib/dates";
 
 const column = createColumnHelper<PurchaseOrderSummary>();
 const columns = [
@@ -15,8 +16,8 @@ const columns = [
     cell: (info) => <RecordLink href={`/purchase-orders/${info.row.original.id}`}>{info.getValue()}</RecordLink>,
   }),
   column.accessor("supplierName", { header: "Supplier" }),
-  column.accessor("orderDate", { header: "Ordered" }),
-  column.accessor("expectedDate", { header: "Expected" }),
+  column.accessor("orderDate", { header: "Ordered", cell: (info) => formatCalendarDay(info.getValue()) }),
+  column.accessor("expectedDate", { header: "Expected", cell: (info) => formatCalendarDay(info.getValue()) }),
   column.accessor("status", { header: "Status", cell: (info) => <StatusBadge status={info.getValue()} /> }),
 ];
 

@@ -33,7 +33,7 @@ class QualityAlerts {
 
     void ncrRaised(NonConformance ncr) {
         ncr(access.holdersOf(Permissions.NCR_ASSIGN), NotificationType.NCR_RAISED, ncr,
-                ncr.getNcrNumber() + " was raised", ncr.getSeverity() + " non-conformance: " + ncr.getTitle(),
+                ncr.getNcrNumber() + " was raised", com.qualityos.common.util.EnumLabels.label(ncr.getSeverity().name()) + " non-conformance: " + ncr.getTitle(),
                 ncrEmail(EmailTemplate.NCR_CREATED, ncr));
     }
 

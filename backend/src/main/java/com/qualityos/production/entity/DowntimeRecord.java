@@ -64,10 +64,10 @@ public class DowntimeRecord extends TenantOwnedEntity {
         categorise(category);
     }
 
-    /** Planned maintenance is planned downtime; the category decides it. */
+    /** Planned maintenance and a shift hand-over are planned downtime; the category decides it. */
     public void categorise(LossCategory value) {
         this.category = value;
-        this.planned = value == LossCategory.PLANNED_MAINTENANCE;
+        this.planned = value == LossCategory.PLANNED_MAINTENANCE || value == LossCategory.SHIFT_END;
     }
 
     /** Who was responsible, or nobody when {@code departmentId} is null. */

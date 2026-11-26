@@ -13,7 +13,7 @@ import { DEFINITIONS, revisionActions, type DefinitionKind } from "@/lib/manufac
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import type { Revision } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { formatDateTime } from "@/lib/dates";
+import { formatCalendarDay, formatDateTime } from "@/lib/dates";
 
 const when = (value: string | null) => (value ? formatDateTime(value) : "–");
 
@@ -144,7 +144,7 @@ export function RevisionHeader({
               : []),
             ...details,
             ["What it is for", revision.changeNote ?? "–"],
-            ["Effective", revision.effectiveFrom ? `${revision.effectiveFrom} to ${revision.effectiveTo ?? "open"}` : "Not yet approved"],
+            ["Effective", revision.effectiveFrom ? `${formatCalendarDay(revision.effectiveFrom)} to ${revision.effectiveTo ? formatCalendarDay(revision.effectiveTo) : "open"}` : "Not yet approved"],
             ["Submitted", revision.submittedAt ? `${revision.submittedByName ?? "Former member"}, ${when(revision.submittedAt)}` : "–"],
             ["Approved", revision.approvedAt ? `${revision.approvedByName ?? "Former member"}, ${when(revision.approvedAt)}` : "–"],
           ]}

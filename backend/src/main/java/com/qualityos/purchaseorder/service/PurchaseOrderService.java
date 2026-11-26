@@ -141,11 +141,16 @@ public class PurchaseOrderService {
     }
 
     @Transactional
-    public PurchaseOrderDetail cancel(UUID id) {
+    public PurchaseOrderDetail cancel(UUID id, String reason) {
         PurchaseOrder order = loadWithItems(id);
+        // The supplier already has an issued order, so the reason it is withdrawn is kept.
+        if (order.getStatus() == PurchaseOrder.Status.ISSUED && (reason == null || reason.isBlank())) {
+            throw new BusinessRuleException("Say why an issued order is cancelled.");
+        }
         order.cancel();
         orders.saveAndFlush(order);
-        audit.record("PURCHASE_ORDER_CANCELLED", "PurchaseOrder", id);
+        audit.record("PURCHASE_ORDER_CANCELLED", "PurchaseOrder", id, null,
+                reason == null || reason.isBlank() ? Map.of() : Map.of("reason", reason.trim()));
         return toDetail(order);
     }
 

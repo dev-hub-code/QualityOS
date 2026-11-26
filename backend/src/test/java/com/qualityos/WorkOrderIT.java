@@ -28,6 +28,7 @@ class WorkOrderIT extends TraceabilityFixture {
 
     @BeforeEach
     void approver() throws Exception {
+        finalInspectionTemplate();
         approver = addMember(owner, "PRODUCTION_MANAGER");
     }
 

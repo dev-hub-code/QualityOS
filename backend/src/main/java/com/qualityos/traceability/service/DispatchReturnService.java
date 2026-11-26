@@ -7,6 +7,7 @@ import com.qualityos.common.audit.AuditService;
 import com.qualityos.common.exception.BusinessRuleException;
 import com.qualityos.common.exception.ConflictException;
 import com.qualityos.common.exception.ResourceNotFoundException;
+import com.qualityos.common.util.Quantities;
 import com.qualityos.common.persistence.DocumentNumberService;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.identity.service.FacilityScope;
@@ -80,6 +81,7 @@ public class DispatchReturnService {
     private final AuditService audit;
     private final FacilityScope scope;
     private final NcrService ncrs;
+    private final com.qualityos.material.service.MaterialService materials;
 
     DispatchReturnService(
             DispatchReversalRepository reversals,
@@ -97,7 +99,9 @@ public class DispatchReturnService {
             DocumentNumberService numbers,
             AuditService audit,
             FacilityScope scope,
-            NcrService ncrs) {
+            NcrService ncrs,
+            com.qualityos.material.service.MaterialService materials) {
+        this.materials = materials;
         this.ncrs = ncrs;
         this.scope = scope;
         this.reversals = reversals;
@@ -247,7 +251,8 @@ public class DispatchReturnService {
                 .collect(Collectors.toMap(ProductionBatchView::id, Function.identity()));
         List<String> batchNumbers = byBatch.keySet().stream().map(id -> made.get(id).batchNumber()).toList();
         List<String> described = byBatch.entrySet().stream().map(entry -> "%s × %s".formatted(
-                made.get(entry.getKey()).batchNumber(), entry.getValue().stripTrailingZeros().toPlainString())).toList();
+                made.get(entry.getKey()).batchNumber(),
+                Quantities.label(entry.getValue(), materials.unitCode(made.get(entry.getKey()).uomId())))).toList();
         ncrs.raiseFromCustomerReturn(new CustomerReturn(
                 reversal.getId(),
                 reversal.getReversalNumber(),
@@ -347,7 +352,36 @@ public class DispatchReturnService {
                 ? "NOT_REVERSED"
                 : reversed.compareTo(dispatched) == 0 ? "FULLY_REVERSED" : "PARTIALLY_REVERSED";
         return new ReversalSummary(dispatchId, status, dispatched, reversed, dispatched.subtract(reversed),
-                expected, reversed.subtract(accepted).subtract(rejected), accepted, rejected);
+                expected, reversed.subtract(accepted).subtract(rejected), accepted, rejected,
+                labels(lines, returned));
+    }
+
+    private record Counted(String unit, BigDecimal quantity) {
+    }
+
+    /** The summary's quantities by unit, as a dispatch may carry batches counted in different units. */
+    private ReversalSummary.Labels labels(List<DispatchItem> lines, List<DispatchReversalItem> returned) {
+        Map<UUID, String> units = new java.util.HashMap<>();
+        production.views(java.util.stream.Stream.concat(
+                        lines.stream().map(DispatchItem::getProductionBatchId),
+                        returned.stream().map(DispatchReversalItem::getProductionBatchId))
+                        .filter(Objects::nonNull).distinct().toList())
+                .forEach(batch -> units.put(batch.id(), materials.unitCode(batch.uomId())));
+        List<Counted> sent = lines.stream()
+                .map(line -> new Counted(units.get(line.getProductionBatchId()), line.getQuantity())).toList();
+        List<Counted> back = returned.stream()
+                .map(item -> new Counted(units.get(item.getProductionBatchId()), item.getQuantity())).toList();
+        List<Counted> pending = returned.stream()
+                .filter(item -> item.getStatus() != DispatchReversalItem.Status.ACCEPTED
+                        && item.getStatus() != DispatchReversalItem.Status.REJECTED)
+                .map(item -> new Counted(units.get(item.getProductionBatchId()), item.getQuantity())).toList();
+        List<Counted> remaining = java.util.stream.Stream.concat(sent.stream(),
+                back.stream().map(row -> new Counted(row.unit(), row.quantity().negate()))).toList();
+        return new ReversalSummary.Labels(total(sent), total(back), total(pending), total(remaining));
+    }
+
+    private static String total(List<Counted> rows) {
+        return Quantities.total(rows, Counted::unit, Counted::quantity);
     }
 
     private static BigDecimal total(List<DispatchReversalItem> items, DispatchReversalItem.Status status) {
@@ -438,7 +472,8 @@ public class DispatchReturnService {
                                 ProductionBatchView batch = made.get(item.getProductionBatchId());
                                 return new ReversalItemView(item.getId(), item.getDispatchItemId(), batch.batchNumber(),
                                         batch.productCode(), item.getQuantity(), item.getSerialNumbers(),
-                                        item.getStatus().name(), item.getDisposition());
+                                        item.getStatus().name(), item.getDisposition(),
+                                        materials.unitCode(batch.uomId()));
                             }).toList(),
                             raised.containsKey(reversal.getId()) ? raised.get(reversal.getId()).id() : null,
                             raised.containsKey(reversal.getId()) ? raised.get(reversal.getId()).ncrNumber() : null);

@@ -69,6 +69,7 @@ public class StockTransferService {
     private final OrganizationService organizations;
     private final DocumentNumberService numbers;
     private final AuditService audit;
+    private final com.qualityos.material.service.MaterialService materials;
 
     StockTransferService(
             StockTransferRepository transfers,
@@ -81,7 +82,9 @@ public class StockTransferService {
             FacilityScope scope,
             OrganizationService organizations,
             DocumentNumberService numbers,
-            AuditService audit) {
+            AuditService audit,
+            com.qualityos.material.service.MaterialService materials) {
+        this.materials = materials;
         this.transfers = transfers;
         this.lines = lines;
         this.batches = batches;
@@ -279,7 +282,7 @@ public class StockTransferService {
         Map<UUID, TransferResponse> responses = new HashMap<>();
         for (StockTransfer transfer : found) {
             List<TransferLine> items = byTransfer.getOrDefault(transfer.getId(), List.of()).stream()
-                    .map(line -> line(line, lots, views)).toList();
+                    .map(line -> line(line, lots, views, materials::unitCode)).toList();
             responses.put(transfer.getId(), new TransferResponse(
                     transfer.getId(),
                     transfer.getTransferNumber(),
@@ -298,19 +301,21 @@ public class StockTransferService {
         return responses;
     }
 
-    private static TransferLine line(
-            StockTransferItem line, Map<UUID, LotView> lots, Map<UUID, ProductionBatchView> views) {
+    private static TransferLine line(StockTransferItem line, Map<UUID, LotView> lots,
+            Map<UUID, ProductionBatchView> views, Function<UUID, String> unitCode) {
         if (line.getSourceLotId() != null) {
             LotView source = lots.get(line.getSourceLotId());
             LotView received = line.getReceivedLotId() == null ? null : lots.get(line.getReceivedLotId());
             return new TransferLine("LOT", source.itemId(), source.internalBatch(), source.materialCode(),
                     source.materialName(), line.getQuantity(), source.uomId(),
-                    received == null ? null : received.itemId(), received == null ? null : received.internalBatch());
+                    received == null ? null : received.itemId(), received == null ? null : received.internalBatch(),
+                    unitCode.apply(source.uomId()));
         }
         ProductionBatchView source = views.get(line.getSourceBatchId());
         ProductionBatchView received = line.getReceivedBatchId() == null ? null : views.get(line.getReceivedBatchId());
         return new TransferLine("BATCH", source.id(), source.batchNumber(), source.productCode(), source.productName(),
                 line.getQuantity(), source.uomId(),
-                received == null ? null : received.id(), received == null ? null : received.batchNumber());
+                received == null ? null : received.id(), received == null ? null : received.batchNumber(),
+                unitCode.apply(source.uomId()));
     }
 }

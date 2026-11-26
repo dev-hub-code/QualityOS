@@ -224,7 +224,9 @@ class RecallIT extends TraceabilityFixture {
     @Test
     void identifyingCustomersIsNotEnoughToClose() throws Exception {
         String recall = start();
-        requestClosure(owner, recall, true).andExpect(status().isUnprocessableContent());
+        requestClosure(owner, recall, true).andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString(
+                        "Mark each one resolved, or record an exception")));
     }
 
     @Test

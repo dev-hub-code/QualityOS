@@ -18,7 +18,7 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
-import { formatQuantity, type FieldDef } from "@/lib/record-form";
+import { formatQuantityIn, type FieldDef } from "@/lib/record-form";
 import type { DispatchReturn } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
@@ -98,7 +98,7 @@ export default function DispatchReversalPage() {
           {reversal.items.map((item) => (
             <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
               <span>
-                {item.batchNumber} · {item.productCode} × {formatQuantity(item.quantity)}
+                {item.batchNumber} · {item.productCode} × {formatQuantityIn(item.quantity, item.unit)}
                 {item.serialNumbers.length > 0 && ` · ${item.serialNumbers.join(", ")}`}
               </span>
               <span className="flex items-center gap-2">

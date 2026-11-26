@@ -44,6 +44,7 @@ class StockTransferIT extends TraceabilityFixture {
 
         String sent = body(send(owner, from, to, "lotId", lot.id(), "4").andExpect(status().isCreated())
                 .andExpect(jsonPath("$.data.status").value("IN_TRANSIT"))
+                .andExpect(jsonPath("$.data.items[0].unit").value("KG"))
                 .andExpect(jsonPath("$.data.transferNumber").value(org.hamcrest.Matchers.startsWith("STR-")))
                 .andExpect(jsonPath("$.data.items[0].kind").value("LOT"))
                 .andExpect(jsonPath("$.data.items[0].sourceNumber").value(lot.batch())));

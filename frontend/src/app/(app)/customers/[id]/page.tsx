@@ -7,7 +7,7 @@ import { DataTable } from "@/components/records/data-table";
 import { Details, PageHeader, QueryState, RecordLink, Section } from "@/components/records/parts";
 import { DispatchActions } from "@/components/traceability/dispatch-actions";
 import { api } from "@/lib/api";
-import { formatQuantity } from "@/lib/record-form";
+import { formatQuantityIn } from "@/lib/record-form";
 import type { Customer, Dispatch } from "@/lib/types";
 import { formatCalendarDay } from "@/lib/dates";
 
@@ -24,7 +24,7 @@ const columns = [
     cell: (info) =>
       info
         .getValue()
-        .map((line) => `${line.batchNumber} × ${formatQuantity(line.quantity)}`)
+        .map((line) => `${line.batchNumber} × ${formatQuantityIn(line.quantity, line.unit)}`)
         .join(", "),
   }),
   column.display({ id: "state", header: "", cell: (info) => <DispatchActions dispatch={info.row.original} /> }),

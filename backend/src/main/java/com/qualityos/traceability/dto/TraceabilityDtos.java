@@ -203,7 +203,9 @@ public final class TraceabilityDtos {
             String productName,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal returnedQuantity,
-            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal expectedQuantity) {
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal expectedQuantity,
+            /* The unit the batch is counted in, such as LTR or PCS. */
+            String unit) {
     }
 
     public record ReturnLineRequest(
@@ -251,7 +253,8 @@ public final class TraceabilityDtos {
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
             List<String> serialNumbers,
             String status,
-            String disposition) {
+            String disposition,
+            String unit) {
     }
 
     public record ReversalView(
@@ -296,7 +299,12 @@ public final class TraceabilityDtos {
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal expectedQuantity,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal pendingQuantity,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal acceptedQuantity,
-            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal rejectedQuantity) {
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal rejectedQuantity,
+            /* The same quantities by unit, such as "400 LTR · 5 PCS": the numbers above add up lines of any unit. */
+            Labels labels) {
+
+        public record Labels(String dispatched, String reversed, String pending, String remaining) {
+        }
     }
 
     public record DispatchResponse(
@@ -489,7 +497,8 @@ public final class TraceabilityDtos {
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
             UUID uomId,
             UUID receivedId,
-            String receivedNumber) {
+            String receivedNumber,
+            String unit) {
     }
 
     public record TransferResponse(

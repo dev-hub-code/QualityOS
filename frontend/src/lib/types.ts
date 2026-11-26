@@ -774,6 +774,8 @@ export interface Dispatch {
     quantity: string;
     returnedQuantity: string;
     expectedQuantity: string;
+    /** The unit the batch is counted in, such as LTR or PCS. */
+    unit: string | null;
   }[];
   reversalReason: string | null;
   reversedAt: string | null;
@@ -791,6 +793,8 @@ export interface ReversalSummary {
   pendingQuantity: string;
   acceptedQuantity: string;
   rejectedQuantity: string;
+  /** The same quantities by unit, such as "400 LTR · 5 PCS". The numbers above add up lines of any unit. */
+  labels: { dispatched: string; reversed: string; pending: string; remaining: string };
 }
 
 /** One entry of the organisation's own audit trail. {@code actor} is null for an event the system raised itself. */
@@ -900,6 +904,7 @@ export interface DispatchReturn {
     serialNumbers: string[];
     status: string;
     disposition: string | null;
+    unit: string | null;
   }[];
   /** The NCR the return raised as a quality complaint, if any. */
   ncrId: string | null;
@@ -2960,6 +2965,7 @@ export interface TransferLine {
   uomId: string;
   receivedId: string | null;
   receivedNumber: string | null;
+  unit: string | null;
 }
 
 export interface StockTransfer {

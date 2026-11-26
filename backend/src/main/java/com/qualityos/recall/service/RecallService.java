@@ -611,7 +611,8 @@ public class RecallService implements AttachmentPolicy {
         BigDecimal outstanding = sum(covered.lines(), RecallLine::outstandingQuantity);
         List<String> blockers = new ArrayList<>();
         if (!unresolved.isEmpty()) {
-            blockers.add("Customers still unresolved: " + String.join(", ", unresolved) + ".");
+            blockers.add("Customers still unresolved: " + String.join(", ", unresolved)
+                    + ". Mark each one resolved, or record an exception for one you cannot settle, such as a customer you cannot reach.");
         }
         if (outstanding.signum() > 0 && !outstandingAccepted) {
             blockers.add("Goods remain with customers. Confirm this and explain it in the note.");

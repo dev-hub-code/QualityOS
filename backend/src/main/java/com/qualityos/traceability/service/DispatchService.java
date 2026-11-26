@@ -87,6 +87,7 @@ public class DispatchService {
     private final FacilityScope scope;
     private final RecallHolds recallHolds;
     private final ApplicationEventPublisher events;
+    private final com.qualityos.material.service.MaterialService materials;
 
     DispatchService(
             org.springframework.jdbc.core.JdbcTemplate jdbc,
@@ -107,7 +108,9 @@ public class DispatchService {
             AuditService audit,
             FacilityScope scope,
             RecallHolds recallHolds,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events,
+            com.qualityos.material.service.MaterialService materials) {
+        this.materials = materials;
         this.recallHolds = recallHolds;
         this.events = events;
         this.scope = scope;
@@ -359,6 +362,8 @@ public class DispatchService {
         Map<UUID, ProductionBatchView> shipped = production.views(lines.stream()
                         .map(DispatchItem::getProductionBatchId).filter(Objects::nonNull).distinct().toList())
                 .stream().collect(Collectors.toMap(ProductionBatchView::id, Function.identity()));
+        Map<UUID, String> units = new java.util.HashMap<>();
+        shipped.values().forEach(batch -> units.computeIfAbsent(batch.uomId(), materials::unitCode));
         Map<UUID, Customer> named = customers.findAllById(records.stream().map(DispatchRecord::getCustomerId).toList())
                 .stream().collect(Collectors.toMap(Customer::getId, Function.identity()));
         Map<UUID, List<DispatchItem>> byDispatch =
@@ -386,7 +391,7 @@ public class DispatchService {
                     ProductionBatchView batch = shipped.get(line.getProductionBatchId());
                     return new DispatchLine(line.getId(), batch.batchNumber(), batch.productCode(), batch.productName(),
                             line.getQuantity(), returned.getOrDefault(line.getId(), BigDecimal.ZERO),
-                            expected.getOrDefault(line.getId(), BigDecimal.ZERO));
+                            expected.getOrDefault(line.getId(), BigDecimal.ZERO), units.get(batch.uomId()));
                 }).toList(),
                 record.getCreatedAt(),
                 voided.containsKey(record.getId()) ? voided.get(record.getId()).getReason() : null,

@@ -17,7 +17,7 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
-import { formatQuantity, type FieldDef } from "@/lib/record-form";
+import { formatQuantity, formatQuantityIn, type FieldDef } from "@/lib/record-form";
 import type { CorrectionDetail, TimelineEvent, TraceNode, TraceReport } from "@/lib/types";
 import { formatCalendarDay, formatDateTime } from "@/lib/dates";
 
@@ -141,7 +141,7 @@ export default function TraceReportPage() {
             {dispatches.map((dispatch) => (
               <li key={dispatch.id} className="py-2">
                 {dispatch.dispatchNumber} to {dispatch.customerName} on {formatCalendarDay(dispatch.dispatchedOn)}:{" "}
-                {dispatch.lines.map((line) => `${line.batchNumber} × ${formatQuantity(line.quantity)}`).join(", ")}
+                {dispatch.lines.map((line) => `${line.batchNumber} × ${formatQuantityIn(line.quantity, line.unit)}`).join(", ")}
                 {dispatch.reversalReason && ` (reversed: ${dispatch.reversalReason})`}
               </li>
             ))}

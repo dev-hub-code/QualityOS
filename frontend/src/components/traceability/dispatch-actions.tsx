@@ -7,7 +7,7 @@ import { StatusBadge, useRefresh } from "@/components/records/parts";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api, ApiError } from "@/lib/api";
-import { formatQuantity, type FieldDef } from "@/lib/record-form";
+import { formatQuantityIn, type FieldDef } from "@/lib/record-form";
 import { toReturnItems } from "@/lib/traceability";
 import { today } from "@/lib/dates";
 import type { Dispatch, ReversalSummary } from "@/lib/types";
@@ -38,7 +38,7 @@ export function DispatchActions({ dispatch }: { dispatch: Dispatch }) {
       const twice = returnable.filter((other) => other.batchNumber === line.batchNumber).length > 1;
       const name = twice ? `${line.batchNumber}, line ${index + 1}` : line.batchNumber;
       const left = Number(line.quantity) - Number(line.returnedQuantity) - Number(line.expectedQuantity);
-      const upTo = formatQuantity(String(Number(left.toFixed(6))));
+      const upTo = formatQuantityIn(String(Number(left.toFixed(6))), line.unit);
       return [
         { name: `quantity${index + 1}`, label: `Returned from ${name} (up to ${upTo})`, type: "decimal" },
         { name: `serials${index + 1}`, label: `Serial numbers from ${name}, if tracked (one per line)`, type: "textarea" },
@@ -122,10 +122,10 @@ function ReturnStanding({ dispatchId }: { dispatchId: string }) {
   const { data } = useQuery({ queryKey: [path], queryFn: () => api.get<ReversalSummary>(path) });
   if (!data) return null;
   const parts = [
-    `${formatQuantity(data.dispatchedQuantity)} dispatched`,
-    Number(data.reversedQuantity) > 0 && `${formatQuantity(data.reversedQuantity)} back`,
-    Number(data.pendingQuantity) > 0 && `${formatQuantity(data.pendingQuantity)} on its way back`,
-    `${formatQuantity(data.remainingQuantity)} still with the customer`,
+    `${data.labels.dispatched} dispatched`,
+    Number(data.reversedQuantity) > 0 && `${data.labels.reversed} back`,
+    Number(data.pendingQuantity) > 0 && `${data.labels.pending} on its way back`,
+    `${data.labels.remaining} still with the customer`,
   ].filter(Boolean);
   return <p className="text-sm text-muted-foreground">{parts.join(" · ")}.</p>;
 }

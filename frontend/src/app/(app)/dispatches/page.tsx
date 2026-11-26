@@ -10,10 +10,10 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api, ApiError } from "@/lib/api";
-import { formatQuantity, type FieldDef } from "@/lib/record-form";
+import { formatQuantityIn, type FieldDef } from "@/lib/record-form";
 import { toDispatchItems } from "@/lib/traceability";
 import type { Customer, Dispatch, ProductionBatch } from "@/lib/types";
-import { lookupAll } from "@/components/records/parts";
+import { lookupAll, useUnits } from "@/components/records/parts";
 import { formatCalendarDay, today } from "@/lib/dates";
 
 const RELEASED = "/production-batches?status=RELEASED";
@@ -36,8 +36,8 @@ const columns = [
       info
         .getValue()
         .map((line) => {
-          const returned = Number(line.returnedQuantity) > 0 ? ` (${formatQuantity(line.returnedQuantity)} returned)` : "";
-          return `${line.batchNumber} × ${formatQuantity(line.quantity)}${returned}`;
+          const returned = Number(line.returnedQuantity) > 0 ? ` (${formatQuantityIn(line.returnedQuantity, line.unit)} returned)` : "";
+          return `${line.batchNumber} × ${formatQuantityIn(line.quantity, line.unit)}${returned}`;
         })
         .join(", "),
   }),
@@ -58,11 +58,12 @@ function DispatchDialog({ onClose }: { onClose: () => void }) {
   const canOverrideRecall = usePermission("RECALL_MANAGE");
   // Set once the server refuses goods under an open recall, so that someone allowed to may give a reason.
   const [heldByRecall, setHeldByRecall] = useState(false);
+  const unit = useUnits().label;
   const options = (batches ?? [])
     .filter((batch) => Number(batch.availableQuantity) > 0)
     .map((batch) => ({
       value: batch.id,
-      label: `${batch.batchNumber} – ${batch.productCode} (${formatQuantity(batch.availableQuantity)} available)`,
+      label: `${batch.batchNumber} – ${batch.productCode} (${formatQuantityIn(batch.availableQuantity, unit(batch.uomId))} available)`,
     }));
   const fields: FieldDef[] = [
     {

@@ -11,12 +11,13 @@ import {
   StatusBadge,
   useFacilities,
   useRefresh,
+  useUnits,
 } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
-import { formatQuantity, type FieldDef } from "@/lib/record-form";
+import { formatQuantityIn, type FieldDef } from "@/lib/record-form";
 import { toTransferItems } from "@/lib/traceability";
 import type { ProductionBatch, ReleasedLot, StockTransfer } from "@/lib/types";
 import { formatCalendarDay, today } from "@/lib/dates";
@@ -34,7 +35,7 @@ function Lines({ transfer }: { transfer: StockTransfer }) {
           >
             {line.sourceNumber}
           </RecordLink>{" "}
-          × {formatQuantity(line.quantity)} ({line.itemCode})
+          × {formatQuantityIn(line.quantity, line.unit)} ({line.itemCode})
           {line.receivedNumber && (
             <>
               {" → "}
@@ -158,6 +159,7 @@ function SendDialog({ onClose }: { onClose: () => void }) {
     queryFn: () =>
       lookupAll<ProductionBatch>("/production-batches", "&status=RELEASED"),
   });
+  const unit = useUnits().label;
   const plant = (id: string) =>
     facilities.find((facility) => facility.value === id)?.label ?? "";
   // Each choice says which plant it is at: a transfer leaves from the plant chosen above.
@@ -169,13 +171,13 @@ function SendDialog({ onClose }: { onClose: () => void }) {
       )
       .map((lot) => ({
         value: `LOT:${lot.itemId}`,
-        label: `${lot.internalBatch} – ${lot.materialCode} (${formatQuantity(String(Number(lot.remainingQuantity) - Number(lot.reservedQuantity)))} free) at ${plant(lot.facilityId)}`,
+        label: `${lot.internalBatch} – ${lot.materialCode} (${formatQuantityIn(String(Number(lot.remainingQuantity) - Number(lot.reservedQuantity)), unit(lot.uomId))} free) at ${plant(lot.facilityId)}`,
       })),
     ...batches
       .filter((batch) => Number(batch.availableQuantity) > 0)
       .map((batch) => ({
         value: `BATCH:${batch.id}`,
-        label: `${batch.batchNumber} – ${batch.productCode} (${formatQuantity(batch.availableQuantity)} available) at ${plant(batch.facilityId)}`,
+        label: `${batch.batchNumber} – ${batch.productCode} (${formatQuantityIn(batch.availableQuantity, unit(batch.uomId))} available) at ${plant(batch.facilityId)}`,
       })),
   ];
   const fields: FieldDef[] = [

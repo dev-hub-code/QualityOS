@@ -4,6 +4,7 @@ import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/records/data-table";
 import { PageHeader, RecordLink, StatusBadge } from "@/components/records/parts";
 import type { ReceiptSummary } from "@/lib/types";
+import { formatCalendarDay } from "@/lib/dates";
 
 const column = createColumnHelper<ReceiptSummary>();
 const columns = [
@@ -12,7 +13,7 @@ const columns = [
     cell: (info) => <RecordLink href={`/material-receipts/${info.row.original.id}`}>{info.getValue()}</RecordLink>,
   }),
   column.accessor("supplierName", { header: "Supplier" }),
-  column.accessor("receivedOn", { header: "Received" }),
+  column.accessor("receivedOn", { header: "Received", cell: (info) => formatCalendarDay(info.getValue()) }),
   column.accessor("status", { header: "Status", cell: (info) => <StatusBadge status={info.getValue()} /> }),
 ];
 

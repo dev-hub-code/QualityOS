@@ -125,9 +125,19 @@ public class NcrService implements AttachmentPolicy {
         return places.options(scope::allows);
     }
 
+    /** Work that can be handed to someone, by the permission it needs. Other permissions are not listed. */
+    private static final Set<String> ASSIGNABLE = Set.of(Permissions.NCR_ASSIGN, Permissions.CAPA_MANAGE,
+            Permissions.AUDIT_MANAGE, Permissions.RECALL_MANAGE);
+
+    /** @param permission null for every active member, or one of {@link #ASSIGNABLE} for those who hold it */
     @Transactional(readOnly = true)
-    public List<Assignee> assignees() {
+    public List<Assignee> assignees(String permission) {
+        if (permission != null && !ASSIGNABLE.contains(permission)) {
+            throw new BusinessRuleException("People can be listed only for NCR, CAPA, audit or recall work.");
+        }
+        Set<UUID> holders = permission == null ? null : access.holdersOf(permission);
         return access.activeMembers().entrySet().stream()
+                .filter(member -> holders == null || holders.contains(member.getKey()))
                 .map(member -> new Assignee(member.getKey(), member.getValue()))
                 .toList();
     }
@@ -355,15 +365,32 @@ public class NcrService implements AttachmentPolicy {
         if (returnIds.isEmpty()) {
             return Map.of();
         }
-        return ncrs.findByDispatchReversalIdIn(returnIds).stream().collect(java.util.stream.Collectors.toMap(
-                NonConformance::getDispatchReversalId, ncr -> new NcrOutcome(ncr.getId(), ncr.getNcrNumber(),
-                        ncr.getStatus().name(), ncr.getStatus().isFinished(), List.of())));
+        Map<UUID, NcrOutcome> found = new java.util.HashMap<>();
+        ncrs.findByDispatchReversalIdIn(returnIds).forEach(ncr -> found.put(ncr.getDispatchReversalId(), outcome(ncr)));
+        // Without a complaint, the NCR is the one the inspection of the returned goods raised.
+        var byInspection = ncrs.findRaisedByReturnInspections(returnIds);
+        Map<UUID, NonConformance> raised = ncrs.findAllById(byInspection.stream()
+                        .map(NonConformanceRepository.ReturnInspectionNcr::getNcrId).toList()).stream()
+                .collect(java.util.stream.Collectors.toMap(NonConformance::getId, ncr -> ncr));
+        byInspection.forEach(row -> found.putIfAbsent(row.getReversalId(), outcome(raised.get(row.getNcrId()))));
+        return found;
+    }
+
+    private static NcrOutcome outcome(NonConformance ncr) {
+        return new NcrOutcome(ncr.getId(), ncr.getNcrNumber(), ncr.getStatus().name(), ncr.getStatus().isFinished(),
+                List.of());
     }
 
     /** For a shop-floor report: the category must exist and be in use. */
     @Transactional(readOnly = true)
     public void requireDefectCategory(UUID id) {
         requireCategory(id);
+    }
+
+    /** Whether the organisation has defect categories to choose from, so rejects can be told apart. */
+    @Transactional(readOnly = true)
+    public boolean hasDefectCategories() {
+        return !categories.findByArchivedAtIsNullOrderByCode().isEmpty();
     }
 
     private static String rejectSummary(ProductionReject reject) {
@@ -413,7 +440,7 @@ public class NcrService implements AttachmentPolicy {
                 ncr.getNcrNumber(),
                 ncr.getStatus().name(),
                 ncr.getStatus().isFinished(),
-                capas.findByNcrIdOrderByCapaNumber(ncr.getId()).stream()
+                capas.findAnsweringNcr(ncr.getId()).stream()
                         .map(capa -> new LinkedCapa(
                                 capa.getId(), capa.getCapaNumber(), capa.getTitle(), capa.getStatus().name()))
                         .toList())));
@@ -421,7 +448,8 @@ public class NcrService implements AttachmentPolicy {
 
     @Transactional
     public NcrDetail assign(UUID id, UUID assigneeId) {
-        requireMember(assigneeId);
+        requireMemberWho(assigneeId, Permissions.NCR_ASSIGN,
+                "This person cannot work on NCRs. Assign it to someone whose role can.");
         NonConformance ncr = lock(id);
         scope.requireAllowedFor(assigneeId, ncr.getFacilityId());
         NonConformance.Status previous = ncr.getStatus();
@@ -445,11 +473,34 @@ public class NcrService implements AttachmentPolicy {
         return transition(id, null, ncr -> ncr.recordInvestigation(cause, request.defectCategoryId()));
     }
 
+    /**
+     * Links an open NCR to a CAPA that already exists, when the same root cause is behind it, so no duplicate CAPA is
+     * needed. A closed CAPA counts for closing the NCR; one that was cancelled answers nothing.
+     */
+    @Transactional
+    public NcrDetail linkCapa(UUID id, UUID capaId, String note) {
+        NonConformance ncr = lock(id);
+        if (ncr.getStatus().isFinished()) {
+            throw new BusinessRuleException("A finished NCR cannot be linked to a CAPA.");
+        }
+        CorrectiveAction capa = capas.findById(capaId)
+                .filter(found -> scope.allows(found.getFacilityId()))
+                .orElseThrow(() -> new ResourceNotFoundException("CAPA", capaId.toString()));
+        if (capa.getStatus() == CorrectiveAction.Status.CANCELLED) {
+            throw new BusinessRuleException(capa.getCapaNumber() + " was cancelled. Link a CAPA that is open or closed.");
+        }
+        if (id.equals(capa.getNcrId()) || capas.linkToNcr(id, capaId, note.trim(), TenantContext.getCurrentUserId()) == 0) {
+            throw new BusinessRuleException(capa.getCapaNumber() + " is already linked to this NCR.");
+        }
+        audit.record("NCR_CAPA_LINKED", ENTITY, id, null, Map.of("capa", capa.getCapaNumber(), "note", note.trim()));
+        return toDetail(ncr);
+    }
+
     /** The organisation's rule decides which NCRs need a closed CAPA behind them. None may leave a CAPA unfinished. */
     @Transactional
     public NcrDetail requestVerification(UUID id, String note) {
         NonConformance ncr = lock(id);
-        List<CorrectiveAction> linked = capas.findByNcrIdOrderByCapaNumber(id);
+        List<CorrectiveAction> linked = capas.findAnsweringNcr(id);
         boolean unfinished = linked.stream().anyMatch(capa -> !capa.getStatus().isFinished());
         if (unfinished) {
             throw new BusinessRuleException("Every linked CAPA must be closed or cancelled first.");
@@ -622,6 +673,17 @@ public class NcrService implements AttachmentPolicy {
         }
     }
 
+    /**
+     * An active member who holds {@code permission}, so the work handed to them is work they can do. Without it they
+     * would be named on a record they cannot act on.
+     */
+    void requireMemberWho(UUID userId, String permission, String refusal) {
+        requireMember(userId);
+        if (!access.holdersOf(permission).contains(userId)) {
+            throw new BusinessRuleException(refusal);
+        }
+    }
+
     private NonConformance load(UUID id) {
         NonConformance ncr = ncrs.findById(id).orElseThrow(() -> new ResourceNotFoundException("NCR", id));
         scope.requireAllowed(ncr.getFacilityId(), "NCR", id.toString());
@@ -648,7 +710,7 @@ public class NcrService implements AttachmentPolicy {
 
     private NcrDetail toDetail(NonConformance ncr) {
         Map<UUID, String> members = access.names();
-        List<LinkedCapa> linked = capas.findByNcrIdOrderByCapaNumber(ncr.getId()).stream()
+        List<LinkedCapa> linked = capas.findAnsweringNcr(ncr.getId()).stream()
                 .map(capa -> new LinkedCapa(capa.getId(), capa.getCapaNumber(), capa.getTitle(), capa.getStatus().name()))
                 .toList();
         List<StatusChange> changes = history.findByNcrIdOrderByCreatedAt(ncr.getId()).stream()

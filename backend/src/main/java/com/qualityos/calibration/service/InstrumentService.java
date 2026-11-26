@@ -195,6 +195,9 @@ public class InstrumentService implements AttachmentPolicy {
     public CalibrationResponse recordCalibration(UUID id, RecordCalibrationRequest request) {
         Instrument instrument = load(id);
         instrument.requireNotRetired();
+        if (request.calibratedOn().isAfter(today())) {
+            throw new BusinessRuleException("The calibration date cannot be in the future.");
+        }
         if (instrument.getLastCalibratedOn() != null && request.calibratedOn().isBefore(instrument.getLastCalibratedOn())) {
             throw new BusinessRuleException("This is earlier than the last calibration.");
         }

@@ -49,7 +49,7 @@ td { font-size: 8.5pt; overflow-wrap: break-word; word-wrap: break-word; }
 <tr><td class="label">Recall started</td><td>{{report.recall.recallDate}}</td><td class="label">Hazard class</td><td>{{hazard}}</td></tr>
 <tr><td class="label">Regulator</td><td>{{#report.recall.regulator}}{{.}}{{/report.recall.regulator}}{{^report.recall.regulator}}Not recorded{{/report.recall.regulator}}</td><td class="label">Their reference</td><td>{{#report.recall.regulatorReference}}{{.}}{{/report.recall.regulatorReference}}{{^report.recall.regulatorReference}}Not recorded{{/report.recall.regulatorReference}}</td></tr>
 <tr><td class="label">Regulator told on</td><td>{{#report.recall.regulatorNotifiedOn}}{{.}}{{/report.recall.regulatorNotifiedOn}}{{^report.recall.regulatorNotifiedOn}}Not recorded{{/report.recall.regulatorNotifiedOn}}</td><td class="label">Report as of</td><td>{{report.generatedLabel}}</td></tr>
-{{#report.recall.closedAt}}<tr><td class="label">Closed</td><td>{{.}}</td><td class="label">Closed by</td><td>{{report.recall.closedBy}}</td></tr>{{/report.recall.closedAt}}
+{{#report.closedLabel}}<tr><td class="label">Closed</td><td>{{.}}</td><td class="label">Closed by</td><td>{{report.recall.closedBy}}</td></tr>{{/report.closedLabel}}
 </table>
 
 <h2>2. Products and batches</h2>

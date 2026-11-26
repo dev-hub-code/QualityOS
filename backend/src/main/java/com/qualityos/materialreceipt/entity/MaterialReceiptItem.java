@@ -101,7 +101,7 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
     public void transferOut(BigDecimal amount) {
         requireReleased();
         if (amount.compareTo(freeQuantity()) > 0) {
-            throw new BusinessRuleException("Batch " + internalBatch + " has only " + plain(freeQuantity()) + " free.");
+            throw new BusinessRuleException("Lot " + internalBatch + " has only " + plain(freeQuantity()) + " free.");
         }
         transferredQuantity = transferredQuantity.add(amount);
     }
@@ -164,7 +164,7 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
     public void reserve(BigDecimal amount) {
         requireReleased();
         if (amount.compareTo(freeQuantity()) > 0) {
-            throw new BusinessRuleException("Batch " + internalBatch + " has only " + plain(freeQuantity()) + " free.");
+            throw new BusinessRuleException("Lot " + internalBatch + " has only " + plain(freeQuantity()) + " free.");
         }
         reservedQuantity = reservedQuantity.add(amount);
     }

@@ -53,7 +53,9 @@ public class FacilityService {
     private final List<ArchiveGuard> archiveGuards;
     private final PlanLimits limits;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+    private final com.qualityos.identity.service.FacilityScope scope;
     private final StateHolidayService stateHolidays;
+    private final OrganizationClock clock;
 
     FacilityService(
             FacilityRepository facilities,
@@ -65,7 +67,11 @@ public class FacilityService {
             AuditService audit,
             List<ArchiveGuard> archiveGuards,
             org.springframework.jdbc.core.JdbcTemplate jdbc,
-            StateHolidayService stateHolidays) {
+            StateHolidayService stateHolidays,
+            OrganizationClock clock,
+            com.qualityos.identity.service.FacilityScope scope) {
+        this.clock = clock;
+        this.scope = scope;
         this.jdbc = jdbc;
         this.stateHolidays = stateHolidays;
         this.limits = limits;
@@ -82,14 +88,15 @@ public class FacilityService {
     public PageResponse<FacilityResponse> list(String search, boolean archived, Pageable pageable) {
         Specification<Facility> filter = Specification.<Facility>where(Searches.archived(archived))
                 .and(Searches.contains(search, "code", "name", "city"));
-        return PageResponse.from(facilities.findAll(filter, pageable), mapper::toResponse);
+        // A member limited to some plants is offered only those, in filters and pickers as in this list.
+        return PageResponse.from(facilities.findAll(scope.limit(filter, "id"), pageable), mapper::toResponse);
     }
 
     @Transactional(readOnly = true)
     public FacilityDetail get(UUID id) {
         Facility facility = load(id);
         DaysOff offs = daysOff(id);
-        java.time.LocalDate thisYear = java.time.LocalDate.now().withDayOfYear(1);
+        java.time.LocalDate thisYear = clock.today().withDayOfYear(1);
         return new FacilityDetail(
                 mapper.toResponse(facility),
                 departments.findByFacilityIdAndArchivedAtIsNullOrderByName(id).stream()
@@ -304,6 +311,8 @@ public class FacilityService {
         facility.setCode(code);
         apply(facility, request);
         facilities.saveAndFlush(facility);
+        // A facility in another state takes that state's holidays: what it said of the old state's no longer applies.
+        stateHolidays.forgetOutsideState(id, facility.getState());
         audit.recordChange("FACILITY_UPDATED", "Facility", id, before, audit.state(mapper.toResponse(facility)));
         return mapper.toResponse(facility);
     }

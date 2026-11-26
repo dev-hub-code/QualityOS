@@ -67,7 +67,10 @@ public final class RecallDtos {
             @Size(max = 2000) String customerResponse) {
     }
 
-    public record ContactStatusRequest(@NotNull RecallContact.Status status) {
+    public record ContactStatusRequest(
+            @NotNull RecallContact.Status status,
+            /* Needed to resolve a customer who still holds recalled units: why that is acceptable. */
+            @Size(max = 2000) String note) {
     }
 
     public record ExceptionRequest(@NotBlank @Size(max = 2000) String reason) {
@@ -280,6 +283,8 @@ public final class RecallDtos {
             List<String> serialNumbers,
             List<InspectionHistory> inspections,
             List<NcrHistory> ncrs,
-            List<HistoryEntry> history) {
+            List<HistoryEntry> history,
+            /* When it closed, in the organisation's time zone, as the report prints it. Null while open. */
+            String closedLabel) {
     }
 }

@@ -14,6 +14,7 @@ import { api } from "@/lib/api";
 import { formatQuantity } from "@/lib/record-form";
 import { purchaseOrderSchema, type PurchaseOrderValues } from "@/lib/schemas";
 import type { PurchaseOrder } from "@/lib/types";
+import { today } from "@/lib/dates";
 
 const SELECT_CLASS = "h-9 w-full rounded-xl border border-input bg-white/70 px-2 text-sm";
 
@@ -47,7 +48,7 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
       : {
           supplierId: "",
           facilityId: "",
-          orderDate: new Date().toISOString().slice(0, 10),
+          orderDate: today(),
           expectedDate: "",
           items: [{ materialId: "", quantity: "", unitPrice: "" }],
         },

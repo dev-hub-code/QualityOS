@@ -15,6 +15,7 @@ import { FACILITY_FIELDS } from "@/lib/record-fields";
 import type { FieldDef } from "@/lib/record-form";
 import type { FacilityDetail } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { formatCalendarDay } from "@/lib/dates";
 
 const UNIT_FIELDS: FieldDef[] = [
   { name: "code", label: "Code", required: true },
@@ -232,7 +233,7 @@ export default function FacilityPage() {
         </p>
         <h3 className="mt-4 mb-1 text-sm font-semibold">This facility&apos;s own</h3>
         <UnitList
-          items={holidays.map((holiday) => ({ id: holiday.id, label: `${holiday.date} – ${holiday.name}` }))}
+          items={holidays.map((holiday) => ({ id: holiday.id, label: `${formatCalendarDay(holiday.date)} – ${holiday.name}` }))}
           onEdit={canManage ? setEditingHoliday : undefined}
           onRemove={remover("holidays")}
         />
@@ -255,7 +256,7 @@ export default function FacilityPage() {
             {stateHolidays.map((holiday) => (
               <li key={holiday.id} className="flex items-center justify-between gap-4 py-2">
                 <span className={holiday.working ? "text-muted-foreground line-through" : undefined}>
-                  {holiday.date} – {holiday.name}
+                  {formatCalendarDay(holiday.date)} – {holiday.name}
                   <span className="text-muted-foreground"> · {holiday.regionName}</span>
                 </span>
                 <span className="flex items-center gap-2">

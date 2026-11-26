@@ -152,7 +152,11 @@ public class CapaService implements AttachmentPolicy {
 
     @Transactional
     public CapaDetail create(CreateCapaRequest request) {
-        ncrs.requireMember(request.ownerId());
+        if (!request.targetDate().isAfter(today())) {
+            throw new BusinessRuleException("Choose a target date after today.");
+        }
+        ncrs.requireMemberWho(request.ownerId(), Permissions.CAPA_MANAGE,
+                "This person cannot work on CAPAs. Choose an owner whose role can.");
         boolean effectiveness = request.effectivenessRequired();
         UUID facilityId = request.facilityId();
         if (request.ncrId() != null) {

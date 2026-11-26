@@ -94,6 +94,7 @@ export function MonthBars<T extends { month: string }>({
             <div
               key={row.month}
               tabIndex={0}
+              role="img"
               aria-label={`${row.month}: ${low} ${series[0].label}, ${high} ${series[1].label}`}
               className={`group relative flex h-full max-w-12 min-w-0 flex-1 gap-0.5 outline-none focus-visible:ring-2 ${
                 grouped ? "items-end" : "flex-col justify-end"
@@ -170,6 +171,7 @@ export function RankBars({
             </span>
             <div
               tabIndex={0}
+              role="img"
               aria-label={`${row.label}: ${row.display}`}
               className="group relative h-3 rounded-r bg-muted outline-none focus-visible:ring-2"
             >

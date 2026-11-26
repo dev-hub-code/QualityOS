@@ -136,6 +136,68 @@ days through versioning.
 To restore, create a new instance from a point in time (`aws rds restore-db-instance-to-point-in-time`), check it,
 then point `DB_URL` at it. A timed restore test is still to do (see Status).
 
+### Restore drill
+
+`scripts/backup-restore-drill.sh` rehearses a full backup and restore on the local Docker stack:
+1. It backs up the database (`pg_dump -Fc`) and the attachments volume.
+2. It restores both into a fresh Postgres and a new volume. The roles are created the way a new environment creates them.
+3. It checks the copy against the source:
+   - every table's row count
+   - row-level security on the same tables
+   - that the migrator owns the tables, so the application role cannot bypass row-level security
+   - the Flyway version
+   - every attachment's checksum
+4. It starts a second backend on the copy, waits for readiness and, given `DRILL_EMAIL` and `DRILL_PASSWORD`, signs in.
+
+Run it while the stack is idle: rows written during the drill show up as differences. The backup stays in `./backups`
+(git-ignored). It holds real data, password hashes included.
+
+Last run, 22 November 2026, on the local stack:
+
+| Step | Result |
+|---|---|
+| Backup | 7.2 s: 10 MB database, 409 attachments |
+| Restore | 3.8 s |
+| Tables | 141 tables, 153,566 rows, all matching |
+| Row-level security | On for the same 124 tables; tables owned by the migrator |
+| Schema | Flyway version 74; the backend found nothing to migrate |
+| Application on the copy | Ready in 11.4 s; sign-in worked |
+
+On AWS the same checks apply after `restore-db-instance-to-point-in-time`. The time is dominated by RDS creating the
+instance, which is typically 10 to 30 minutes, and is still to be measured after the first deployment.
+
+## Several instances
+
+AWS runs two or more backends behind the load balancer, so the backend keeps no state that one instance alone holds and
+others need:
+- **Sessions:** access tokens are signed with one key pair from Secrets Manager. Refresh tokens are kept in the database.
+- **Jobs:** every scheduled job takes a lease in `scheduled_job_locks` first, so one instance runs it per interval.
+- **Sign-in limits:** rate limits and lockouts are counted in the database.
+- **Concurrent edits:** optimistic-lock versions live in the rows.
+
+Two things are per instance, by design:
+- **The live notification stream.** A change made on one instance does not push to a page connected to another, and
+  that page catches up at its next poll.
+- **The 60-second dashboard cache.**
+
+The `local` profile generates a key pair per instance at startup. Every other profile refuses to start without
+`JWT_PRIVATE_KEY` and `JWT_PUBLIC_KEY`.
+
+`scripts/multi-instance-drill.sh` proves this locally. It runs two backends behind nginx on a throwaway copy of the
+database, with one shared key pair, every job on a 20-second interval, and a sign-in limit of 10 a minute. Last run,
+22 November 2026, it passed every check:
+
+| Check | Result |
+|---|---|
+| Sessions | Signed in on A, recognised on B; 20 requests through nginx reached both, all 200 |
+| Refresh tokens | A's token rotated on B. Reusing the old one on A after the 10-second grace was refused, and revoked B's newer token |
+| Sign-out | Signing out on A ended the session on B |
+| Concurrent edits | B's edit from a version A had already changed got 409 |
+| Rate limit | 20 failed sign-ins alternating A and B: 8 let through, inside one shared limit of 10 |
+| Jobs | All 13 jobs ran 4 times in 70 seconds, some on each instance, never overlapping or within 90% of the interval |
+
+A restored database carries the jobs' leases with it, so a job may wait up to one interval before its first run.
+
 ## Diagnosing
 
 Everything below is kept for a year (`log_retention_days`).
@@ -160,5 +222,5 @@ Everything below is kept for a year (`log_retention_days`).
 | Terraform for UAT, scripts, this runbook | Written; `terraform validate` passes; database setup script tested on PostgreSQL 18 as a non-superuser admin; secret seeding tested against a stand-in for AWS. **Not yet applied** |
 | First UAT deployment | Waiting for the owner's go-ahead, since it creates billable resources |
 | Deploy pipeline in GitHub Actions | To do. Actions is disabled on the account, so deploys run from `deploy.sh` until then |
-| Timed restore test | To do, after the first deployment |
+| Timed restore test | Local drill passing (`scripts/backup-restore-drill.sh`); the RDS restore is to be timed after the first deployment |
 | Production | After UAT passes: same module, one NAT gateway per zone, larger database |

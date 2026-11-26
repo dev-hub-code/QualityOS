@@ -40,7 +40,19 @@ public final class ProductionAnalyticsDtos {
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal rework,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal rejectionRate,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal scrapRate,
-            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal reworkRate) {
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal reworkRate,
+            /* The same quantities for each unit they were reported in. Pieces and kilograms do not add up, so with
+               more than one unit the totals above are not shown and each rate is the mean of the units' rates. */
+            java.util.List<UnitQuantities> byUnit) {
+    }
+
+    public record UnitQuantities(
+            java.util.UUID uomId,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal processed,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal good,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal rejected,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal scrap,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal rework) {
     }
 
     /** Planned setup and run time against running time, for operations completed in the period. */

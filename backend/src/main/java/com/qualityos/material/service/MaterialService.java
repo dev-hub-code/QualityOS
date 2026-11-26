@@ -204,6 +204,19 @@ public class MaterialService implements AttachmentPolicy {
         return converted;
     }
 
+    /**
+     * The code of a unit that measures rather than counts, such as KG or LTR, or null for a count (PCS) or no unit.
+     * Sampling plans that count units need a counted lot.
+     */
+    @Transactional(readOnly = true)
+    public String bulkUnitCode(UUID id) {
+        if (id == null) {
+            return null;
+        }
+        UnitOfMeasure unit = visibleUnit(id);
+        return "Count".equalsIgnoreCase(unit.getDimension()) ? null : unit.getCode();
+    }
+
     @Transactional(readOnly = true)
     public void requireUnit(UUID id) {
         visibleUnit(id);

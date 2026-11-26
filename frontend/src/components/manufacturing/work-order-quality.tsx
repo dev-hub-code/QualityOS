@@ -2,6 +2,7 @@
 
 import { NcrStatusBadge } from "@/components/records/ncr-status-badge";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
 import { RecordLink, Section, StatusBadge, useAction, useRefresh, useUnits, useWorkCenters } from "@/components/records/parts";
@@ -47,8 +48,10 @@ export function WorkOrderQualityPanel({
     rework: usePermission("REWORK_MANAGE"),
   };
   const units = useUnits();
-  const workCenters = useWorkCenters();
+  // Only the rework dialog lists work centres, and an operator may not see them.
+  const workCenters = useWorkCenters(can.rework);
   const refresh = useRefresh();
+  const router = useRouter();
   const { run, pending, message } = useAction();
   const [dialog, setDialog] = useState<Dialog>(null);
   const { data } = useQuery({
@@ -62,6 +65,15 @@ export function WorkOrderQualityPanel({
   const reworkInspections = data.gates
     .flatMap((gate) => gate.inspections)
     .filter((inspection) => inspection.disposition === "REWORK");
+  // The NCR a rejection raised is usually the one this rework answers, and what is still marked for rework is the
+  // usual quantity, so both start filled in.
+  const openNcrs = data.ncrs.filter((ncr) => !["CLOSED", "CANCELLED"].includes(ncr.status));
+  const stillToRework =
+    Number(data.rejected.toRework) - Number(data.rejected.inRework) - Number(data.rejected.reworkedAccepted);
+  const reworkDefaults = {
+    ...(openNcrs.length === 1 ? { ncrId: openNcrs[0].id } : {}),
+    ...(stillToRework > 0 && data.reworkOrders.length === 0 ? { quantity: String(stillToRework) } : {}),
+  };
   const nothingYet = data.gates.length === 0 && data.reworkOrders.length === 0 && data.ncrs.length === 0 && !data.batchId;
   if (nothingYet) return null;
 
@@ -125,7 +137,13 @@ export function WorkOrderQualityPanel({
                       size="sm"
                       variant="outline"
                       disabled={pending}
-                      onClick={() => run(() => api.post(`${path}/quality-gates/${gate.id}/inspections`))}
+                      onClick={() =>
+                        run(() =>
+                          api
+                            .post<QualityGate>(`${path}/quality-gates/${gate.id}/inspections`)
+                            .then((started) => router.push(`/inspections/${started.inspections.at(-1)?.id}`)),
+                        )
+                      }
                     >
                       {gate.status === "FAILED" ? "Inspect again" : "Inspect"}
                     </Button>
@@ -207,6 +225,7 @@ export function WorkOrderQualityPanel({
       {dialog === "rework" && (
         <RecordDialog
           title="Raise a rework order"
+          record={reworkDefaults}
           fields={[
             {
               name: "operationId",
@@ -229,8 +248,13 @@ export function WorkOrderQualityPanel({
             { name: "quantity", label: "Quantity", type: "decimal", required: true },
             { name: "reason", label: "Reason", type: "textarea", required: true },
             { name: "instructions", label: "Instructions", type: "textarea" },
-            { name: "steps", label: "Steps, one per line", type: "textarea", required: true },
-            { name: "workCenterId", label: "Work centre for the steps", type: "select", options: workCenters },
+            {
+              name: "steps",
+              label: "Steps, one per line (end a line with @ and a work centre code to do it there)",
+              type: "textarea",
+              required: true,
+            },
+            { name: "workCenterId", label: "Work centre for the other steps", type: "select", options: workCenters },
           ]}
           onClose={close}
           onSubmit={(values) => {
@@ -239,7 +263,7 @@ export function WorkOrderQualityPanel({
               .post("/manufacturing/rework-orders", {
                 ...rest,
                 workOrderId: orderId,
-                steps: parseSteps(String(steps ?? ""), (workCenterId as string | null) ?? null),
+                steps: parseSteps(String(steps ?? ""), (workCenterId as string | null) ?? null, workCenters),
               })
               .then(refresh);
           }}

@@ -10,8 +10,9 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { newRequestKey } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
-import type { WorkOrderMaterials, WorkOrderStatus } from "@/lib/types";
+import type { WorkOrderCompletion, WorkOrderMaterials, WorkOrderStatus } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { formatDateTime } from "@/lib/dates";
 
 /** Lots are offered first expiring first; the date shows why. */
 function expiring(expiryDate: string | null): string {
@@ -50,12 +51,41 @@ export function WorkOrderMaterialsPanel({ orderId, status }: { orderId: string; 
     queryKey: [`${path}/materials`],
     queryFn: () => api.get<WorkOrderMaterials>(`${path}/materials`),
   });
+  // Once finished goods are received the batch is complete: nothing more goes into it, and nothing comes back out.
+  const { data: completion } = useQuery({
+    queryKey: [`${path}/completion`],
+    queryFn: () => api.get<WorkOrderCompletion>(`${path}/completion`),
+    enabled: status === "IN_PROGRESS",
+  });
   if (!data || data.lines.length === 0) return null;
 
-  const reservable = canReserve && (status === "RELEASED" || status === "IN_PROGRESS");
-  const issuable = canIssue && status === "IN_PROGRESS";
+  const received = completion?.receipt != null;
+  const reservable = canReserve && (status === "RELEASED" || status === "IN_PROGRESS") && !received;
+  const issuable = canIssue && status === "IN_PROGRESS" && !received;
   const amount = (value: string, uomId: string) => `${formatQuantity(value)} ${units.label(uomId)}`;
   const close = () => setDialog(null);
+
+  const issueLine = dialog?.kind === "issue" ? dialog.line : null;
+  const reservedForLine = issueLine
+    ? data.reservations.filter(
+        (reservation) => reservation.lineNumber === issueLine.lineNumber && Number(reservation.openQuantity) > 0,
+      )
+    : [];
+  const reservedFirst = reservedForLine.length > 0;
+  const issueSources = issueLine
+    ? [
+        ...reservedForLine.map((reservation) => ({
+          value: reservation.lotId,
+          label: `${reservation.lotNumber} (${amount(reservation.openQuantity, reservation.uomId)} reserved)`,
+        })),
+        ...issueLine.sources
+          .filter((source) => !data.reservations.some((r) => r.lotId === source.id && Number(r.openQuantity) > 0))
+          .map((source) => ({
+            value: source.id,
+            label: `${source.number}${substituting(source.substituteCode)}${expiring(source.expiryDate)} (${amount(source.freeQuantity, source.uomId)} free)`,
+          })),
+      ]
+    : [];
 
   return (
     <>
@@ -191,7 +221,7 @@ export function WorkOrderMaterialsPanel({ orderId, status }: { orderId: string; 
                   {movement.reason && <span className="text-muted-foreground">· {movement.reason}</span>}
                 </span>
                 <span className="text-muted-foreground">
-                  {movement.movedByName ?? "Former member"} · {new Date(movement.movedAt).toLocaleString()}
+                  {movement.movedByName ?? "Former member"} · {formatDateTime(movement.movedAt)}
                 </span>
               </li>
             ))}
@@ -232,24 +262,15 @@ export function WorkOrderMaterialsPanel({ orderId, status }: { orderId: string; 
               label: dialog.line.componentType === "MATERIAL" ? "Lot" : "Batch",
               type: "select",
               required: true,
-              options: [
-                ...data.reservations
-                  .filter((reservation) => reservation.lineNumber === dialog.line.lineNumber && Number(reservation.openQuantity) > 0)
-                  .map((reservation) => ({
-                    value: reservation.lotId,
-                    label: `${reservation.lotNumber} (${amount(reservation.openQuantity, reservation.uomId)} reserved)`,
-                  })),
-                ...dialog.line.sources
-                  .filter((source) => !data.reservations.some((r) => r.lotId === source.id && Number(r.openQuantity) > 0))
-                  .map((source) => ({
-                    value: source.id,
-                    label: `${source.number}${substituting(source.substituteCode)}${expiring(source.expiryDate)} (${amount(source.freeQuantity, source.uomId)} free)`,
-                  })),
-              ],
+              options: issueSources,
             },
             { name: "quantity", label: `Quantity, in ${units.label(dialog.line.uomId)}`, type: "decimal", required: true },
           ]}
-          record={{ quantity: formatQuantity(String(Math.max(Number(dialog.line.required) - Number(dialog.line.issued), 0))) }}
+          record={{
+            // The reserved lot comes first, so it is the one meant; a single choice needs no choosing.
+            source: issueSources.length === 1 || reservedFirst ? (issueSources[0]?.value ?? "") : "",
+            quantity: formatQuantity(String(Math.max(Number(dialog.line.required) - Number(dialog.line.issued), 0))),
+          }}
           onClose={close}
           onSubmit={(values) =>
             api

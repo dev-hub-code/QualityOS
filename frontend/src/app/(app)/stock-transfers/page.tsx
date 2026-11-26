@@ -19,6 +19,7 @@ import { api } from "@/lib/api";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import { toTransferItems } from "@/lib/traceability";
 import type { ProductionBatch, ReleasedLot, StockTransfer } from "@/lib/types";
+import { formatCalendarDay, today } from "@/lib/dates";
 
 const LOTS = "/material-receipts/released-lots";
 
@@ -76,6 +77,7 @@ function Actions({ transfer }: { transfer: StockTransfer }) {
               required: true,
             },
           ]}
+          record={{ receivedOn: today() }}
           onClose={() => setReceiving(false)}
           onSubmit={(values) =>
             api.post(`${path}/receive`, values).then(refresh)
@@ -106,7 +108,7 @@ function Actions({ transfer }: { transfer: StockTransfer }) {
 const column = createColumnHelper<StockTransfer>();
 const columns = [
   column.accessor("transferNumber", { header: "Number" }),
-  column.accessor("sentOn", { header: "Sent" }),
+  column.accessor("sentOn", { header: "Sent", cell: (info) => formatCalendarDay(info.getValue()) }),
   column.display({
     id: "route",
     header: "From → to",
@@ -125,7 +127,7 @@ const columns = [
         <StatusBadge status={info.getValue()} />
         {info.row.original.receivedOn && (
           <span className="text-muted-foreground">
-            {info.row.original.receivedOn}
+            {formatCalendarDay(info.row.original.receivedOn)}
           </span>
         )}
         {info.row.original.cancelReason && (
@@ -213,6 +215,7 @@ function SendDialog({ onClose }: { onClose: () => void }) {
     <RecordDialog
       title="Send stock to another plant"
       fields={fields}
+      record={{ sentOn: today() }}
       onClose={onClose}
       extra={
         <Button

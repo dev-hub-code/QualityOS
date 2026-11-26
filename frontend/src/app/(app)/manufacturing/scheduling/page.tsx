@@ -12,6 +12,7 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { formatMinutes, loadShare, localDate, PRIORITY_LABELS } from "@/lib/manufacturing";
 import type { DayLoad, ScheduledOrder, SchedulingBoard } from "@/lib/types";
+import { formatCalendarDay } from "@/lib/dates";
 
 const SELECT_CLASS = "h-9 rounded-xl border border-input bg-white/70 px-2 text-sm";
 
@@ -104,7 +105,7 @@ export default function SchedulingPage() {
             {data.workCenters.length === 0 ? (
               <p className="text-sm text-muted-foreground">This facility has no work centres.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Capacity by day, scrolls sideways">
                 <table className="min-w-full text-xs">
                   <thead className="text-left text-muted-foreground">
                     <tr>
@@ -164,7 +165,7 @@ export default function SchedulingPage() {
                           {order.workOrderNumber}
                         </Link>
                         <StatusBadge status={order.status} />
-                        {order.productCode} · {PRIORITY_LABELS[order.priority]} · {order.plannedStart} to {order.plannedEnd} ·{" "}
+                        {order.productCode} · {PRIORITY_LABELS[order.priority]} · {formatCalendarDay(order.plannedStart)} to {formatCalendarDay(order.plannedEnd)} ·{" "}
                         {formatMinutes(order.remainingMinutes)} left
                       </span>
                       {canManage && (

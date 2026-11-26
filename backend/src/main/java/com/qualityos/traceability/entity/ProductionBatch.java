@@ -114,7 +114,8 @@ public class ProductionBatch extends TenantOwnedEntity {
             }
         } else if (FINAL.equals(inspectionType)) {
             if (producedQuantity == null || (status != Status.COMPLETED && status != Status.ON_HOLD)) {
-                throw new BusinessRuleException("Final inspection needs a completed batch.");
+                throw new BusinessRuleException(
+                        "Final inspection needs a completed batch. Receive the finished goods on the work order first.");
             }
         } else if (OUTGOING.equals(inspectionType)) {
             if (status != Status.RELEASED || availableQuantity().signum() <= 0) {
@@ -197,7 +198,8 @@ public class ProductionBatch extends TenantOwnedEntity {
             throw new BusinessRuleException("Batch " + batchNumber + " has not been released.");
         }
         if (quantity.compareTo(availableQuantity()) > 0) {
-            throw new BusinessRuleException("Batch " + batchNumber + " has only " + availableQuantity() + " available.");
+            throw new BusinessRuleException("Batch %s has only %s available.".formatted(batchNumber,
+                    availableQuantity().stripTrailingZeros().toPlainString()));
         }
     }
 }

@@ -26,6 +26,7 @@ import { planActions } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
 import type { PlanDetail, PlanLine, WorkOrderDetail } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { formatCalendarDay, formatDateTime, today } from "@/lib/dates";
 
 type Dialog = { kind: "edit" | "line" | "close" | "cancel" } | { kind: "editLine" | "order"; line: PlanLine } | null;
 
@@ -95,7 +96,7 @@ export default function ProductionPlanPage() {
       <Section title="Details">
         <Details
           items={[
-            ["Approved", plan.approvedAt ? `${plan.approvedByName ?? "Former member"}, ${new Date(plan.approvedAt).toLocaleString()}` : "–"],
+            ["Approved", plan.approvedAt ? `${plan.approvedByName ?? "Former member"}, ${formatDateTime(plan.approvedAt)}` : "–"],
             ["Notes", plan.notes ?? "–"],
             ...(plan.statusReason ? ([["Reason", plan.statusReason]] as [string, string][]) : []),
           ]}
@@ -134,7 +135,7 @@ export default function ProductionPlanPage() {
                       <td className="py-2">
                         {line.productCode} – {line.productName}
                       </td>
-                      <td className="py-2">{line.dueDate}</td>
+                      <td className="py-2">{formatCalendarDay(line.dueDate)}</td>
                       <td className="py-2 text-right">
                         {formatQuantity(line.quantity)} {unit}
                       </td>
@@ -223,6 +224,8 @@ export default function ProductionPlanPage() {
           fields={workOrderFields(products, facilities, true)}
           record={{
             quantity: Number(dialog.line.remainingQuantity) === 0 ? "" : formatQuantity(dialog.line.remainingQuantity),
+            // Today, or the due date when that is already past, so start never falls after end.
+            plannedStart: today() > dialog.line.dueDate ? dialog.line.dueDate : today(),
             plannedEnd: dialog.line.dueDate,
             priority: "NORMAL",
           }}

@@ -48,7 +48,9 @@ public class WorkCenterController {
         this.workCenters = workCenters;
     }
 
+    /** Operators filter the shop floor by work centre, so those who carry out production read the list too. */
     @GetMapping("/work-centers")
+    @PreAuthorize("hasAnyAuthority('MANUFACTURING_VIEW', 'PRODUCTION_EXECUTE')")
     public ApiResponse<PageResponse<WorkCenterResponse>> list(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size,

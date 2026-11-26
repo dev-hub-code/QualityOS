@@ -192,7 +192,7 @@ class DispatchReturnIT extends TraceabilityFixture {
         String item = returnItem(recordReturn("RMA-1", "200"));
         String inspection = idOf(body(inspect("returnItemId", item, "FQC").andExpect(status().isCreated())));
         inspect("returnItemId", item, "FQC").andExpect(status().isUnprocessableContent());
-        as(owner, postJson("/api/v1/inspections/" + inspection + "/cancel", Map.of())).andExpect(status().isOk());
+        as(owner, postJson("/api/v1/inspections/" + inspection + "/cancel", Map.of("reason", "Started too early"))).andExpect(status().isOk());
         inspect("returnItemId", item, "FQC").andExpect(status().isCreated());
     }
 

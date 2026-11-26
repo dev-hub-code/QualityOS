@@ -39,10 +39,37 @@ function DialogOverlay({
   )
 }
 
+const TABBABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/**
+ * Keeps Tab and Shift+Tab inside an open dialog (WCAG 2.4.3). Without it, Tab after the last button left the dialog
+ * for the page behind it.
+ */
+export function keepFocusInside(event: React.KeyboardEvent<HTMLElement>) {
+  if (event.key !== "Tab") return
+  const items = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(TABBABLE)).filter(
+    // checkVisibility skips fields hidden by CSS; where it is missing (older browsers, tests) every field counts.
+    (item) => (typeof item.checkVisibility === "function" ? item.checkVisibility() : true)
+  )
+  if (items.length === 0) return
+  const first = items[0]
+  const last = items[items.length - 1]
+  const active = document.activeElement
+  if (event.shiftKey && (active === first || !event.currentTarget.contains(active))) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && (active === last || !event.currentTarget.contains(active))) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onKeyDown,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
@@ -57,6 +84,10 @@ function DialogContent({
           className
         )}
         {...props}
+        onKeyDown={(event) => {
+          onKeyDown?.(event)
+          keepFocusInside(event)
+        }}
       >
         {children}
         {showCloseButton && (

@@ -510,7 +510,7 @@ public class SubscriptionService {
             subscription.extend(Duration.ofDays(invoice.getExtraDays()));
         }
         if (!previousPlan.equals(invoice.getPlanId())) {
-            notifications.notify(access.holdersOf(PlanAccess.SUBSCRIPTION_MANAGE), NotificationType.PLAN_CHANGED,
+            notifications.notifyIncludingActor(access.holdersOf(PlanAccess.SUBSCRIPTION_MANAGE), NotificationType.PLAN_CHANGED,
                     "Plan changed", "Your organisation is now on the " + invoice.getPlanName() + " plan.", LINK,
                     new EmailContent(EmailTemplate.PLAN_CHANGED, Map.of("planName", invoice.getPlanName())));
         }
@@ -521,7 +521,8 @@ public class SubscriptionService {
         if (invoice.getTotal().signum() == 0) {
             return;
         }
-        notifications.notify(access.holdersOf(PlanAccess.SUBSCRIPTION_MANAGE), NotificationType.PAYMENT_RECEIVED,
+        // The payer is usually the only billing manager, so they get the receipt too.
+        notifications.notifyIncludingActor(access.holdersOf(PlanAccess.SUBSCRIPTION_MANAGE), NotificationType.PAYMENT_RECEIVED,
                 "Payment received", "Thank you. Invoice " + invoice.getInvoiceNumber() + " is paid.", LINK,
                 new EmailContent(EmailTemplate.PAYMENT_CONFIRMATION, Map.of("amount", "₹" + invoice.getTotal())));
     }

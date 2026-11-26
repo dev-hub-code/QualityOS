@@ -28,6 +28,7 @@ class WorkOrderIT extends TraceabilityFixture {
 
     @BeforeEach
     void approver() throws Exception {
+        finalInspectionTemplate();
         approver = addMember(owner, "PRODUCTION_MANAGER");
     }
 
@@ -98,6 +99,36 @@ class WorkOrderIT extends TraceabilityFixture {
                         "periodStart", TODAY, "periodEnd", LocalDate.now().plusDays(6).toString()))
                         .andExpect(status().isCreated())),
                 "$.data.plan.id");
+    }
+
+    @Test
+    void anOrderForARecipeProductSaysRecipeAndShowsTheRecipesConditions() throws Exception {
+        change(owner, "/settings", Map.of("manufacturingModel", "HYBRID", "separateApprover", true))
+                .andExpect(status().isOk());
+        String facility = facility(owner);
+        String product = product("LTR");
+        change(owner, "/products/" + product + "/settings", Map.of("manufacturingModel", "PROCESS"))
+                .andExpect(status().isOk());
+        String order = create(owner, order(product, facility, "100"));
+
+        // Nothing in effect yet: it still says recipe, never BOM.
+        as(owner, get(API + "/work-orders/" + order))
+                .andExpect(jsonPath("$.data.definition.definitionKind").value("RECIPE"))
+                .andExpect(jsonPath("$.data.definition.definitionId").doesNotExist())
+                .andExpect(jsonPath("$.data.definition.processParameters").isEmpty());
+
+        String recipe = JsonPath.read(body(send(owner, "/recipes", Map.of("productId", product, "baseQuantity", "200"))
+                .andExpect(status().isCreated())), "$.data.revision.id");
+        send(owner, "/recipes/" + recipe + "/lines", Map.of("materialId", material(owner, false, "LTR"),
+                "quantity", "10", "uomId", unitId(owner, "LTR"))).andExpect(status().isOk());
+        send(owner, "/recipes/" + recipe + "/parameters", Map.of("code", "MIX-T", "name", "Mixing temperature",
+                "unit", "°C", "minimum", "35", "maximum", "45")).andExpect(status().isOk());
+        submitAndApprove("/recipes", recipe);
+
+        as(owner, get(API + "/work-orders/" + order))
+                .andExpect(jsonPath("$.data.definition.definitionKind").value("RECIPE"))
+                .andExpect(jsonPath("$.data.definition.processParameters[0].code").value("MIX-T"))
+                .andExpect(jsonPath("$.data.definition.processParameters[0].maximum").value("45.000000"));
     }
 
     @Test

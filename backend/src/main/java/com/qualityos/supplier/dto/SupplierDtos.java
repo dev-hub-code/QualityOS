@@ -2,7 +2,6 @@ package com.qualityos.supplier.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
@@ -17,7 +16,7 @@ public final class SupplierDtos {
             @NotBlank @Size(max = 30) String code,
             @NotBlank @Size(max = 200) String name,
             @Size(max = 200) String legalName,
-            @Pattern(regexp = "^$|^[0-9]{2}[A-Z0-9]{13}$", message = "must be a 15 character GSTIN") String gstin,
+            @com.qualityos.common.validation.Gstin String gstin,
             UUID categoryId,
             @Email @Size(max = 254) String email,
             @Size(max = 30) String phone,
@@ -44,6 +43,7 @@ public final class SupplierDtos {
             String countryCode,
             String status,
             String statusNote,
+            UUID submittedBy,
             Instant approvedAt,
             long version) {
     }
@@ -52,6 +52,10 @@ public final class SupplierDtos {
     }
 
     public record StatusNoteRequest(@NotBlank @Size(max = 1000) String note) {
+    }
+
+    /** @param note needed only when a sole member approves their own submission */
+    public record ApproveRequest(@Size(max = 1000) String note) {
     }
 
     public record SaveContactRequest(

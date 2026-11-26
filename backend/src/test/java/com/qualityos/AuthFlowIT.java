@@ -207,7 +207,11 @@ class AuthFlowIT extends AbstractIntegrationTest {
 
         as(session, postJson("/api/v1/auth/change-password",
                         Map.of("currentPassword", "wrong-current-password", "newPassword", "a-brand-new-password")))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.message").value("Your current password is incorrect."));
+        as(session, postJson("/api/v1/auth/change-password",
+                        Map.of("currentPassword", PASSWORD, "newPassword", PASSWORD)))
+                .andExpect(status().isUnprocessableEntity());
         as(session, postJson("/api/v1/auth/change-password",
                         Map.of("currentPassword", PASSWORD, "newPassword", "a-brand-new-password")))
                 .andExpect(status().isNoContent());
@@ -245,7 +249,7 @@ class AuthFlowIT extends AbstractIntegrationTest {
         Session session = register();
         String path = "/api/v1/organizations/" + session.tenantId();
         Map<String, Object> update = new java.util.HashMap<>(Map.of(
-                "name", "Acme Forgings", "gstin", "27ABCDE1234F1Z5", "countryCode", "IN",
+                "name", "Acme Forgings", "gstin", "27AAPFU0939F1ZV", "countryCode", "IN",
                 "timezone", "Asia/Kolkata", "currency", "INR", "locale", "en-IN", "version", 0));
 
         as(session, org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path)

@@ -28,6 +28,9 @@ function RolePicker({
   selected: Set<string>;
   onChange: (next: Set<string>) => void;
 }) {
+  const { data: me } = useMe();
+  // Only roles whose permissions you hold yourself can be given or taken away.
+  const grantable = (role: Role) => role.permissions.every((permission) => me?.permissions.includes(permission));
   return (
     <fieldset className="max-h-56 space-y-2 overflow-y-auto">
       <legend className="mb-2 text-sm font-medium">Roles</legend>
@@ -35,6 +38,7 @@ function RolePicker({
         <div key={role.id} className="flex items-center gap-2">
           <Checkbox
             id={`role-${role.id}`}
+            disabled={!grantable(role)}
             checked={selected.has(role.id)}
             onCheckedChange={(checked) => {
               const next = new Set(selected);
@@ -245,6 +249,15 @@ export default function UsersPage() {
     queryFn: () => api.get<PageResponse<Member>>("/users?size=100"),
   });
   const roles = useQuery({ queryKey: ["roles"], queryFn: () => api.get<Role[]>("/roles") });
+  const facilities = useFacilities();
+  const facilityLabel = (id: string) => facilities.find((facility) => facility.value === id)?.label ?? "Another plant";
+  /** A member holding a role with permissions you lack, such as the Owner, is not yours to deactivate. */
+  const outranks = (member: Member) =>
+    member.roles.some((held) =>
+      (roles.data?.find((role) => role.id === held.id)?.permissions ?? []).some(
+        (permission) => !me?.permissions.includes(permission),
+      ),
+    );
   const setActive = useMutation({
     mutationFn: ({ member, active }: { member: Member; active: boolean }) =>
       api.post(`/users/${member.membershipId}/${active ? "activate" : "deactivate"}`),
@@ -272,6 +285,7 @@ export default function UsersPage() {
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Roles</TableHead>
+              <TableHead>Facilities</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
@@ -293,6 +307,11 @@ export default function UsersPage() {
                   </div>
                 </TableCell>
                 <TableCell>
+                  {member.facilityIds.length === 0
+                    ? "All"
+                    : member.facilityIds.map(facilityLabel).join(", ")}
+                </TableCell>
+                <TableCell>
                   <Badge variant={member.status === "ACTIVE" ? "outline" : "destructive"}>
                     {member.status === "ACTIVE" ? "Active" : "Inactive"}
                   </Badge>
@@ -304,7 +323,7 @@ export default function UsersPage() {
                   <Button variant="ghost" size="sm" onClick={() => setPlacing(member)}>
                     Facilities
                   </Button>
-                  {member.userId !== me?.user.id && (
+                  {member.userId !== me?.user.id && !outranks(member) && (
                     <Button
                       variant="ghost"
                       size="sm"

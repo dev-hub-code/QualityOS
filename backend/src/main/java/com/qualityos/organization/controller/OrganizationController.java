@@ -59,7 +59,8 @@ public class OrganizationController {
                             .header("X-Content-Type-Options", "nosniff")
                             .body(logo.data());
                 })
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                // No logo is an ordinary answer, not a missing page: a 404 here filled every page's console.
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @PostMapping(path = "/current/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

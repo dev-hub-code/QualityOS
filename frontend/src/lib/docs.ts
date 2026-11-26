@@ -1074,6 +1074,47 @@ export const DOC_PAGES: DocPage[] = [
         ],
       },
       {
+        title: "Control charts and Cp/Cpk",
+        terms: [
+          [
+            "Where",
+            "Insight → Control charts, for anyone who can view both reports and inspections. Pick a template's numeric parameter, a period of up to two years, and if you like a facility, a material or a product.",
+          ],
+          [
+            "Which chart",
+            "Auto draws an X̄-R chart when at least half the inspections, and at least two, took 2 to 25 readings. Otherwise it draws an individuals and moving range (I-MR) chart, so one-reading inspections and large AQL samples still chart. You can choose either.",
+          ],
+          [
+            "X̄-R chart",
+            "One point per inspection: the mean of its readings, and below it their range. Inspections with one reading, or more than 25, are left out and counted.",
+          ],
+          [
+            "Stepping limits",
+            "Under AQL sampling, inspections take different numbers of samples, so each point's limits come from its own sample size around one shared estimate of σ.",
+          ],
+          [
+            "Individuals chart",
+            "One point per reading, in order of submission and sample number, with the moving range from the one before.",
+          ],
+          [
+            "Signals",
+            "A point beyond its control limits, or 8 or more in a row on one side of the centre line. Each is marked in red and listed with a link to its inspection.",
+          ],
+          [
+            "Cp and Cpk",
+            "How the process fits the specification, using the variation within inspections. Cp needs both limits; with one limit, Cpk is the one-sided figure. With fewer than 25 points the figures are shown with a warning that they are not yet reliable.",
+          ],
+          [
+            "Reading the figures",
+            "Control limits show how the process behaves; specification limits show what the design requires. Cp and Cpk assume a stable process with roughly normal readings: with signals on the chart, or fewer than 25 points, read them with care. About these figures, under the tiles, says the same on the page.",
+          ],
+          [
+            "Which readings",
+            "Submitted, approved and completed inspections, placed at their submission time, at facilities you can see. Capability uses the latest inspection's specification, and the page says if it changed during the period. Charts show the latest 500 inspections or 1,000 readings, and say how many the period holds.",
+          ],
+        ],
+      },
+      {
         title: "Good to know",
         list: [
           "The default period is the last 90 days, and you can choose up to two years.",

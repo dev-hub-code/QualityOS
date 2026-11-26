@@ -114,6 +114,19 @@ public class QualityGateService {
      *
      * @return how many gates the order took
      */
+    /**
+     * A problem to stop a release when the order will need a final inspection to close but no published final template
+     * fits the product: otherwise it is found only once the goods are made and received.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Optional<String> finalInspectionProblem(UUID productId, String productCode, boolean required) {
+        if (!required || templates.hasFinalTemplateFor(productId)) {
+            return java.util.Optional.empty();
+        }
+        return java.util.Optional.of(("No published final inspection (FQC) template fits %s, and Configuration needs a "
+                + "final inspection before an order closes. Publish one before releasing.").formatted(productCode));
+    }
+
     @Transactional(propagation = Propagation.MANDATORY)
     public int writeGates(WorkOrder order, List<WorkOrderOperation> steps) {
         List<QualityGate> made = new ArrayList<>();
@@ -334,6 +347,14 @@ public class QualityGateService {
         Map<UUID, InspectionHistory> inspected = order.getProductionBatchId() == null ? Map.of()
                 : inspections.history(List.of(), List.of(order.getProductionBatchId())).stream()
                         .collect(Collectors.toMap(InspectionHistory::id, Function.identity()));
+        // A batch is finally inspected once, which releases it. Started from the batch rather than a gate, that
+        // inspection still decides the order's final release; otherwise the gate could never be inspected again.
+        Set<UUID> linked = byGate.values().stream().flatMap(List::stream).map(QualityGateInspection::getInspectionId)
+                .collect(Collectors.toSet());
+        List<InspectionHistory> unlinkedFinal = inspected.values().stream()
+                .filter(found -> "FQC".equals(found.inspectionType()) && found.returnItemId() == null
+                        && !linked.contains(found.id()))
+                .toList();
         Map<UUID, WorkOrderOperation> steps = operations.findByWorkOrderIdOrderBySequence(order.getId()).stream()
                 .collect(Collectors.toMap(WorkOrderOperation::getId, Function.identity()));
         Map<UUID, TemplateSummary> templateRefs = new HashMap<>();
@@ -345,11 +366,15 @@ public class QualityGateService {
                                 : steps.get(gate.getOperationId()).getSequence())
                         .thenComparing(QualityGate::getStage))
                 .map(gate -> {
-                    List<GateInspection> history = byGate.getOrDefault(gate.getId(), List.of()).stream()
+                    List<InspectionHistory> own = new ArrayList<>(byGate.getOrDefault(gate.getId(), List.of()).stream()
                             .map(link -> inspected.get(link.getInspectionId()))
                             .filter(java.util.Objects::nonNull)
-                            .map(ReworkService::gateInspection)
-                            .toList();
+                            .toList());
+                    if (gate.getStage() == Stage.FINAL_RELEASE) {
+                        own.addAll(unlinkedFinal);
+                        own.sort(java.util.Comparator.comparing(InspectionHistory::createdAt));
+                    }
+                    List<GateInspection> history = own.stream().map(ReworkService::gateInspection).toList();
                     WorkOrderOperation step = gate.getOperationId() == null ? null : steps.get(gate.getOperationId());
                     TemplateSummary template = templateRefs.get(gate.getTemplateId());
                     return new GateResponse(gate.getId(), gate.getName(), gate.getStage(), gate.isMandatory(),

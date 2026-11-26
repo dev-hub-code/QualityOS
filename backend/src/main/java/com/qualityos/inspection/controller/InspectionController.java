@@ -100,8 +100,9 @@ public class InspectionController {
 
     @PostMapping("/{id}/cancel")
     @PreAuthorize(Require.INSPECTION_CREATE)
-    public ApiResponse<InspectionDetail> cancel(@PathVariable UUID id) {
-        return ApiResponse.ok(inspections.cancel(id));
+    public ApiResponse<InspectionDetail> cancel(@PathVariable UUID id,
+            @Valid @RequestBody(required = false) com.qualityos.inspection.dto.InspectionDtos.CancelInspectionRequest request) {
+        return ApiResponse.ok(inspections.cancel(id, request == null ? null : request.reason()));
     }
 
     @PostMapping("/{id}/instruments")

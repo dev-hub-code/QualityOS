@@ -33,6 +33,7 @@ class ProductionReportsIT extends TraceabilityFixture {
 
     @BeforeEach
     void plant() throws Exception {
+        finalInspectionTemplate();
         supervisor = addMember(owner, "PRODUCTION_MANAGER");
         operator = addMember(owner, "PRODUCTION_OPERATOR");
         facility = facility(owner);
@@ -92,13 +93,13 @@ class ProductionReportsIT extends TraceabilityFixture {
 
         List<List<String>> orders = rows("work-orders");
         assertThat(orders).hasSize(1);
-        assertThat(orders.getFirst()).startsWith(number, "Shaft").contains("IN_PROGRESS", "10");
+        assertThat(orders.getFirst()).startsWith(number, "Shaft").contains("In progress", "10");
         List<List<String>> losses = rows("production-quality");
         assertThat(losses).hasSize(1);
         assertThat(losses.getFirst()).startsWith("Shaft", "10 Turn").endsWith("10", "8", "1", "1", "0", "20.0");
         List<List<String>> stops = rows("downtime");
         assertThat(stops).hasSize(1);
-        assertThat(stops.getFirst()).contains("Open", machineCode, "MACHINE_BREAKDOWN", "No", "Spindle seized");
+        assertThat(stops.getFirst()).contains("Open", machineCode, "Machine breakdown", "No", "Spindle seized");
 
         for (String slug : List.of("work-orders", "production-quality", "downtime")) {
             as(owner, get("/api/v1/reports/" + slug + ".pdf")).andExpect(status().isOk())

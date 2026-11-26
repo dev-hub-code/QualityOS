@@ -1,9 +1,11 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createColumnHelper } from "@tanstack/react-table";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useState } from "react";
+import { RecordDialog } from "@/components/records/record-dialog";
 import { FormError } from "@/components/forms/field";
 import { DataTable } from "@/components/records/data-table";
 import {
@@ -23,6 +25,7 @@ import { api } from "@/lib/api";
 import { formatQuantity } from "@/lib/record-form";
 import type { PurchaseOrder, ReceiptSummary } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { formatCalendarDay } from "@/lib/dates";
 
 const column = createColumnHelper<ReceiptSummary>();
 const receiptColumns = [
@@ -30,7 +33,7 @@ const receiptColumns = [
     header: "GRN",
     cell: (info) => <RecordLink href={`/material-receipts/${info.row.original.id}`}>{info.getValue()}</RecordLink>,
   }),
-  column.accessor("receivedOn", { header: "Received" }),
+  column.accessor("receivedOn", { header: "Received", cell: (info) => formatCalendarDay(info.getValue()) }),
   column.accessor("status", { header: "Status", cell: (info) => <StatusBadge status={info.getValue()} /> }),
 ];
 
@@ -42,6 +45,8 @@ export default function PurchaseOrderPage() {
   const canReceive = usePermission("RECEIPT_MANAGE");
   const units = useUnits();
   const { run, pending, message } = useAction();
+  const [cancelling, setCancelling] = useState(false);
+  const queryClient = useQueryClient();
   const { data: order, error } = useQuery({ queryKey: [path], queryFn: () => api.get<PurchaseOrder>(path) });
   if (!order) return <QueryState error={error} />;
 
@@ -86,18 +91,21 @@ export default function PurchaseOrderPage() {
           </Button>
         )}
         {canManage && (status === "DRAFT" || status === "ISSUED") && (
-          <Button variant="destructive" disabled={pending} onClick={() =>
-              confirm({
-                title: "Cancel this purchase order?",
-                description: "The order is called off and cannot be used again.",
-                confirmLabel: "Cancel order",
-                danger: true,
-              }).then((ok) => {
-                if (ok) void act("cancel");
-              })
-            }>
+          <Button variant="destructive" disabled={pending} onClick={() => setCancelling(true)}>
             Cancel order
           </Button>
+        )}
+        {cancelling && (
+          <RecordDialog
+            title="Cancel this purchase order? It cannot be used again."
+            fields={[{ name: "reason", label: "Reason", type: "textarea", required: status === "ISSUED" }]}
+            onClose={() => setCancelling(false)}
+            onSubmit={(values) =>
+              api
+                .post(`${path}/cancel`, { reason: values.reason || undefined })
+                .then(() => queryClient.invalidateQueries())
+            }
+          />
         )}
       </PageHeader>
       <FormError message={message} />

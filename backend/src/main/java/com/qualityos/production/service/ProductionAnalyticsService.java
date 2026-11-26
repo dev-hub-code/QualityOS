@@ -14,6 +14,7 @@ import com.qualityos.production.dto.ProductionAnalyticsDtos.ProductOutput;
 import com.qualityos.production.dto.ProductionAnalyticsDtos.ProductionAnalytics;
 import com.qualityos.production.dto.ProductionAnalyticsDtos.QualityRates;
 import com.qualityos.production.dto.ProductionAnalyticsDtos.StatusCount;
+import com.qualityos.production.dto.ProductionAnalyticsDtos.UnitQuantities;
 import com.qualityos.production.entity.DowntimeRecord;
 import com.qualityos.production.entity.FinishedGoodsReceipt;
 import com.qualityos.production.entity.Machine;
@@ -153,7 +154,9 @@ public class ProductionAnalyticsService {
                 .map(WorkOrderOperation::getWorkOrderId).collect(Collectors.toSet())).stream()
                 .collect(Collectors.toMap(WorkOrder::getId, o -> o));
 
-        QualityRates quality = qualityRates(reported);
+        Map<UUID, WorkOrder> reportOrders = new HashMap<>();
+        reported.forEach(report -> reportOrders.put(report.getId(), orderById.get(report.getWorkOrderId())));
+        QualityRates quality = qualityRates(reported, reportOrders);
         Efficiency efficiency = efficiency(centreById.keySet(), start, end);
 
         // Machines: shift time, planned and unplanned downtime, running time, units
@@ -269,14 +272,43 @@ public class ProductionAnalyticsService {
 
     // Figures
 
-    private static QualityRates qualityRates(List<OperationReport> reported) {
+    private static QualityRates qualityRates(List<OperationReport> reported, Map<UUID, WorkOrder> orderOf) {
         BigDecimal good = sum(reported, OperationReport::getGoodQuantity);
         BigDecimal rejected = sum(reported, OperationReport::getRejectedQuantity);
         BigDecimal scrap = sum(reported, OperationReport::getScrapQuantity);
         BigDecimal rework = sum(reported, OperationReport::getReworkQuantity);
         BigDecimal processed = good.add(rejected).add(scrap);
-        return new QualityRates(processed, good, rejected, scrap, rework, percent(rejected, processed),
-                percent(scrap, processed), percent(rework, processed));
+        Map<UUID, List<OperationReport>> byUnit = new java.util.LinkedHashMap<>();
+        reported.forEach(report -> {
+            WorkOrder order = orderOf.get(report.getId());
+            byUnit.computeIfAbsent(order == null ? null : order.getUomId(), ignored -> new ArrayList<>()).add(report);
+        });
+        List<UnitQuantities> units = byUnit.entrySet().stream().map(entry -> {
+            List<OperationReport> in = entry.getValue();
+            BigDecimal unitGood = sum(in, OperationReport::getGoodQuantity);
+            BigDecimal unitRejected = sum(in, OperationReport::getRejectedQuantity);
+            BigDecimal unitScrap = sum(in, OperationReport::getScrapQuantity);
+            return new UnitQuantities(entry.getKey(), unitGood.add(unitRejected).add(unitScrap), unitGood,
+                    unitRejected, unitScrap, sum(in, OperationReport::getReworkQuantity));
+        }).toList();
+        if (units.size() <= 1) {
+            return new QualityRates(processed, good, rejected, scrap, rework, percent(rejected, processed),
+                    percent(scrap, processed), percent(rework, processed), units);
+        }
+        return new QualityRates(processed, good, rejected, scrap, rework,
+                meanRate(units, UnitQuantities::rejected), meanRate(units, UnitQuantities::scrap),
+                meanRate(units, UnitQuantities::rework), units);
+    }
+
+    /** The mean of each unit's own rate, since quantities in different units cannot be added. */
+    private static BigDecimal meanRate(List<UnitQuantities> units, Function<UnitQuantities, BigDecimal> part) {
+        List<BigDecimal> rates = units.stream().filter(unit -> unit.processed().signum() > 0)
+                .map(unit -> percent(part.apply(unit), unit.processed())).filter(java.util.Objects::nonNull).toList();
+        if (rates.isEmpty()) {
+            return null;
+        }
+        return rates.stream().reduce(BigDecimal.ZERO, BigDecimal::add)
+                .divide(BigDecimal.valueOf(rates.size()), 1, RoundingMode.HALF_UP);
     }
 
     private Efficiency efficiency(Collection<UUID> centreIds, Instant start, Instant end) {

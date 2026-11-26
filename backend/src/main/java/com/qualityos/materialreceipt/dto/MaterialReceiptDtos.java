@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
@@ -22,7 +21,7 @@ public final class MaterialReceiptDtos {
     /** One order line may appear several times, when a delivery holds several supplier batches. */
     public record CreateReceiptRequest(
             @NotNull UUID purchaseOrderId,
-            @NotNull @PastOrPresent LocalDate receivedOn,
+            @NotNull LocalDate receivedOn,
             @Size(max = 100) String deliveryNote,
             @Size(max = 1000) String notes,
             @NotEmpty List<@Valid ReceiptItemRequest> items) {

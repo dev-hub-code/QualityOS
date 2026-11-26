@@ -205,6 +205,7 @@ export const LOSS_CATEGORY_LABELS: Record<LossCategory, string> = {
   PLANNED_MAINTENANCE: "Planned maintenance",
   CHANGEOVER: "Changeover",
   ORDER_ON_HOLD: "Work order on hold",
+  SHIFT_END: "End of shift / hand-over",
   OTHER: "Other",
 };
 
@@ -274,12 +275,26 @@ export function reinspectionState(reinspection: { status: string; disposition: s
 }
 
 /** Rework steps typed one per line, blank lines left out. */
-export function parseSteps(text: string, workCenterId: string | null): { description: string; workCenterId: string | null }[] {
+/**
+ * One step per line, at the default work centre. A line ending "@ CODE" goes to that work centre instead, so turning
+ * and deburring steps need not share one. An unknown code is left in the text rather than guessed.
+ */
+export function parseSteps(
+  text: string,
+  workCenterId: string | null,
+  centres: { value: string; label: string }[] = [],
+): { description: string; workCenterId: string | null }[] {
   return text
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
-    .map((description) => ({ description, workCenterId }));
+    .map((line) => {
+      const named = /^(.*\S)\s*@\s*(\S+)$/.exec(line);
+      const centre = named && centres.find((option) => option.label.split(" ")[0].toLowerCase() === named[2].toLowerCase());
+      return named && centre
+        ? { description: named[1], workCenterId: centre.value }
+        : { description: line, workCenterId };
+    });
 }
 
 /**

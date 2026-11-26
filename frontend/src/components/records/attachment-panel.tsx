@@ -6,7 +6,7 @@ import { Section, useAction } from "@/components/records/parts";
 import { FormError } from "@/components/forms/field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import type { Attachment } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
@@ -41,7 +41,7 @@ export function AttachmentList({
   const confirm = useConfirm();
   const path = `/attachments?entityType=${entityType}&entityId=${entityId}`;
   const input = useRef<HTMLInputElement>(null);
-  const { data = [] } = useQuery({ queryKey: [path], queryFn: () => api.get<Attachment[]>(path) });
+  const { data = [], error } = useQuery({ queryKey: [path], queryFn: () => api.get<Attachment[]>(path) });
   const { run, pending, message } = useAction();
 
   function upload(file: File) {
@@ -50,10 +50,14 @@ export function AttachmentList({
     run(() => api.upload(path, form).finally(() => input.current && (input.current.value = "")));
   }
 
+  // Refused is not the same as empty: say so rather than claim there is nothing.
+  if (error instanceof ApiError && error.status === 403) {
+    return <p className="text-sm text-muted-foreground">Only people who can see this record&apos;s files see them here.</p>;
+  }
   return (
     <div className="space-y-3">
       <FormError message={message} />
-      {data.length === 0 && <p className="text-sm text-muted-foreground">{emptyMessage}</p>}
+      {data.length === 0 && !error && <p className="text-sm text-muted-foreground">{emptyMessage}</p>}
       <ul className="divide-y text-sm">
         {data.map((attachment) => (
           <li key={attachment.id} className="flex items-center justify-between gap-3 py-2">

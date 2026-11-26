@@ -4,6 +4,7 @@ import com.qualityos.common.response.ApiResponse;
 import com.qualityos.common.response.PageResponse;
 import com.qualityos.common.response.Pages;
 import com.qualityos.common.security.Permissions.Require;
+import com.qualityos.purchaseorder.dto.PurchaseOrderDtos.CancelOrderRequest;
 import com.qualityos.purchaseorder.dto.PurchaseOrderDtos.PurchaseOrderDetail;
 import com.qualityos.purchaseorder.dto.PurchaseOrderDtos.PurchaseOrderSummary;
 import com.qualityos.purchaseorder.dto.PurchaseOrderDtos.SavePurchaseOrderRequest;
@@ -78,8 +79,9 @@ public class PurchaseOrderController {
 
     @PostMapping("/{id}/cancel")
     @PreAuthorize(Require.PURCHASE_MANAGE)
-    public ApiResponse<PurchaseOrderDetail> cancel(@PathVariable UUID id) {
-        return ApiResponse.ok(orders.cancel(id));
+    public ApiResponse<PurchaseOrderDetail> cancel(@PathVariable UUID id,
+            @jakarta.validation.Valid @RequestBody(required = false) CancelOrderRequest request) {
+        return ApiResponse.ok(orders.cancel(id, request == null ? null : request.reason()));
     }
 
     @PostMapping("/{id}/close")

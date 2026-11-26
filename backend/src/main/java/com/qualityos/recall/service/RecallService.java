@@ -32,6 +32,7 @@ import com.qualityos.recall.dto.RecallDtos.RegulatoryRequest;
 import com.qualityos.recall.dto.RecallDtos.ReportCapa;
 import com.qualityos.recall.dto.RecallDtos.ReportCustomer;
 import com.qualityos.recall.dto.RecallDtos.ReportProduct;
+import com.qualityos.recall.dto.RecallDtos.Totals;
 import com.qualityos.recall.dto.RecallDtos.RequestClosureRequest;
 import com.qualityos.recall.dto.RecallDtos.UpdateContactRequest;
 import com.qualityos.recall.entity.Recall;
@@ -360,7 +361,8 @@ public class RecallService implements AttachmentPolicy {
                         .count(),
                 sum(lines, RecallLine::quantity),
                 sum(lines, RecallLine::returnedQuantity),
-                sum(lines, RecallLine::outstandingQuantity));
+                sum(lines, RecallLine::outstandingQuantity),
+                Totals.of(lines));
     }
 
     @Transactional
@@ -512,7 +514,8 @@ public class RecallService implements AttachmentPolicy {
                 (int) found.stream().filter(contact -> contact.getStatus() == RecallContact.Status.UNREACHABLE).count(),
                 review.exceptions(),
                 percent(review.contacted(), total), percent(review.acknowledged(), total),
-                percent(review.returnedQuantity(), review.dispatchedQuantity()), unanswered);
+                review.totals().oneUnit() ? percent(review.returnedQuantity(), review.dispatchedQuantity()) : "–",
+                unanswered);
     }
 
     private static String percent(long part, long whole) {
@@ -543,7 +546,7 @@ public class RecallService implements AttachmentPolicy {
                     Optional.ofNullable(contact.contactPerson()).orElse(customer.contactPerson()),
                     customer.email(), customer.phone(), customer.address(), contact.status(), contact.assignedName(),
                     contact.attempts(), contact.acknowledgedOn(), contact.exceptionReason(), contact.quantity(),
-                    contact.returnedQuantity(), contact.outstandingQuantity());
+                    contact.returnedQuantity(), contact.outstandingQuantity(), contact.totals());
         }).toList();
         DateTimeFormatter label = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm z").withZone(zone);
         return new RecallReport(organization.name(), organization.legalName(), organization.address(),
@@ -628,7 +631,8 @@ public class RecallService implements AttachmentPolicy {
                 sum(covered.lines(), RecallLine::returnedQuantity),
                 outstanding,
                 capaClosed.map(closed -> closed ? "CLOSED" : "OPEN").orElse(null),
-                blockers);
+                blockers,
+                Totals.of(covered.lines()));
     }
 
     private ContactView view(UUID id, UUID customerId, Set<String> permissions) {
@@ -659,7 +663,7 @@ public class RecallService implements AttachmentPolicy {
                     theirAttempts.isEmpty() ? null : theirAttempts.getLast().getAttemptedAt(),
                     acknowledged.get(contact.getId()),
                     sum(theirs, RecallLine::quantity), sum(theirs, RecallLine::returnedQuantity),
-                    sum(theirs, RecallLine::outstandingQuantity));
+                    sum(theirs, RecallLine::outstandingQuantity), Totals.of(theirs));
         }).sorted(Comparator.comparing(ContactView::customerName)).toList();
     }
 

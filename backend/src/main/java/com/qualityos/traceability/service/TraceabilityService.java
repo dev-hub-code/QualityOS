@@ -43,6 +43,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -113,6 +114,7 @@ public class TraceabilityService {
     private final InspectionService inspections;
     private final NcrService ncrs;
     private final FacilityScope scope;
+    private final com.qualityos.material.service.MaterialService materials;
 
     TraceabilityService(
             JdbcTemplate jdbc,
@@ -128,7 +130,8 @@ public class TraceabilityService {
             ProductService products,
             InspectionService inspections,
             NcrService ncrs,
-            FacilityScope scope) {
+            FacilityScope scope,
+            com.qualityos.material.service.MaterialService materials) {
         this.jdbc = jdbc;
         this.batches = batches;
         this.relationships = relationships;
@@ -143,6 +146,7 @@ public class TraceabilityService {
         this.inspections = inspections;
         this.ncrs = ncrs;
         this.scope = scope;
+        this.materials = materials;
     }
 
     /** Finds lots, batches and serial numbers by any number a person is likely to have in hand. */
@@ -257,10 +261,10 @@ public class TraceabilityService {
                 .filter(dispatch -> dispatch.reversalReason() == null)
                 .map(DispatchResponse::customerName)
                 .distinct().sorted().toList();
-        Set<String> tracedBatches = views.values().stream().map(ProductionBatchView::batchNumber).collect(Collectors.toSet());
+        Map<String, String> tracedBatches = unitsOf(views.values());
         List<RecallLine> recall = shipped.stream()
                 .filter(dispatch -> dispatch.reversalReason() == null)
-                .map(dispatch -> recallLine(dispatch, tracedBatches))
+                .flatMap(dispatch -> recallLines(dispatch, tracedBatches).stream())
                 .toList();
         List<String> unconfirmed = recall.stream()
                 .filter(line -> line.shippedOn() == null)
@@ -459,15 +463,33 @@ public class TraceabilityService {
                 batch.uomId(), batch.status(), null, null, null, null);
     }
 
-    private static RecallLine recallLine(DispatchResponse dispatch, Set<String> batches) {
-        List<DispatchLine> lines = dispatch.lines().stream()
-                .filter(line -> batches.contains(line.batchNumber()))
-                .toList();
-        BigDecimal quantity = lines.stream().map(DispatchLine::quantity).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal returned = lines.stream().map(DispatchLine::returnedQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new RecallLine(dispatch.id(), dispatch.dispatchNumber(), dispatch.customerId(), dispatch.customerName(),
-                dispatch.dispatchedOn(),
-                dispatch.shippedOn(), quantity, returned, quantity.subtract(returned));
+    /** Each batch's unit, by batch number. */
+    private Map<String, String> unitsOf(Collection<ProductionBatchView> views) {
+        Map<UUID, String> codes = new HashMap<>();
+        Map<String, String> units = new HashMap<>();
+        views.forEach(view -> units.put(view.batchNumber(), view.uomId() == null ? ""
+                : codes.computeIfAbsent(view.uomId(), id -> Objects.requireNonNullElse(materials.unitCode(id), ""))));
+        return units;
+    }
+
+    /**
+     * What one dispatch sent of the traced batches, one line for each unit: metres of wire and coils of it are not
+     * added together.
+     */
+    private static List<RecallLine> recallLines(DispatchResponse dispatch, Map<String, String> units) {
+        Map<String, List<DispatchLine>> byUnit = dispatch.lines().stream()
+                .filter(line -> units.containsKey(line.batchNumber()))
+                .collect(Collectors.groupingBy(line -> units.get(line.batchNumber()), java.util.LinkedHashMap::new,
+                        Collectors.toList()));
+        return byUnit.entrySet().stream().map(entry -> {
+            BigDecimal quantity = entry.getValue().stream().map(DispatchLine::quantity)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal returned = entry.getValue().stream().map(DispatchLine::returnedQuantity)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            return new RecallLine(dispatch.id(), dispatch.dispatchNumber(), dispatch.customerId(),
+                    dispatch.customerName(), dispatch.dispatchedOn(), dispatch.shippedOn(), quantity, returned,
+                    quantity.subtract(returned), entry.getKey().isEmpty() ? null : entry.getKey());
+        }).toList();
     }
 
     /** Every customer a unit reached, oldest first. Traces follow batches, so this answers it for a single unit. */
@@ -507,11 +529,12 @@ public class TraceabilityService {
         List<ProductionBatchView> views = production.views(all).stream()
                 .sorted(Comparator.comparing(ProductionBatchView::batchNumber))
                 .toList();
-        Set<String> numbers = views.stream().map(ProductionBatchView::batchNumber).collect(Collectors.toSet());
+        Map<String, String> units = unitsOf(views);
+        Set<String> numbers = units.keySet();
         List<DispatchResponse> shipped = dispatches.forBatches(List.copyOf(all)).stream()
                 .filter(dispatch -> dispatch.reversalReason() == null)
                 .toList();
-        List<RecallLine> lines = shipped.stream().map(dispatch -> recallLine(dispatch, numbers)).toList();
+        List<RecallLine> lines = shipped.stream().flatMap(dispatch -> recallLines(dispatch, units).stream()).toList();
         List<String> serials = finishedProducts.findByProductionBatchIdInOrderBySerialNumber(all).stream()
                 .map(FinishedProduct::getSerialNumber)
                 .toList();

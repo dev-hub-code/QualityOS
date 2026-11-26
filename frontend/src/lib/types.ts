@@ -916,6 +916,16 @@ export interface RecallLine {
   quantity: string;
   returnedQuantity: string;
   outstandingQuantity: string;
+  /** The unit of what this line sent, such as M or PCS: a dispatch of two units is two lines. */
+  unit: string | null;
+}
+
+/** Recall quantities by unit, such as "100.5 M · 5 PCS": units are never added together. */
+export interface RecallTotals {
+  dispatched: string;
+  returned: string;
+  outstanding: string;
+  oneUnit: boolean;
 }
 
 export interface SerialSearchResult {
@@ -978,6 +988,7 @@ export interface ClosureReview {
   outstandingQuantity: string;
   capaStatus: string | null;
   blockers: string[];
+  totals: RecallTotals;
 }
 
 export interface RecallDetail {
@@ -1017,6 +1028,7 @@ export interface RecallDashboard {
   dispatchedQuantity: string;
   returnedQuantity: string;
   outstandingQuantity: string;
+  totals: RecallTotals;
 }
 
 export interface RecallContact {
@@ -1038,6 +1050,7 @@ export interface RecallContact {
   quantity: string;
   returnedQuantity: string;
   outstandingQuantity: string;
+  totals: RecallTotals;
 }
 
 export interface RecallHistoryEntry {
@@ -1083,6 +1096,7 @@ export interface RecallReport {
     quantity: string;
     returnedQuantity: string;
     outstandingQuantity: string;
+    totals: RecallTotals;
   }[];
   dispatches: RecallLine[];
   serialNumbers: string[];

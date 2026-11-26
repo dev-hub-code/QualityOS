@@ -1,4 +1,3 @@
-import { formatQuantity } from "@/lib/record-form";
 import type { RecallDashboard } from "@/lib/types";
 
 export function RecallDashboardTiles({ dashboard }: { dashboard: RecallDashboard }) {
@@ -12,7 +11,7 @@ export function RecallDashboardTiles({ dashboard }: { dashboard: RecallDashboard
     ["Returns in progress", dashboard.returnsInProgress],
     ["Resolved", dashboard.resolved],
     ["Follow-ups due", dashboard.outstandingFollowUps],
-    ["Still with customers", formatQuantity(dashboard.outstandingQuantity)],
+    ["Still with customers", dashboard.totals.outstanding],
   ];
   return (
     <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">

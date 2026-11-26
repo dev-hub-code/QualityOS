@@ -34,9 +34,9 @@ public class RecallPdfRenderer {
                     default -> "Class III: unlikely to cause harm";
                 });
         model.put("hasUnanswered", !pack.unanswered().isEmpty());
-        model.put("dispatched", plain(report.recall().review().dispatchedQuantity()));
-        model.put("returned", plain(report.recall().review().returnedQuantity()));
-        model.put("outstanding", plain(report.recall().review().outstandingQuantity()));
+        model.put("dispatched", report.recall().review().totals().dispatched());
+        model.put("returned", report.recall().review().totals().returned());
+        model.put("outstanding", report.recall().review().totals().outstanding());
         model.put("footerName", HtmlPdf.cssString(report.organizationName()));
         addFormatters(model);
         return pdf.render(regulatory.execute(model));
@@ -51,9 +51,9 @@ public class RecallPdfRenderer {
                 "hasSerials", !report.serialNumbers().isEmpty(),
                 "serials", String.join(",  ", report.serialNumbers()),
                 "serialCount", report.serialNumbers().size(),
-                "dispatched", plain(report.recall().review().dispatchedQuantity()),
-                "returned", plain(report.recall().review().returnedQuantity()),
-                "outstanding", plain(report.recall().review().outstandingQuantity())));
+                "dispatched", report.recall().review().totals().dispatched(),
+                "returned", report.recall().review().totals().returned(),
+                "outstanding", report.recall().review().totals().outstanding()));
         model.put("footerName", HtmlPdf.cssString(report.organizationName()));
         addFormatters(model);
         return pdf.render(template.execute(model));

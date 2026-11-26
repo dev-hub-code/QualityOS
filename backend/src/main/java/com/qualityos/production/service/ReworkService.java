@@ -202,6 +202,31 @@ public class ReworkService {
         return rows.isEmpty() ? List.of() : rows.stream().map(summaries(rows)).toList();
     }
 
+    /**
+     * Goods the last operation marked for rework that no rework order has taken yet. Finished goods wait for them:
+     * once received, reworked goods could not join the batch. An earlier operation's rework comes back through the
+     * operations after it, which wait for it there.
+     */
+    @Transactional(readOnly = true)
+    public List<String> unordered(UUID workOrderId) {
+        List<WorkOrderOperation> route = operations.findByWorkOrderIdOrderBySequence(workOrderId).stream()
+                .filter(operation -> operation.getStatus() != WorkOrderOperation.Status.CANCELLED).toList();
+        return route.isEmpty() ? List.of() : java.util.stream.Stream.of(route.getLast())
+                .filter(operation -> notOnReworkOrder(operation).signum() > 0)
+                .map(operation -> ("Operation %d has %s marked for rework that is not on a rework order yet. Raise one "
+                        + "for them first.").formatted(operation.getSequence(), plain(notOnReworkOrder(operation))))
+                .toList();
+    }
+
+    private BigDecimal notOnReworkOrder(WorkOrderOperation operation) {
+        BigDecimal ordered = reworks.findByOperationId(operation.getId()).stream()
+                .filter(other -> other.getStatus() != Status.CANCELLED)
+                .map(ReworkOrder::getQuantity)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal marked = operation.getReworkQuantity() == null ? BigDecimal.ZERO : operation.getReworkQuantity();
+        return marked.subtract(ordered).max(BigDecimal.ZERO);
+    }
+
     // Changing
 
     /**
@@ -231,11 +256,12 @@ public class ReworkService {
             WorkOrderOperation operation = operations.findById(request.operationId())
                     .filter(found -> found.getWorkOrderId().equals(order.getId()))
                     .orElseThrow(() -> new BusinessRuleException("That operation is not on this work order."));
-            BigDecimal ordered = reworks.findByOperationId(operation.getId()).stream()
-                    .filter(other -> other.getStatus() != Status.CANCELLED)
-                    .map(ReworkOrder::getQuantity)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal room = operation.getReworkQuantity().subtract(ordered).max(BigDecimal.ZERO);
+            if (batch.producedQuantity() != null) {
+                throw new BusinessRuleException(("The finished goods of %s are received already, so goods reworked "
+                        + "from operation %d could not join them.").formatted(order.getWorkOrderNumber(),
+                        operation.getSequence()));
+            }
+            BigDecimal room = notOnReworkOrder(operation);
             // Reworked goods go back into the next operation, which must still be able to take them.
             operations.findByWorkOrderIdOrderBySequence(order.getId()).stream()
                     .filter(next -> next.getSequence() > operation.getSequence()
@@ -248,8 +274,11 @@ public class ReworkService {
                                 operation.getSequence()));
                     });
             if (request.quantity().compareTo(room) > 0) {
-                throw new BusinessRuleException(("Operation %d has %s marked for rework that is not on a rework order "
-                        + "yet.").formatted(operation.getSequence(), plain(room)));
+                throw new BusinessRuleException(room.signum() == 0
+                        ? "Everything operation %d marked for rework is on a rework order already."
+                                .formatted(operation.getSequence())
+                        : "Operation %d has only %s marked for rework that is not on a rework order yet, so %s cannot be."
+                                .formatted(operation.getSequence(), plain(room), plain(request.quantity())));
             }
         }
         List<InspectionHistory> batchInspections = inspections.history(List.of(), List.of(batch.id()));

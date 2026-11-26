@@ -220,15 +220,17 @@ class AdvancedManufacturingIT extends TraceabilityFixture {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.minutes").value("30.0"));
 
-        // Summaries by category and by machine.
+        // Summaries by category and by machine. They start the day before, so that a run just after midnight still
+        // counts the stops of an hour ago in full.
         String today = LocalDate.now().toString();
-        String byCategory = body(as(owner, get(API + "/downtime/summary?groupBy=CATEGORY&from=" + today + "&to="
+        String since = LocalDate.now().minusDays(1).toString();
+        String byCategory = body(as(owner, get(API + "/downtime/summary?groupBy=CATEGORY&from=" + since + "&to="
                 + today + "&facilityId=" + facility)).andExpect(status().isOk()));
         assertThat(JsonPath.<List<String>>read(byCategory, "$.data.rows[*].key"))
                 .contains("POWER_FAILURE", "MACHINE_BREAKDOWN", "PLANNED_MAINTENANCE");
         assertThat(JsonPath.<List<String>>read(byCategory, "$.data.rows[?(@.key == 'POWER_FAILURE')].minutes"))
                 .containsExactly("30.0");
-        String byMachine = body(as(owner, get(API + "/downtime/summary?groupBy=MACHINE&from=" + today + "&to="
+        String byMachine = body(as(owner, get(API + "/downtime/summary?groupBy=MACHINE&from=" + since + "&to="
                 + today)).andExpect(status().isOk()));
         assertThat(JsonPath.<List<String>>read(byMachine, "$.data.rows[*].label")).contains("No machine");
         assertThat(asDatabaseSuperuser().queryForList("SELECT action FROM audit_logs WHERE entity_id = ?",

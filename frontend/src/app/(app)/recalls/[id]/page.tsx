@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { useMe, usePermission } from "@/hooks/use-me";
 import { useSelfReviewInEffect } from "@/hooks/use-organization-settings";
 import { api } from "@/lib/api";
-import { formatQuantity, type FieldDef } from "@/lib/record-form";
+import { type FieldDef } from "@/lib/record-form";
 import type {
   RecallContact,
   RecallDashboard,
@@ -180,9 +180,9 @@ function Closure({ recall, path }: { recall: RecallDetail; path: string }) {
             `${review.acknowledged} of ${review.customers}`,
           ],
           ["Exceptions", review.exceptions],
-          ["Dispatched", formatQuantity(review.dispatchedQuantity)],
-          ["Returned", formatQuantity(review.returnedQuantity)],
-          ["Still with customers", formatQuantity(review.outstandingQuantity)],
+          ["Dispatched", review.totals.dispatched],
+          ["Returned", review.totals.returned],
+          ["Still with customers", review.totals.outstanding],
           ...(review.capaStatus
             ? [["Linked CAPA", review.capaStatus] as [string, string]]
             : []),

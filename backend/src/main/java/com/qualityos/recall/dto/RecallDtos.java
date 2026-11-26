@@ -106,7 +106,28 @@ public final class RecallDtos {
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal returnedQuantity,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal outstandingQuantity,
             String capaStatus,
-            List<String> blockers) {
+            List<String> blockers,
+            Totals totals) {
+    }
+
+    /**
+     * Quantities as a person reads them, by unit: {@code 100.5 M · 5 PCS}. The bare numbers beside them add units
+     * together whenever a recall reaches products in more than one, so only these are shown.
+     */
+    public record Totals(String dispatched, String returned, String outstanding, boolean oneUnit) {
+
+        public static Totals of(List<com.qualityos.traceability.dto.TraceabilityDtos.RecallLine> lines) {
+            java.util.function.Function<com.qualityos.traceability.dto.TraceabilityDtos.RecallLine, String> unit =
+                    com.qualityos.traceability.dto.TraceabilityDtos.RecallLine::unit;
+            return new Totals(
+                    com.qualityos.common.util.Quantities.total(lines, unit,
+                            com.qualityos.traceability.dto.TraceabilityDtos.RecallLine::quantity),
+                    com.qualityos.common.util.Quantities.total(lines, unit,
+                            com.qualityos.traceability.dto.TraceabilityDtos.RecallLine::returnedQuantity),
+                    com.qualityos.common.util.Quantities.total(lines, unit,
+                            com.qualityos.traceability.dto.TraceabilityDtos.RecallLine::outstandingQuantity),
+                    com.qualityos.common.util.Quantities.oneUnit(lines, unit));
+        }
     }
 
     public record RecallDetail(
@@ -183,7 +204,8 @@ public final class RecallDtos {
             LocalDate acknowledgedOn,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal returnedQuantity,
-            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal outstandingQuantity) {
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal outstandingQuantity,
+            Totals totals) {
     }
 
     public record HistoryEntry(
@@ -230,7 +252,8 @@ public final class RecallDtos {
             int outstandingFollowUps,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal dispatchedQuantity,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal returnedQuantity,
-            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal outstandingQuantity) {
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal outstandingQuantity,
+            Totals totals) {
     }
 
     public record ReportProduct(String code, String name, String batchNumber, String status) {
@@ -250,22 +273,23 @@ public final class RecallDtos {
             String exceptionReason,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal returnedQuantity,
-            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal outstandingQuantity) {
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal outstandingQuantity,
+            Totals totals) {
 
         public String statusLabel() {
             return words(status);
         }
 
         public String quantityLabel() {
-            return quantity.stripTrailingZeros().toPlainString();
+            return totals.dispatched();
         }
 
         public String returnedLabel() {
-            return returnedQuantity.stripTrailingZeros().toPlainString();
+            return totals.returned();
         }
 
         public String outstandingLabel() {
-            return outstandingQuantity.stripTrailingZeros().toPlainString();
+            return totals.outstanding();
         }
     }
 

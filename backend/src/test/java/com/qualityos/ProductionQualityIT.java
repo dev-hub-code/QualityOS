@@ -190,6 +190,31 @@ class ProductionQualityIT extends TraceabilityFixture {
     }
 
     @Test
+    void finishedGoodsWaitForTheLastOperationsReworkWhichCannotJoinThemAfterwards() throws Exception {
+        String order = order("10");
+        send(supervisor, "/work-orders/" + order + "/start", Map.of()).andExpect(status().isOk());
+        String turn = "/operations/" + operation(order, 0);
+        String grindId = operation(order, 1);
+        String grind = "/operations/" + grindId;
+        send(operator, turn + "/start", Map.of()).andExpect(status().isOk());
+        send(operator, turn + "/reports", report("10", "10", "0", "0")).andExpect(status().isOk());
+        send(operator, turn + "/complete", Map.of()).andExpect(status().isOk());
+        send(operator, grind + "/start", Map.of()).andExpect(status().isOk());
+        send(operator, grind + "/reports", report("10", "8", "2", "2")).andExpect(status().isOk());
+        send(operator, grind + "/complete", Map.of()).andExpect(status().isOk());
+
+        assertThat(JsonPath.<List<String>>read(body(as(owner, get(API + "/work-orders/" + order + "/completion"))),
+                "$.data.receiveBlockers")).contains(
+                "Operation 20 has 2 marked for rework that is not on a rework order yet. Raise one for them first.");
+        send(supervisor, "/work-orders/" + order + "/receipt", Map.of("shortReason", "Two in rework"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(containsString("Operation 20 has 2 marked for rework")));
+        reworkAccepted(order, grindId, "2");
+        assertThat(JsonPath.<String>read(body(as(owner, get(API + "/work-orders/" + order + "/completion"))),
+                "$.data.expectedQuantity")).isEqualTo("10.000000");
+    }
+
+    @Test
     void gatesHoldTheLineAndReworkClosesOnlyOnReinspection() throws Exception {
         // Checkpoints name an inspection template of the right kind; only quality may set them.
         send(manager, "/quality-checkpoints", Map.of("name", "Wrong", "stage", "OPERATION_START",
@@ -267,7 +292,7 @@ class ProductionQualityIT extends TraceabilityFixture {
         send(supervisor, "/rework-orders", rework)
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.error.message")
-                        .value("Operation 10 has 2 marked for rework that is not on a rework order yet."));
+                        .value("Operation 10 has only 2 marked for rework that is not on a rework order yet, so 3 cannot be."));
         rework.put("quantity", "2");
         send(operator, "/rework-orders", rework).andExpect(status().isForbidden());
         String created = body(send(supervisor, "/rework-orders", rework).andExpect(status().isCreated()));

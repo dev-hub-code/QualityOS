@@ -9,7 +9,7 @@ import { PageHeader, QueryState, RecordLink, StatusBadge } from "@/components/re
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
-import { formatQuantity } from "@/lib/record-form";
+import { formatQuantityIn } from "@/lib/record-form";
 import type { TraceReport } from "@/lib/types";
 
 export default function RecallReportPage() {
@@ -54,7 +54,7 @@ export default function RecallReportPage() {
           </thead>
           <tbody>
             {data.recall.map((line) => (
-              <tr key={line.dispatchId} className="border-b">
+              <tr key={`${line.dispatchId}-${line.unit ?? ""}`} className="border-b">
                 <td className="py-2 pr-4">{line.customerName}</td>
                 <td className="py-2 pr-4">
                   <RecordLink href="/dispatches">{line.dispatchNumber}</RecordLink>
@@ -62,9 +62,9 @@ export default function RecallReportPage() {
                 <td className="py-2 pr-4">
                   {line.shippedOn ? formatCalendarDay(line.shippedOn) : <StatusBadge status="AWAITING_SHIPMENT" />}
                 </td>
-                <td className="py-2 pr-4 text-right">{formatQuantity(line.quantity)}</td>
-                <td className="py-2 pr-4 text-right">{formatQuantity(line.returnedQuantity)}</td>
-                <td className="py-2 text-right">{formatQuantity(line.outstandingQuantity)}</td>
+                <td className="py-2 pr-4 text-right">{formatQuantityIn(line.quantity, line.unit)}</td>
+                <td className="py-2 pr-4 text-right">{formatQuantityIn(line.returnedQuantity, line.unit)}</td>
+                <td className="py-2 text-right">{formatQuantityIn(line.outstandingQuantity, line.unit)}</td>
               </tr>
             ))}
           </tbody>

@@ -9,7 +9,7 @@ import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
-import { formatQuantity, type FieldDef } from "@/lib/record-form";
+import { type FieldDef } from "@/lib/record-form";
 import type { RecallContact } from "@/lib/types";
 
 const METHODS = ["EMAIL", "PHONE", "WHATSAPP", "OTHER"].map((value) => ({
@@ -98,8 +98,8 @@ export function ContactTable({
               {contact.followUpOn && ` · Follow up on ${formatCalendarDay(contact.followUpOn)}`}
             </p>
             <p>
-              {formatQuantity(contact.quantity)} dispatched, {formatQuantity(contact.returnedQuantity)} returned,{" "}
-              {formatQuantity(contact.outstandingQuantity)} still out · {contact.attempts} {contact.attempts === 1 ? "attempt" : "attempts"}
+              {contact.totals.dispatched} dispatched, {contact.totals.returned} returned,{" "}
+              {contact.totals.outstanding} still out · {contact.attempts} {contact.attempts === 1 ? "attempt" : "attempts"}
               {contact.acknowledgedOn && ` · Acknowledged ${formatCalendarDay(contact.acknowledgedOn)}`}
             </p>
             {contact.exceptionReason && <p>Exception: {contact.exceptionReason}</p>}
@@ -205,7 +205,7 @@ export function ContactTable({
           fields={[
             {
               name: "note",
-              label: `${formatQuantity(active.contact.outstandingQuantity)} units are still with this customer. Why is it resolved without them?`,
+              label: `${active.contact.totals.outstanding} still with this customer. Why is it resolved without them?`,
               type: "textarea",
               required: true,
             },

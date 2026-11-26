@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/records/parts";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type { ReportExport } from "@/lib/types";
-import { formatDay } from "@/lib/dates";
+import { formatDay, formatCalendarDay } from "@/lib/dates";
 
 const PATH = "/reports/exports";
 const STATES: Record<ReportExport["status"], string> = {
@@ -100,7 +100,7 @@ export function ReportExports() {
       {data.map((item) => (
         <li key={item.id} className="flex flex-wrap items-center gap-2 py-2">
           <span>
-            {item.title}, {item.from} to {item.to}
+            {item.title}, {formatCalendarDay(item.from)} to {formatCalendarDay(item.to)}
           </span>
           <StatusBadge
             status={item.status === "FAILED" ? "REJECTED" : item.status}

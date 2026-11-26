@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCalendarDay } from "@/lib/dates";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -210,7 +211,7 @@ function ChartResult({ chart }: { chart: SpcChart }) {
       <Section title={`${chart.templateCode} · ${name}`}>
         <p className="mb-3 text-sm text-muted-foreground">
           {subgroups ? "X̄-R chart, one subgroup per inspection" : "Individuals and moving range chart, one point per reading"}{" "}
-          · {chart.points.length} {chart.points.length === 1 ? "point" : "points"} · {chart.from} to {chart.to}
+          · {chart.points.length} {chart.points.length === 1 ? "point" : "points"} · {formatCalendarDay(chart.from)} to {formatCalendarDay(chart.to)}
         </p>
         <CapabilitySummary chart={chart} />
         <div className="mt-3">

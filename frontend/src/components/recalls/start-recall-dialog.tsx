@@ -7,6 +7,7 @@ import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import type { FieldDef } from "@/lib/record-form";
 import { recallBatchNumbers } from "@/lib/traceability";
+import { today } from "@/lib/dates";
 import type { CapaSummary, RecallDetail } from "@/lib/types";
 import { lookupAll } from "@/components/records/parts";
 
@@ -43,6 +44,7 @@ export function StartRecallDialog({ batchNumber, onClose }: { batchNumber: strin
     <RecordDialog
       title={`Start a recall of ${batchNumber}`}
       fields={fields}
+      record={{ recallDate: today() }}
       onClose={onClose}
       onSubmit={async ({ otherBatches, capaId, ...values }) => {
         const recall = await api.post<RecallDetail>("/recalls", {

@@ -92,9 +92,11 @@ export default function SupplierPage() {
               Approve
             </Button>
             )}
-            <Button variant="destructive" onClick={() => setDialog("reject")}>
-              Reject
-            </Button>
+            {(!mine || selfReviewInEffect) && (
+              <Button variant="destructive" onClick={() => setDialog("reject")}>
+                Reject
+              </Button>
+            )}
           </>
         )}
         {canApprove && status === "APPROVED" && (
@@ -188,6 +190,13 @@ export default function SupplierPage() {
           title="Edit supplier"
           fields={supplierFields(categories)}
           record={supplier}
+          extra={
+            status === "APPROVED" ? (
+              <p className="text-sm text-muted-foreground">
+                Changing the name, legal name or GSTIN sends the supplier back for a second approval.
+              </p>
+            ) : undefined
+          }
           onClose={() => setDialog(null)}
           onSubmit={(values) => api.put(path, { ...values, version: supplier.version }).then(refresh)}
         />

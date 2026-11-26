@@ -38,6 +38,7 @@ public class RecallPdfRenderer {
         model.put("returned", plain(report.recall().review().returnedQuantity()));
         model.put("outstanding", plain(report.recall().review().outstandingQuantity()));
         model.put("footerName", HtmlPdf.cssString(report.organizationName()));
+        addFormatters(model);
         return pdf.render(regulatory.execute(model));
     }
 
@@ -54,7 +55,25 @@ public class RecallPdfRenderer {
                 "returned", plain(report.recall().review().returnedQuantity()),
                 "outstanding", plain(report.recall().review().outstandingQuantity())));
         model.put("footerName", HtmlPdf.cssString(report.organizationName()));
+        addFormatters(model);
         return pdf.render(template.execute(model));
+    }
+
+    private static final java.time.format.DateTimeFormatter DAY =
+            java.time.format.DateTimeFormatter.ofPattern("d MMM uuuu", java.util.Locale.ENGLISH);
+
+    /** {{#words}}CLOSED{{/words}} reads "Closed"; {{#day}}2026-11-26{{/day}} reads "26 Nov 2026". */
+    private static void addFormatters(Map<String, Object> model) {
+        model.put("words", (com.samskivert.mustache.Mustache.Lambda) (fragment, out) ->
+                out.write(com.qualityos.common.util.EnumLabels.label(fragment.execute().trim())));
+        model.put("day", (com.samskivert.mustache.Mustache.Lambda) (fragment, out) -> {
+            String text = fragment.execute().trim();
+            try {
+                out.write(java.time.LocalDate.parse(text).format(DAY));
+            } catch (java.time.format.DateTimeParseException notADay) {
+                out.write(text);
+            }
+        });
     }
 
     private static String plain(BigDecimal quantity) {

@@ -147,7 +147,7 @@ public class InstrumentService implements AttachmentPolicy {
 
     @Transactional
     public InstrumentResponse create(SaveInstrumentRequest request) {
-        if (instruments.existsByInstrumentCode(request.instrumentCode().trim())) {
+        if (instruments.existsByInstrumentCodeIgnoreCase(request.instrumentCode().trim())) {
             throw new ConflictException("Instrument ID %s is already in use.".formatted(request.instrumentCode()));
         }
         Instrument instrument = new Instrument(request.instrumentCode().trim(), request.nextDueOn());
@@ -163,6 +163,9 @@ public class InstrumentService implements AttachmentPolicy {
         Instrument instrument = load(id);
         instrument.requireNotRetired();
         var before = audit.state(toResponse(instrument));
+        if (instruments.existsByInstrumentCodeIgnoreCaseAndIdNot(request.instrumentCode().trim(), id)) {
+            throw new ConflictException("Instrument ID %s is already in use.".formatted(request.instrumentCode()));
+        }
         apply(instrument, request);
         instrument.setInstrumentCode(request.instrumentCode().trim());
         instrument.setNextDueOn(instrument.getLastCalibratedOn() == null

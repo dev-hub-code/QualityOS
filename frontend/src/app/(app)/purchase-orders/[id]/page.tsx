@@ -113,8 +113,8 @@ export default function PurchaseOrderPage() {
         <Details
           items={[
             ["Supplier", order.supplierName],
-            ["Order date", order.orderDate],
-            ["Expected date", order.expectedDate],
+            ["Order date", formatCalendarDay(order.orderDate)],
+            ["Expected date", formatCalendarDay(order.expectedDate)],
             ["Notes", order.notes],
           ]}
         />

@@ -145,7 +145,7 @@ public class WorkCenterService {
     @Transactional
     public WorkCenterResponse create(SaveWorkCenterRequest request) {
         String code = request.code().trim();
-        if (workCenters.existsByCode(code)) {
+        if (workCenters.existsByCodeIgnoreCase(code)) {
             throw new ConflictException("Work centre %s already exists.".formatted(code));
         }
         WorkCenter centre = new WorkCenter(request.facilityId(), code);
@@ -160,7 +160,7 @@ public class WorkCenterService {
         WorkCenter centre = loadActive(id);
         var before = audit.state(toResponse(centre, facilityCodes(List.of(centre))));
         String code = request.code().trim();
-        if (workCenters.existsByCodeAndIdNot(code, id)) {
+        if (workCenters.existsByCodeIgnoreCaseAndIdNot(code, id)) {
             throw new ConflictException("Work centre %s already exists.".formatted(code));
         }
         if (!centre.getFacilityId().equals(request.facilityId())) {
@@ -283,7 +283,7 @@ public class WorkCenterService {
     @Transactional
     public MachineResponse createMachine(SaveMachineRequest request) {
         String code = request.code().trim();
-        if (machines.existsByCode(code)) {
+        if (machines.existsByCodeIgnoreCase(code)) {
             throw new ConflictException("Machine %s already exists.".formatted(code));
         }
         WorkCenter centre = loadActive(request.workCenterId());
@@ -300,7 +300,7 @@ public class WorkCenterService {
         Machine machine = loadMachine(id);
         var before = audit.state(toResponse(machine, workCenters.findById(machine.getWorkCenterId()).orElseThrow()));
         String code = request.code().trim();
-        if (machines.existsByCodeAndIdNot(code, id)) {
+        if (machines.existsByCodeIgnoreCaseAndIdNot(code, id)) {
             throw new ConflictException("Machine %s already exists.".formatted(code));
         }
         WorkCenter centre = loadActive(request.workCenterId());

@@ -68,7 +68,8 @@ class InspectionAlerts {
         recipients.add(inspection.getApprovedBy());
         send(recipients, NotificationType.INSPECTION_DISPOSITION_RECORDED, inspection,
                 "Disposition recorded for " + number,
-                "Inspection " + number + " was closed with the disposition " + inspection.getDisposition() + ".",
+                "Inspection " + number + " was closed with the disposition: "
+                        + com.qualityos.common.util.EnumLabels.label(String.valueOf(inspection.getDisposition())) + ".",
                 "HOLD".equals(String.valueOf(inspection.getDisposition()))
                         ? EmailTemplate.MATERIAL_ON_HOLD
                         : EmailTemplate.INSPECTION_DISPOSITION,

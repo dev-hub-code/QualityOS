@@ -59,6 +59,22 @@ public class IndiaPlaces {
         return java.util.Optional.ofNullable(byCode.get(gstCode)).map(StateWithCities::name);
     }
 
+    /**
+     * A GSTIN and a state given together must agree, because a GSTIN's first two digits are the code of the state it is
+     * registered in. A state this list does not know is left alone.
+     */
+    public void requireGstinInState(String gstin, String state) {
+        if (gstin == null || gstin.isBlank() || gstin.trim().length() < 2) {
+            return;
+        }
+        String registered = gstin.trim().substring(0, 2);
+        codeOf(state).filter(code -> !code.equals(registered)).ifPresent(code -> {
+            throw new com.qualityos.common.exception.BusinessRuleException(
+                    "The GSTIN is registered in %s, not in %s. Check the GSTIN or the state."
+                            .formatted(nameOf(registered).orElse("state " + registered), nameOf(code).orElseThrow()));
+        });
+    }
+
     /** Every state and union territory, by name. */
     public List<StateResponse> states() {
         return states.stream().map(state -> new StateResponse(state.gstCode(), state.name(), state.kind())).toList();

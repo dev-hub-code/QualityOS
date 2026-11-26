@@ -652,7 +652,7 @@ export interface Ncr extends NcrSummary {
   capaRequired: boolean;
   /** A CAPA raised on this NCR must have its fix verified. */
   effectivenessRequired: boolean;
-  capas: { id: string; capaNumber: string; title: string; status: string }[];
+  capas: { id: string; capaNumber: string; title: string; status: string; linkNote: string | null }[];
   history: StatusChange[];
 }
 
@@ -697,6 +697,8 @@ export interface Capa extends CapaSummary {
     at: string;
   }[];
   history: StatusChange[];
+  /** NCRs linked to this CAPA after it was raised, because they share its root cause. */
+  linkedNcrs: { id: string; ncrNumber: string; status: string; note: string }[];
 }
 
 export interface Customer {

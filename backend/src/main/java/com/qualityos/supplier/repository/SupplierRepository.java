@@ -7,5 +7,5 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface SupplierRepository extends JpaRepository<Supplier, UUID>, JpaSpecificationExecutor<Supplier> {
 
-    boolean existsByCode(String code);
+    boolean existsByCodeIgnoreCase(String code);
 }

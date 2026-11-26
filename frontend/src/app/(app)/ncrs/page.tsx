@@ -69,7 +69,9 @@ export default function NcrsPage() {
   const canCreate = usePermission("NCR_CREATE");
   const router = useRouter();
   const refresh = useRefresh();
-  const suppliers = useApprovedSuppliers();
+  // Only someone who can see suppliers can name one, so only they are offered a supplier issue.
+  const canSeeSuppliers = usePermission("SUPPLIER_VIEW");
+  const suppliers = useApprovedSuppliers(canSeeSuppliers);
   const materials = useMaterials();
   const categories = useDefectCategories();
   const facilities = useFacilities();
@@ -180,9 +182,11 @@ export default function NcrsPage() {
       <PageHeader title="Non-conformances">
         {canCreate && (
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setAdding("SUPPLIER")}>
-              Supplier issue
-            </Button>
+            {canSeeSuppliers && (
+              <Button variant="outline" onClick={() => setAdding("SUPPLIER")}>
+                Supplier issue
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setAdding("PROCESS")}>
               Process incident
             </Button>

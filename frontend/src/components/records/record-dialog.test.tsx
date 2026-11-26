@@ -107,4 +107,13 @@ describe("RecordDialog's state from GSTIN", () => {
     expect(await screen.findByText("The GSTIN is registered in Maharashtra.")).toBeInTheDocument();
     expect(state()).toHaveValue("Gujarat");
   });
+
+  it("refuses a GSTIN whose check character is wrong before sending it", async () => {
+    const onSubmit = show({ code: "P1", name: "Plant" });
+    await states();
+    fireEvent.change(screen.getByLabelText("GSTIN"), { target: { value: "27AAPFU0939F1Z9" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText(/Not a valid GSTIN/)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
 });

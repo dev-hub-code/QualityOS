@@ -302,6 +302,9 @@ public class ShopFloorService implements AttachmentPolicy {
         if (operation.getMachineId() != null) {
             occupy(locked.order(), operation, operation.getMachineId());
         }
+        if (operation.getOperatorId() == null) {
+            operation.assign(TenantContext.getCurrentUserId(), operation.getMachineId());
+        }
         operation.start(Instant.now());
         return changed(locked, from, OperationEvent.Type.RESUMED, null, null, "OPERATION_RESUMED");
     }
@@ -316,6 +319,10 @@ public class ShopFloorService implements AttachmentPolicy {
         String reason = reason(request.category(), request.reason());
         operation.pause(Instant.now(), reason);
         releaseMachine(locked.order(), operation, request.category(), reason);
+        if (request.category() == OperationEvent.LossCategory.SHIFT_END) {
+            // A hand-over: the next shift's operator picks it up, without waiting for a supervisor to reassign it.
+            operation.assign(null, operation.getMachineId());
+        }
         return changed(locked, from, OperationEvent.Type.PAUSED, request.category(), blankToNull(request.reason()),
                 "OPERATION_PAUSED");
     }

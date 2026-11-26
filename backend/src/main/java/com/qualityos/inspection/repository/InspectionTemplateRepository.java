@@ -8,5 +8,5 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 public interface InspectionTemplateRepository
         extends JpaRepository<InspectionTemplate, UUID>, JpaSpecificationExecutor<InspectionTemplate> {
 
-    boolean existsByCode(String code);
+    boolean existsByCodeIgnoreCase(String code);
 }

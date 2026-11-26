@@ -68,6 +68,17 @@ public class Supplier extends TenantOwnedEntity {
         this.code = code;
     }
 
+    /** An approved supplier whose identity changed waits for a second approval again, with this note. */
+    public void sendBackForApproval(UUID actor, String note) {
+        if (status != Status.APPROVED) {
+            throw new BusinessRuleException("Only an approved supplier is sent back for approval.");
+        }
+        status = Status.PENDING_APPROVAL;
+        statusNote = note;
+        submittedBy = actor;
+        submittedAt = Instant.now();
+    }
+
     /** The only way to change status, so that a supplier cannot skip the approval workflow. */
     public void transitionTo(Status target, UUID actor, String note) {
         if (!ALLOWED_TRANSITIONS.getOrDefault(status, Set.of()).contains(target)) {

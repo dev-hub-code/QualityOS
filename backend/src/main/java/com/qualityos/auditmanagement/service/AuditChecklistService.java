@@ -58,7 +58,7 @@ public class AuditChecklistService {
     @Transactional
     public ChecklistDetail create(SaveChecklistRequest request) {
         String code = request.code().trim();
-        if (checklists.existsByCode(code)) {
+        if (checklists.existsByCodeIgnoreCase(code)) {
             throw new ConflictException("Checklist code %s is already in use.".formatted(code));
         }
         AuditChecklist checklist = checklists.saveAndFlush(new AuditChecklist(code, request.name().trim()));

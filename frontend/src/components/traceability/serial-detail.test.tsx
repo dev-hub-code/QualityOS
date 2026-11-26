@@ -32,7 +32,7 @@ describe("SerialDetail", () => {
     expect(await screen.findByRole("heading", { name: "SN 1" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "PB-1" })).toHaveAttribute("href", "/traceability/PB-1");
     expect(screen.getByRole("link", { name: "INS-1" })).toBeInTheDocument();
-    expect(screen.getByText(/Tata Motors on 2026-10-03/)).toBeInTheDocument();
+    expect(screen.getByText(/Tata Motors on 3 Oct 2026/)).toBeInTheDocument();
     expect(screen.getByText("returned")).toBeInTheDocument();
     expect(screen.getByText("awaiting shipment")).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/serials/SN%201"), expect.anything());

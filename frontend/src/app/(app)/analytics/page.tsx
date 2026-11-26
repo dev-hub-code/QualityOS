@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCalendarDay } from "@/lib/dates";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { MonthBars, RankBars, type Rank } from "@/components/analytics/charts";
@@ -33,7 +34,7 @@ export default function AnalyticsPage() {
   });
   return (
     <div className="space-y-6">
-      <PageHeader title="Analytics" subtitle={data && `${data.from} to ${data.to}`} />
+      <PageHeader title="Analytics" subtitle={data && `${formatCalendarDay(data.from)} to ${formatCalendarDay(data.to)}`} />
       <PeriodFilter value={period} onChange={setPeriod} />
       {error && <QueryState error={error} />}
       {!data && !error && <QueryState error={null} />}

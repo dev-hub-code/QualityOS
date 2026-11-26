@@ -314,6 +314,11 @@ export default function NcrPage() {
                   {capa.capaNumber}
                 </RecordLink>{" "}
                 {capa.title}
+                {capa.linkNote && (
+                  <span className="block text-muted-foreground">
+                    Linked: {capa.linkNote}
+                  </span>
+                )}
               </span>
               <StatusBadge status={capa.status} />
             </li>

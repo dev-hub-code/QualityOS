@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCalendarDay } from "@/lib/dates";
 import { NcrStatusBadge } from "@/components/records/ncr-status-badge";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -141,7 +142,7 @@ export function ImpactReviews({
       {groups.map((group) => (
         <div key={group.calibrationId} className="space-y-2">
           <p className="text-sm">
-            Failed on {group.calibratedOn}
+            Failed on {formatCalendarDay(group.calibratedOn)}
             {group.ncrId && (
               <>
                 {" · "}
@@ -177,7 +178,7 @@ export function ImpactReviews({
                   >
                     <RecordLink href={use.link}>{use.label}</RecordLink>
                     <span className="text-muted-foreground">
-                      used {use.usedOn}
+                      used {formatCalendarDay(use.usedOn)}
                     </span>
                   </li>
                 ))}
@@ -194,7 +195,7 @@ export function ImpactReviews({
                   {review.inspectionNumber}
                 </RecordLink>
                 <span className="text-muted-foreground">
-                  used {review.usedOn}
+                  used {formatCalendarDay(review.usedOn)}
                   {review.parameters.length > 0
                     ? `, measured ${review.parameters.join(", ")}`
                     : ", measurements not named"}

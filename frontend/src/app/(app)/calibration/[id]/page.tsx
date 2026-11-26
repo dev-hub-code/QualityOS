@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCalendarDay } from "@/lib/dates";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -107,7 +108,7 @@ export default function InstrumentPage() {
         <div className="text-sm">
           <p className="font-semibold">{instrument.instrumentCode}</p>
           <p>{instrument.name}</p>
-          <p>Due {instrument.nextDueOn}</p>
+          <p>Due {formatCalendarDay(instrument.nextDueOn)}</p>
         </div>
       </div>
       <div className="space-y-6 print:hidden">
@@ -122,8 +123,8 @@ export default function InstrumentPage() {
               ["Location", instrument.location],
               ["Custodian", instrument.custodianName],
               ["Calibrate every", `${instrument.frequencyDays} days`],
-              ["Last calibrated", instrument.lastCalibratedOn],
-              ["Next due", instrument.nextDueOn],
+              ["Last calibrated", formatCalendarDay(instrument.lastCalibratedOn)],
+              ["Next due", formatCalendarDay(instrument.nextDueOn)],
               ...(instrument.statusReason ? [["Status reason", instrument.statusReason] as [string, string]] : []),
             ]}
           />

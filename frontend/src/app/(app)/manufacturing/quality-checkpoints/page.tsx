@@ -19,8 +19,9 @@ const PATH = "/manufacturing/quality-checkpoints";
 type Template = { id: string; code: string; name: string; inspectionType: string; materialId: string | null; publishedVersion: number | null };
 
 /** Published in-process and final templates that are not for one material: the ones a checkpoint can name. */
-function useCheckpointTemplates() {
+function useCheckpointTemplates(enabled: boolean) {
   const { data } = useQuery({
+    enabled,
     queryKey: ["/inspection-templates", "checkpoints"],
     queryFn: async () => {
       const [inProcess, final] = await Promise.all(
@@ -42,7 +43,8 @@ export default function QualityCheckpointsPage() {
   const canManage = usePermission("QUALITY_CHECKPOINT_MANAGE");
   const products = useProducts();
   const workCenters = useWorkCenters();
-  const templates = useCheckpointTemplates();
+  // Only those who set checkpoints up choose a template; the list shows each checkpoint's own.
+  const templates = useCheckpointTemplates(canManage);
   const refresh = useRefresh();
   const { run, pending, message } = useAction();
   const [archived, setArchived] = useState(false);

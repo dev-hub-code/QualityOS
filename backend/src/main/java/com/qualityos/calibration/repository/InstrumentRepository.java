@@ -11,7 +11,9 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface InstrumentRepository extends JpaRepository<Instrument, UUID>, JpaSpecificationExecutor<Instrument> {
 
-    boolean existsByInstrumentCode(String instrumentCode);
+    boolean existsByInstrumentCodeIgnoreCase(String instrumentCode);
+
+    boolean existsByInstrumentCodeIgnoreCaseAndIdNot(String instrumentCode, UUID id);
 
     @Query("""
             SELECT i FROM Instrument i WHERE i.status = ACTIVE AND i.nextDueOn < :today

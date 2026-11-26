@@ -1,8 +1,9 @@
 "use client";
 
+import { formatCalendarDay } from "@/lib/dates";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { RankBars } from "@/components/analytics/charts";
 import { PeriodFilter, periodQuery } from "@/components/analytics/period-filter";
 import { PageHeader, QueryState, Section, StatusBadge, useUnits } from "@/components/records/parts";
@@ -76,7 +77,7 @@ export default function ProductionAnalyticsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Production analytics"
-        subtitle={data ? `${data.from} to ${data.to}, days in ${data.timezone}` : "Choose a period"}
+        subtitle={data ? `${formatCalendarDay(data.from)} to ${formatCalendarDay(data.to)}, days in ${data.timezone}` : "Choose a period"}
       />
       <PeriodFilter value={period} onChange={setPeriod} />
       {error && <QueryState error={error} />}
@@ -149,7 +150,7 @@ export default function ProductionAnalyticsPage() {
                 ).map((row) => {
                   const unit = row.uomId ? ` ${units.label(row.uomId)}` : "";
                   return (
-                    <div key={row.uomId ?? "all"} className="col-span-2 grid grid-cols-2 gap-2">
+                    <Fragment key={row.uomId ?? "all"}>
                       <dt className="text-muted-foreground">Reported{unit && ` in${unit}`}</dt>
                       <dd>{formatQuantity(row.processed)}{unit}</dd>
                       <dt className="text-muted-foreground">Good · rejected · scrap</dt>
@@ -158,14 +159,16 @@ export default function ProductionAnalyticsPage() {
                       </dd>
                       <dt className="text-muted-foreground">Sent to rework</dt>
                       <dd>{formatQuantity(row.rework)}</dd>
-                    </div>
+                    </Fragment>
                   );
                 })}
-                {data.quality.byUnit && data.quality.byUnit.length > 1 && (
-                  <p className="col-span-2 text-xs text-muted-foreground">
-                    Reported in more than one unit, so each rate is the mean of the units&apos; own rates.
-                  </p>
-                )}
+              </dl>
+              {data.quality.byUnit && data.quality.byUnit.length > 1 && (
+                <p className="my-2 text-xs text-muted-foreground">
+                  Reported in more than one unit, so each rate is the mean of the units&apos; own rates.
+                </p>
+              )}
+              <dl className="grid grid-cols-2 gap-2 text-sm">
                 <dt className="text-muted-foreground">Running time against plan</dt>
                 <dd>
                   {formatMinutes(data.efficiency.actualMinutes)} for {formatMinutes(data.efficiency.plannedMinutes)} planned (

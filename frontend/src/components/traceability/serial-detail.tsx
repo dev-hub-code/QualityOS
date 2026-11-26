@@ -1,6 +1,6 @@
 "use client";
 
-import { formatDay } from "@/lib/dates";
+import { formatDay, formatCalendarDay } from "@/lib/dates";
 import { useQuery } from "@tanstack/react-query";
 import { Details, PageHeader, QueryState, RecordLink, Section, StatusBadge } from "@/components/records/parts";
 import { api } from "@/lib/api";
@@ -64,7 +64,7 @@ export function SerialDetail({ serial, backHref }: { serial: string; backHref: s
             {data.deliveries.map((delivery) => (
               <li key={delivery.dispatchId} className="flex flex-wrap items-center gap-2 py-2">
                 <RecordLink href="/dispatches">{delivery.dispatchNumber}</RecordLink>
-                {delivery.customerName} on {delivery.shippedOn ?? delivery.dispatchedOn}
+                {delivery.customerName} on {formatCalendarDay(delivery.shippedOn ?? delivery.dispatchedOn)}
                 <StatusBadge
                   status={delivery.returned ? "RETURNED" : delivery.shippedOn ? "SHIPPED" : "AWAITING_SHIPMENT"}
                 />

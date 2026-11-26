@@ -214,7 +214,7 @@ public class StateHolidayService {
     }
 
     private ConflictException clash(String region, LocalDate date) {
-        return new ConflictException("%s is already a holiday in %s.".formatted(date, regionName(region)));
+        return new ConflictException("%s is already a holiday in %s.".formatted(com.qualityos.common.util.DayLabels.label(date), regionName(region)));
     }
 
     private static Map<String, Object> state(StateHolidayResponse holiday) {

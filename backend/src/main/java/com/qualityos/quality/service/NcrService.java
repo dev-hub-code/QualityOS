@@ -83,6 +83,7 @@ public class NcrService implements AttachmentPolicy {
     private final QualityRules rules;
     private final CalibrationDecisions calibrationDecisions;
     private final NcrPlaces places;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     NcrService(
             NonConformanceRepository ncrs,
@@ -100,7 +101,9 @@ public class NcrService implements AttachmentPolicy {
             ReviewPolicy reviewPolicy,
             QualityRules rules,
             CalibrationDecisions calibrationDecisions,
-            NcrPlaces places) {
+            NcrPlaces places,
+            org.springframework.jdbc.core.JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
         this.places = places;
         this.rules = rules;
         this.calibrationDecisions = calibrationDecisions;
@@ -117,6 +120,27 @@ public class NcrService implements AttachmentPolicy {
         this.numbers = numbers;
         this.audit = audit;
         this.alerts = alerts;
+    }
+
+    /**
+     * A batch named on an NCR is one on record: a lot as received, its supplier's own batch, or a production batch.
+     * A mistyped number would otherwise leave the NCR out of every trace and recall of the real one.
+     */
+    private void requireKnownBatch(String batchNumber) {
+        if (batchNumber == null || batchNumber.isBlank()) {
+            return;
+        }
+        String number = batchNumber.trim();
+        UUID tenant = com.qualityos.common.tenant.TenantContext.getCurrentTenantId();
+        Boolean known = jdbc.queryForObject("""
+                SELECT EXISTS (SELECT 1 FROM material_receipt_items
+                                WHERE tenant_id = ? AND (internal_batch = ? OR supplier_batch = ?))
+                    OR EXISTS (SELECT 1 FROM production_batches WHERE tenant_id = ? AND batch_number = ?)""",
+                Boolean.class, tenant, number, number, tenant, number);
+        if (!Boolean.TRUE.equals(known)) {
+            throw new BusinessRuleException(("No lot or batch %s is on record. Give the number on its label, or leave "
+                    + "the batch out.").formatted(number));
+        }
     }
 
     /** Where a process incident can be said to have happened, in the caller's plants. */
@@ -152,7 +176,7 @@ public class NcrService implements AttachmentPolicy {
     @Transactional
     public DefectCategoryResponse addCategory(SaveDefectCategoryRequest request) {
         String code = request.code().trim();
-        if (categories.existsByCode(code)) {
+        if (categories.existsByCodeIgnoreCase(code)) {
             throw new ConflictException("A defect category with this code already exists.");
         }
         DefectCategory saved = categories.save(new DefectCategory(code, request.name().trim()));
@@ -226,6 +250,7 @@ public class NcrService implements AttachmentPolicy {
             facilities.requireActive(facilityId);
         }
         requireReferences(request);
+        requireKnownBatch(request.batchNumber());
         if (request.defectCategoryId() != null) {
             requireCategory(request.defectCategoryId());
         }
@@ -442,7 +467,7 @@ public class NcrService implements AttachmentPolicy {
                 ncr.getStatus().isFinished(),
                 capas.findAnsweringNcr(ncr.getId()).stream()
                         .map(capa -> new LinkedCapa(
-                                capa.getId(), capa.getCapaNumber(), capa.getTitle(), capa.getStatus().name()))
+                                capa.getId(), capa.getCapaNumber(), capa.getTitle(), capa.getStatus().name(), null))
                         .toList())));
     }
 
@@ -710,8 +735,11 @@ public class NcrService implements AttachmentPolicy {
 
     private NcrDetail toDetail(NonConformance ncr) {
         Map<UUID, String> members = access.names();
+        Map<UUID, String> linkNotes = new java.util.HashMap<>();
+        capas.linkNotesOfNcr(ncr.getId()).forEach(row -> linkNotes.put((UUID) row[0], (String) row[1]));
         List<LinkedCapa> linked = capas.findAnsweringNcr(ncr.getId()).stream()
-                .map(capa -> new LinkedCapa(capa.getId(), capa.getCapaNumber(), capa.getTitle(), capa.getStatus().name()))
+                .map(capa -> new LinkedCapa(capa.getId(), capa.getCapaNumber(), capa.getTitle(), capa.getStatus().name(),
+                        linkNotes.get(capa.getId())))
                 .toList();
         List<StatusChange> changes = history.findByNcrIdOrderByCreatedAt(ncr.getId()).stream()
                 .map(change -> new StatusChange(change.getFromStatus(), change.getToStatus(), change.getNote(),

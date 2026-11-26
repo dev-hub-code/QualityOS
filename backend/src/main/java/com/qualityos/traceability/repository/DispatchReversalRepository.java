@@ -21,6 +21,8 @@ public interface DispatchReversalRepository extends JpaRepository<DispatchRevers
             """)
     Page<DispatchReversal> findWithin(Collection<UUID> facilities, Pageable pageable);
 
+    List<DispatchReversal> findByStatusInOrderByCreatedAt(Collection<DispatchReversal.Status> statuses);
+
     boolean existsByDispatchIdAndReturnReference(UUID dispatchId, String returnReference);
 
     List<DispatchReversal> findByDispatchIdInOrderByCreatedAt(Collection<UUID> dispatchIds);

@@ -48,6 +48,7 @@ public class SupplierService implements AttachmentPolicy {
     private final SupplierMapper mapper;
     private final AuditService audit;
     private final ReviewPolicy reviewPolicy;
+    private final com.qualityos.organization.service.IndiaPlaces places;
 
     SupplierService(
             SupplierRepository suppliers,
@@ -55,7 +56,9 @@ public class SupplierService implements AttachmentPolicy {
             SupplierContactRepository contacts,
             SupplierMapper mapper,
             AuditService audit,
-            ReviewPolicy reviewPolicy) {
+            ReviewPolicy reviewPolicy,
+            com.qualityos.organization.service.IndiaPlaces places) {
+        this.places = places;
         this.reviewPolicy = reviewPolicy;
         this.suppliers = suppliers;
         this.categories = categories;
@@ -83,7 +86,7 @@ public class SupplierService implements AttachmentPolicy {
     @Transactional
     public SupplierResponse create(SaveSupplierRequest request) {
         String code = request.code().trim();
-        if (suppliers.existsByCode(code)) {
+        if (suppliers.existsByCodeIgnoreCase(code)) {
             throw new ConflictException("A supplier with this code already exists.");
         }
         Supplier supplier = new Supplier(code);
@@ -99,7 +102,13 @@ public class SupplierService implements AttachmentPolicy {
         Supplier supplier = load(id);
         var before = audit.state(mapper.toResponse(supplier));
         supplier.requireVersion(request.version());
+        String identity = identity(supplier);
         apply(supplier, request);
+        // An approver checked who the supplier is. A new name or GSTIN is someone else, so it is checked again.
+        if (supplier.getStatus() == Status.APPROVED && !identity.equals(identity(supplier))) {
+            supplier.sendBackForApproval(TenantContext.getCurrentUserId(),
+                    "Name, legal name or GSTIN changed, so it needs approving again.");
+        }
         suppliers.saveAndFlush(supplier);
         audit.recordChange("SUPPLIER_UPDATED", "Supplier", id, before, audit.state(mapper.toResponse(supplier)));
         return mapper.toResponse(supplier);
@@ -133,6 +142,10 @@ public class SupplierService implements AttachmentPolicy {
         if (previous == Status.PENDING_APPROVAL && target == Status.APPROVED && !reviewPolicy.permits(
                 actor, supplier.getSubmittedBy(), "Supplier", id, "SUPPLIER_APPROVE", note)) {
             throw new BusinessRuleException("You submitted this supplier, so someone else must approve it.");
+        }
+        if (previous == Status.PENDING_APPROVAL && target == Status.REJECTED && !reviewPolicy.permits(
+                actor, supplier.getSubmittedBy(), "Supplier", id, "SUPPLIER_REJECT", note)) {
+            throw new BusinessRuleException("You submitted this supplier, so someone else must review it.");
         }
         if (target == Status.APPROVED) {
             note = null;
@@ -258,7 +271,13 @@ public class SupplierService implements AttachmentPolicy {
         return suppliers.findById(id).orElseThrow(() -> new ResourceNotFoundException("Supplier", id));
     }
 
+    private static String identity(Supplier supplier) {
+        return String.join("|", String.valueOf(supplier.getName()), String.valueOf(supplier.getLegalName()),
+                String.valueOf(supplier.getGstin()));
+    }
+
     private void apply(Supplier supplier, SaveSupplierRequest request) {
+        places.requireGstinInState(request.gstin(), request.state());
         if (request.categoryId() != null && !categories.existsById(request.categoryId())) {
             throw new BusinessRuleException("This category does not exist.");
         }

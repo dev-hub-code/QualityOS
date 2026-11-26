@@ -9,5 +9,5 @@ public interface CustomerRepository extends JpaRepository<Customer, UUID> {
 
     List<Customer> findByArchivedAtIsNullOrderByCode();
 
-    boolean existsByCode(String code);
+    boolean existsByCodeIgnoreCase(String code);
 }

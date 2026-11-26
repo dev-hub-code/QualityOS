@@ -9,5 +9,5 @@ public interface ProductionLineRepository extends JpaRepository<ProductionLine, 
 
     List<ProductionLine> findByFacilityIdAndArchivedAtIsNullOrderByName(UUID facilityId);
 
-    boolean existsByFacilityIdAndCode(UUID facilityId, String code);
+    boolean existsByFacilityIdAndCodeIgnoreCase(UUID facilityId, String code);
 }

@@ -393,14 +393,18 @@ public class BomService {
                     line.getScrapPercent().divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP)));
             if (line.getMaterialId() != null) {
                 MaterialReference material = materialRefs.get(line.getMaterialId());
-                BigDecimal own = materials.convert(round(needed), line.getUomId(), material.uomId());
+                BigDecimal amount = round(needed);
+                BigDecimal own = inUnitsOf(line, material.code(),
+                        () -> materials.convert(amount, line.getUomId(), material.uomId()));
                 rows.add(new ExplosionRow(level, MATERIAL, material.id(), material.code(), material.name(), own,
                         material.uomId(), false));
                 add(totals, MATERIAL, material.id(), material.code(), material.name(), own, material.uomId());
                 continue;
             }
             ProductReference component = productRefs.get(line.getComponentProductId());
-            BigDecimal own = materials.convert(round(needed), line.getUomId(), component.uomId());
+            BigDecimal amount = round(needed);
+            BigDecimal own = inUnitsOf(line, component.code(),
+                    () -> materials.convert(amount, line.getUomId(), component.uomId()));
             Bom child = children.get(component.id());
             boolean expand = child != null && !path.contains(component.id());
             rows.add(new ExplosionRow(level, PRODUCT, component.id(), component.code(), component.name(), own,
@@ -498,6 +502,16 @@ public class BomService {
     }
 
     /** The product's flat material list, as quantities per one unit of the product. */
+    /** A conversion of one line's quantity, whose refusal names the line, so that it can be found and fixed. */
+    private static BigDecimal inUnitsOf(BomLine line, String code, java.util.function.Supplier<BigDecimal> conversion) {
+        try {
+            return conversion.get();
+        } catch (BusinessRuleException e) {
+            throw new BusinessRuleException("Line %d (%s): %s Change the line's unit in a new revision."
+                    .formatted(line.getLineNumber(), code, e.getMessage()));
+        }
+    }
+
     private void copyProductMaterials(UUID productId, Bom target) {
         List<BillOfMaterialResponse> list = products.get(productId).materials();
         if (list.isEmpty()) {
@@ -506,6 +520,8 @@ public class BomService {
         int number = 0;
         for (BillOfMaterialResponse item : list) {
             BomLine line = new BomLine(target.getId(), ++number);
+            UUID materialUom = materials.requireActive(item.materialId()).uomId();
+            inUnitsOf(line, item.materialCode(), () -> materials.convert(BigDecimal.ONE, item.uomId(), materialUom));
             line.setMaterialId(item.materialId());
             line.setQuantity(item.quantityPerUnit().multiply(target.getBaseQuantity()));
             line.setUomId(item.uomId());

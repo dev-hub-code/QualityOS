@@ -98,9 +98,9 @@ export default function DispatchPage() {
         <Details
           items={[
             ["Customer", <RecordLink key="customer" href={`/customers/${dispatch.customerId}`}>{dispatch.customerName}</RecordLink>],
-            ["Dispatched on", dispatch.dispatchedOn],
+            ["Dispatched on", formatCalendarDay(dispatch.dispatchedOn)],
             ["Reference", dispatch.reference],
-            ["Shipped on", dispatch.shippedOn],
+            ["Shipped on", formatCalendarDay(dispatch.shippedOn)],
             ["Carrier or vehicle", dispatch.carrierReference],
             ["Reversed as a mistake", dispatch.reversalReason],
           ]}

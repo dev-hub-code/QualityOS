@@ -42,7 +42,7 @@ const isNamed = (holiday: CalendarHoliday) => holiday.kind === "HOLIDAY" || holi
 function byMonth(holidays: CalendarHoliday[]): [string, CalendarHoliday[]][] {
   const months = new Map<string, CalendarHoliday[]>();
   for (const holiday of holidays) {
-    const month = localDay(holiday.date).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    const month = localDay(holiday.date).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
     months.set(month, [...(months.get(month) ?? []), holiday]);
   }
   return [...months];
@@ -148,7 +148,7 @@ export default function HolidayCalendarPage() {
                     >
                       <span className="flex items-baseline gap-3">
                         <span className="w-28 shrink-0 font-medium">
-                          {localDay(holiday.date).toLocaleDateString(undefined, {
+                          {localDay(holiday.date).toLocaleDateString("en-IN", {
                             weekday: "short",
                             day: "numeric",
                             month: "short",

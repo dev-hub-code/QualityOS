@@ -61,7 +61,7 @@ public class Instrument extends TenantOwnedEntity {
     public void calibrated(CalibrationRecord record) {
         requireNotRetired();
         if (record.getResult() == CalibrationRecord.Result.FAIL) {
-            changeStatus(Status.OUT_OF_SERVICE, "Failed calibration on " + record.getCalibratedOn());
+            changeStatus(Status.OUT_OF_SERVICE, "Failed calibration on " + com.qualityos.common.util.DayLabels.label(record.getCalibratedOn()));
             return;
         }
         lastCalibratedOn = record.getCalibratedOn();

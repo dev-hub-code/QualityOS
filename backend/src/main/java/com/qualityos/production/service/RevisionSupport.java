@@ -112,7 +112,7 @@ class RevisionSupport {
             }
             if (!other.getEffectiveFrom().isBefore(from)) {
                 throw new BusinessRuleException(("Revision %d takes effect on %s. Choose a later date, or retire it "
-                        + "first.").formatted(other.getRevision(), other.getEffectiveFrom()));
+                        + "first.").formatted(other.getRevision(), com.qualityos.common.util.DayLabels.label(other.getEffectiveFrom())));
             }
             other.endBefore(from);
         }

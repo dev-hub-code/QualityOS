@@ -59,7 +59,7 @@ export default function ProductionPlanPage() {
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
             <StatusBadge status={plan.status} />
-            {plan.facilityCode} · {plan.periodStart} to {plan.periodEnd}
+            {plan.facilityCode} · {formatCalendarDay(plan.periodStart)} to {formatCalendarDay(plan.periodEnd)}
           </span>
         }
       >

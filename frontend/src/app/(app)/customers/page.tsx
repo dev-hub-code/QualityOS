@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
-import { PageHeader, RecordLink, useAction, useRefresh } from "@/components/records/parts";
+import { PageHeader, QueryState, RecordLink, useAction, useRefresh } from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { usePermission } from "@/hooks/use-me";
@@ -29,7 +29,8 @@ export default function CustomersPage() {
   const refresh = useRefresh();
   const { run, message } = useAction();
   const [adding, setAdding] = useState(false);
-  const { data = [] } = useQuery({ queryKey: [PATH], queryFn: () => api.get<Customer[]>(PATH) });
+  const { data = [], error, isPending } = useQuery({ queryKey: [PATH], queryFn: () => api.get<Customer[]>(PATH) });
+  if (error || isPending) return <QueryState error={error} />;
   return (
     <div className="max-w-2xl space-y-6">
       <PageHeader title="Customers">

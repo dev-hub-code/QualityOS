@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCalendarDay } from "@/lib/dates";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -76,7 +77,7 @@ export default function DispatchReversalPage() {
           items={[
             ["Dispatch", reversal.dispatchNumber],
             ["Customer", reversal.customerName],
-            [reversal.status === "EXPECTED" ? "Expected on" : "Date received", reversal.reversalDate],
+            [reversal.status === "EXPECTED" ? "Expected on" : "Date received", formatCalendarDay(reversal.reversalDate)],
             ["Reason", reversal.reason],
             [
               "NCR",

@@ -1,4 +1,5 @@
 import { isValidGstin } from "@/lib/gstin";
+import { GSTIN_MESSAGE } from "@/lib/record-form";
 import { z } from "zod";
 import { DECIMAL_PATTERN, decimalCheck } from "@/lib/record-form";
 
@@ -26,7 +27,7 @@ export const organizationSchema = z.object({
     .string()
     .trim()
     .toUpperCase()
-    .refine((value) => value === "" || isValidGstin(value), "Not a valid GSTIN: check the 15 characters, the last is a check character"),
+    .refine((value) => value === "" || isValidGstin(value), GSTIN_MESSAGE),
   industry: z.string().trim().max(100),
   address: z.string().trim().max(1000),
   contactPhone: z

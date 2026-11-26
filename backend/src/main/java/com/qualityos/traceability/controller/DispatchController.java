@@ -177,6 +177,13 @@ public class DispatchController {
         return ApiResponse.ok(returns.cancel(id));
     }
 
+    /** For the inspection queue: received returns whose goods still wait for their inspection. */
+    @GetMapping("/dispatch-reversals/awaiting-inspection")
+    @PreAuthorize(Require.INSPECTION_CREATE)
+    public ApiResponse<List<ReversalView>> returnsAwaitingInspection() {
+        return ApiResponse.ok(returns.awaitingInspection());
+    }
+
     @GetMapping("/dispatch-reversals/{id}")
     @PreAuthorize(Require.TRACEABILITY_VIEW)
     public ApiResponse<ReversalView> reversal(@PathVariable UUID id) {

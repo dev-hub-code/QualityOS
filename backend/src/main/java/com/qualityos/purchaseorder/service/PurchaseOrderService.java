@@ -268,6 +268,7 @@ public class PurchaseOrderService {
                 throw new BusinessRuleException("Each material can appear once. Combine the quantities.");
             }
             MaterialReference material = materials.requireActive(item.materialId());
+            materials.requireWholeIfCounted(material, item.quantity());
             order.addItem(material.id(), material.uomId(), item.quantity(), item.unitPrice());
         }
     }

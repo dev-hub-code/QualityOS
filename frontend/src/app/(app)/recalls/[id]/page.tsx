@@ -126,7 +126,7 @@ function Regulator({ recall, path }: { recall: RecallDetail; path: string }) {
           ],
           ["Regulator", recall.regulator],
           ["Their reference", recall.regulatorReference],
-          ["Told on", recall.regulatorNotifiedOn],
+          ["Told on", formatCalendarDay(recall.regulatorNotifiedOn)],
           [
             "Customers must acknowledge within",
             `${recall.responseDays} days of ${formatCalendarDay(recall.recallDate)}`,
@@ -342,7 +342,7 @@ export default function RecallPage() {
       <Section title="Recall">
         <Details
           items={[
-            ["Date", recall.recallDate],
+            ["Date", formatCalendarDay(recall.recallDate)],
             ["Reason", recall.reason],
             ["What customers must do", recall.instructions],
             ...(recall.capaId

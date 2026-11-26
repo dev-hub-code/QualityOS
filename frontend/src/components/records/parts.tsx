@@ -163,7 +163,9 @@ function useLookup<T extends { id: string; code: string; name: string }>(
   return (data ?? []).map((item) => ({ value: item.id, label: `${item.code} – ${item.name}` }));
 }
 
-export const useApprovedSuppliers = () => useLookup<Supplier>("/suppliers", "&status=APPROVED");
+/** @param enabled false for someone who may not see suppliers, so that no refused request is made */
+export const useApprovedSuppliers = (enabled = true) =>
+  useLookup<Supplier>("/suppliers", "&status=APPROVED", enabled);
 /**
  * Active members to hand work to. With a permission, only those who hold it, so nobody is named on work their role
  * cannot do: NCR_ASSIGN for an NCR, CAPA_MANAGE for a CAPA owner, AUDIT_MANAGE for a lead auditor and RECALL_MANAGE

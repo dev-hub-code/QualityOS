@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCalendarDay } from "@/lib/dates";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
@@ -51,7 +52,7 @@ export function InspectionInstruments({
         {inspection.instruments.map((instrument) => (
           <li key={instrument.id}>
             {instrument.instrumentCode} – {instrument.name}, calibration due{" "}
-            {instrument.nextDueOn}
+            {formatCalendarDay(instrument.nextDueOn)}
             {instrument.parameters.length > 0 &&
               `, measured ${instrument.parameters.join(", ")}`}
             {instrument.impactReview && (

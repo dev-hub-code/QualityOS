@@ -339,7 +339,7 @@ function Billing() {
                       {invoice.planName}
                       <InvoiceNote invoice={invoice} />
                     </TableCell>
-                    <TableCell>{invoice.issuedOn}</TableCell>
+                    <TableCell>{formatCalendarDay(invoice.issuedOn)}</TableCell>
                     <TableCell>
                       <StatusBadge status={invoice.status} />
                     </TableCell>

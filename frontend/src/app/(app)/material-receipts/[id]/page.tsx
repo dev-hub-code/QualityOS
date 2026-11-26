@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCalendarDay } from "@/lib/dates";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -38,7 +39,7 @@ export default function MaterialReceiptPage() {
           items={[
             ["Supplier", receipt.supplierName],
             ["Purchase order", <RecordLink key="po" href={`/purchase-orders/${receipt.purchaseOrderId}`}>View order</RecordLink>],
-            ["Received on", receipt.receivedOn],
+            ["Received on", formatCalendarDay(receipt.receivedOn)],
             ["Delivery note", receipt.deliveryNote],
             ["Notes", receipt.notes],
             ...(receipt.voidReason ? ([["Void reason", receipt.voidReason]] as [string, string][]) : []),
@@ -67,7 +68,7 @@ export default function MaterialReceiptPage() {
                   <TableCell>{item.supplierBatch}</TableCell>
                   <TableCell>{item.internalBatch}</TableCell>
                   <TableCell>{formatQuantity(item.quantity)}</TableCell>
-                  <TableCell>{item.expiryDate ?? "—"}</TableCell>
+                  <TableCell>{item.expiryDate ? formatCalendarDay(item.expiryDate) : "—"}</TableCell>
                   <TableCell>
                     <StatusBadge status={item.inspectionStatus} />
                   </TableCell>

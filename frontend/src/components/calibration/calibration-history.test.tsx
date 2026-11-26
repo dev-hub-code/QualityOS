@@ -35,7 +35,7 @@ describe("InstrumentUsage", () => {
       />,
     );
     expect(
-      screen.getByText(/2 record\(s\) used this instrument/),
+      screen.getByText(/2 records have used this instrument/),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "INS-1" })).toHaveAttribute(
       "href",

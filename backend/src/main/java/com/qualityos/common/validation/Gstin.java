@@ -16,7 +16,7 @@ import java.lang.annotation.Target;
 @Constraint(validatedBy = GstinValidator.class)
 public @interface Gstin {
 
-    String message() default "is not a valid GSTIN: check the 15 characters, the last one is a check character";
+    String message() default "Not a valid GSTIN: check the 15 characters, the last is a check character";
 
     Class<?>[] groups() default {};
 

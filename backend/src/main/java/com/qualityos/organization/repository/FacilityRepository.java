@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface FacilityRepository extends JpaRepository<Facility, UUID>, JpaSpecificationExecutor<Facility> {
 
-    boolean existsByCode(String code);
+    boolean existsByCodeIgnoreCase(String code);
 
-    boolean existsByCodeAndIdNot(String code, UUID id);
+    boolean existsByCodeIgnoreCaseAndIdNot(String code, UUID id);
 }

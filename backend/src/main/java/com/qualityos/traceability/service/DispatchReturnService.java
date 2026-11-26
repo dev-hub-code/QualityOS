@@ -126,6 +126,29 @@ public class DispatchReturnService {
         return PageResponse.from(page, reversal -> views.get(reversal.getId()));
     }
 
+    /** Returns received and not yet inspected, with only their items still waiting, for the inspection queue. */
+    @Transactional(readOnly = true)
+    public List<ReversalView> awaitingInspection() {
+        List<DispatchReversal> waiting = reversals.findByStatusInOrderByCreatedAt(
+                List.of(DispatchReversal.Status.RETURN_RECEIVED, DispatchReversal.Status.PENDING_INSPECTION));
+        java.util.Optional<java.util.Set<UUID>> visible = scope.restriction().map(allowed ->
+                reversals.findWithin(allowed, org.springframework.data.domain.Pageable.unpaged()).stream()
+                        .map(DispatchReversal::getId).collect(Collectors.toSet()));
+        List<DispatchReversal> mine = waiting.stream()
+                .filter(reversal -> visible.map(ids -> ids.contains(reversal.getId())).orElse(true)).toList();
+        return views(mine).stream()
+                .map(view -> withItems(view, view.items().stream()
+                        .filter(item -> DispatchReversalItem.Status.RETURN_RECEIVED.name().equals(item.status())).toList()))
+                .filter(view -> !view.items().isEmpty())
+                .toList();
+    }
+
+    private static ReversalView withItems(ReversalView view, List<ReversalItemView> items) {
+        return new ReversalView(view.id(), view.reversalNumber(), view.dispatchId(), view.dispatchNumber(),
+                view.customerName(), view.returnReference(), view.reversalDate(), view.reason(), view.status(),
+                view.recordedByName(), view.createdAt(), view.closedAt(), items, view.ncrId(), view.ncrNumber());
+    }
+
     @Transactional(readOnly = true)
     public ReversalView get(UUID id) {
         return views(List.of(load(id))).getFirst();

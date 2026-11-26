@@ -117,8 +117,8 @@ export default function RecallReportPage() {
           rows={data.dispatches.map((line) => [
             line.dispatchNumber,
             line.customerName,
-            line.dispatchedOn,
-            line.shippedOn,
+            formatCalendarDay(line.dispatchedOn),
+            formatCalendarDay(line.shippedOn),
             formatQuantity(line.quantity),
             formatQuantity(line.returnedQuantity),
             formatQuantity(line.outstandingQuantity),

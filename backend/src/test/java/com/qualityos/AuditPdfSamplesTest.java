@@ -49,7 +49,7 @@ class AuditPdfSamplesTest {
                 "Caliper VC-9 was in use without a calibration label, and nobody could say when it was last checked.",
                 "Seen at station 4 on 20 October. Register page 12 shows no entry for this instrument since March.",
                 "7.1.5", 5, ncr ? new NcrOutcome(UUID.randomUUID(), "NCR-2026-0001" + number, "ACTION_REQUIRED", false,
-                        List.of(new LinkedCapa(UUID.randomUUID(), "CAPA-2026-00003", "Label all gauges", "IMPLEMENTATION")))
+                        List.of(new LinkedCapa(UUID.randomUUID(), "CAPA-2026-00003", "Label all gauges", "IMPLEMENTATION", null)))
                         : null);
     }
 

@@ -12,11 +12,11 @@ import { newRequestKey } from "@/lib/manufacturing";
 import { formatQuantity } from "@/lib/record-form";
 import type { WorkOrderCompletion, WorkOrderMaterials, WorkOrderStatus } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { formatDateTime } from "@/lib/dates";
+import { formatDateTime, formatCalendarDay } from "@/lib/dates";
 
 /** Lots are offered first expiring first; the date shows why. */
 function expiring(expiryDate: string | null): string {
-  return expiryDate ? `, expires ${expiryDate}` : "";
+  return expiryDate ? `, expires ${formatCalendarDay(expiryDate)}` : "";
 }
 
 /** A substitute's lot names its material, since it is not the line's own. */

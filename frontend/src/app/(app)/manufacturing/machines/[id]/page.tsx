@@ -13,7 +13,7 @@ import { api } from "@/lib/api";
 import type { Instrument, InstrumentOption, Machine, MachineStatusEvent } from "@/lib/types";
 import { lookupAll } from "@/components/records/parts";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { formatDateTime } from "@/lib/dates";
+import { formatDateTime, formatCalendarDay } from "@/lib/dates";
 
 interface MachineDetail {
   machine: Machine;
@@ -104,7 +104,7 @@ export default function MachinePage() {
                   {instrument.instrumentCode} – {instrument.name}
                 </Link>
                 <span className="flex items-center gap-2 text-muted-foreground">
-                  Due {instrument.nextDueOn}
+                  Due {formatCalendarDay(instrument.nextDueOn)}
                   {canManage && (
                     <Button
                       size="sm"

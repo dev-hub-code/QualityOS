@@ -8,5 +8,5 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 public interface AuditChecklistRepository
         extends JpaRepository<AuditChecklist, UUID>, JpaSpecificationExecutor<AuditChecklist> {
 
-    boolean existsByCode(String code);
+    boolean existsByCodeIgnoreCase(String code);
 }

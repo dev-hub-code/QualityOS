@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCalendarDay } from "@/lib/dates";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -21,7 +22,7 @@ const COLUMNS: ColumnDef<ProductionPlan>[] = [
   },
   { header: "Name", accessorKey: "name" },
   { header: "Facility", accessorKey: "facilityCode" },
-  { header: "Period", cell: ({ row }) => `${row.original.periodStart} to ${row.original.periodEnd}` },
+  { header: "Period", cell: ({ row }) => `${formatCalendarDay(row.original.periodStart)} to ${formatCalendarDay(row.original.periodEnd)}` },
   { header: "Status", cell: ({ row }) => <StatusBadge status={row.original.status} /> },
 ];
 

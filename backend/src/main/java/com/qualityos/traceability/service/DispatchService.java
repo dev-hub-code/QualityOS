@@ -137,7 +137,7 @@ public class DispatchService {
     @Transactional
     public CustomerResponse addCustomer(SaveCustomerRequest request) {
         String code = request.code().trim();
-        if (customers.existsByCode(code)) {
+        if (customers.existsByCodeIgnoreCase(code)) {
             throw new ConflictException("A customer with this code already exists.");
         }
         Customer customer = customers.save(new Customer(code, request.name().trim(), request.gstin(),

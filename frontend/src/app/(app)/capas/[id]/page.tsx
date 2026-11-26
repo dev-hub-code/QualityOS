@@ -241,6 +241,18 @@ export default function CapaPage() {
                 </RecordLink>
               ),
             ],
+            [
+              "Also answers",
+              capa.linkedNcrs.length > 0 && (
+                <ul className="space-y-1">
+                  {capa.linkedNcrs.map((linked) => (
+                    <li key={linked.id}>
+                      <RecordLink href={`/ncrs/${linked.id}`}>{linked.ncrNumber}</RecordLink>: {linked.note}
+                    </li>
+                  ))}
+                </ul>
+              ),
+            ],
             ["Owner", capa.ownerName],
             ["Target date", formatCalendarDay(capa.targetDate)],
             [

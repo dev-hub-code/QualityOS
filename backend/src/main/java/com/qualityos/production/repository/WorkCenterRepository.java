@@ -9,9 +9,9 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface WorkCenterRepository extends JpaRepository<WorkCenter, UUID>, JpaSpecificationExecutor<WorkCenter> {
 
-    boolean existsByCode(String code);
+    boolean existsByCodeIgnoreCase(String code);
 
-    boolean existsByCodeAndIdNot(String code, UUID id);
+    boolean existsByCodeIgnoreCaseAndIdNot(String code, UUID id);
 
     List<WorkCenter> findByFacilityIdInAndArchivedAtIsNullOrderByCode(Collection<UUID> facilityIds);
 }

@@ -272,7 +272,9 @@ public class ReportService {
                            (SELECT r.result FROM calibration_records r
                             WHERE r.tenant_id = t.tenant_id AND r.instrument_id = t.id
                             ORDER BY r.calibrated_on DESC, r.created_at DESC LIMIT 1),
-                           t.last_calibrated_on::text, t.next_due_on::text
+                           (SELECT max(r.calibrated_on) FROM calibration_records r
+                            WHERE r.tenant_id = t.tenant_id AND r.instrument_id = t.id)::text,
+                           t.next_due_on::text
                     FROM instruments t
                     JOIN facilities f ON f.tenant_id = t.tenant_id AND f.id = t.facility_id
                     WHERE t.status <> 'RETIRED'%s ORDER BY t.next_due_on, t.instrument_code

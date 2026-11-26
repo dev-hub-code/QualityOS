@@ -42,8 +42,8 @@ class ProductionAlerts {
     }
 
     void workOrderSubmitted(WorkOrder order, String productCode) {
-        String summary = productCode + " × " + plain(order.getQuantity()) + ", planned " + order.getPlannedStart()
-                + " to " + order.getPlannedEnd();
+        String summary = productCode + " × " + plain(order.getQuantity()) + ", planned " + com.qualityos.common.util.DayLabels.label(order.getPlannedStart())
+                + " to " + com.qualityos.common.util.DayLabels.label(order.getPlannedEnd());
         atFacility(order.getFacilityId(), access.holdersOf(Permissions.WORK_ORDER_APPROVE),
                 NotificationType.WORK_ORDER_AWAITING_APPROVAL, order.getWorkOrderNumber() + " needs approval", summary,
                 WORK_ORDERS + order.getId(), approval(order.getWorkOrderNumber(), summary));

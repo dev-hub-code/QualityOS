@@ -188,7 +188,12 @@ public final class QualityDtos {
     public record StatusChange(String fromStatus, String toStatus, String note, String actorName, Instant at) {
     }
 
-    public record LinkedCapa(UUID id, String capaNumber, String title, String status) {
+    /** @param linkNote why an existing CAPA was linked; null for one raised from the NCR itself */
+    public record LinkedCapa(UUID id, String capaNumber, String title, String status, String linkNote) {
+    }
+
+    /** An NCR linked to a CAPA after the CAPA was raised, because it shares the root cause. */
+    public record LinkedNcr(UUID id, String ncrNumber, String status, String note) {
     }
 
     /**
@@ -315,7 +320,8 @@ public final class QualityDtos {
             Instant closedAt,
             List<ActionResponse> actions,
             List<VerificationResponse> verifications,
-            List<StatusChange> history) {
+            List<StatusChange> history,
+            List<LinkedNcr> linkedNcrs) {
     }
 
     /** An NCR as a trace shows it. */

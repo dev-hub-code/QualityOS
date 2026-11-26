@@ -25,7 +25,7 @@ const FIELDS: FieldDef[] = [
 /** "2026-01-26" as "Mon, 26 Jan", with no time zone to move it. */
 function showDate(date: string): string {
   const [year, month, day] = date.split("-").map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+  return new Date(year, month - 1, day).toLocaleDateString("en-IN", {
     weekday: "short",
     day: "numeric",
     month: "short",

@@ -9,6 +9,7 @@ import { usePermission } from "@/hooks/use-me";
 import { api, ApiError } from "@/lib/api";
 import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import { toReturnItems } from "@/lib/traceability";
+import { today } from "@/lib/dates";
 import type { Dispatch, ReversalSummary } from "@/lib/types";
 
 /** A dispatch's state, and what can be done with it: confirm the shipment, record a return, or reverse a mistake. */
@@ -71,6 +72,7 @@ export function DispatchActions({ dispatch }: { dispatch: Dispatch }) {
         <RecordDialog
           title={`Confirm shipment of ${dispatch.dispatchNumber}`}
           fields={shipmentFields}
+          record={{ shippedOn: today() }}
           onClose={() => setShipping(false)}
           onSubmit={(values) => api.post(`/dispatches/${dispatch.id}/shipment`, values).then(refresh)}
         />

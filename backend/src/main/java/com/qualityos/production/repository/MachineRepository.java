@@ -9,9 +9,9 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface MachineRepository extends JpaRepository<Machine, UUID>, JpaSpecificationExecutor<Machine> {
 
-    boolean existsByCode(String code);
+    boolean existsByCodeIgnoreCase(String code);
 
-    boolean existsByCodeAndIdNot(String code, UUID id);
+    boolean existsByCodeIgnoreCaseAndIdNot(String code, UUID id);
 
     List<Machine> findByWorkCenterIdOrderByCode(UUID workCenterId);
 

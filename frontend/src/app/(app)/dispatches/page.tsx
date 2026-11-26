@@ -14,7 +14,7 @@ import { formatQuantity, type FieldDef } from "@/lib/record-form";
 import { toDispatchItems } from "@/lib/traceability";
 import type { Customer, Dispatch, ProductionBatch } from "@/lib/types";
 import { lookupAll } from "@/components/records/parts";
-import { formatCalendarDay } from "@/lib/dates";
+import { formatCalendarDay, today } from "@/lib/dates";
 
 const RELEASED = "/production-batches?status=RELEASED";
 
@@ -90,6 +90,7 @@ function DispatchDialog({ onClose }: { onClose: () => void }) {
     <RecordDialog
       title="Record dispatch"
       fields={fields}
+      record={{ dispatchedOn: today() }}
       onClose={onClose}
       extra={
         <Button type="button" variant="outline" onClick={() => setLines(lines + 1)}>

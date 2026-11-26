@@ -102,7 +102,7 @@ public class ProductService implements AttachmentPolicy {
     @Transactional
     public ProductResponse create(SaveProductRequest request) {
         String code = request.code().trim();
-        if (products.existsByCode(code)) {
+        if (products.existsByCodeIgnoreCase(code)) {
             throw new ConflictException("A product with this code already exists.");
         }
         Product product = new Product(code);
@@ -186,6 +186,7 @@ public class ProductService implements AttachmentPolicy {
         load(id);
         MaterialReference material = materials.requireActive(request.materialId());
         materials.requireUnit(request.uomId());
+        requireSameKind(material, request.uomId());
         if (productMaterials.existsByProductIdAndMaterialId(id, request.materialId())) {
             throw new ConflictException("This material is already mapped to the product.");
         }
@@ -194,6 +195,17 @@ public class ProductService implements AttachmentPolicy {
         audit.record("PRODUCT_MATERIAL_ADDED", "Product", id, null, Map.of("material", material.code(),
                 "quantityPerUnit", request.quantityPerUnit().toPlainString()));
         return toResponse(mapping, material);
+    }
+
+    /** A material kept in kilograms is listed in a unit of weight, not of volume or count. */
+    private void requireSameKind(MaterialReference material, UUID uomId) {
+        try {
+            materials.convert(java.math.BigDecimal.ONE, uomId, material.uomId());
+        } catch (com.qualityos.common.exception.BusinessRuleException e) {
+            throw new com.qualityos.common.exception.BusinessRuleException(
+                    "%s is kept in %s. Give its quantity in a unit of the same kind. (%s)"
+                            .formatted(material.code(), materials.unitCode(material.uomId()), e.getMessage()));
+        }
     }
 
     @Transactional

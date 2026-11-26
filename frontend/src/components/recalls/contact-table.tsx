@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCalendarDay } from "@/lib/dates";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
 import { AttachmentPanel } from "@/components/records/attachment-panel";
@@ -94,12 +95,12 @@ export function ContactTable({
             <p className="text-muted-foreground break-words">
               {[contact.contactPerson, contact.contactDetails].filter(Boolean).join(", ") || "No contact details"}
               {contact.assignedName && ` · Assigned to ${contact.assignedName}`}
-              {contact.followUpOn && ` · Follow up on ${contact.followUpOn}`}
+              {contact.followUpOn && ` · Follow up on ${formatCalendarDay(contact.followUpOn)}`}
             </p>
             <p>
               {formatQuantity(contact.quantity)} dispatched, {formatQuantity(contact.returnedQuantity)} returned,{" "}
               {formatQuantity(contact.outstandingQuantity)} still out · {contact.attempts} {contact.attempts === 1 ? "attempt" : "attempts"}
-              {contact.acknowledgedOn && ` · Acknowledged ${contact.acknowledgedOn}`}
+              {contact.acknowledgedOn && ` · Acknowledged ${formatCalendarDay(contact.acknowledgedOn)}`}
             </p>
             {contact.exceptionReason && <p>Exception: {contact.exceptionReason}</p>}
             <div className="flex flex-wrap items-center gap-2">

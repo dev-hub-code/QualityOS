@@ -56,6 +56,7 @@ public class FacilityService {
     private final com.qualityos.identity.service.FacilityScope scope;
     private final StateHolidayService stateHolidays;
     private final OrganizationClock clock;
+    private final IndiaPlaces places;
 
     FacilityService(
             FacilityRepository facilities,
@@ -69,7 +70,9 @@ public class FacilityService {
             org.springframework.jdbc.core.JdbcTemplate jdbc,
             StateHolidayService stateHolidays,
             OrganizationClock clock,
-            com.qualityos.identity.service.FacilityScope scope) {
+            com.qualityos.identity.service.FacilityScope scope,
+            IndiaPlaces places) {
+        this.places = places;
         this.clock = clock;
         this.scope = scope;
         this.jdbc = jdbc;
@@ -194,7 +197,7 @@ public class FacilityService {
                 """, id, com.qualityos.common.tenant.TenantContext.getCurrentTenantId(), facilityId, request.date(),
                 name, com.qualityos.common.tenant.TenantContext.getCurrentUserId());
         if (added == 0) {
-            throw new ConflictException("%s is already a holiday here.".formatted(request.date()));
+            throw new ConflictException("%s is already a holiday here.".formatted(com.qualityos.common.util.DayLabels.label(request.date())));
         }
         audit.record("HOLIDAY_ADDED", "Facility", facilityId, null,
                 Map.of("date", request.date().toString(), "name", name));
@@ -222,7 +225,7 @@ public class FacilityService {
                 SELECT count(*) FROM facility_holidays WHERE facility_id = ? AND holiday_on = ? AND id <> ?
                 """, Integer.class, facilityId, after.date(), holidayId);
         if (clashes != null && clashes > 0) {
-            throw new ConflictException("%s is already a holiday here.".formatted(after.date()));
+            throw new ConflictException("%s is already a holiday here.".formatted(com.qualityos.common.util.DayLabels.label(after.date())));
         }
         jdbc.update("UPDATE facility_holidays SET holiday_on = ?, name = ? WHERE id = ?", after.date(), after.name(),
                 holidayId);
@@ -287,7 +290,7 @@ public class FacilityService {
     @Transactional
     public FacilityResponse create(SaveFacilityRequest request) {
         String code = request.code().trim();
-        if (facilities.existsByCode(code)) {
+        if (facilities.existsByCodeIgnoreCase(code)) {
             throw new ConflictException("A facility with this code already exists.");
         }
         limits.requireFacilityPlace();
@@ -305,7 +308,7 @@ public class FacilityService {
         var before = audit.state(mapper.toResponse(facility));
         facility.requireVersion(request.version());
         String code = request.code().trim();
-        if (facilities.existsByCodeAndIdNot(code, id)) {
+        if (facilities.existsByCodeIgnoreCaseAndIdNot(code, id)) {
             throw new ConflictException("A facility with this code already exists.");
         }
         facility.setCode(code);
@@ -340,7 +343,7 @@ public class FacilityService {
     public UnitResponse addDepartment(UUID facilityId, SaveUnitRequest request) {
         load(facilityId);
         String code = request.code().trim();
-        if (departments.existsByFacilityIdAndCode(facilityId, code)) {
+        if (departments.existsByFacilityIdAndCodeIgnoreCase(facilityId, code)) {
             throw new ConflictException("This facility already has a department with this code.");
         }
         Department department = departments.save(new Department(facilityId, code, request.name().trim()));
@@ -352,7 +355,7 @@ public class FacilityService {
     public UnitResponse addProductionLine(UUID facilityId, SaveUnitRequest request) {
         load(facilityId);
         String code = request.code().trim();
-        if (lines.existsByFacilityIdAndCode(facilityId, code)) {
+        if (lines.existsByFacilityIdAndCodeIgnoreCase(facilityId, code)) {
             throw new ConflictException("This facility already has a production line with this code.");
         }
         ProductionLine line = lines.save(new ProductionLine(facilityId, code, request.name().trim()));
@@ -367,12 +370,58 @@ public class FacilityService {
         if (shifts.existsByFacilityIdAndName(facilityId, name)) {
             throw new ConflictException("This facility already has a shift with this name.");
         }
+        int days = request.daysOfWeek() == null ? Shift.EVERY_DAY : request.daysOfWeek();
+        int breakMinutes = request.breakMinutes() == null ? 0 : request.breakMinutes();
+        long length = shiftLength(request.startsAt(), request.endsAt());
+        if (length == 24 * 60) {
+            throw new BusinessRuleException("A shift cannot end when it starts. Give the time it ends.");
+        }
+        if (breakMinutes >= length) {
+            throw new BusinessRuleException("The break must be shorter than the shift.");
+        }
+        for (Shift other : shifts.findByFacilityIdAndArchivedAtIsNullOrderByStartsAt(facilityId)) {
+            if (overlap(request.startsAt(), length, days, other.getStartsAt(),
+                    shiftLength(other.getStartsAt(), other.getEndsAt()), other.getDaysOfWeek())) {
+                throw new BusinessRuleException("This shift overlaps shift %s (%s to %s). Shifts of a facility cannot overlap, or its hours would count twice."
+                        .formatted(other.getName(), other.getStartsAt(), other.getEndsAt()));
+            }
+        }
         Shift shift = shifts.save(new Shift(facilityId, name, request.startsAt(), request.endsAt(),
                 request.breakMinutes() == null ? 0 : request.breakMinutes(),
                 request.daysOfWeek() == null ? Shift.EVERY_DAY : request.daysOfWeek()));
         audit.record("SHIFT_ADDED", "Facility", facilityId, null, Map.of("shift", name,
                 "startsAt", String.valueOf(request.startsAt()), "endsAt", String.valueOf(request.endsAt())));
         return mapper.toResponse(shift);
+    }
+
+    /** Minutes from start to end, past midnight if it ends at or before it starts. */
+    private static long shiftLength(java.time.LocalTime startsAt, java.time.LocalTime endsAt) {
+        long length = java.time.Duration.between(startsAt, endsAt).toMinutes();
+        return length <= 0 ? length + 24 * 60 : length;
+    }
+
+    /** Whether two shifts work a common minute of the week. Bit 0 of the days is Monday; a shift may run into the next day. */
+    private static boolean overlap(java.time.LocalTime aStart, long aLength, int aDays,
+            java.time.LocalTime bStart, long bLength, int bDays) {
+        final long week = 7L * 24 * 60;
+        for (int a = 0; a < 7; a++) {
+            if ((aDays & (1 << a)) == 0) {
+                continue;
+            }
+            long from = a * 24L * 60 + aStart.toSecondOfDay() / 60;
+            for (int b = 0; b < 7; b++) {
+                if ((bDays & (1 << b)) == 0) {
+                    continue;
+                }
+                long other = b * 24L * 60 + bStart.toSecondOfDay() / 60;
+                // Compare on a circle a week round: the later one starts within the earlier one.
+                long gap = Math.floorMod(other - from, week);
+                if (gap < aLength || Math.floorMod(from - other, week) < bLength) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @Transactional
@@ -495,7 +544,8 @@ public class FacilityService {
         return facilities.findById(id).orElseThrow(() -> new ResourceNotFoundException("Facility", id));
     }
 
-    private static void apply(Facility facility, SaveFacilityRequest request) {
+    private void apply(Facility facility, SaveFacilityRequest request) {
+        places.requireGstinInState(request.gstin(), request.state());
         facility.setName(request.name().trim());
         facility.setAddress(request.address());
         facility.setCity(request.city());

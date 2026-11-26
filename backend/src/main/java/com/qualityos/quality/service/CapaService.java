@@ -508,6 +508,10 @@ public class CapaService implements AttachmentPolicy {
                 capa.getClosedAt(),
                 planned,
                 verdicts,
-                changes);
+                changes,
+                capas.linkedNcrsOfCapa(capa.getId()).stream()
+                        .map(row -> new com.qualityos.quality.dto.QualityDtos.LinkedNcr((UUID) row[0], (String) row[1],
+                                (String) row[2], (String) row[3]))
+                        .toList());
     }
 }

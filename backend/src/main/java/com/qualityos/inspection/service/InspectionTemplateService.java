@@ -109,7 +109,7 @@ public class InspectionTemplateService {
     @Transactional
     public TemplateDetail create(SaveTemplateRequest request) {
         String code = request.code().trim();
-        if (templates.existsByCode(code)) {
+        if (templates.existsByCodeIgnoreCase(code)) {
             throw new ConflictException("A template with this code already exists.");
         }
         requireTarget(request.materialId(), request.productId());
@@ -239,9 +239,24 @@ public class InspectionTemplateService {
     /** Publishing is the approval step: it needs its own permission, and the version is final from then on. */
     @Transactional
     public TemplateDetail publish(UUID id, LocalDate effectiveFrom) {
-        load(id);
+        InspectionTemplate template = load(id);
         TemplateVersion draft = versions.findByTemplateIdAndStatus(id, Status.DRAFT)
                 .orElseThrow(() -> new BusinessRuleException("There is no draft to publish."));
+        String bulkUnit = bulkUnitOf(template);
+        if (bulkUnit != null && draft.getSamplingType() != TemplateVersion.SamplingType.FIXED) {
+            throw new BusinessRuleException(("This version samples by counting units, but its item is measured in %s. "
+                    + "Use a fixed number of samples.").formatted(bulkUnit));
+        }
+        if (draft.getSamplingType() == TemplateVersion.SamplingType.AQL) {
+            // An AQL plan counts the samples that do not conform, which needs each yes/no check to say what conforms.
+            draft.getParameters().stream()
+                    .filter(parameter -> parameter.getDataType() == com.qualityos.inspection.entity.InspectionParameter.DataType.BOOLEAN)
+                    .filter(parameter -> parameter.getExpectedText() == null || parameter.getExpectedText().isBlank())
+                    .findFirst().ifPresent(parameter -> {
+                        throw new BusinessRuleException(("Give the expected answer of %s. An AQL plan counts the samples "
+                                + "that differ from it.").formatted(parameter.getCode()));
+                    });
+        }
         versions.findByTemplateIdAndStatus(id, Status.PUBLISHED).ifPresent(previous -> {
             if (effectiveFrom.isBefore(previous.getEffectiveFrom())) {
                 throw new BusinessRuleException("The new version cannot take effect before the current one.");
@@ -254,6 +269,19 @@ public class InspectionTemplateService {
         audit.record("TEMPLATE_PUBLISHED", "InspectionTemplate", id, null, Map.of(
                 "version", draft.getVersionNumber(), "effectiveFrom", effectiveFrom.toString()));
         return get(id);
+    }
+
+    /** The unit of the template's own material or product when it is weighed or measured, such as KG; else null. */
+    private String bulkUnitOf(InspectionTemplate template) {
+        if (template.getMaterialId() != null) {
+            var material = materials.references(List.of(template.getMaterialId())).get(template.getMaterialId());
+            return material == null ? null : materials.bulkUnitCode(material.uomId());
+        }
+        if (template.getProductId() != null) {
+            var product = products.references(List.of(template.getProductId())).get(template.getProductId());
+            return product == null ? null : materials.bulkUnitCode(product.uomId());
+        }
+        return null;
     }
 
     /** The version an inspection started today must use. */

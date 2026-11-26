@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCalendarDay } from "@/lib/dates";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -59,7 +60,7 @@ export default function RecallReportPage() {
                   <RecordLink href="/dispatches">{line.dispatchNumber}</RecordLink>
                 </td>
                 <td className="py-2 pr-4">
-                  {line.shippedOn ?? <StatusBadge status="AWAITING_SHIPMENT" />}
+                  {line.shippedOn ? formatCalendarDay(line.shippedOn) : <StatusBadge status="AWAITING_SHIPMENT" />}
                 </td>
                 <td className="py-2 pr-4 text-right">{formatQuantity(line.quantity)}</td>
                 <td className="py-2 pr-4 text-right">{formatQuantity(line.returnedQuantity)}</td>

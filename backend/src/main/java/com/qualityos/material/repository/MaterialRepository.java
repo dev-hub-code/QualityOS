@@ -7,5 +7,5 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface MaterialRepository extends JpaRepository<Material, UUID>, JpaSpecificationExecutor<Material> {
 
-    boolean existsByCode(String code);
+    boolean existsByCodeIgnoreCase(String code);
 }

@@ -35,6 +35,17 @@ public interface CorrectiveActionRepository
             VALUES (current_tenant_id(), :ncrId, :capaId, :note, :linkedBy) ON CONFLICT DO NOTHING""", nativeQuery = true)
     int linkToNcr(UUID ncrId, UUID capaId, String note, UUID linkedBy);
 
+    /** Why each existing CAPA was linked to this NCR: capa id, note. */
+    @Query(value = "SELECT l.capa_id, l.note FROM ncr_capa_links l WHERE l.ncr_id = :ncrId", nativeQuery = true)
+    List<Object[]> linkNotesOfNcr(UUID ncrId);
+
+    /** The NCRs linked to this CAPA after it was raised, and why: ncr id, number, status, note. */
+    @Query(value = """
+            SELECT n.id, n.ncr_number, n.status, l.note FROM ncr_capa_links l
+            JOIN non_conformances n ON n.tenant_id = l.tenant_id AND n.id = l.ncr_id
+            WHERE l.capa_id = :capaId ORDER BY n.ncr_number""", nativeQuery = true)
+    List<Object[]> linkedNcrsOfCapa(UUID capaId);
+
     List<CorrectiveAction> findByNcrIdInOrderByCreatedAt(Collection<UUID> ncrIds);
 
     /** Skips anyone reminded since {@code remindedBefore}, so that a CAPA does not nag on every run. */

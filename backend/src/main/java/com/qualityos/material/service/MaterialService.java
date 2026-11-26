@@ -89,7 +89,7 @@ public class MaterialService implements AttachmentPolicy {
     @Transactional
     public MaterialResponse create(SaveMaterialRequest request) {
         String code = request.code().trim();
-        if (materials.existsByCode(code)) {
+        if (materials.existsByCodeIgnoreCase(code)) {
             throw new ConflictException("A material with this code already exists.");
         }
         Material material = new Material(code);
@@ -215,6 +215,25 @@ public class MaterialService implements AttachmentPolicy {
         }
         UnitOfMeasure unit = visibleUnit(id);
         return "Count".equalsIgnoreCase(unit.getDimension()) ? null : unit.getCode();
+    }
+
+    /** A material counted in pieces is ordered and received in whole pieces. */
+    @Transactional(readOnly = true)
+    public void requireWholeIfCounted(MaterialReference material, BigDecimal quantity) {
+        if (quantity == null || material.uomId() == null || quantity.stripTrailingZeros().scale() <= 0) {
+            return;
+        }
+        UnitOfMeasure unit = visibleUnit(material.uomId());
+        if ("Count".equalsIgnoreCase(unit.getDimension())) {
+            throw new BusinessRuleException("%s is counted in %s, so give a whole number, not %s."
+                    .formatted(material.code(), unit.getCode(), quantity.stripTrailingZeros().toPlainString()));
+        }
+    }
+
+    /** A unit's code, such as KG. */
+    @Transactional(readOnly = true)
+    public String unitCode(UUID id) {
+        return visibleUnit(id).getCode();
     }
 
     @Transactional(readOnly = true)

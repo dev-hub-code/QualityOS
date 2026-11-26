@@ -12,5 +12,5 @@ public interface DepartmentRepository extends JpaRepository<Department, UUID> {
 
     List<Department> findByFacilityIdInAndArchivedAtIsNullOrderByName(Collection<UUID> facilityIds);
 
-    boolean existsByFacilityIdAndCode(UUID facilityId, String code);
+    boolean existsByFacilityIdAndCodeIgnoreCase(UUID facilityId, String code);
 }

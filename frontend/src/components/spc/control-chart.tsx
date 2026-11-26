@@ -25,7 +25,7 @@ const PLOT_HEIGHT = HEIGHT - MARGIN.top - MARGIN.bottom;
 const LEFT = MARGIN.left;
 const RIGHT = MARGIN.left + PLOT_WIDTH;
 
-const day = (instant: string) => new Date(instant).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+const day = (instant: string) => new Date(instant).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 const time = (instant: string) =>
   new Date(instant).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 

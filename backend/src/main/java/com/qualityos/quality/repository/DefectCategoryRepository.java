@@ -9,5 +9,5 @@ public interface DefectCategoryRepository extends JpaRepository<DefectCategory, 
 
     List<DefectCategory> findByArchivedAtIsNullOrderByCode();
 
-    boolean existsByCode(String code);
+    boolean existsByCodeIgnoreCase(String code);
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCalendarDay } from "@/lib/dates";
 import { useState } from "react";
 import { AttachmentPanel } from "@/components/records/attachment-panel";
 import { RecordLink, StatusBadge } from "@/components/records/parts";
@@ -23,7 +24,7 @@ export function CalibrationHistory({
       {records.map((record) => (
         <li key={record.id} className="space-y-1 py-2">
           <div className="flex flex-wrap items-center gap-2">
-            {record.calibratedOn}
+            {formatCalendarDay(record.calibratedOn)}
             <StatusBadge status={record.result} />
             {record.performedBy}
             {record.certificateNumber &&
@@ -64,15 +65,15 @@ export function InstrumentUsage({ uses }: { uses: InstrumentUse[] }) {
     <>
       {suspect > 0 && (
         <p className="mb-2 text-sm text-destructive">
-          {suspect} record(s) used this instrument since its last good
-          calibration. Review them.
+          {suspect === 1 ? "1 record has" : `${suspect} records have`} used this instrument since its last good
+          calibration. Review {suspect === 1 ? "it" : "them"}.
         </p>
       )}
       <ul className="divide-y text-sm">
         {uses.map((use) => (
           <li key={use.link} className="flex flex-wrap items-center gap-2 py-2">
             <RecordLink href={use.link}>{use.label}</RecordLink>
-            {use.usedOn}
+            {formatCalendarDay(use.usedOn)}
             {use.suspect && <StatusBadge status="HOLD" />}
           </li>
         ))}

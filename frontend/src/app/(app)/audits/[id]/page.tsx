@@ -1,5 +1,6 @@
 "use client";
 
+import { formatCalendarDay } from "@/lib/dates";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { type ReactNode, useState } from "react";
@@ -151,7 +152,7 @@ export default function AuditPage() {
           items={[
             ["Type", audit.auditType.toLowerCase()],
             ["Facility", audit.facilityName],
-            ["Planned for", audit.plannedOn],
+            ["Planned for", formatCalendarDay(audit.plannedOn)],
             ["Lead auditor", audit.leadAuditorName],
             ["Repeats", repeats(audit.repeatEveryMonths)],
             ...(audit.nextAuditId

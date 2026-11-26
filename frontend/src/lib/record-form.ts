@@ -1,9 +1,12 @@
+import { isValidGstin } from "@/lib/gstin";
 import { z } from "zod";
 
 export interface FieldOption {
   value: string;
   label: string;
 }
+
+export const GSTIN_MESSAGE = "Not a valid GSTIN: check the 15 characters, the last is a check character";
 
 export interface FieldDef {
   name: string;
@@ -44,6 +47,11 @@ function fieldSchema(field: FieldDef): z.ZodType {
   if (field.required) text = text.min(1, `${field.label} is required`);
   if (field.type === "decimal") {
     return text.superRefine(decimalCheck);
+  }
+  if (field.name === "gstin") {
+    return text
+      .toUpperCase()
+      .refine((value) => value === "" || isValidGstin(value), GSTIN_MESSAGE);
   }
   if (field.type === "email") {
     return text.refine((value) => value === "" || z.email().safeParse(value).success, "Enter a valid email");

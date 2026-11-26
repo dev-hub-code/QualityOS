@@ -24,7 +24,7 @@ function cellClass(day: DayLoad) {
   return "";
 }
 
-const weekday = (date: string) => new Date(`${date}T00:00`).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+const weekday = (date: string) => new Date(`${date}T00:00`).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 
 /** Load against capacity at each work centre of a facility, day by day; conflicts and warnings, never a fix. */
 export default function SchedulingPage() {

@@ -12,6 +12,7 @@ const CONTACT: RecallContact = {
   contactPerson: "Asha Rao", contactDetails: "+91 98200 11000", assignedTo: null, assignedName: "Meera Iyer",
   followUpOn: "2026-11-02", notes: null, exceptionReason: null, attempts: 2, lastAttemptAt: null, acknowledgedOn: null,
   quantity: "100.000000", returnedQuantity: "30.000000", outstandingQuantity: "70.000000",
+  totals: { dispatched: "100 PCS", returned: "30 PCS", outstanding: "70 PCS", oneUnit: true },
 };
 
 function show(contacts: RecallContact[], open = true) {
@@ -32,7 +33,7 @@ describe("ContactTable", () => {
     show([CONTACT]);
     expect(screen.getByText(/Asha Rao, \+91 98200 11000/)).toBeInTheDocument();
     expect(screen.getByText(/Assigned to Meera Iyer/)).toBeInTheDocument();
-    expect(screen.getByText(/100 dispatched, 30 returned, 70 still out/)).toBeInTheDocument();
+    expect(screen.getByText(/100 PCS dispatched, 30 PCS returned, 70 PCS still out/)).toBeInTheDocument();
   });
 
   it("lets a manager log attempts but not record exceptions", () => {

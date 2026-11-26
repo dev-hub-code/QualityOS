@@ -35,6 +35,7 @@ class ProductionCompletionIT extends TraceabilityFixture {
     private String facility;
     private String material;
     private String product;
+    private String centre;
 
     /** A shaft takes 1 kg of bar, and is turned, then ground. */
     @BeforeEach
@@ -51,7 +52,7 @@ class ProductionCompletionIT extends TraceabilityFixture {
         send(owner, "/boms/" + bom + "/lines", Map.of("materialId", material, "quantity", "1",
                 "uomId", unitId(owner, "KG"))).andExpect(status().isOk());
         approve("/boms", bom);
-        String centre = idOf(body(send(owner, "/work-centers", Map.of("code", "WC-" + code(), "name", "Turning",
+        centre = idOf(body(send(owner, "/work-centers", Map.of("code", "WC-" + code(), "name", "Turning",
                 "facilityId", facility)).andExpect(status().isCreated())));
         String routing = JsonPath.read(body(send(owner, "/routings", Map.of("productId", product))
                 .andExpect(status().isCreated())), "$.data.revision.id");
@@ -198,6 +199,12 @@ class ProductionCompletionIT extends TraceabilityFixture {
         String received = body(sendWithKey(supervisor, path + "/receipt", request, "fg-1").andExpect(status().isOk()));
         String receipt = JsonPath.read(received, "$.data.receipt.id");
         assertThat(number(received, "$.data.receipt.quantity")).isEqualByComparingTo("9");
+        // What an operation rejects now could not join the goods received.
+        String grind = JsonPath.read(body(as(owner, get(API + path))), "$.data.operations[1].id");
+        send(supervisor, "/rework-orders", Map.of("workOrderId", order, "operationId", grind, "quantity", "1",
+                        "reason", "Found late", "steps", List.of(Map.of("description", "Regrind", "workCenterId", centre))))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(containsString("are received already")));
         assertThat(JsonPath.<Integer>read(received, "$.data.receipt.serialCount")).isEqualTo(9);
         assertThat(JsonPath.<String>read(received, "$.data.closesAs")).isEqualTo("PARTIALLY_COMPLETED");
 

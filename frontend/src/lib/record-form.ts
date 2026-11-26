@@ -78,6 +78,12 @@ export function toFormValues(fields: FieldDef[], record: Record<string, unknown>
 }
 
 /** "250.000000" reads as "250". */
+/** A quantity with its unit, such as "100.5 M", or the number alone when there is none. */
+export function formatQuantityIn(value: string | null, unit: string | null): string {
+  const number = formatQuantity(value);
+  return unit ? `${number} ${unit}` : number;
+}
+
 export function formatQuantity(value: string | null): string {
   if (value === null) return "";
   return value.includes(".") ? value.replace(/\.?0+$/, "") : value;

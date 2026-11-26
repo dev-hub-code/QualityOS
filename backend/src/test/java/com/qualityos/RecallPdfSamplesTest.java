@@ -11,6 +11,7 @@ import com.qualityos.recall.dto.RecallDtos.RecallDetail;
 import com.qualityos.recall.dto.RecallDtos.RecallReport;
 import com.qualityos.recall.dto.RecallDtos.ReportCustomer;
 import com.qualityos.recall.dto.RecallDtos.ReportProduct;
+import com.qualityos.recall.dto.RecallDtos.Totals;
 import com.qualityos.recall.service.RecallPdfRenderer;
 import com.qualityos.traceability.dto.TraceabilityDtos.RecallLine;
 import java.io.IOException;
@@ -56,14 +57,16 @@ class RecallPdfSamplesTest {
                     "quality.manager@customer" + i + ".example.com", "+91 98200 1" + (1000 + i),
                     "Plot " + (i + 1) + ", MIDC Bhosari, Pune 411026", one.status(), "Meera Iyer", one.attempts(),
                     one.status().equals("RESOLVED") ? DATE : null, one.exception(),
-                    number(one.dispatched()), number(one.returned()), number(left)));
+                    number(one.dispatched()), number(one.returned()), number(left),
+                    new Totals(one.dispatched() + " PCS", one.returned() + " PCS", left + " PCS", true)));
             lines.add(new RecallLine(UUID.randomUUID(), "DSP-2026-" + (1000 + i), UUID.randomUUID(), one.name(),
-                    DATE.minusDays(9), DATE.minusDays(8), number(one.dispatched()), number(one.returned()), number(left)));
+                    DATE.minusDays(9), DATE.minusDays(8), number(one.dispatched()), number(one.returned()), number(left),
+                    "PCS"));
         }
         int dispatched = delivered.stream().mapToInt(Delivered::dispatched).sum();
         int returned = delivered.stream().mapToInt(Delivered::returned).sum();
         ClosureReview review = new ClosureReview(delivered.size(), 1, 1, 0, List.of(), number(dispatched),
-                number(returned), number(dispatched - returned), null, List.of());
+                number(returned), number(dispatched - returned), null, List.of(), Totals.of(lines));
         RecallDetail detail = new RecallDetail(UUID.randomUUID(), "RCL-2026-00007", DATE, "Hairline cracks were found in "
                 + "drive shafts from these batches during a customer's incoming inspection. Metallurgy points to "
                 + "incorrect heat treatment on furnace 3.", "Stop using the affected units at once. Quarantine "

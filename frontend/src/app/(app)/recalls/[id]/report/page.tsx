@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { PageHeader, QueryState, RecordLink } from "@/components/records/parts";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
-import { formatQuantity } from "@/lib/record-form";
+import { formatQuantityIn } from "@/lib/record-form";
 import type { RecallReport } from "@/lib/types";
 import { formatCalendarDay } from "@/lib/dates";
 
@@ -85,8 +85,8 @@ export default function RecallReportPage() {
       </Part>
       <Part title="Quantities">
         <p className="text-sm">
-          {recall.review.customers} {recall.review.customers === 1 ? "customer" : "customers"}. {formatQuantity(recall.review.dispatchedQuantity)} dispatched,{" "}
-          {formatQuantity(recall.review.returnedQuantity)} returned, {formatQuantity(recall.review.outstandingQuantity)}{" "}
+          {recall.review.customers} {recall.review.customers === 1 ? "customer" : "customers"}. {recall.review.totals.dispatched} dispatched,{" "}
+          {recall.review.totals.returned} returned, {recall.review.totals.outstanding}{" "}
           outstanding.
         </p>
       </Part>
@@ -105,9 +105,9 @@ export default function RecallReportPage() {
             customer.status.replaceAll("_", " ").toLowerCase(),
             customer.attempts,
             customer.acknowledgedOn,
-            formatQuantity(customer.quantity),
-            formatQuantity(customer.returnedQuantity),
-            formatQuantity(customer.outstandingQuantity),
+            customer.totals.dispatched,
+            customer.totals.returned,
+            customer.totals.outstanding,
           ])}
         />
       </Part>
@@ -119,9 +119,9 @@ export default function RecallReportPage() {
             line.customerName,
             formatCalendarDay(line.dispatchedOn),
             formatCalendarDay(line.shippedOn),
-            formatQuantity(line.quantity),
-            formatQuantity(line.returnedQuantity),
-            formatQuantity(line.outstandingQuantity),
+            formatQuantityIn(line.quantity, line.unit),
+            formatQuantityIn(line.returnedQuantity, line.unit),
+            formatQuantityIn(line.outstandingQuantity, line.unit),
           ])}
         />
       </Part>

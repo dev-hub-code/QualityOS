@@ -387,6 +387,41 @@ class RecallIT extends TraceabilityFixture {
     }
 
     @Test
+    void quantitiesOfDifferentUnitsAreShownSideBySideNotAdded() throws Exception {
+        // Wire is made in metres and sold by the metre; coils of it are counted.
+        String wire = idOf(body(as(owner, postJson("/api/v1/products", Map.of("code", code(), "name", "FR wire",
+                        "productType", "SEMI_FINISHED", "uomId", unitId(owner, "M"))))
+                .andExpect(status().isCreated())));
+        String bulk = JsonPath.read(body(as(owner, postJson("/api/v1/production-batches", Map.of(
+                        "productId", wire, "facilityId", facility(owner), "plannedQuantity", "500")))
+                .andExpect(status().isCreated())), "$.data.batch.id");
+        consumeLot(bulk, releasedLot("10").id(), "10").andExpect(status().isOk());
+        complete(bulk, "500").andExpect(status().isOk());
+        inspectBatch(bulk, "FQC", "20.0", "ACCEPT");
+        String coils = startBatch(product());
+        as(owner, postJson("/api/v1/production-batches/" + coils + "/consume",
+                        Map.of("parentBatchId", bulk, "quantity", "450")))
+                .andExpect(status().isOk());
+        complete(coils, "5").andExpect(status().isOk());
+        inspectBatch(coils, "FQC", "20.0", "ACCEPT");
+        dispatch(customer, bulk, "40.5", List.of()).andExpect(status().isCreated());
+        dispatch(customer, coils, "5", List.of()).andExpect(status().isCreated());
+        batch = bulk;
+        String recall = start();
+
+        as(owner, get("/api/v1/recalls/" + recall + "/dashboard"))
+                .andExpect(jsonPath("$.data.totals.outstanding").value(org.hamcrest.Matchers.allOf(
+                        containsString("40.5 M"), containsString("5 PCS"))))
+                .andExpect(jsonPath("$.data.totals.oneUnit").value(false));
+        as(owner, get("/api/v1/recalls/" + recall))
+                .andExpect(jsonPath("$.data.review.totals.dispatched").value(org.hamcrest.Matchers.allOf(
+                        containsString("40.5 M"), containsString("5 PCS"))));
+        as(owner, get("/api/v1/recalls/" + recall + "/customers"))
+                .andExpect(jsonPath("$.data[0].totals.outstanding").value(org.hamcrest.Matchers.allOf(
+                        containsString("40.5 M"), containsString("5 PCS"))));
+    }
+
+    @Test
     void whatIsMadeFromARecalledBatchIsHeldUntilTheRecallCloses() throws Exception {
         String component = releasedBatch(releasedLot("60").id(), "60", "30");
         String assembly = startBatch(product());

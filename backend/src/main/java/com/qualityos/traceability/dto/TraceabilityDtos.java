@@ -353,9 +353,11 @@ public final class TraceabilityDtos {
      * for anyone who could not open them directly.
      */
     /**
-     * One dispatch that reached, or may have reached, a customer. A customer stays listed after returning everything.
+     * What one dispatch sent, in one unit, to a customer it reached or may have reached. A customer stays listed after
+     * returning everything.
      *
      * @param outstandingQuantity what the customer still holds, as far as anyone has recorded
+     * @param unit the unit of the batches it sent, or null when they have none
      */
     public record RecallLine(
             UUID dispatchId,
@@ -366,18 +368,19 @@ public final class TraceabilityDtos {
             LocalDate shippedOn,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal returnedQuantity,
-            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal outstandingQuantity) {
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal outstandingQuantity,
+            String unit) {
 
         public String quantityLabel() {
-            return quantity.stripTrailingZeros().toPlainString();
+            return com.qualityos.common.util.Quantities.label(quantity, unit);
         }
 
         public String returnedLabel() {
-            return returnedQuantity.stripTrailingZeros().toPlainString();
+            return com.qualityos.common.util.Quantities.label(returnedQuantity, unit);
         }
 
         public String outstandingLabel() {
-            return outstandingQuantity.stripTrailingZeros().toPlainString();
+            return com.qualityos.common.util.Quantities.label(outstandingQuantity, unit);
         }
     }
 

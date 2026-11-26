@@ -375,6 +375,7 @@ public class CompletionService {
                 .forEach(step -> blockers.add("Operation %d is %s.".formatted(step.getSequence(),
                         WorkOrderOperation.label(step.getStatus()))));
         blockers.addAll(qualityGates.receiveBlockers(order));
+        blockers.addAll(reworks.unordered(order.getId()));
         if (production.activeConsumptions(order.getProductionBatchId()).isEmpty()) {
             blockers.add("No material has been issued to the batch, so it could not be traced.");
         }

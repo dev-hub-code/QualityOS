@@ -6,6 +6,7 @@ import { useState } from "react";
 import { FormError } from "@/components/forms/field";
 import { ProductManufacturing } from "@/components/manufacturing/product-manufacturing";
 import { AttachmentPanel } from "@/components/records/attachment-panel";
+import { UnitConversions } from "@/components/records/item-units";
 import {
   Details,
   PageHeader,
@@ -132,6 +133,7 @@ export default function ProductPage() {
       </Section>
       {canSeeManufacturing && <ProductManufacturing productId={id} />}
       {canTrace && <ProductBatches productId={id} />}
+      <UnitConversions itemId={id} canManage={canManage} />
       <AttachmentPanel entityType="PRODUCT" entityId={id} canManage={canManage} />
       {dialog === "edit" && (
         <RecordDialog

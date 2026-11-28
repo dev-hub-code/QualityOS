@@ -26,6 +26,17 @@ public interface PurchaseOrderRepository
     @Query("select o from PurchaseOrder o where o.id = :id")
     Optional<PurchaseOrder> findForUpdate(UUID id);
 
+    /**
+     * The material and unit of an order's lines, as plain values: a receipt reads them before it locks the order,
+     * and loading the lines themselves here would leave stale copies for the locked update to save over.
+     */
+    @Query("""
+            select new com.qualityos.purchaseorder.dto.PurchaseOrderDtos$ReceiptLine(i.id, i.materialId, i.uomId)
+            from PurchaseOrderItem i where i.purchaseOrder.id = :orderId and i.id in :ids
+            """)
+    List<com.qualityos.purchaseorder.dto.PurchaseOrderDtos.ReceiptLine> lineUnits(
+            @Param("orderId") UUID orderId, @Param("ids") Collection<UUID> ids);
+
     /** Purchase order lines by id, for their prices. */
     @Query("select i from PurchaseOrderItem i where i.id in :ids")
     List<PurchaseOrderItem> items(@Param("ids") Collection<UUID> ids);

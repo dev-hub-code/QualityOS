@@ -73,7 +73,12 @@ export function toPayload(values: Record<string, unknown>): Record<string, unkno
 /** Values for a form, where the API's nulls become blank inputs. */
 export function toFormValues(fields: FieldDef[], record: Record<string, unknown> = {}) {
   return Object.fromEntries(
-    fields.map((field) => [field.name, record[field.name] ?? (field.type === "checkbox" ? false : "")]),
+    fields.map((field) => {
+      const value = record[field.name];
+      if (value === null || value === undefined) return [field.name, field.type === "checkbox" ? false : ""];
+      // A number from the server, such as a shelf life of 730 days, is edited as text like any other field.
+      return [field.name, typeof value === "number" && field.type !== "checkbox" ? String(value) : value];
+    }),
   );
 }
 

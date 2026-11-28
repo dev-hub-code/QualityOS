@@ -47,6 +47,7 @@ import {
   SquareCheckBig,
   ShieldEllipsis,
   Siren,
+  Ruler,
   Tags,
   ToggleRight,
   Truck,
@@ -149,6 +150,13 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/categories",
     icon: Tags,
     anyPermission: ["SUPPLIER_VIEW", "PRODUCT_VIEW", "NCR_VIEW"],
+    group: "Set up",
+  },
+  {
+    label: "Units of measure",
+    href: "/units",
+    icon: Ruler,
+    anyPermission: ["PRODUCT_VIEW"],
     group: "Set up",
   },
   {

@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
+import { enteredLabel } from "@/components/records/item-units";
 import { formatQuantity } from "@/lib/record-form";
 import type { PurchaseOrder, ReceiptSummary } from "@/lib/types";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -138,9 +139,14 @@ export default function PurchaseOrderPage() {
                     {item.materialCode} – {item.materialName}
                   </TableCell>
                   <TableCell>
-                    {formatQuantity(item.orderedQuantity)} {units.label(item.uomId)}
+                    {enteredLabel(item.orderedQuantity, units.label(item.uomId), {
+                      quantity: item.enteredQuantity,
+                      unitCode: item.enteredUomId ? units.label(item.enteredUomId) : null,
+                    })}
                   </TableCell>
-                  <TableCell>{formatQuantity(item.receivedQuantity)}</TableCell>
+                  <TableCell>
+                    {formatQuantity(item.receivedQuantity)} {units.label(item.uomId)}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -28,10 +28,15 @@ public final class PurchaseOrderDtos {
             Long version) {
     }
 
+    /**
+     * A line. {@code uomId} is the unit it is ordered in, such as DRUM for a material kept in KG, when not the
+     * material's own; the unit price is per that unit.
+     */
     public record ItemRequest(
             @NotNull UUID materialId,
             @NotNull @Positive @Digits(integer = 12, fraction = 6) BigDecimal quantity,
-            @PositiveOrZero @Digits(integer = 12, fraction = 6) BigDecimal unitPrice) {
+            @PositiveOrZero @Digits(integer = 12, fraction = 6) BigDecimal unitPrice,
+            UUID uomId) {
     }
 
     public record PurchaseOrderSummary(
@@ -67,7 +72,11 @@ public final class PurchaseOrderDtos {
             UUID uomId,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal orderedQuantity,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal receivedQuantity,
-            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal unitPrice) {
+            /* Per the ordered unit: enteredUomId when there is one, otherwise uomId. */
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal unitPrice,
+            /* What was ordered when in another unit than the material's, such as 4 DRUM; ordered is then 800 KG. */
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal enteredQuantity,
+            UUID enteredUomId) {
     }
 
     /** The order details a receipt must copy. */

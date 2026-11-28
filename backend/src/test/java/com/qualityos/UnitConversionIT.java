@@ -72,7 +72,9 @@ class UnitConversionIT extends TraceabilityFixture {
 
         consume(batch, "receiptItemId", lot.id(), "3", "PCS")
                 .andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.error.message").value("A quantity in PCS cannot be converted to KG."));
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("in PCS cannot be converted to KG."),
+                        org.hamcrest.Matchers.containsString("Add a unit conversion to"))));
         consume(batch, "receiptItemId", lot.id(), "0.0001", "GM")
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString("too little")));

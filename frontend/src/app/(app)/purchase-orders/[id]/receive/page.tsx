@@ -4,10 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { applyServerErrors } from "@/components/forms/apply-server-errors";
 import { Field, FormError } from "@/components/forms/field";
-import { PageHeader, QueryState, Section } from "@/components/records/parts";
+import { ItemUnitField } from "@/components/records/item-units";
+import { PageHeader, QueryState, Section, useUnits } from "@/components/records/parts";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
@@ -39,10 +40,20 @@ function ReceiptForm({ order }: { order: PurchaseOrder }) {
     defaultValues: {
       receivedOn: today(),
       deliveryNote: "",
-      items: openItems.map((item) => ({ purchaseOrderItemId: item.id, supplierBatch: "", quantity: "", expiryDate: "" })),
+      // A line ordered in drums is counted in drums, unless changed.
+      items: openItems.map((item) => ({
+        purchaseOrderItemId: item.id,
+        supplierBatch: "",
+        quantity: "",
+        expiryDate: "",
+        uomId: item.enteredUomId ?? "",
+      })),
     },
   });
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
+  const lines = useWatch({ control, name: "items" });
+  const units = useUnits();
+  const materialOf = (itemId: string | undefined) => order.items.find((item) => item.id === itemId)?.materialId;
 
   async function onSubmit(values: ReceiptValues) {
     setFormError("");
@@ -52,7 +63,7 @@ function ReceiptForm({ order }: { order: PurchaseOrder }) {
         purchaseOrderId: order.id,
         deliveryNote: values.deliveryNote || null,
         // A blank expiry is left to the material's shelf life.
-        items: values.items.map((item) => ({ ...item, expiryDate: item.expiryDate || null })),
+        items: values.items.map((item) => ({ ...item, expiryDate: item.expiryDate || null, uomId: item.uomId || null })),
       });
       await queryClient.invalidateQueries();
       router.push(`/material-receipts/${receipt.id}`);
@@ -82,7 +93,15 @@ function ReceiptForm({ order }: { order: PurchaseOrder }) {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => append({ purchaseOrderItemId: openItems[0].id, supplierBatch: "", quantity: "", expiryDate: "" })}
+            onClick={() =>
+              append({
+                purchaseOrderItemId: openItems[0].id,
+                supplierBatch: "",
+                quantity: "",
+                expiryDate: "",
+                uomId: openItems[0].enteredUomId ?? "",
+              })
+            }
           >
             Add batch
           </Button>
@@ -90,7 +109,7 @@ function ReceiptForm({ order }: { order: PurchaseOrder }) {
       >
         <div className="space-y-4">
           {fields.map((field, index) => (
-            <div key={field.id} className="grid items-end gap-3 sm:grid-cols-[1fr_12rem_10rem_10rem_auto]">
+            <div key={field.id} className="grid items-end gap-3 sm:grid-cols-[1fr_10rem_8rem_8rem_9rem_auto]">
               <div className="space-y-1.5">
                 <Label htmlFor={`line-${index}`}>Order line</Label>
                 <select
@@ -100,7 +119,7 @@ function ReceiptForm({ order }: { order: PurchaseOrder }) {
                 >
                   {openItems.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.materialCode} ({formatQuantity(String(remaining(item)))} remaining)
+                      {item.materialCode} ({formatQuantity(String(remaining(item)))} {units.label(item.uomId)} remaining)
                     </option>
                   ))}
                 </select>
@@ -117,6 +136,11 @@ function ReceiptForm({ order }: { order: PurchaseOrder }) {
                 inputMode="decimal"
                 error={errors.items?.[index]?.quantity}
                 {...register(`items.${index}.quantity`)}
+              />
+              <ItemUnitField
+                itemId={materialOf(lines?.[index]?.purchaseOrderItemId)}
+                id={`unit-${index}`}
+                registration={register(`items.${index}.uomId`)}
               />
               <Field
                 label="Expiry date"

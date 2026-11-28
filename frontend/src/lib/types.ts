@@ -338,7 +338,11 @@ export interface PurchaseOrderItem {
   uomId: string;
   orderedQuantity: string;
   receivedQuantity: string;
+  /** Per the unit ordered in: enteredUomId when there is one, otherwise uomId. */
   unitPrice: string | null;
+  /** What was ordered when in another unit than the material's, such as 4 DRUM; orderedQuantity is then 800 KG. */
+  enteredQuantity: string | null;
+  enteredUomId: string | null;
 }
 
 export interface PurchaseOrder {
@@ -371,9 +375,13 @@ export interface ReceiptItem {
   supplierBatch: string;
   internalBatch: string;
   quantity: string;
+  uomId: string;
   inspectionStatus: string;
   /** The lot's last day of use, or null when it does not expire. */
   expiryDate: string | null;
+  /** As counted, such as 2 DRUM, when not in the material's own unit; quantity is then 400 KG. */
+  enteredQuantity: string | null;
+  enteredUomId: string | null;
 }
 
 export interface Receipt {
@@ -3039,4 +3047,19 @@ export interface ReportExport {
   failure: string | null;
   requestedAt: string;
   expiresAt: string | null;
+}
+
+/** "1 {unitCode} = {factor} of the item's own unit", for one material or product. */
+export interface UnitConversion {
+  id: string;
+  uomId: string;
+  unitCode: string;
+  factor: string;
+}
+
+/** A material's or product's own unit, its conversions, and every unit its quantities may be entered in. */
+export interface ItemUnits {
+  stockUnitId: string;
+  conversions: UnitConversion[];
+  enterableUnitIds: string[];
 }

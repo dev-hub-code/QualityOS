@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { FormError } from "@/components/forms/field";
 import { AttachmentPanel } from "@/components/records/attachment-panel";
+import { UnitConversions } from "@/components/records/item-units";
 import {
   Details,
   PageHeader,
@@ -76,6 +77,7 @@ export default function MaterialPage() {
           }
         />
       </Section>
+      <UnitConversions itemId={id} canManage={canManage} />
       <AttachmentPanel entityType="MATERIAL" entityId={id} canManage={canManage} />
       {dialog === "edit" && (
         <RecordDialog

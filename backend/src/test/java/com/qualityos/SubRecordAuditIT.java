@@ -61,7 +61,7 @@ class SubRecordAuditIT extends TraceabilityFixture {
                 .satisfies(row -> assertThat((String) row.get("after")).contains("1.5"));
         assertThat(entries("PRODUCT_MATERIAL_REMOVED")).hasSize(1);
         assertThat(entries("UNIT_ADDED")).singleElement()
-                .satisfies(row -> assertThat((String) row.get("after")).contains("BOX", "COUNT"));
+                .satisfies(row -> assertThat((String) row.get("after")).contains("BOX", "Count"));
     }
 
     private void put(String path, Map<String, Object> body) throws Exception {

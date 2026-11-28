@@ -4,9 +4,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { applyServerErrors } from "@/components/forms/apply-server-errors";
 import { Field, FormError } from "@/components/forms/field";
+import { ItemUnitField } from "@/components/records/item-units";
 import {
   PageHeader,
   QueryState,
@@ -59,8 +60,9 @@ function PurchaseOrderEditor({ order }: { order?: PurchaseOrder }) {
           expectedDate: order.expectedDate ?? "",
           items: order.items.map((item) => ({
             materialId: item.materialId,
-            quantity: formatQuantity(item.orderedQuantity),
+            quantity: formatQuantity(item.enteredQuantity ?? item.orderedQuantity),
             unitPrice: formatQuantity(item.unitPrice),
+            uomId: item.enteredUomId ?? "",
           })),
         }
       : {
@@ -68,10 +70,11 @@ function PurchaseOrderEditor({ order }: { order?: PurchaseOrder }) {
           facilityId: "",
           orderDate: today(),
           expectedDate: "",
-          items: [{ materialId: "", quantity: "", unitPrice: "" }],
+          items: [{ materialId: "", quantity: "", unitPrice: "", uomId: "" }],
         },
   });
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
+  const lines = useWatch({ control, name: "items" });
 
   async function onSubmit(values: PurchaseOrderValues) {
     setFormError("");
@@ -79,7 +82,7 @@ function PurchaseOrderEditor({ order }: { order?: PurchaseOrder }) {
       const payload = {
         ...values,
         expectedDate: values.expectedDate || null,
-        items: values.items.map((item) => ({ ...item, unitPrice: item.unitPrice || null })),
+        items: values.items.map((item) => ({ ...item, unitPrice: item.unitPrice || null, uomId: item.uomId || null })),
       };
       const saved = order
         ? await api.put<PurchaseOrder>(`/purchase-orders/${order.id}`, { ...payload, version: order.version })
@@ -138,7 +141,7 @@ function PurchaseOrderEditor({ order }: { order?: PurchaseOrder }) {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => append({ materialId: "", quantity: "", unitPrice: "" })}
+              onClick={() => append({ materialId: "", quantity: "", unitPrice: "", uomId: "" })}
             >
               Add item
             </Button>
@@ -146,7 +149,7 @@ function PurchaseOrderEditor({ order }: { order?: PurchaseOrder }) {
         >
           <div className="space-y-4">
             {fields.map((field, index) => (
-              <div key={field.id} className="grid items-end gap-3 sm:grid-cols-[1fr_10rem_10rem_auto]">
+              <div key={field.id} className="grid items-end gap-3 sm:grid-cols-[1fr_9rem_9rem_9rem_auto]">
                 <div className="space-y-1.5">
                   <Label htmlFor={`material-${index}`}>Material</Label>
                   <select id={`material-${index}`} className={SELECT_CLASS} {...register(`items.${index}.materialId`)}>
@@ -168,8 +171,13 @@ function PurchaseOrderEditor({ order }: { order?: PurchaseOrder }) {
                   error={errors.items?.[index]?.quantity}
                   {...register(`items.${index}.quantity`)}
                 />
+                <ItemUnitField
+                  itemId={lines?.[index]?.materialId || undefined}
+                  id={`unit-${index}`}
+                  registration={register(`items.${index}.uomId`)}
+                />
                 <Field
-                  label="Unit price"
+                  label="Price per unit"
                   id={`price-${index}`}
                   inputMode="decimal"
                   error={errors.items?.[index]?.unitPrice}

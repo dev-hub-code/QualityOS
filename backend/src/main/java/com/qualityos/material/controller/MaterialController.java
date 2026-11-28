@@ -117,6 +117,28 @@ public class MaterialController {
         return ApiResponse.ok(materials.addUnit(request));
     }
 
+    /** A material's or product's own unit conversions, and the units its quantities may be entered in. */
+    @GetMapping("/items/{id}/units")
+    @PreAuthorize(Require.PRODUCT_VIEW)
+    public ApiResponse<com.qualityos.material.dto.MaterialDtos.ItemUnits> itemUnits(@PathVariable UUID id) {
+        return ApiResponse.ok(materials.itemUnits(id));
+    }
+
+    @PostMapping("/items/{id}/unit-conversions")
+    @PreAuthorize(Require.PRODUCT_MANAGE)
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<com.qualityos.material.dto.MaterialDtos.ItemUnits> addConversion(@PathVariable UUID id,
+            @Valid @RequestBody com.qualityos.material.dto.MaterialDtos.AddConversionRequest request) {
+        return ApiResponse.ok(materials.addConversion(id, request));
+    }
+
+    @DeleteMapping("/items/{id}/unit-conversions/{conversionId}")
+    @PreAuthorize(Require.PRODUCT_MANAGE)
+    public ApiResponse<com.qualityos.material.dto.MaterialDtos.ItemUnits> removeConversion(@PathVariable UUID id,
+            @PathVariable UUID conversionId) {
+        return ApiResponse.ok(materials.removeConversion(id, conversionId));
+    }
+
     @GetMapping("/product-categories")
     @PreAuthorize(Require.PRODUCT_VIEW)
     public ApiResponse<List<CategoryResponse>> categories() {

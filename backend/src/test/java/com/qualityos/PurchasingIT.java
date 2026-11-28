@@ -113,7 +113,9 @@ class PurchasingIT extends MasterDataFixture {
 
         receive(owner, order, "10.5")
                 .andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.error.message").value("Line 1: only 10 remains to be received."));
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("this receipt comes to 10.5 "),
+                        org.hamcrest.Matchers.containsString(", but only 10 "))));
     }
 
     @Test

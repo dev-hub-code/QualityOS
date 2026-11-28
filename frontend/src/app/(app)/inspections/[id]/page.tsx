@@ -569,6 +569,7 @@ export default function InspectionPage() {
   const { message } = useAction();
   const [cancelling, setCancelling] = useState(false);
   const queryClient = useQueryClient();
+  const units = useUnits();
   const { data: inspection, error } = useQuery({
     queryKey: [path],
     queryFn: () => api.get<Inspection>(path),
@@ -630,7 +631,7 @@ export default function InspectionPage() {
             ],
             [inspection.productionBatchId ? "Batch" : "Lot", inspection.batchNumber],
             ["Supplier", inspection.supplierName],
-            ["Quantity", formatQuantity(inspection.quantity)],
+            ["Quantity", `${formatQuantity(inspection.quantity)} ${units.label(inspection.uomId)}`.trim()],
             ["Samples", inspection.sampleSize],
             [
               "Template",

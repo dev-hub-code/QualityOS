@@ -222,6 +222,8 @@ class InspectionIT extends MasterDataFixture {
         String inspection = idOf(body(as(owner, postJson("/api/v1/inspections",
                         Map.of("receiptItemId", item, "templateId", shaftTemplate(owner))))
                 .andExpect(jsonPath("$.data.sampleSize").value(2))
+                // Round 9: the lot's quantity comes with its unit.
+                .andExpect(jsonPath("$.data.uomId").value(org.hamcrest.Matchers.notNullValue()))
                 .andExpect(jsonPath("$.data.specification.versionNumber").value(1))));
         as(owner, get("/api/v1/material-receipts/awaiting-inspection"))
                 .andExpect(jsonPath("$.data.totalItems").value(0));

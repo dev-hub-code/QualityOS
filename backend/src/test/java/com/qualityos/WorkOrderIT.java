@@ -290,6 +290,27 @@ class WorkOrderIT extends TraceabilityFixture {
                 .andExpect(jsonPath("$.data.operations").isEmpty());
     }
 
+    /** Round 9: an order planned for yesterday, and its routing approved today, says how to release it. */
+    @Test
+    void aRevisionTakingEffectAfterThePlannedStartIsNamed() throws Exception {
+        String facility = facility(owner);
+        String product = product("PCS");
+        change(owner, "/settings", Map.of("manufacturingModel", "DISCRETE", "separateApprover", true,
+                "workOrderRequiresBom", false, "workOrderRequiresRouting", true)).andExpect(status().isOk());
+        Map<String, Object> yesterday = order(product, facility, "4");
+        yesterday.put("plannedStart", LocalDate.now().minusDays(1).toString());
+        String order = create(owner, yesterday);
+        send(owner, "/work-orders/" + order + "/submit", Map.of()).andExpect(status().isOk());
+        send(approver, "/work-orders/" + order + "/approve", Map.of()).andExpect(status().isOk());
+        approvedRouting(product, workCenter(facility));
+
+        send(approver, "/work-orders/" + order + "/release", Map.of())
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(containsString(
+                        "Revision 1 takes effect on " + com.qualityos.common.util.DayLabels.label(LocalDate.now())
+                                + ": reschedule the order to start on or after that day.")));
+    }
+
     @Test
     void cancellingAnApprovedOrderNeedsAnApprover() throws Exception {
         String facility = facility(owner);

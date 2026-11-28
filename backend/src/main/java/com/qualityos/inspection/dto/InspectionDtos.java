@@ -91,6 +91,8 @@ public final class InspectionDtos {
             String materialName,
             String batchNumber,
             @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
+            /* The unit of quantity: the lot's material's, or the batch's product's. */
+            UUID uomId,
             int sampleSize,
             /* Under double sampling: the first sample was inconclusive, and the sample size includes the second. */
             boolean secondSampleDrawn,

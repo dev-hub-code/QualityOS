@@ -96,6 +96,10 @@ class ItemUnitConversionIT extends TraceabilityFixture {
                 .andExpect(status().isUnprocessableContent())
                 .andExpect(jsonPath("$.error.message").value(containsString("already converts through LTR")));
         addConversion(material, drumUnit(), "180").andExpect(status().isConflict());
+        // Round 9: QualityOS's readings, such as °C, are never an amount of stock.
+        addConversion(material, unitId(owner, "°C"), "5")
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(containsString("°C is a reading")));
         addConversion(material, unitId(owner, "PCS"), "0")
                 .andExpect(status().isBadRequest());
     }
@@ -118,7 +122,9 @@ class ItemUnitConversionIT extends TraceabilityFixture {
         assertThat(decimal(litres, "$.data.items[0].quantity")).isEqualByComparingTo("158.76");
 
         // 800 - 558.76 = 241.24 KG is left: 2 more drums (400 KG) is too much.
-        receiveIn(order, "2", drumUnit()).andExpect(status().isUnprocessableContent());
+        receiveIn(order, "2", drumUnit()).andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.error.message").value(containsString(
+                        "this receipt comes to 400 KG, but only 241.24 KG remains to be received.")));
         String after = body(as(owner, get("/api/v1/purchase-orders/" + idOf(order))));
         assertThat(decimal(after, "$.data.items[0].receivedQuantity")).isEqualByComparingTo("558.76");
     }

@@ -519,6 +519,8 @@ export interface Inspection {
   materialName: string;
   batchNumber: string;
   quantity: string;
+  /** The unit of quantity: the lot's material's, or the batch's product's. */
+  uomId: string;
   sampleSize: number;
   /** Under double sampling: the first sample was inconclusive, and the sample size now counts both. */
   secondSampleDrawn: boolean;

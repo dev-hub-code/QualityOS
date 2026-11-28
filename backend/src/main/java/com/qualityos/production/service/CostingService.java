@@ -256,7 +256,8 @@ public class CostingService {
                 }
                 BigDecimal sign = movement.getMovementType() == MaterialMovement.Type.RETURNED ? BigDecimal.ONE.negate()
                         : BigDecimal.ONE;
-                BigDecimal inLine = convert(movement.getQuantity(), movement.getUomId(), line.getUomId());
+                BigDecimal inLine = convert(movement.getQuantity(), movement.getUomId(), line.getUomId(),
+                        line.getMaterialId() != null ? line.getMaterialId() : line.getComponentProductId());
                 issued = issued.add(inLine == null ? BigDecimal.ZERO : inLine.multiply(sign));
                 UnitPrice price = movement.getLotId() == null ? null : lotPrices.get(movement.getLotId());
                 BigDecimal value = price == null ? null : priced(movement.getQuantity(), movement.getUomId(), price);
@@ -339,16 +340,17 @@ public class CostingService {
 
     /** Quantity in {@code uom} at a price per the price's own unit; null when the units do not convert. */
     private BigDecimal priced(BigDecimal quantity, UUID uom, UnitPrice price) {
-        BigDecimal inPriceUnit = convert(quantity, uom, price.uomId());
+        BigDecimal inPriceUnit = convert(quantity, uom, price.uomId(), price.materialId());
         return inPriceUnit == null ? null : inPriceUnit.multiply(price.price());
     }
 
-    private BigDecimal convert(BigDecimal quantity, UUID from, UUID to) {
+    /** A quantity of {@code item} in another unit, or null when its units do not convert. */
+    private BigDecimal convert(BigDecimal quantity, UUID from, UUID to, UUID item) {
         if (from.equals(to) || quantity.signum() == 0) {
             return quantity;
         }
         try {
-            return materials.convert(quantity, from, to);
+            return materials.convert(quantity, from, to, item);
         } catch (BusinessRuleException e) {
             return null;
         }

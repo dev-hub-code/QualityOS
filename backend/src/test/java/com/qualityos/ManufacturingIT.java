@@ -197,7 +197,8 @@ class ManufacturingIT extends TraceabilityFixture {
 
         line("/boms", bom, "materialId", material, "3", "PCS")
                 .andExpect(status().isUnprocessableContent())
-                .andExpect(jsonPath("$.error.message").value("A quantity in PCS cannot be converted to KG."));
+                .andExpect(jsonPath("$.error.message").value(org.hamcrest.Matchers.containsString(
+                        "in PCS cannot be converted to KG.")));
         line("/boms", bom, "materialId", material, "250", "GM", Map.of("scrapPercent", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.lines[0].lineNumber").value(1))

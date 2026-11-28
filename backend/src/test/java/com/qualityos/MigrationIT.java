@@ -61,6 +61,10 @@ class MigrationIT extends AbstractIntegrationTest {
             "audits.next_audit_id",
             "batch_relationships.entered_uom_id",
             "bom_lines.uom_id",
+            // Units are looked up by id; no unit is ever removed. (Unit conversions, V80.)
+            "item_unit_conversions.uom_id",
+            "material_receipt_items.entered_uom_id",
+            "purchase_order_items.entered_uom_id",
             "capa_actions.owner_id",
             "corrective_actions.closed_by",
             "corrective_actions.owner_id",

@@ -32,7 +32,14 @@ public final class MaterialReceiptDtos {
             @NotBlank @Size(max = 100) String supplierBatch,
             @NotNull @Positive @Digits(integer = 12, fraction = 6) BigDecimal quantity,
             /* The lot's last day of use. Left out, it is the receipt date plus the material's shelf life, if any. */
-            LocalDate expiryDate) {
+            LocalDate expiryDate,
+            /* The unit the quantity is counted in, such as DRUM, when not the material's own. */
+            UUID uomId) {
+
+        public ReceiptItemRequest(UUID purchaseOrderItemId, String supplierBatch, BigDecimal quantity,
+                LocalDate expiryDate) {
+            this(purchaseOrderItemId, supplierBatch, quantity, expiryDate, null);
+        }
     }
 
     public record VoidReceiptRequest(@NotBlank @Size(max = 1000) String reason) {
@@ -76,7 +83,10 @@ public final class MaterialReceiptDtos {
             boolean inspectionRequired,
             String inspectionStatus,
             String disposition,
-            LocalDate expiryDate) {
+            LocalDate expiryDate,
+            /* As counted, such as 4 DRUM, when that was not the material's own unit; quantity is then 800 KG. */
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal enteredQuantity,
+            UUID enteredUomId) {
     }
 
     /** A received batch, as the inspection module sees it. */

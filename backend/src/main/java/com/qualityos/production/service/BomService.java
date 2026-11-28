@@ -395,7 +395,7 @@ public class BomService {
                 MaterialReference material = materialRefs.get(line.getMaterialId());
                 BigDecimal amount = round(needed);
                 BigDecimal own = inUnitsOf(line, material.code(),
-                        () -> materials.convert(amount, line.getUomId(), material.uomId()));
+                        () -> materials.convert(amount, line.getUomId(), material.uomId(), material.id()));
                 rows.add(new ExplosionRow(level, MATERIAL, material.id(), material.code(), material.name(), own,
                         material.uomId(), false));
                 add(totals, MATERIAL, material.id(), material.code(), material.name(), own, material.uomId());
@@ -404,7 +404,7 @@ public class BomService {
             ProductReference component = productRefs.get(line.getComponentProductId());
             BigDecimal amount = round(needed);
             BigDecimal own = inUnitsOf(line, component.code(),
-                    () -> materials.convert(amount, line.getUomId(), component.uomId()));
+                    () -> materials.convert(amount, line.getUomId(), component.uomId(), component.id()));
             Bom child = children.get(component.id());
             boolean expand = child != null && !path.contains(component.id());
             rows.add(new ExplosionRow(level, PRODUCT, component.id(), component.code(), component.name(), own,
@@ -447,7 +447,8 @@ public class BomService {
             componentUom = component.uomId();
         }
         // Refuses a unit of another kind, such as pieces for a material kept in kilograms.
-        materials.convert(request.quantity(), request.uomId(), componentUom);
+        materials.convert(request.quantity(), request.uomId(), componentUom,
+                request.materialId() != null ? request.materialId() : request.componentProductId());
         // A component listed twice would be needed twice over, with nothing on the screen to say so.
         UUID component = request.materialId() != null ? request.materialId() : request.componentProductId();
         lines.findByBomIdOrderByLineNumber(bom.getId()).stream()
@@ -531,7 +532,8 @@ public class BomService {
         for (BillOfMaterialResponse item : list) {
             BomLine line = new BomLine(target.getId(), ++number);
             UUID materialUom = materials.requireActive(item.materialId()).uomId();
-            inUnitsOf(line, item.materialCode(), () -> materials.convert(BigDecimal.ONE, item.uomId(), materialUom));
+            inUnitsOf(line, item.materialCode(), () -> materials.convert(BigDecimal.ONE, item.uomId(), materialUom,
+                    item.materialId()));
             line.setMaterialId(item.materialId());
             line.setQuantity(item.quantityPerUnit().multiply(target.getBaseQuantity()));
             line.setUomId(item.uomId());

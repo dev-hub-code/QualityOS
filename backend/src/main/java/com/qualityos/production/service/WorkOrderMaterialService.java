@@ -148,7 +148,7 @@ public class WorkOrderMaterialService {
                     line.getLineNumber(), plain(coverage.outstanding())));
         }
         LotView lot = lotFor(order, line, request.lotId());
-        BigDecimal inLot = convert(request.quantity(), line.getUomId(), lot.uomId());
+        BigDecimal inLot = convertEntered(request.quantity(), line.getUomId(), lot.uomId(), lot.materialId());
         receipts.reserve(lot.itemId(), inLot);
         recordSubstitution(order, line, lot, "reserved", inLot);
         MaterialReservation reservation = reservations.saveAndFlush(
@@ -192,7 +192,7 @@ public class WorkOrderMaterialService {
                 if (remaining.signum() <= 0) {
                     break;
                 }
-                BigDecimal got = receipts.reserveUpTo(lot.itemId(), convert(remaining, line.getUomId(), lot.uomId()));
+                BigDecimal got = receipts.reserveUpTo(lot.itemId(), convert(remaining, line.getUomId(), lot.uomId(), lot.materialId()));
                 if (got.signum() == 0) {
                     continue;
                 }
@@ -202,7 +202,7 @@ public class WorkOrderMaterialService {
                         lot.itemId(), null, got, lot.uomId(), reservation.getId(), null, null, pendingKey));
                 pendingKey = null;
                 made++;
-                remaining = remaining.subtract(convert(got, lot.uomId(), line.getUomId())).max(BigDecimal.ZERO);
+                remaining = remaining.subtract(convert(got, lot.uomId(), line.getUomId(), lot.materialId())).max(BigDecimal.ZERO);
             }
         }
         if (made > 0) {
@@ -271,7 +271,7 @@ public class WorkOrderMaterialService {
                 throw new BusinessRuleException("Line %d is a material. Issue it from a lot.".formatted(line.getLineNumber()));
             }
             LotView lot = lotFor(order, line, request.lotId());
-            BigDecimal inLot = convert(request.quantity(), line.getUomId(), lot.uomId());
+            BigDecimal inLot = convertEntered(request.quantity(), line.getUomId(), lot.uomId(), lot.materialId());
             recordSubstitution(order, line, lot, "issued", inLot);
             BigDecimal fromReserved = BigDecimal.ZERO;
             for (MaterialReservation reservation : reservations.findOpen(id)) {
@@ -305,7 +305,8 @@ public class WorkOrderMaterialService {
                 throw new BusinessRuleException("Batch %s is under open recall %s, so it cannot go into new production."
                         .formatted(source.batchNumber(), String.join(", ", recalls)));
             }
-            BigDecimal inBatch = convert(request.quantity(), line.getUomId(), source.uomId());
+            BigDecimal inBatch = convertEntered(request.quantity(), line.getUomId(), source.uomId(),
+                    line.getComponentProductId());
             UUID entry = production.consumeEntry(batch, new ConsumeRequest(null, source.id(), inBatch, null));
             issue.record(null, source.id(), inBatch, source.uomId(), entry);
         }
@@ -516,7 +517,8 @@ public class WorkOrderMaterialService {
             if (matching.isEmpty()) {
                 continue;
             }
-            BigDecimal left = convert(consumption.quantity(), sources.unitOf(consumption), matching.getFirst().getUomId());
+            BigDecimal left = convert(consumption.quantity(), sources.unitOf(consumption), matching.getFirst().getUomId(),
+                    componentOf(matching.getFirst()));
             for (int i = 0; i < matching.size() && left.signum() > 0; i++) {
                 WorkOrderMaterial line = matching.get(i);
                 BigDecimal sofar = issued.getOrDefault(line.getId(), BigDecimal.ZERO);
@@ -536,7 +538,8 @@ public class WorkOrderMaterialService {
                 .collect(Collectors.toMap(WorkOrderMaterial::getId, Function.identity()));
         for (MaterialReservation reservation : open) {
             WorkOrderMaterial line = byId.get(reservation.getWorkOrderMaterialId());
-            reserved.merge(line.getId(), convert(reservation.getOpenQuantity(), reservation.getUomId(), line.getUomId()),
+            reserved.merge(line.getId(), convert(reservation.getOpenQuantity(), reservation.getUomId(), line.getUomId(),
+                    componentOf(line)),
                     BigDecimal::add);
         }
         Map<UUID, Coverage> coverage = new LinkedHashMap<>();
@@ -592,11 +595,11 @@ public class WorkOrderMaterialService {
             // Lines naming the same component share what is free.
             BigDecimal available = availableLeft.computeIfAbsent(key(line), k -> options.stream()
                     .filter(option -> option.substituteCode() == null)
-                    .map(option -> convert(option.freeQuantity(), option.uomId(), line.getUomId()))
+                    .map(option -> convert(option.freeQuantity(), option.uomId(), line.getUomId(), componentOf(line)))
                     .reduce(BigDecimal.ZERO, BigDecimal::add));
             BigDecimal substituteAvailable = options.stream()
                     .filter(option -> option.substituteCode() != null)
-                    .map(option -> convert(option.freeQuantity(), option.uomId(), line.getUomId()))
+                    .map(option -> convert(option.freeQuantity(), option.uomId(), line.getUomId(), componentOf(line)))
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             Coverage c = coverage.get(line.getId());
             BigDecimal shortage = c.outstanding().subtract(available).max(BigDecimal.ZERO);
@@ -717,8 +720,18 @@ public class WorkOrderMaterialService {
         return materials.listUnits().stream().collect(Collectors.toMap(UnitResponse::id, UnitResponse::code));
     }
 
-    private BigDecimal convert(BigDecimal quantity, UUID from, UUID to) {
-        return scaled(from.equals(to) ? quantity : materials.convert(quantity, from, to));
+    private static UUID componentOf(WorkOrderMaterial line) {
+        return line.getMaterialId() != null ? line.getMaterialId() : line.getComponentProductId();
+    }
+
+    /** A quantity of {@code item}, a material or product, in another unit. */
+    private BigDecimal convert(BigDecimal quantity, UUID from, UUID to, UUID item) {
+        return scaled(from.equals(to) ? quantity : materials.convert(quantity, from, to, item));
+    }
+
+    /** A quantity typed on a line, in the lot's or batch's unit, which must convert exactly. */
+    private BigDecimal convertEntered(BigDecimal quantity, UUID from, UUID to, UUID item) {
+        return scaled(from.equals(to) ? quantity : materials.convertEntered(quantity, from, to, item));
     }
 
     private static BigDecimal scaled(BigDecimal value) {

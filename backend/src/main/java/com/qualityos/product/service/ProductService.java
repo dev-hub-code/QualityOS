@@ -56,6 +56,7 @@ public class ProductService implements AttachmentPolicy {
     private final AuditService audit;
     private final List<ArchiveGuard> archiveGuards;
     private final com.qualityos.organization.service.OrganizationClock clock;
+    private final com.qualityos.material.service.UnitChangeGuard unitGuard;
 
     ProductService(
             ProductRepository products,
@@ -66,8 +67,10 @@ public class ProductService implements AttachmentPolicy {
             ProductMapper mapper,
             AuditService audit,
             List<ArchiveGuard> archiveGuards,
-            com.qualityos.organization.service.OrganizationClock clock) {
+            com.qualityos.organization.service.OrganizationClock clock,
+            com.qualityos.material.service.UnitChangeGuard unitGuard) {
         this.clock = clock;
+        this.unitGuard = unitGuard;
         this.products = products;
         this.revisions = revisions;
         this.specifications = specifications;
@@ -119,6 +122,9 @@ public class ProductService implements AttachmentPolicy {
         Product product = load(id);
         var before = audit.state(mapper.toResponse(product));
         product.requireVersion(request.version());
+        unitGuard.requireProductUnitFree(product.getCode(),
+                product.getUomId() == null ? null : materials.unitCode(product.getUomId()), id,
+                product.getUomId(), request.uomId());
         apply(product, request);
         products.saveAndFlush(product);
         audit.recordChange("PRODUCT_UPDATED", "Product", id, before, audit.state(mapper.toResponse(product)));
@@ -200,11 +206,11 @@ public class ProductService implements AttachmentPolicy {
     /** A material kept in kilograms is listed in a unit of weight, not of volume or count. */
     private void requireSameKind(MaterialReference material, UUID uomId) {
         try {
-            materials.convert(java.math.BigDecimal.ONE, uomId, material.uomId());
+            materials.convert(java.math.BigDecimal.ONE, uomId, material.uomId(), material.id());
         } catch (com.qualityos.common.exception.BusinessRuleException e) {
             throw new com.qualityos.common.exception.BusinessRuleException(
-                    "%s is kept in %s. Give its quantity in a unit of the same kind. (%s)"
-                            .formatted(material.code(), materials.unitCode(material.uomId()), e.getMessage()));
+                    "%s is kept in %s. %s".formatted(material.code(), materials.unitCode(material.uomId()),
+                            e.getMessage()));
         }
     }
 

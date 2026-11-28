@@ -5,13 +5,23 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { AttachmentPanel } from "@/components/records/attachment-panel";
-import { Details, PageHeader, QueryState, RecordLink, Section, StatusBadge, useRefresh } from "@/components/records/parts";
+import { enteredLabel } from "@/components/records/item-units";
+import {
+  Details,
+  PageHeader,
+  QueryState,
+  RecordLink,
+  Section,
+  StatusBadge,
+  useRefresh,
+  useUnits,
+} from "@/components/records/parts";
 import { RecordDialog } from "@/components/records/record-dialog";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePermission } from "@/hooks/use-me";
 import { api } from "@/lib/api";
-import { formatQuantity, type FieldDef } from "@/lib/record-form";
+import type { FieldDef } from "@/lib/record-form";
 import type { Receipt } from "@/lib/types";
 
 const VOID_FIELDS: FieldDef[] = [{ name: "reason", label: "Reason", required: true }];
@@ -23,6 +33,7 @@ export default function MaterialReceiptPage() {
   const refresh = useRefresh();
   const [voiding, setVoiding] = useState(false);
   const { data: receipt, error } = useQuery({ queryKey: [path], queryFn: () => api.get<Receipt>(path) });
+  const units = useUnits();
   if (!receipt) return <QueryState error={error} />;
 
   return (
@@ -67,7 +78,12 @@ export default function MaterialReceiptPage() {
                   </TableCell>
                   <TableCell>{item.supplierBatch}</TableCell>
                   <TableCell>{item.internalBatch}</TableCell>
-                  <TableCell>{formatQuantity(item.quantity)}</TableCell>
+                  <TableCell>
+                    {enteredLabel(item.quantity, units.label(item.uomId), {
+                      quantity: item.enteredQuantity,
+                      unitCode: item.enteredUomId ? units.label(item.enteredUomId) : null,
+                    })}
+                  </TableCell>
                   <TableCell>{item.expiryDate ? formatCalendarDay(item.expiryDate) : "—"}</TableCell>
                   <TableCell>
                     <StatusBadge status={item.inspectionStatus} />

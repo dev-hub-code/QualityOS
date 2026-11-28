@@ -190,13 +190,16 @@ public class ProductionService {
         batch.requireInProgress();
         BigDecimal quantity;
         if (request.receiptItemId() != null) {
-            quantity = receipts.consume(request.receiptItemId(), unit -> inUnit(request, unit));
+            // A lot this organisation cannot see has no material here; consuming it is then refused as not found.
+            UUID material = receipts.lots(List.of(request.receiptItemId())).stream().findFirst()
+                    .map(lot -> lot.materialId()).orElse(null);
+            quantity = receipts.consume(request.receiptItemId(), unit -> inUnit(request, unit, material));
         } else {
             if (request.parentBatchId().equals(id)) {
                 throw new BusinessRuleException("A batch cannot consume itself.");
             }
             ProductionBatch parent = lock(request.parentBatchId());
-            quantity = inUnit(request, unitOf(parent));
+            quantity = inUnit(request, unitOf(parent), parent.getProductId());
             parent.use(quantity);
         }
         BatchRelationship edge = relationships.save(new BatchRelationship(request.receiptItemId(),
@@ -287,9 +290,9 @@ public class ProductionService {
         return found.stream().map(batch -> toView(batch, referenced.get(batch.getProductId()))).toList();
     }
 
-    private BigDecimal inUnit(ConsumeRequest request, UUID sourceUnit) {
+    private BigDecimal inUnit(ConsumeRequest request, UUID sourceUnit, UUID item) {
         BigDecimal quantity = request.uomId() == null ? request.quantity()
-                : materials.convert(request.quantity(), request.uomId(), sourceUnit);
+                : materials.convertEntered(request.quantity(), request.uomId(), sourceUnit, item);
         materials.requireWholeInUnit("This lot or batch", sourceUnit, quantity);
         return quantity;
     }

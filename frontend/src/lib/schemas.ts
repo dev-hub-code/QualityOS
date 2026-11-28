@@ -97,6 +97,8 @@ export const purchaseOrderSchema = z.object({
         materialId: z.string().min(1, "Choose a material"),
         quantity: positiveDecimal,
         unitPrice: decimal.or(z.literal("")),
+        /** Empty for the material's own unit. */
+        uomId: z.string(),
       }),
     )
     .min(1),
@@ -113,6 +115,8 @@ export const receiptSchema = z.object({
         supplierBatch: z.string().trim().min(1, "Enter the supplier's batch"),
         quantity: positiveDecimal,
         expiryDate: z.string(),
+        /** Empty for the material's own unit. */
+        uomId: z.string(),
       }),
     )
     .min(1),

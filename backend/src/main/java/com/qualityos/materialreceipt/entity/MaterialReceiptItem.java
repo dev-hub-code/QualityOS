@@ -57,6 +57,10 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
     /** The lot this one was sent from, for a lot received from another plant. */
     private UUID transferredFromId;
 
+    /** As counted, such as 4 DRUM, when that is not the material's own unit; quantity is in the material's. */
+    private BigDecimal enteredQuantity;
+    private UUID enteredUomId;
+
     public MaterialReceiptItem(
             MaterialReceipt receipt,
             UUID purchaseOrderItemId,
@@ -75,6 +79,12 @@ public class MaterialReceiptItem extends TenantOwnedEntity {
         this.quantity = quantity;
         this.inspectionRequired = inspectionRequired;
         this.inspectionStatus = inspectionRequired ? InspectionStatus.PENDING : InspectionStatus.NOT_REQUIRED;
+    }
+
+    /** Keeps what was counted when it was in another unit than the material's own. */
+    public void countedAs(BigDecimal quantity, UUID uomId) {
+        this.enteredQuantity = quantity;
+        this.enteredUomId = uomId;
     }
 
     /**

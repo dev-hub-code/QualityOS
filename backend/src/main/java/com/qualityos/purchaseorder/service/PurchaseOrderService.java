@@ -175,7 +175,7 @@ public class PurchaseOrderService {
             return Map.of();
         }
         return orders.items(itemIds).stream().collect(Collectors.toMap(PurchaseOrderItem::getId,
-                item -> new UnitPrice(item.getMaterialId(), item.getUomId(), item.getUnitPrice())));
+                item -> new UnitPrice(item.getMaterialId(), item.priceUomId(), item.getUnitPrice())));
     }
 
     /**
@@ -190,9 +190,9 @@ public class PurchaseOrderService {
         Map<UUID, Map<UUID, BigDecimal[]>> sums = new HashMap<>();
         for (PurchaseOrderItem item : orders.pricedItems(materialIds)) {
             BigDecimal[] sum = sums.computeIfAbsent(item.getMaterialId(), ignored -> new HashMap<>())
-                    .computeIfAbsent(item.getUomId(), ignored -> new BigDecimal[] {BigDecimal.ZERO, BigDecimal.ZERO});
-            sum[0] = sum[0].add(item.getOrderedQuantity().multiply(item.getUnitPrice()));
-            sum[1] = sum[1].add(item.getOrderedQuantity());
+                    .computeIfAbsent(item.priceUomId(), ignored -> new BigDecimal[] {BigDecimal.ZERO, BigDecimal.ZERO});
+            sum[0] = sum[0].add(item.priceQuantity().multiply(item.getUnitPrice()));
+            sum[1] = sum[1].add(item.priceQuantity());
         }
         Map<UUID, List<UnitPrice>> prices = new HashMap<>();
         sums.forEach((material, byUnit) -> byUnit.forEach((unit, sum) -> {
@@ -208,6 +208,13 @@ public class PurchaseOrderService {
     public Map<UUID, String> numbers(Collection<UUID> ids) {
         return orders.findAllById(ids).stream()
                 .collect(Collectors.toMap(PurchaseOrder::getId, PurchaseOrder::getPoNumber));
+    }
+
+    /** The material and unit of each of these lines of an order, before anything is received against them. */
+    @Transactional(readOnly = true)
+    public Map<UUID, ReceiptLine> lines(UUID orderId, Collection<UUID> itemIds) {
+        return orders.lineUnits(orderId, itemIds).stream()
+                .collect(Collectors.toMap(ReceiptLine::itemId, Function.identity()));
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -268,8 +275,16 @@ public class PurchaseOrderService {
                 throw new BusinessRuleException("Each material can appear once. Combine the quantities.");
             }
             MaterialReference material = materials.requireActive(item.materialId());
-            materials.requireWholeIfCounted(material, item.quantity());
-            order.addItem(material.id(), material.uomId(), item.quantity(), item.unitPrice());
+            PurchaseOrderItem.Entered entered = null;
+            BigDecimal quantity = item.quantity();
+            if (item.uomId() != null && !item.uomId().equals(material.uomId())) {
+                // 4 DRUM is ordered, and 800 KG is what the order expects to receive.
+                materials.requireWholeInUnit(material.code(), item.uomId(), item.quantity());
+                quantity = materials.convertEntered(item.quantity(), item.uomId(), material.uomId(), material.id());
+                entered = new PurchaseOrderItem.Entered(item.quantity(), item.uomId());
+            }
+            materials.requireWholeIfCounted(material, quantity);
+            order.addItem(material.id(), material.uomId(), quantity, item.unitPrice(), entered);
         }
     }
 
@@ -297,7 +312,9 @@ public class PurchaseOrderService {
                             item.getUomId(),
                             item.getOrderedQuantity(),
                             item.getReceivedQuantity(),
-                            item.getUnitPrice());
+                            item.getUnitPrice(),
+                            item.getEnteredQuantity(),
+                            item.getEnteredUomId());
                 }).toList(),
                 order.getVersion() == null ? 0 : order.getVersion());
     }

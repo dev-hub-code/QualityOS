@@ -497,7 +497,8 @@ public class WorkOrderService {
                     ? materials.references(List.of(line.getMaterialId())).get(line.getMaterialId()).uomId()
                     : products.references(List.of(line.getComponentProductId()))
                             .get(line.getComponentProductId()).uomId();
-            BigDecimal own = materials.convert(needed.setScale(6, RoundingMode.HALF_UP), line.getUomId(), componentUom)
+            BigDecimal own = materials.convert(needed.setScale(6, RoundingMode.HALF_UP), line.getUomId(), componentUom,
+                            line.getMaterialId() != null ? line.getMaterialId() : line.getComponentProductId())
                     .setScale(6, RoundingMode.HALF_UP);
             requirements.save(new WorkOrderMaterial(order.getId(), ++number, line.getMaterialId(),
                     line.getComponentProductId(), own, componentUom).withAlternates(line.getAlternateMaterialIds())

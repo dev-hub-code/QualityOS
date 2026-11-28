@@ -176,7 +176,7 @@ public class MaterialCorrectionService {
             String batch = request.supplierBatch().trim();
             changes.add(new Change(Field.SUPPLIER_BATCH, lot.supplierBatch(), batch, lot.supplierBatch(), batch));
         }
-        BigDecimal quantity = request.quantity() == null ? null : inUnit(request, lot.uomId());
+        BigDecimal quantity = request.quantity() == null ? null : inUnit(request, lot.uomId(), lot.materialId());
         if (quantity != null && quantity.compareTo(lot.quantity()) != 0) {
             Map<UUID, String> codes = unitCodes();
             changes.add(new Change(Field.QUANTITY, lot.quantity().toPlainString(), quantity.toPlainString(),
@@ -206,7 +206,7 @@ public class MaterialCorrectionService {
         }
         boolean otherUnit = !Objects.equals(unit, sourceUnit);
         // Moved to a lot kept in another unit, the same amount is taken from it, in that lot's unit.
-        BigDecimal quantity = request.quantity() != null ? inUnit(request, unit)
+        BigDecimal quantity = request.quantity() != null ? inUnit(request, unit, null)
                 : otherUnit ? convert(entry.quantity(), sourceUnit, unit) : null;
         if (quantity != null && (otherUnit || quantity.compareTo(entry.quantity()) != 0)) {
             Map<UUID, String> codes = unitCodes();
@@ -219,8 +219,14 @@ public class MaterialCorrectionService {
     }
 
     /** A quantity typed in another unit, converted to the unit it is recorded in. */
-    private BigDecimal inUnit(CreateCorrectionRequest request, UUID unit) {
-        return request.uomId() == null ? request.quantity() : convert(request.quantity(), request.uomId(), unit);
+    private BigDecimal inUnit(CreateCorrectionRequest request, UUID unit, UUID item) {
+        if (request.uomId() == null) {
+            return request.quantity();
+        }
+        if (unit == null) {
+            throw new BusinessRuleException("This record has no unit, so enter the quantity without one.");
+        }
+        return materials.convertEntered(request.quantity(), request.uomId(), unit, item);
     }
 
     private BigDecimal convert(BigDecimal quantity, UUID from, UUID to) {

@@ -28,6 +28,12 @@ public class PurchaseOrderItem extends TenantOwnedEntity {
     private BigDecimal orderedQuantity;
     private BigDecimal receivedQuantity = BigDecimal.ZERO;
     private BigDecimal unitPrice;
+    private BigDecimal enteredQuantity;
+    private UUID enteredUomId;
+
+    /** A line ordered in another unit than the material's own, as typed. */
+    public record Entered(BigDecimal quantity, UUID uomId) {
+    }
 
     PurchaseOrderItem(
             PurchaseOrder purchaseOrder,
@@ -35,13 +41,28 @@ public class PurchaseOrderItem extends TenantOwnedEntity {
             UUID materialId,
             UUID uomId,
             BigDecimal orderedQuantity,
-            BigDecimal unitPrice) {
+            BigDecimal unitPrice,
+            Entered entered) {
         this.purchaseOrder = purchaseOrder;
         this.lineNumber = lineNumber;
         this.materialId = materialId;
         this.uomId = uomId;
         this.orderedQuantity = orderedQuantity;
         this.unitPrice = unitPrice;
+        if (entered != null) {
+            this.enteredQuantity = entered.quantity();
+            this.enteredUomId = entered.uomId();
+        }
+    }
+
+    /** The unit the line was ordered in, which its price is per. */
+    public UUID priceUomId() {
+        return enteredUomId != null ? enteredUomId : uomId;
+    }
+
+    /** What was ordered, in the unit it was ordered in. */
+    public BigDecimal priceQuantity() {
+        return enteredQuantity != null ? enteredQuantity : orderedQuantity;
     }
 
     public BigDecimal remainingQuantity() {

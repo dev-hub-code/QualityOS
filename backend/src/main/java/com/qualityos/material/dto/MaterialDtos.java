@@ -69,11 +69,22 @@ public final class MaterialDtos {
             String notes) {
     }
 
+    /**
+     * A unit of the organisation's own. The plainest way to say how it converts is {@code equalsQuantity} of another
+     * unit ("1 MG equals 0.001 GM"): its kind is then that unit's. Otherwise give the kind and how many of its base
+     * unit one holds, or no factor for a reading that never converts, such as viscosity.
+     */
     public record SaveUnitRequest(
             @NotBlank @Size(max = 10) String code,
             @NotBlank @Size(max = 100) String name,
-            @NotBlank @Size(max = 50) String dimension,
-            @Positive @Digits(integer = 12, fraction = 12) BigDecimal toBase) {
+            @Size(max = 50) String dimension,
+            @Positive @Digits(integer = 12, fraction = 12) BigDecimal toBase,
+            @Positive @Digits(integer = 12, fraction = 12) BigDecimal equalsQuantity,
+            UUID equalsUnitId) {
+
+        public SaveUnitRequest(String code, String name, String dimension, BigDecimal toBase) {
+            this(code, name, dimension, toBase, null, null);
+        }
     }
 
     public record UnitResponse(
@@ -94,5 +105,22 @@ public final class MaterialDtos {
     /** What other modules may know about a material. */
     public record MaterialReference(UUID id, String code, String name, UUID uomId, boolean inspectionRequired,
             Integer shelfLifeDays) {
+    }
+
+    /** "1 {uomId} = {factor} of the item's own unit", for one material or product. */
+    public record AddConversionRequest(
+            @NotNull UUID uomId,
+            @NotNull @Positive @Digits(integer = 12, fraction = 12) BigDecimal factor) {
+    }
+
+    public record ConversionResponse(UUID id, UUID uomId, String unitCode,
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal factor) {
+    }
+
+    /**
+     * An item's own unit, its conversions, and every unit a quantity of it may be entered in: its own, units of the
+     * same kind, and those its conversions reach.
+     */
+    public record ItemUnits(UUID stockUnitId, List<ConversionResponse> conversions, List<UUID> enterableUnitIds) {
     }
 }

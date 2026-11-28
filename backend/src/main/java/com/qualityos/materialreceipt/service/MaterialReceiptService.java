@@ -134,8 +134,20 @@ public class MaterialReceiptService implements AttachmentPolicy {
         if (request.receivedOn().isAfter(today())) {
             throw new BusinessRuleException("The received date cannot be in the future.");
         }
+        // A line counted in another unit, such as 4 DRUM, is received as the material's own: 800 KG.
+        Map<UUID, ReceiptLine> ordered = purchaseOrders.lines(request.purchaseOrderId(),
+                request.items().stream().map(ReceiptItemRequest::purchaseOrderItemId).toList());
+        Map<ReceiptItemRequest, BigDecimal> inOwnUnit = new java.util.IdentityHashMap<>();
+        for (ReceiptItemRequest item : request.items()) {
+            ReceiptLine line = ordered.get(item.purchaseOrderItemId());
+            if (line == null) {
+                throw new BusinessRuleException("A received item does not belong to this purchase order.");
+            }
+            inOwnUnit.put(item, item.uomId() == null || item.uomId().equals(line.uomId()) ? item.quantity()
+                    : materials.convertEntered(item.quantity(), item.uomId(), line.uomId(), line.materialId()));
+        }
         Map<UUID, BigDecimal> totals = request.items().stream().collect(Collectors.toMap(
-                ReceiptItemRequest::purchaseOrderItemId, ReceiptItemRequest::quantity, BigDecimal::add));
+                ReceiptItemRequest::purchaseOrderItemId, inOwnUnit::get, BigDecimal::add));
         ReceiptTarget target = purchaseOrders.recordReceipt(request.purchaseOrderId(), totals);
         Map<UUID, ReceiptLine> lines =
                 target.lines().stream().collect(Collectors.toMap(ReceiptLine::itemId, Function.identity()));
@@ -148,7 +160,8 @@ public class MaterialReceiptService implements AttachmentPolicy {
         for (ReceiptItemRequest item : request.items()) {
             ReceiptLine line = lines.get(item.purchaseOrderItemId());
             MaterialReference material = referenced.get(line.materialId());
-            materials.requireWholeIfCounted(material, item.quantity());
+            BigDecimal quantity = inOwnUnit.get(item);
+            materials.requireWholeIfCounted(material, quantity);
             MaterialReceiptItem lot = new MaterialReceiptItem(
                     receipt,
                     line.itemId(),
@@ -156,8 +169,11 @@ public class MaterialReceiptService implements AttachmentPolicy {
                     line.uomId(),
                     item.supplierBatch().trim(),
                     numbers.next("LOT"),
-                    item.quantity(),
+                    quantity,
                     material.inspectionRequired());
+            if (quantity != item.quantity()) {
+                lot.countedAs(item.quantity(), item.uomId());
+            }
             lot.expiresOn(expiryOf(item, material, request.receivedOn()));
             receipt.getItems().add(lot);
         }
@@ -648,7 +664,9 @@ public class MaterialReceiptService implements AttachmentPolicy {
                             item.isInspectionRequired(),
                             item.getInspectionStatus().name(),
                             item.getDisposition(),
-                            item.getExpiryDate());
+                            item.getExpiryDate(),
+                            item.getEnteredQuantity(),
+                            item.getEnteredUomId());
                 }).toList());
     }
 }

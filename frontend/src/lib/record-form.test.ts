@@ -57,4 +57,11 @@ describe("decimal field messages", () => {
     expect(schema.safeParse({ quantity: "2.5" }).success).toBe(true);
     expect(schema.safeParse({ quantity: "" }).success).toBe(true);
   });
+
+  it("edits a number from the server as text, so a material with a shelf life can be saved", () => {
+    const shelfLife: FieldDef[] = [{ name: "shelfLifeDays", label: "Shelf life in days", type: "decimal" }];
+    const values = toFormValues(shelfLife, { shelfLifeDays: 730 });
+    expect(values).toEqual({ shelfLifeDays: "730" });
+    expect(recordSchema(shelfLife).safeParse(values).success).toBe(true);
+  });
 });

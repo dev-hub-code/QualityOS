@@ -55,8 +55,10 @@ public class PurchaseOrder extends TenantOwnedEntity {
         this.poNumber = poNumber;
     }
 
-    public void addItem(UUID materialId, UUID uomId, BigDecimal quantity, BigDecimal unitPrice) {
-        items.add(new PurchaseOrderItem(this, items.size() + 1, materialId, uomId, quantity, unitPrice));
+    /** A line of {@code quantity} in the material's own unit, ordered as {@code entered} when that differs. */
+    public void addItem(UUID materialId, UUID uomId, BigDecimal quantity, BigDecimal unitPrice,
+            PurchaseOrderItem.Entered entered) {
+        items.add(new PurchaseOrderItem(this, items.size() + 1, materialId, uomId, quantity, unitPrice, entered));
     }
 
     public void requireDraft() {

@@ -172,10 +172,11 @@ public class InspectionService implements AttachmentPolicy {
             if (inspection.getMaterialId() != null) {
                 MaterialReference material = referenced.get(inspection.getMaterialId());
                 subject = new Subject(
-                        supplierNames.get(inspection.getSupplierId()).name(), material.code(), material.name());
+                        supplierNames.get(inspection.getSupplierId()).name(), material.code(), material.name(),
+                        material.uomId());
             } else {
                 ProductionBatchView batch = made.get(inspection.getProductionBatchId());
-                subject = new Subject(null, batch.productCode(), batch.productName());
+                subject = new Subject(null, batch.productCode(), batch.productName(), batch.uomId());
             }
             return new InspectionSummary(
                     inspection.getId(),
@@ -822,17 +823,17 @@ public class InspectionService implements AttachmentPolicy {
         }
     }
 
-    private record Subject(String supplierName, String code, String name) {
+    private record Subject(String supplierName, String code, String name, UUID uomId) {
     }
 
     /** What was inspected, in the same words whether it arrived from a supplier or was made here. */
     private Subject subjectOf(Inspection inspection) {
         if (inspection.getReceiptItemId() != null) {
             ReceivedBatch batch = receipts.batch(inspection.getReceiptItemId());
-            return new Subject(batch.supplierName(), batch.materialCode(), batch.materialName());
+            return new Subject(batch.supplierName(), batch.materialCode(), batch.materialName(), batch.uomId());
         }
         ProductionBatchView batch = production.batch(inspection.getProductionBatchId());
-        return new Subject(null, batch.productCode(), batch.productName());
+        return new Subject(null, batch.productCode(), batch.productName(), batch.uomId());
     }
 
     private InspectionDetail toDetail(Inspection inspection) {
@@ -848,6 +849,7 @@ public class InspectionService implements AttachmentPolicy {
                 subject.name(),
                 inspection.getBatchNumber(),
                 inspection.getQuantity(),
+                subject.uomId(),
                 inspection.getSampleSize(),
                 inspection.isSecondSampleDrawn(),
                 inspection.getStatus().name(),

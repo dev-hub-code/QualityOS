@@ -624,7 +624,8 @@ public class MaterialReceiptService implements AttachmentPolicy {
                 material.name(),
                 item.getSupplierBatch(),
                 item.getInternalBatch(),
-                item.getQuantity());
+                item.getQuantity(),
+                item.getUomId());
     }
 
     private MaterialReceipt load(UUID id) {

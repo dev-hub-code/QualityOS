@@ -228,6 +228,14 @@ public class PurchaseOrderService {
             if (item == null) {
                 throw new BusinessRuleException("A received item does not belong to this purchase order.");
             }
+            if (quantity.compareTo(item.remainingQuantity()) > 0) {
+                // In the material's own unit, since the batches may have been counted in drums, litres and KG at once.
+                String unit = materials.unitCode(item.getUomId());
+                String code = materials.references(List.of(item.getMaterialId())).get(item.getMaterialId()).code();
+                throw new BusinessRuleException(("Line %d, %s: this receipt comes to %s %s, but only %s %s remains to "
+                        + "be received.").formatted(item.getLineNumber(), code, plain(quantity), unit,
+                        plain(item.remainingQuantity()), unit));
+            }
             order.receive(item, quantity);
         });
         return new ReceiptTarget(
@@ -317,5 +325,9 @@ public class PurchaseOrderService {
                             item.getEnteredUomId());
                 }).toList(),
                 order.getVersion() == null ? 0 : order.getVersion());
+    }
+
+    private static String plain(BigDecimal quantity) {
+        return quantity.stripTrailingZeros().toPlainString();
     }
 }

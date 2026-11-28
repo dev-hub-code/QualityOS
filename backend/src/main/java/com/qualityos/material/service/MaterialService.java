@@ -364,6 +364,11 @@ public class MaterialService implements AttachmentPolicy {
             throw new BusinessRuleException("%s already converts to %s for every item.".formatted(unit.getCode(),
                     stock.getCode()));
         }
+        if (unit.getTenantId() == null && unit.getToBase() == null) {
+            // QualityOS's own units without a factor, such as °C, % and HRC, are readings, never an amount of stock.
+            throw new BusinessRuleException("%s is a reading, such as a temperature or a percentage, not an amount %s "
+                    .formatted(unit.getCode(), item.code()) + "can be counted in.");
+        }
         for (ItemUnitConversion rule : converter.rulesOf(itemId)) {
             UnitOfMeasure ruled = visible.get(rule.getUomId());
             if (ruled.getId().equals(unit.getId())) {

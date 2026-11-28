@@ -446,6 +446,19 @@ public class WorkOrderService {
     private record Resolution(Bom definition, Routing routing, List<String> problems) {
     }
 
+    /**
+     * " Revision 1 takes effect on 28 Nov 2026: reschedule …" when an approved revision starts after the planned start,
+     * such as an order planned for yesterday and a recipe approved today; otherwise "".
+     */
+    private static String laterRevision(List<? extends RevisionedDefinition> approved, LocalDate on) {
+        return approved.stream()
+                .filter(revision -> revision.getEffectiveFrom() != null && revision.getEffectiveFrom().isAfter(on))
+                .min(java.util.Comparator.comparing(RevisionedDefinition::getEffectiveFrom))
+                .map(revision -> " Revision %d takes effect on %s: reschedule the order to start on or after that day."
+                        .formatted(revision.getRevision(), DayLabels.label(revision.getEffectiveFrom())))
+                .orElse("");
+    }
+
     /** The revisions in effect on the planned start, and what would stop a release with them. */
     private Resolution resolve(WorkOrder order) {
         List<String> problems = new ArrayList<>();
@@ -457,13 +470,17 @@ public class WorkOrderService {
         if (definition == null && settings.workOrderRequiresBom()) {
             problems.add(kind.isEmpty()
                     ? "Choose whether %s is made by discrete or process manufacturing.".formatted(product.code())
-                    : "%s has no approved %s in effect on %s.".formatted(product.code(),
-                            kind.get() == Bom.Kind.BOM ? "BOM" : "recipe", DayLabels.label(on)));
+                    : "%s has no approved %s in effect on %s.%s".formatted(product.code(),
+                            kind.get() == Bom.Kind.BOM ? "BOM" : "recipe", DayLabels.label(on),
+                            laterRevision(boms.findByProductIdAndKindAndStatus(order.getProductId(), kind.get(),
+                                    RevisionedDefinition.Status.APPROVED), on)));
         }
         Routing routing = routings.findApprovedOn(order.getProductId(), on, RevisionedDefinition.Status.APPROVED)
                 .stream().findFirst().orElse(null);
         if (routing == null && settings.workOrderRequiresRouting()) {
-            problems.add("%s has no approved routing in effect on %s.".formatted(product.code(), DayLabels.label(on)));
+            problems.add("%s has no approved routing in effect on %s.%s".formatted(product.code(), DayLabels.label(on),
+                    laterRevision(routings.findByProductIdAndStatus(order.getProductId(),
+                            RevisionedDefinition.Status.APPROVED), on)));
         }
         qualityGates.finalInspectionProblem(order.getProductId(), product.code(),
                 settings.rules().completionRequiresFinalInspection()).ifPresent(problems::add);

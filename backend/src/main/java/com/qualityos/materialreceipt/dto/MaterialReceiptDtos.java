@@ -103,7 +103,9 @@ public final class MaterialReceiptDtos {
             String materialName,
             String supplierBatch,
             String internalBatch,
-            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity) {
+            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal quantity,
+            /* The unit of quantity: the material's own. */
+            UUID uomId) {
     }
 
     /** A lot as traceability and production see it. */
